@@ -1,0 +1,155 @@
+name: Agent implement (Paseo)
+
+# Load-bearing: unblock-dispatch.yml reads the issue number back out of this
+# run name to tell which issues already have a session on the way. Keep the
+# "issue #<N>" shape.
+run-name: "Agent implement: issue #${{ inputs.issue }}"
+
+# Spawns a background Paseo agent session on the self-hosted Mac runner to
+# implement one issue. Dispatched by unblock-dispatch.yml; can also be run
+# manually from the Actions tab for any issue number.
+# See docs/agents/auto-dispatch.md for the runner + Paseo setup.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number to implement"
+        required: true
+        type: string
+      force:
+        description: "Spawn even if the issue is closed or already claimed"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  issues: read
+
+jobs:
+  spawn:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
+    steps:
+      # This job can sit queued for up to 24 h waiting for the Mac to wake, so
+      # what was true when the dispatcher fired it may not be true now: the
+      # issue may have been finished by hand in the meantime, or a duplicate
+      # run that beat this one to the runner may already have a session on it.
+      # Re-check at the moment of spawning rather than trusting the intent.
+      - name: Re-check the issue
+        id: preflight
+        uses: actions/github-script@v7
+        # Through the environment rather than `${{ }}` inside the script, so a
+        # hand-typed input is data and never JavaScript.
+        env:
+          ISSUE: ${{ inputs.issue }}
+          FORCE: ${{ inputs.force }}
+        with:
+          script: |
+            const number = Number(process.env.ISSUE);
+            const { data: issue } = await github.rest.issues.get({
+              ...context.repo, issue_number: number,
+            });
+
+            let stale = null;
+            if (issue.state === 'closed') {
+              stale = `#${number} is already closed ("${issue.state_reason}")`;
+            } else if (issue.labels.some(l => l.name === 'agent-dispatched')) {
+              // A session applies that label as its first act, so it means one
+              // is already on this issue — see docs/agents/auto-dispatch.md.
+              stale = `#${number} is already claimed by a running session`;
+            }
+
+            if (!stale) return;
+            if (process.env.FORCE === 'true') {
+              core.warning(`${stale}; spawning anyway because force was set.`);
+              return;
+            }
+            core.setOutput('skip', 'true');
+            core.notice(`Not spawning: ${stale}. Re-run with force to override.`);
+
+      - name: Spawn Paseo session
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          ISSUE: ${{ inputs.issue }}
+          PROJECT_DIR: ${{ vars.PASEO_PROJECT_DIR }}
+          PASEO_PROVIDER: ${{ vars.PASEO_PROVIDER }}
+          PASEO_MODEL: ${{ vars.PASEO_MODEL }}
+          # Optional repo Actions variables.
+          PASEO_THINKING: ${{ vars.PASEO_THINKING }}
+          PASEO_MODE: ${{ vars.PASEO_MODE }}
+          PASEO_BASE: ${{ vars.PASEO_BASE }}
+        run: |
+          set -euo pipefail
+          # Runner services start with a minimal PATH; include the usual
+          # CLI install locations.
+          export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin"
+          command -v paseo >/dev/null || { echo "::error::paseo CLI not found on the runner's PATH" >&2; exit 1; }
+          if [ -z "${PROJECT_DIR:-}" ]; then
+            echo "::error::Set the PASEO_PROJECT_DIR repository Actions variable to this repo's checkout path on this Mac" >&2
+            exit 1
+          fi
+
+          PROVIDER="${PASEO_PROVIDER:-}"
+          MODEL="${PASEO_MODEL:-}"
+          THINKING="${PASEO_THINKING:-}"
+          MODE="${PASEO_MODE:-}"
+          if [ -z "$PROVIDER" ] || [ -z "$MODEL" ]; then
+            echo "::error::Set the required PASEO_PROVIDER and PASEO_MODEL repository Actions variables" >&2
+            exit 1
+          fi
+
+          # The remote tip, not the Mac clone's checked-out branch: nothing
+          # updates that clone, so its local `main` drifts arbitrarily far
+          # behind while the runner sits idle, and a session branched off it
+          # starts by reading stale code.
+          BASE="${PASEO_BASE:-origin/main}"
+
+          # Resolve and authenticate the provider before creating a branch or
+          # agent run. A disabled provider, missing login, or invalid model is
+          # an actionable configuration error.
+          paseo provider ls --json | PROVIDER="$PROVIDER" python3 -c '
+          import json, os, sys
+          data = json.load(sys.stdin)
+          providers = data.get("providers", data) if isinstance(data, dict) else data
+          provider = next((p for p in providers if p.get("provider") == os.environ["PROVIDER"]), None)
+          if provider is None:
+              sys.exit("::error::PASEO_PROVIDER %r is unknown" % os.environ["PROVIDER"])
+          if provider.get("status") != "available":
+              sys.exit("::error::PASEO_PROVIDER %r is unavailable (%s). Enable and authenticate it in Paseo first."
+                       % (os.environ["PROVIDER"], provider.get("status", "unknown status")))
+          '
+          paseo provider diagnostic "$PROVIDER"
+          paseo provider models "$PROVIDER" --thinking --json | PROVIDER="$PROVIDER" MODEL="$MODEL" THINKING="$THINKING" python3 -c '
+          import json, os, sys
+          models = json.load(sys.stdin)
+          model, thinking = os.environ["MODEL"], os.environ["THINKING"]
+          match = next((m for m in models if m["id"] == model), None)
+          if match is None:
+              sys.exit("::error::PASEO_MODEL %r is not valid for PASEO_PROVIDER %r. Available: %s"
+                       % (model, os.environ["PROVIDER"], ", ".join(m["id"] for m in models)))
+          options = match.get("thinkingOptionIds") or []
+          if thinking and thinking not in options:
+              sys.exit("::error::PASEO_THINKING %r is not valid for %s. Available: %s"
+                       % (thinking, model, ", ".join(options)))
+          '
+          # Paseo resolves --base against the clone's own refs and never
+          # fetches, so `origin/main` there is only as current as whoever last
+          # ran a fetch by hand. Refresh first or the default base is a
+          # remote-tracking ref pointing at yesterday.
+          git -C "$PROJECT_DIR" fetch --prune origin
+
+          echo "Spawning session for issue #${ISSUE} with ${PROVIDER}/${MODEL}, branched off ${BASE}"
+
+          # The background session outlives this job. Its instruction names the
+          # shared skill without depending on any client's slash-command syntax.
+          RUN_ARGS=(--background --provider "$PROVIDER" --model "$MODEL")
+          [ -z "$THINKING" ] || RUN_ARGS+=(--thinking "$THINKING")
+          [ -z "$MODE" ] || RUN_ARGS+=(--mode "$MODE")
+          paseo run "${RUN_ARGS[@]}" \
+            --cwd "$PROJECT_DIR" \
+            --new-workspace worktree \
+            --worktree-mode branch-off \
+            --new-branch "agent/issue-${ISSUE}" \
+            --base "$BASE" \
+            "Use the label-and-implement-with-pr skill to implement issue #${ISSUE}."
