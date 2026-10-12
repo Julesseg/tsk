@@ -45,8 +45,8 @@ on:
 # PRODUCT_BUNDLE_IDENTIFIER in the project AND the app record in App Store
 # Connect.
 env:
-  APP_NAME: MyApp
-  BUNDLE_ID: com.example.myapp
+  APP_NAME: Tsk
+  BUNDLE_ID: com.julesseguin.tsk
 
 # One release build per ref; a newer push supersedes an older in-flight one.
 concurrency:

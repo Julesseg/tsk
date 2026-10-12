@@ -9,7 +9,7 @@ on:
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
 # keeps them in sync.
 env:
-  APP_NAME: MyApp
+  APP_NAME: Tsk
 
 concurrency:
   group: ci-${{ github.ref }}

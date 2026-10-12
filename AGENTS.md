@@ -1,8 +1,25 @@
-# MyApp
+# tsk
 
-<!-- One-line description of your app. -->
+An iOS Taskwarrior client with TaskChampion as its intended backend.
+The repository currently contains the app scaffold; TaskChampion integration
+and task-management features are future implementation work.
 
 ## Agent skills
+
+### Issue tracker
+
+Track issues and specs in `Julesseg/tsk` GitHub Issues using `gh`. Read
+`docs/agents/issue-tracker.md` before creating or managing tickets.
+
+### Triage labels
+
+Use the five default triage labels. Read `docs/agents/triage-labels.md` before
+triaging or changing issue labels.
+
+### Domain docs
+
+Use a single-context layout: root `GLOSSARY.md` and `docs/adr/`. Read
+`docs/agents/domain.md` before exploring domain concepts or architecture.
 
 ### Auto-dispatch of unblocked issues
 
@@ -23,7 +40,7 @@ same types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`,
 
 ### Logic lives in Core, UI stays thin
 
-`MyAppCore` (in `Core/`) is a pure SwiftPM package: all business logic belongs
+`TskCore` (in `Core/`) is a pure SwiftPM package: all business logic belongs
 there, covered by `cd Core && swift test` — the fast loop that runs on any
 platform. The `App/` target is a thin SwiftUI layer over it, verified by the
 XCUITest suite. When implementing a feature, put the behavior in Core with unit
