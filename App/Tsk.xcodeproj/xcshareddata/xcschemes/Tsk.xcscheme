@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1A0000000000000000000005"
-               BuildableName = "MyApp.app"
-               BlueprintName = "MyApp"
-               ReferencedContainer = "container:MyApp.xcodeproj">
+               BuildableName = "Tsk.app"
+               BlueprintName = "Tsk"
+               ReferencedContainer = "container:Tsk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1A0000000000000000000020"
-               BuildableName = "MyAppUITests.xctest"
-               BlueprintName = "MyAppUITests"
-               ReferencedContainer = "container:MyApp.xcodeproj">
+               BuildableName = "TskUITests.xctest"
+               BlueprintName = "TskUITests"
+               ReferencedContainer = "container:Tsk.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0000000000000000000005"
-            BuildableName = "MyApp.app"
-            BlueprintName = "MyApp"
-            ReferencedContainer = "container:MyApp.xcodeproj">
+            BuildableName = "Tsk.app"
+            BlueprintName = "Tsk"
+            ReferencedContainer = "container:Tsk.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1A0000000000000000000005"
-            BuildableName = "MyApp.app"
-            BlueprintName = "MyApp"
-            ReferencedContainer = "container:MyApp.xcodeproj">
+            BuildableName = "Tsk.app"
+            BlueprintName = "Tsk"
+            ReferencedContainer = "container:Tsk.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

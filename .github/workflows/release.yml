@@ -14,8 +14,8 @@ on:
 # in the project AND the App ID on the provisioning profile. Everything else
 # (Pages URL, repo URL) is derived from the repository at runtime.
 env:
-  APP_NAME: MyApp
-  BUNDLE_ID: com.example.myapp
+  APP_NAME: Tsk
+  BUNDLE_ID: com.julesseguin.tsk
 
 # Supersede only an OLDER build of the SAME PR — a new push to PR #X cancels
 # PR #X's in-flight run (we keep just the latest build per PR anyway). Different

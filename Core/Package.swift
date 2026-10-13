@@ -1,21 +1,21 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// MyAppCore is the platform-agnostic heart of the app: all business logic
+// TskCore is the platform-agnostic heart of the app: all business logic
 // lives here. It depends on nothing but the standard library + Foundation,
 // so its behavior is unit-tested with `swift test` on any platform — no
 // Xcode or simulator required. The iOS app target in App/ is a thin UI
 // layer on top.
 let package = Package(
-    name: "MyAppCore",
+    name: "TskCore",
     products: [
-        .library(name: "MyAppCore", targets: ["MyAppCore"]),
+        .library(name: "TskCore", targets: ["TskCore"]),
     ],
     targets: [
-        .target(name: "MyAppCore"),
+        .target(name: "TskCore"),
         .testTarget(
-            name: "MyAppCoreTests",
-            dependencies: ["MyAppCore"]
+            name: "TskCoreTests",
+            dependencies: ["TskCore"]
         ),
     ]
 )
