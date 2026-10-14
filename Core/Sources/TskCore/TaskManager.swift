@@ -47,6 +47,8 @@ public protocol TaskReplica: Sendable {
 }
 
 public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
+    case invalidTag(String)
+    case invalidPriority(String)
     case emptyDescription
     case unsupportedTaskKind
     case reservedAttribute(String)
@@ -55,6 +57,8 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
+        case .invalidTag(let tag): "The tag ‘\(tag)’ is invalid. Use a name without whitespace or a colon after its first character. Do not start with a digit or operator. Names made only of A–Z letters are reserved."
+        case .invalidPriority(let priority): "Priority ‘\(priority)’ is unsupported. Choose H, M, L, or no priority."
         case .emptyDescription: "Enter a task description before saving."
         case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
@@ -75,9 +79,9 @@ public actor TaskManager {
         self.calendar = calendar
     }
 
-    public func tasks(query: TaskQuery = .all) async throws -> [TaskRecord] {
+    public func tasks(query: TaskQuery = .all, project: TaskProjectSelection = .all) async throws -> [TaskRecord] {
         let instant = now()
-        return try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) }.sorted {
+        return try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) && project.includes($0) }.sorted {
             if $0.attributes["entry"] != $1.attributes["entry"] {
                 return ($0.attributes["entry"] ?? "") > ($1.attributes["entry"] ?? "")
             }
@@ -110,7 +114,7 @@ public actor TaskManager {
               draft.attributes["status"] == nil || draft.attributes["status"] == "pending" else {
             throw TaskManagementError.unsupportedTaskKind
         }
-        var attributes = draft.attributes
+        var attributes = try TaskOrganization.normalizedAttributes(draft.attributes)
         let timestamp = String(Int(now().timeIntervalSince1970))
         attributes["description"] = description
         attributes["status"] = "pending"
@@ -122,7 +126,7 @@ public actor TaskManager {
     public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
-        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask"])
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags"])
         if let key = changes.keys.sorted().first(where: { reserved.contains($0) }) {
             throw TaskManagementError.reservedAttribute(key)
         }
@@ -133,6 +137,7 @@ public actor TaskManager {
             guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
             patch["description"] = description
         }
+        patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
         patch["modified"] = String(Int(now().timeIntervalSince1970))
         return try await replica.update(id: id, changes: patch)
     }

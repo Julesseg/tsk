@@ -74,6 +74,59 @@ final class TskUITests: XCTestCase {
         screenshot("Completed list after relaunch", app: app)
     }
 
+    func testOrganizationProjectViewsAndListActionsPersist() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        app.buttons["new-task"].tap()
+        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        description.typeText("Project fixture")
+        let project = app.textFields["task-project"]
+        project.tap()
+        project.typeText("Work")
+        app.buttons["task-priority"].tap()
+        app.buttons["High"].tap()
+        let tag = app.textFields["task-tag-input"]
+        tag.tap()
+        tag.typeText("home")
+        app.buttons["add-tag"].tap()
+        screenshot("Organization draft", app: app)
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Project fixture"].waitForExistence(timeout: 10))
+        app.buttons["project-filter"].tap()
+        app.buttons["Work"].tap()
+        XCTAssertTrue(app.staticTexts["Project fixture"].waitForExistence(timeout: 5))
+        screenshot("Exact project view", app: app)
+        app.staticTexts["Project fixture"].tap()
+        app.buttons["edit-task"].tap()
+        let editedProject = app.textFields["task-project"]
+        XCTAssertTrue(editedProject.waitForExistence(timeout: 5))
+        editedProject.tap()
+        editedProject.typeText(".sub")
+        app.buttons["task-priority"].tap()
+        app.buttons["Low"].tap()
+        app.buttons["remove-tag-home"].tap()
+        let editedTag = app.textFields["task-tag-input"]
+        editedTag.tap()
+        editedTag.typeText("next")
+        app.buttons["save-task"].tap()
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["project-filter"].waitForExistence(timeout: 10))
+        app.buttons["project-filter"].tap()
+        app.buttons["Work.sub"].tap()
+        XCTAssertTrue(app.staticTexts["Project fixture"].waitForExistence(timeout: 5))
+        screenshot("Organization after relaunch", app: app)
+        app.staticTexts["Project fixture"].swipeLeft()
+        app.buttons["Complete"].tap()
+        XCTAssertFalse(app.staticTexts["Project fixture"].waitForExistence(timeout: 2))
+        app.segmentedControls["task-status-view"].buttons["Completed"].tap()
+        XCTAssertTrue(app.staticTexts["Project fixture"].waitForExistence(timeout: 10))
+        screenshot("Completed task in project view", app: app)
+    }
+
     private func screenshot(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

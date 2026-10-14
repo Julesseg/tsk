@@ -78,7 +78,9 @@ struct ContentView: View {
                 }
             }
             .safeAreaInset(edge: .top) {
-                Picker("Task status", selection: $store.query) {
+                VStack(spacing: 8) {
+                    ProjectPicker(store: store)
+                    Picker("Task status", selection: $store.query) {
                     Text("Today").tag(TaskQuery.today)
                     Text("Upcoming").tag(TaskQuery.upcoming)
                     Text("Unfinished").tag(TaskQuery.unfinished)
@@ -88,6 +90,7 @@ struct ContentView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 8)
                 .accessibilityIdentifier("task-status-view")
+                }
             }
             .navigationTitle("Tasks")
             .toolbar {
@@ -109,7 +112,7 @@ struct ContentView: View {
                 SyncSettingsView(synchronization: synchronization, tasks: store)
             }
             .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
-            .task(id: store.query) { await store.reload() }
+            .task(id: TaskListSelection(query: store.query, project: store.projectSelection)) { await store.reload() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await store.reload() } }
             }
@@ -119,4 +122,9 @@ struct ContentView: View {
             .task { await synchronization.loadConfiguration() }
         }
     }
+}
+
+private struct TaskListSelection: Equatable {
+    let query: TaskQuery
+    let project: TaskProjectSelection
 }

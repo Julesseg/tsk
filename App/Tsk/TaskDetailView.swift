@@ -14,6 +14,7 @@ struct TaskDetailView: View {
     var body: some View {
         Form {
             Section("Description") { Text(task.description).textSelection(.enabled) }
+            TaskOrganizationSummary(task: task)
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
                 if task.canComplete {
@@ -49,7 +50,7 @@ struct TaskDetailView: View {
                     .keyboardShortcut("e", modifiers: .command)
             }
         }
-        .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task) }
+        .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
         .onChange(of: isEditing) { _, editing in
             if !editing {
                 Task {
