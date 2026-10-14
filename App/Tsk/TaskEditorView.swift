@@ -1,6 +1,10 @@
 import SwiftUI
 import TskCore
 
+enum TaskEditorField: Hashable {
+    case description, project, tag
+}
+
 struct TaskEditorView: View {
     let store: TaskStore
     let original: TaskRecord?
@@ -10,7 +14,7 @@ struct TaskEditorView: View {
     @State private var error: String?
     @State private var tagInput = ""
     @State private var tagError: String?
-    @FocusState private var isDescriptionFocused: Bool
+    @FocusState private var focusedField: TaskEditorField?
 
     init(store: TaskStore, task: TaskRecord? = nil, onSave: ((TaskRecord) -> Void)? = nil) {
         self.store = store
@@ -27,30 +31,41 @@ struct TaskEditorView: View {
                 Section("Task") {
                     TextField("What needs to be done?", text: $draft.description, axis: .vertical)
                         .accessibilityIdentifier("task-description")
-                        .focused($isDescriptionFocused)
+                        .focused($focusedField, equals: .description)
                 }
-                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, addTag: { _ = addTag() })
+                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, focus: $focusedField, addTag: { _ = addTag() })
                 TaskPlanningSection(draft: $draft, now: store.currentDate)
                 Section {
                     Text("Review your task before saving. Changes are stored locally and available offline.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(.red).accessibilityIdentifier("draft-error")
-                    }
-                }
             }
             .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .top) {
+                if let error = error ?? tagError {
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.regularMaterial)
+                        .accessibilityIdentifier("draft-error")
+                }
+            }
             .onChange(of: UTF8String(tagInput)) { _, _ in tagError = nil }
             .navigationTitle(original == nil ? "New task" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .accessibilityIdentifier("dismiss-editor-keyboard")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }.disabled(store.isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        focusedField = nil
                         Task {
                             if !tagInput.isEmpty, !addTag() { return }
                             let didSave: Bool
@@ -71,7 +86,7 @@ struct TaskEditorView: View {
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
-            .onAppear { isDescriptionFocused = true }
+            .onAppear { focusedField = .description }
         }
     }
 
