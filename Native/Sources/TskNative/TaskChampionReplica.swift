@@ -15,11 +15,11 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         try request(command: "tasks")
     }
 
-    public func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord {
+    public func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord {
         try request(command: "create", id: id, attributes: attributes)
     }
 
-    public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+    public func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
         try request(command: "update", id: id, changes: changes)
     }
 
@@ -42,7 +42,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         }
     }
 
-    nonisolated private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, changes: [String: String?]? = nil, configuration: SyncConfiguration? = nil, syncGeneration: UInt64? = nil) throws -> T {
+    nonisolated private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: TaskAttributes? = nil, changes: TaskAttributePatch? = nil, configuration: SyncConfiguration? = nil, syncGeneration: UInt64? = nil) throws -> T {
         let request = Request(path: directory.standardizedFileURL.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration, syncGeneration: syncGeneration)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
@@ -67,8 +67,8 @@ private struct Request: Encodable {
     let path: String
     let command: String
     let id: UUID?
-    let attributes: [String: String]?
-    let changes: [String: String?]?
+    let attributes: TaskAttributes?
+    let changes: TaskAttributePatch?
     let configuration: SyncConfiguration?
     let syncGeneration: UInt64?
 }

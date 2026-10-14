@@ -55,7 +55,7 @@ final class TaskStore {
         await perform { try await $0.create(draft) } != nil
     }
 
-    func update(id: UUID, changes: [String: String?]) async -> TaskRecord? {
+    func update(id: UUID, changes: TaskAttributePatch) async -> TaskRecord? {
         await perform { try await $0.update(id: id, changes: changes) }
     }
 
@@ -72,9 +72,9 @@ final class TaskStore {
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
             if query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
-            if !saved.project.isEmpty, !availableProjects.contains(saved.project) {
+            if !saved.project.isEmpty, !availableProjects.contains(where: { UTF8String($0) == UTF8String(saved.project) }) {
                 availableProjects.append(saved.project)
-                availableProjects.sort()
+                availableProjects.sort { UTF8String($0) < UTF8String($1) }
             }
             error = nil
             await reload()

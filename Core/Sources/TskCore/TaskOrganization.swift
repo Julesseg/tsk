@@ -5,12 +5,32 @@ public enum TaskProjectSelection: Hashable, Sendable {
     case unassigned
     case project(String)
 
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.all, .all), (.unassigned, .unassigned): true
+        case (.project(let lhs), .project(let rhs)): UTF8String(lhs) == UTF8String(rhs)
+        default: false
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .all: hasher.combine(0)
+        case .unassigned: hasher.combine(1)
+        case .project(let name): hasher.combine(2); hasher.combine(UTF8String(name))
+        }
+    }
+
     public func includes(_ task: TaskRecord) -> Bool {
         switch self {
         case .all: true
         case .unassigned: task.project.isEmpty
-        case .project(let name): task.project == name
+        case .project(let name): UTF8String(task.project) == UTF8String(name)
         }
+    }
+
+    public static func names(in tasks: [TaskRecord]) -> [String] {
+        Set(tasks.map(\.project).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted().map(\.rawValue)
     }
 
     public var projectName: String? {
@@ -52,16 +72,16 @@ extension TaskDraft {
 extension TaskManager {
     public func projects(query: TaskQuery = .all) async throws -> [String] {
         let records = try await tasks(query: query)
-        return Array(Set(records.map(\.project).filter { !$0.isEmpty })).sorted()
+        return TaskProjectSelection.names(in: records)
     }
 }
 
 enum TaskOrganization {
-    static func tags(in attributes: [String: String]) -> [String] {
+    static func tags(in attributes: TaskAttributes) -> [String] {
         attributes.keys.compactMap { key in
-            guard key.hasPrefix("tag_"), key.count > 4 else { return nil }
-            return String(key.dropFirst(4))
-        }.sorted()
+            guard key.utf8.starts(with: "tag_".utf8), key.utf8.count > 4 else { return nil }
+            return String(decoding: key.utf8.dropFirst(4), as: UTF8.self)
+        }.sorted { UTF8String($0) < UTF8String($1) }
     }
 
     static func validateTag(_ tag: String) throws {
@@ -76,12 +96,12 @@ enum TaskOrganization {
         }
     }
 
-    static func normalizedAttributes(_ attributes: [String: String]) throws -> [String: String] {
+    static func normalizedAttributes(_ attributes: TaskAttributes) throws -> TaskAttributes {
         let patch = try normalizedChanges(attributes.mapValues(Optional.some), original: [:])
-        return patch.reduce(into: [:]) { result, change in result[change.key] = change.value }
+        return patch.reduce(into: TaskAttributes()) { result, change in result[change.key] = change.value }
     }
 
-    static func normalizedChanges(_ changes: [String: String?], original: [String: String]) throws -> [String: String?] {
+    static func normalizedChanges(_ changes: TaskAttributePatch, original: TaskAttributes) throws -> TaskAttributePatch {
         var patch = changes
         if changes.keys.contains("project") {
             let project = changes["project"] ?? nil
@@ -94,9 +114,9 @@ enum TaskOrganization {
             }
             patch.updateValue(priority?.isEmpty == false ? priority : nil, forKey: "priority")
         }
-        let tagKeys = changes.keys.filter { $0.hasPrefix("tag_") }
+        let tagKeys = changes.keys.filter { $0.utf8.starts(with: "tag_".utf8) }
         for key in tagKeys where changes[key] != .some(nil) {
-            try validateTag(String(key.dropFirst(4)))
+            try validateTag(String(decoding: key.utf8.dropFirst(4), as: UTF8.self))
         }
         if !tagKeys.isEmpty {
             var attributes = original

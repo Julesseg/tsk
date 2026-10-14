@@ -28,7 +28,8 @@ struct TaskOrganizationSection: View {
             .accessibilityIdentifier("task-priority")
         }
         Section("Tags") {
-            ForEach(draft.tags, id: \.self) { tag in
+            ForEach(draft.tags.map { UTF8String($0) }) { identity in
+                let tag = identity.rawValue
                 HStack {
                     Text(tag)
                     Spacer()
