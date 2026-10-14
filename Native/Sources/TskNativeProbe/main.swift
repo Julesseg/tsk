@@ -1,6 +1,11 @@
 import Foundation
 import TskCore
 import TskNative
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 @main
 struct MutationProbe {
@@ -16,6 +21,10 @@ struct MutationProbe {
             } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
             return
         }
+        if arguments.dropFirst().first == "verify-ui-sync" {
+            do { try await verifyUISynchronization(); return }
+            catch { print("Real UI synchronization verification failed: \(error)"); exit(EXIT_FAILURE) }
+        }
         guard arguments.count == 8 else { fatalError("Expected replica, source, prerequisite, ready, release, output, coordination") }
         do {
             let replica = BarrierReplica(directory: URL(fileURLWithPath: arguments[1]), ready: URL(fileURLWithPath: arguments[4]), release: URL(fileURLWithPath: arguments[5]), coordinated: arguments[7] == "coordinated")
@@ -25,6 +34,17 @@ struct MutationProbe {
         } catch {
             try? write(["error": error.localizedDescription], to: arguments[6])
         }
+    }
+
+    static func verifyUISynchronization() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let url = environment["TSK_UI_SYNC_SERVER_URL"], let rawClient = environment["TSK_UI_SYNC_CLIENT_ID"], let client = UUID(uuidString: rawClient), let secret = environment["TSK_UI_SYNC_SECRET"], let token = environment["TSK_UI_SYNC_FIXTURE_TOKEN"], let directory = environment["TSK_UI_SYNC_PEER_DIRECTORY"], let proof = environment["TSK_UI_SYNC_PEER_PROOF"] else { throw TaskManagementError.storage("Missing isolated UI peer settings") }
+        let manager = TaskManager(replica: TaskChampionReplica(directory: URL(fileURLWithPath: directory)))
+        let configuration = try SyncConfiguration(serverURL: url, clientID: client, encryptionSecret: secret)
+        let records = try await manager.synchronize(using: configuration)
+        let matching = records.filter { $0.description == "Hosted task " + token }
+        guard matching.count == 1, matching[0].status == "pending" else { throw TaskManagementError.storage("The independent encrypted peer did not find the task saved through UI") }
+        try write(["id": matching[0].id.uuidString, "description": matching[0].description, "status": matching[0].status, "clientID": rawClient, "token": token], to: proof)
     }
 
     static func write(_ value: [String: String], to path: String) throws {

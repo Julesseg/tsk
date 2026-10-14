@@ -105,7 +105,7 @@ public struct FindTasksIntent: AppIntent {
 }
 
 @available(iOS 16, macOS 13, *)
-private enum IntentTaskSession {
+enum IntentTaskSession {
     static func open(directory: URL? = nil) async throws -> TaskManager {
         let location = try directory ?? TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
         return try await TaskChampionSession.open(directory: location)

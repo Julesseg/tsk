@@ -58,14 +58,22 @@ final class SynchronizationUITests: XCTestCase {
 
     func testSuccessfulManualSynchronizationUsesRealConfiguredServer() throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let serverURL = environment["TSK_UI_SYNC_SERVER_URL"],
-              let clientID = environment["TSK_UI_SYNC_CLIENT_ID"],
-              let secret = environment["TSK_UI_SYNC_SECRET"] else {
-            throw XCTSkip("Successful server UI flow requires an isolated TaskChampion server fixture.")
-        }
+        let serverURL = try XCTUnwrap(environment["TSK_UI_SYNC_SERVER_URL"])
+        let clientID = try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])
+        let secret = try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"])
+        let token = try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        app.buttons["new-task"].tap()
+        let draft = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.tap()
+        draft.typeText("Hosted task " + token)
+        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Hosted task " + token].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["synchronization-settings"].waitForExistence(timeout: 10))
         app.buttons["synchronization-settings"].tap()
         let server = app.textFields["sync-server-url"]
@@ -86,6 +94,22 @@ final class SynchronizationUITests: XCTestCase {
         capture("Successful manual synchronization with real server", app)
         app.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["new-task"].exists)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Hosted task " + token].waitForExistence(timeout: 10))
+    }
+
+    func testRealFixtureSettingsReachTheUITestRunner() throws {
+        let environment = ProcessInfo.processInfo.environment
+        let url = try XCTUnwrap(URL(string: XCTUnwrap(environment["TSK_UI_SYNC_SERVER_URL"])))
+        XCTAssertEqual(url.host, "127.0.0.1")
+        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])))
+        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])))
+        XCTAssertFalse(try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"]).isEmpty)
+        let proof = XCTAttachment(string: "Real fixture URL: \(url)\nClient: \(environment["TSK_UI_SYNC_CLIENT_ID"]!)\nToken: \(environment["TSK_UI_SYNC_FIXTURE_TOKEN"]!)")
+        proof.name = "Real server settings received by UI runner"
+        proof.lifetime = .keepAlways
+        add(proof)
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

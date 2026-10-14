@@ -70,6 +70,10 @@ def worker(control, value):
     return process, output
 
 
+seed = root / 'seed'
+invoke(seed, 'create', id=str(uuid.uuid4()), attributes=attributes({'description': 'Remote version for the blocked pull fixture', 'status': 'pending'}))
+invoke(seed, 'synchronize', configuration=dict(serverURL=backend, clientID=client, encryptionSecret=secret))
+
 for method, kill in [('GET', False), ('POST', False), ('POST', True)]:
     case = root / (method + ('-death' if kill else '-interrupt'))
     control = case / 'proxy'

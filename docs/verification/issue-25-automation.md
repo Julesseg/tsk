@@ -1,0 +1,29 @@
+# Complete and reschedule tasks through native automation
+
+Complete Task and Reschedule Task are App Intents with task entities identified by the saved TaskChampion UUID. Reschedule Task requires an explicit Planned day or Deadline and a new date. It changes `scheduled` or `due` independently. Both actions open the same required App Group session as Create Task and Find Tasks, load its persisted connection, and call the public Core TaskManager APIs. A missing group, missing task, unsupported recurring task, invalid date, or storage failure propagates as an error.
+
+`TaskManager.reschedule(id:role:to:)` delegates to the existing guarded update transaction. It also supports removing one date with `nil`. It retains unrelated attributes and uses the same cross-process semantic mutation lease and automatic synchronization request as app edits. Complete Task delegates to the existing completion behavior, including stopping active work and preserving identity. An action acknowledges the local durable commit; network completion is opportunistic and opening the app retries pending work.
+
+The app's Shortcuts and Siri page explains all four actions and the independent date roles. The DEBUG UI fixture executes the actual intent `perform()` against the isolated App Group test directory before opening the production TaskStore. It neither edits records directly nor substitutes a separate in-memory store.
+
+## Verification
+
+The Core tests cover independent date roles, clearing, opaque attribute preservation, invalid dates, unsupported recurring tasks, and Today/Upcoming/Completed query effects. Actual native intent execution covers reopening, UUID preservation, distinct composed/decomposed UTF-8 attributes, idempotent completion, missing-task errors, and unsupported recurring-task errors.
+
+A real TaskChampion sync server 0.7.1 test holds a successful HTTP GET response behind a filesystem barrier. Native rescheduling and completion both acknowledge their durable writes before the response is released. After release an independent encrypted replica receives the same completed UUID, both dates, and its unfamiliar field.
+
+Signed generic arm64 simulator build-for-testing compiles the app and XCUITest target without booting a simulator. `scripts/verify-intents-artifact.py` verifies the executable's embedded App Group entitlement, all four extracted actions, the task entity, and all four App Shortcuts. These checks establish build integration; they do not establish platform discovery or execution by Siri.
+
+`TaskAutomationUITests` drives real complete/reschedule intent execution, observes both date roles in Upcoming and completion in Completed, reopens the app, and checks a missing-task failure preserves earlier work. Canonical iPhone and iPad CI execute these flows and retain screenshot attachments. No local iOS simulator was booted for this slice because disk capacity was constrained. Actual UI execution, Shortcuts discovery, Siri utterances, physical-device entitlement/provisioning, and background execution after process suspension remain separate acceptance evidence.
+
+## Real hosted UI synchronization fixture
+
+The canonical UI lane checks out `GothenburgBitFactory/taskchampion-sync-server` at `d206729d5ea7421d501b60111a7b40ecc2ddb87f` (0.7.1), builds the real server, and runs `scripts/with-sync-fixture.py` around the simulator test script. Every run has an ephemeral loopback port, random client ID, random encryption secret, and separate database. The wrapper checks the actual version and readiness banner, retains sanitized fixture metadata, preserves command failure, and stops only its owned processes. The UI script retains simulator ownership cleanup on exit and signals.
+
+The wrapper supplies each fixture setting both normally and with the `TEST_RUNNER_` prefix that Xcode strips when passing environment variables to its test runner. This convention is documented in Apple's [environment variable reference](https://developer.apple.com/documentation/xcode/environment-variable-reference) and [Xcode test automation session](https://developer.apple.com/videos/play/wwdc2022/110361/). An actual macOS `xcodebuild test-without-building` XCTest runner received those settings, contacted the real owned server, and wrote a proof matching the fixture's URL/client/token. This verifies the forwarding mechanism through Xcode; the iOS runner has its own mandatory assertion and attached proof.
+
+The iPhone successful-server UI test requires the fixture values instead of skipping. It creates `Hosted task <fixture token>`, configures the real connection, synchronizes, and reopens the app. After xcodebuild succeeds, a separately persisted native peer synchronizes through the real encrypted protocol and must find exactly one matching pending task. Empty-server verification exits with failure. This peer probe verifies fixture wiring locally with a native producer; the UI producer remains subject to the canonical iPhone run.
+
+CI uploads both `App/TestResults.xcresult` and `.build/ui-sync`. Because multiple paths share the artifact root, locate `TestResults.xcresult/Info.plist` recursively after extraction rather than assuming it is at the archive root. The fixture directory contains version/client/token metadata, server log, encrypted server database, independent peer database/proof, and a stopped marker; it does not record the encryption secret in fixture metadata.
+
+The local full native suite exposed two older fixture assumptions: a blocked GET needs a previously uploaded remote version, and Foundation Process cleanup in an asynchronous test must resume on the actor where it launched. The affected fixtures now seed a real remote version explicitly and keep asynchronous Process lifetime on MainActor. The sample of the original wait is retained outside the repository; no production sync behavior changed for this correction.
