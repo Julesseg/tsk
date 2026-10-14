@@ -10,7 +10,7 @@ Reading retains every raw annotation-prefixed entry. Numeric timestamps are disp
 
 ## Verified
 
-- Core public TaskManager tests: collision increments, read/edit identity, unchanged description/dates/opaque fields, byte-exact Unicode, malformed suffix preservation, missing-reference/blank validation, unchanged tasks after failed writes, unsupported-task restrictions, concurrent adds, and automatic synchronization after add/edit commits. Full suite: 50 passed.
+- Core public TaskManager tests: collision increments, read/edit identity, unchanged description/dates/opaque fields, byte-exact Unicode, malformed suffix preservation, missing-reference/blank validation, unchanged tasks after failed writes, unsupported-task restrictions, concurrent adds, and automatic synchronization after add/edit commits. Full suite: 51 passed after integrating the shared saved-view fix.
 - Actual TaskChampion persistence: two independent managers add at the same injected second without losing either note; editing and reopening preserve both raw identities, malformed entries, dates, and opaque fields.
 - Actual Taskwarrior 3.5.0 export reads canonical timestamp notes with the expected UTC timestamps and exact multiline text. A Taskwarrior `annotate` operation is then visible through the native Core interface and preserves the native edits.
 - An additional real compatibility probe establishes that Taskwarrior 3.5.0 rejects the noncanonical suffix `01` during export (exit 2, diagnostic that `01` is not a valid date). The failed desktop read leaves the exact native entries unchanged. Preservation of such existing data is supported; successful Taskwarrior export of noncanonical raw timestamps is not claimed.
