@@ -14,6 +14,7 @@ final class TaskStore {
     var isLoading = false
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
+    var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: tasks, at: currentDate) }
     private var reloadGeneration = 0
 
     init() {
