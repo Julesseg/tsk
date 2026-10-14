@@ -46,7 +46,7 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           scripts/build-native.sh host
-          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --disable-index-store --package-path Native
 
   app-ui-tests:
     name: App · XCUITest (macOS)
