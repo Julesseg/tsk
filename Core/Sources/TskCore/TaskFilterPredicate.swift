@@ -70,6 +70,13 @@ enum FilterPredicate: Sendable {
         return .comparison(name: name, operation: operation, value: operand)
     }
 
+    private static func statusEquals(_ lhs: String, _ rhs: String) -> Bool {
+        func folded(_ text: String) -> [UInt8] {
+            text.utf8.map { (65...90).contains($0) ? $0 + 32 : $0 }
+        }
+        return folded(lhs) == folded(rhs)
+    }
+
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
         case .tag(let tag, let present): return (task.attributes["tag_\(tag)"] != nil) == present
@@ -82,12 +89,12 @@ enum FilterPredicate: Sendable {
             switch operation {
             case .partial, .notPartial:
                 let matches: Bool
-                if name == "status" { matches = actual.lowercased().matchesBytes(value.lowercased()) }
+                if name == "status" { matches = Self.statusEquals(actual, value) }
                 else { matches = actual.isEmpty == value.isEmpty && actual.utf8.starts(with: value.utf8) }
                 if case .notPartial = operation { return !matches }
                 return matches
             case .exact, .notExact:
-                let matches = name == "status" ? actual.lowercased().matchesBytes(value.lowercased()) : actual.matchesBytes(value)
+                let matches = name == "status" ? Self.statusEquals(actual, value) : actual.matchesBytes(value)
                 if case .notExact = operation { return !matches }
                 return matches
             case .less: return !actual.isEmpty && !value.isEmpty && UTF8String(actual) < UTF8String(value)
