@@ -3,6 +3,7 @@ import Foundation
 public extension TaskRecord {
     var plannedDate: Date? { dateAttribute("scheduled") }
     var deadline: Date? { dateAttribute("due") }
+    var waitUntil: Date? { dateAttribute("wait") }
     var startedAt: Date? { dateAttribute("start") }
 
     func isInToday(at now: Date, calendar: Calendar) -> Bool {
@@ -16,6 +17,11 @@ public extension TaskRecord {
 }
 
 public extension TaskDraft {
+    var waitUntil: Date? {
+        get { planningDate(attributes["wait"]) }
+        set { attributes["wait"] = newValue.map { String(Int($0.timeIntervalSince1970)) } }
+    }
+
     var plannedDate: Date? {
         get { planningDate(attributes["scheduled"]) }
         set { attributes["scheduled"] = newValue.map { String(Int($0.timeIntervalSince1970)) } }

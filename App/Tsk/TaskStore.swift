@@ -9,6 +9,8 @@ final class TaskStore {
     let directory: URL
     var tasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
+    var projectSelection: TaskProjectSelection = .all
+    var availableProjects: [String] = []
     var error: String?
     var isSaving = false
     var isLoading = false
@@ -25,19 +27,26 @@ final class TaskStore {
         manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
     }
 
+    func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
+        task.availability(at: fixedDate ?? date)
+    }
+
     func reload() async {
         reloadGeneration += 1
         let generation = reloadGeneration
         let requestedQuery = query
+        let requestedProject = projectSelection
         isLoading = true
         defer { if generation == reloadGeneration { isLoading = false } }
         do {
-            let loaded = try await manager.tasks(query: requestedQuery)
-            guard generation == reloadGeneration, query == requestedQuery else { return }
+            let loaded = try await manager.tasks(query: requestedQuery, project: requestedProject)
+            let projects = try await manager.projects()
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
             tasks = loaded
+            availableProjects = projects
             error = nil
         } catch {
-            guard generation == reloadGeneration, query == requestedQuery else { return }
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
             self.error = error.localizedDescription
         }
     }
@@ -62,7 +71,11 @@ final class TaskStore {
             let saved = try await action(manager)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
-            if query.includes(saved, now: currentDate) { tasks.insert(saved, at: min(index, tasks.count)) }
+            if query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
+            if !saved.project.isEmpty, !availableProjects.contains(saved.project) {
+                availableProjects.append(saved.project)
+                availableProjects.sort()
+            }
             error = nil
             await reload()
             return saved
