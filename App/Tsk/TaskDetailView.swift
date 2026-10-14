@@ -24,6 +24,7 @@ struct TaskDetailView: View {
                     .accessibilityIdentifier("complete-task")
                 }
             }
+            Section("Planning") { TaskPlanningSummary(task: task) }
             Section("Attributes") {
                 ForEach(task.attributes.keys.sorted(), id: \.self) { key in
                     LabeledContent(key, value: task.attributes[key] ?? "")
@@ -48,6 +49,14 @@ struct TaskDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task) }
+        .onChange(of: isEditing) { _, editing in
+            if !editing {
+                Task {
+                    do { task = try await store.manager.task(id: task.id) }
+                    catch { store.error = error.localizedDescription }
+                }
+            }
+        }
         .onChange(of: store.tasks) { _, tasks in
             if let updated = tasks.first(where: { $0.id == task.id }) { task = updated }
         }

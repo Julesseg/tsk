@@ -23,6 +23,7 @@ struct TaskEditorView: View {
                         .accessibilityIdentifier("task-description")
                         .focused($isDescriptionFocused)
                 }
+                TaskPlanningSection(draft: $draft, now: store.currentDate)
                 Section {
                     Text("Review your task before saving. Changes are stored locally and available offline.")
                         .font(.footnote).foregroundStyle(.secondary)
