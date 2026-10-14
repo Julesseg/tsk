@@ -7,9 +7,11 @@ import TskNative
 final class TaskStore {
     let manager: TaskManager
     var tasks: [TaskRecord] = []
+    var query: TaskQuery = .unfinished
     var error: String?
     var isSaving = false
     var isLoading = false
+    private var reloadGeneration = 0
 
     init() {
         let support = URL.applicationSupportDirectory
@@ -19,27 +21,48 @@ final class TaskStore {
     }
 
     func reload() async {
+        reloadGeneration += 1
+        let generation = reloadGeneration
+        let requestedQuery = query
         isLoading = true
-        defer { isLoading = false }
+        defer { if generation == reloadGeneration { isLoading = false } }
         do {
-            tasks = try await manager.tasks()
+            let loaded = try await manager.tasks(query: requestedQuery)
+            guard generation == reloadGeneration, query == requestedQuery else { return }
+            tasks = loaded
             error = nil
         } catch {
+            guard generation == reloadGeneration, query == requestedQuery else { return }
             self.error = error.localizedDescription
         }
     }
 
     func save(_ draft: TaskDraft) async -> Bool {
+        await perform { try await $0.create(draft) } != nil
+    }
+
+    func update(id: UUID, changes: [String: String?]) async -> TaskRecord? {
+        await perform { try await $0.update(id: id, changes: changes) }
+    }
+
+    func complete(id: UUID) async -> TaskRecord? {
+        await perform { try await $0.complete(id: id) }
+    }
+
+    private func perform(_ action: @Sendable (TaskManager) async throws -> TaskRecord) async -> TaskRecord? {
+        guard !isSaving else { return nil }
         isSaving = true
         defer { isSaving = false }
         do {
-            let saved = try await manager.create(draft)
-            tasks.insert(saved, at: 0)
+            let saved = try await action(manager)
+            let index = tasks.firstIndex { $0.id == saved.id } ?? 0
+            tasks.removeAll { $0.id == saved.id }
+            if query.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
             error = nil
-            return true
+            return saved
         } catch {
             self.error = error.localizedDescription
-            return false
+            return nil
         }
     }
 }

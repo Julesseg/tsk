@@ -11,6 +11,7 @@ struct Request {
     command: String,
     id: Option<Uuid>,
     attributes: Option<HashMap<String, String>>,
+    changes: Option<HashMap<String, Option<String>>>,
 }
 
 async fn execute(request: Request) -> Result<Value, String> {
@@ -31,6 +32,28 @@ async fn execute(request: Request) -> Result<Value, String> {
             for (key, value) in request.attributes.ok_or("Missing attributes")? {
                 task.update(key, Some(value), &mut operations);
             }
+            replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
+            Ok(record(task))
+        }
+        "update" => {
+            let id = request.id.ok_or("Missing task identity")?;
+            let mut task = replica.get_task_data(id).await.map_err(|e| e.to_string())?.ok_or("Task no longer exists")?;
+            let changes = request.changes.ok_or("Missing task changes")?;
+            if task.get("status") == Some("recurring") || ["recur", "parent", "mask", "imask"].iter().any(|key| task.has(key)) {
+                return Err("Recurring task mutations require compatible series bookkeeping".into());
+            }
+            if !matches!(task.get("status"), Some("pending") | Some("completed")) {
+                return Err("Unsupported task state".into());
+            }
+            if changes.keys().any(|key| ["uuid", "id", "entry", "recur", "parent", "mask", "imask"].contains(&key.as_str())) {
+                return Err("Reserved task attribute cannot be changed by this action".into());
+            }
+            if let Some(status) = changes.get("status") {
+                if status.as_deref() != Some("completed") { return Err("Unsupported status transition".into()); }
+                if task.get("status") == Some("completed") { return Ok(record(task)); }
+            }
+            let mut operations = vec![taskchampion::Operation::UndoPoint];
+            for (key, value) in changes { task.update(key, value, &mut operations); }
             replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
             Ok(record(task))
         }

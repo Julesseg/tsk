@@ -63,3 +63,34 @@ A successful local save is independent of any future server synchronization.
 Simulator tests do not establish physical-device persistence after OS eviction,
 physical keyboard interaction, external-server convergence, or recurrence
 compatibility.
+
+## Ordinary editing and completion
+
+`TaskManager.update(id:changes:)` applies a focused attribute patch. A `nil`
+value removes only that attribute; omitted attributes remain intact. The editor
+compares its draft with the initial task and submits changed fields only, so
+untouched unfamiliar values are not written back from a stale draft.
+
+Identity, status, entry/modified/end timestamps, and recurrence bookkeeping are
+reserved for dedicated actions. Description edits reject empty text. Ordinary
+pending and completed tasks can be edited; recurring templates, occurrences,
+and unsupported statuses remain read only in this slice. The native adapter
+also checks current recurring/state markers before committing ordinary patches.
+
+`complete(id:)` sets completed status, sets end when absent, updates modified,
+and clears start, matching Taskwarrior 3.5.0's ordinary completion behavior.
+Repeating completion preserves the first end time. It does not claim recurrence
+mask or dependency-chain policies have been implemented. Unfinished queries
+include pending tasks with waiting dates or dependencies, and exclude completed
+records. Completed and raw all-task queries remain available in Core.
+
+The UI saves through the same Core interface and updates its visible records
+only after a successful storage acknowledgement. A failed edit retains its
+draft and error; failed completion retains the unfinished task. The list offers
+edit/complete swipe actions and the detail view offers equivalent actions.
+Native lifecycle tests reopen the database after both mutations, retain UUIDs
+and opaque fields, and verify Taskwarrior reads native completion timestamps.
+The XCUITest lifecycle captures edit, relaunch, completion, and the completed
+list. Simulator compilation is separate evidence from execution; physical
+keyboard, accessibility review on devices, and background behavior remain
+unverified by these host tests.
