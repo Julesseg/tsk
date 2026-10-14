@@ -16,21 +16,40 @@ public enum TaskFilterError: Error, Equatable, LocalizedError, Sendable {
     }
 }
 
-public enum TaskFilterAttributeType: String, Codable, Sendable {
-    case string, date, numeric, duration
+public enum TaskFilterAttributeType: String, CaseIterable, Codable, Sendable {
+    case string, date, numeric, duration, uuid
 }
 
 public struct TaskFilterSchema: Sendable {
     var attributes: [UTF8String: TaskFilterAttributeType]
+    private static let builtinNames = Set(["description", "project", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "recur", "entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "id", "urgency", "last", "template"].map { UTF8String($0) })
 
     public init(attributes: [(String, TaskFilterAttributeType)] = []) {
         self.attributes = Dictionary(attributes.map { (UTF8String($0.0), $0.1) }, uniquingKeysWith: { _, new in new })
     }
 
+    public func contains(_ name: String) -> Bool {
+        attributes[UTF8String(name)] != nil || Self.builtinNames.contains(UTF8String(name)) || ["annotation_", "tag_", "dep_"].contains { name.utf8.starts(with: $0.utf8) }
+    }
+
+    public func isUserDefined(_ name: String) -> Bool {
+        attributes[UTF8String(name)] != nil && !Self.builtinNames.contains(UTF8String(name))
+    }
+
+    public func type(for name: String) -> TaskFilterAttributeType? { attributes[UTF8String(name)] }
+
+    public func adding(_ definitions: [TaskAttributeDefinition]) -> TaskFilterSchema {
+        var result = self
+        for definition in definitions where !Self.standard.contains(definition.name.rawValue) {
+            result.attributes[definition.name] = definition.type
+        }
+        return result
+    }
+
     public static let standard = TaskFilterSchema(attributes:
-        ["description", "project", "priority", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent"].map { ($0, .string) }
-        + [("recur", .duration)]
-        + ["entry", "modified", "start", "end", "due", "scheduled", "wait", "until"].map { ($0, .date) })
+        ["description", "project", "priority", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "template"].map { ($0, .string) }
+        + [("recur", .duration), ("id", .numeric), ("urgency", .numeric)]
+        + ["entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "last"].map { ($0, .date) })
 }
 
 struct TaskFilterContext: Sendable {
@@ -78,6 +97,7 @@ extension TaskManager {
     }
 
     public func viewSnapshot(filter expression: String, schema: TaskFilterSchema = .standard) async throws -> TaskViewSnapshot {
+        let schema = try await effectiveFilterSchema(base: schema)
         let filter = try CompiledTaskFilter(expression, schema: schema)
         let records = try await tasks()
         let context = TaskFilterContext(tasks: records, now: now(), calendar: calendar)
@@ -85,7 +105,7 @@ extension TaskManager {
         return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
     }
 
-    public func validateFilter(_ expression: String, schema: TaskFilterSchema = .standard) throws {
-        _ = try CompiledTaskFilter(expression, schema: schema)
+    public func validateFilter(_ expression: String, schema: TaskFilterSchema = .standard) async throws {
+        _ = try CompiledTaskFilter(expression, schema: await effectiveFilterSchema(base: schema))
     }
 }
