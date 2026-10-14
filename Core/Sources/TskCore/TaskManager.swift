@@ -64,7 +64,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 }
 
 public actor TaskManager {
-    private let replica: any TaskReplica
+    let replica: any TaskReplica
     private let now: @Sendable () -> Date
     private let calendar: Calendar
 

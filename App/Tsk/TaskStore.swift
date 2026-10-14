@@ -6,6 +6,7 @@ import TskNative
 @MainActor @Observable
 final class TaskStore {
     let manager: TaskManager
+    let directory: URL
     var tasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
     var error: String?
@@ -18,7 +19,7 @@ final class TaskStore {
     init() {
         let support = URL.applicationSupportDirectory
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
-        let directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
+        directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
         let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
         fixedDate = fixed
         manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
