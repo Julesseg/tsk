@@ -18,6 +18,8 @@ The reproducible native test uses an isolated HTTP proxy forwarding to taskchamp
 
 The original synchronous adapter failed all six capture/edit/completion barrier assertions. The new adapter acknowledged each durable operation while the reply remained held. After release and retry, an independent real TaskChampion replica received exactly one record per tested UUID, preserved opaque attributes, and retained the final completed state. This verifies cancellation/replay through upstream semantics rather than a substitute merge protocol.
 
+Integrated checks passed: Core25 tests, Native18 tests with real server/pinned Taskwarrior fixtures, and arm64 app/XCUITest build-for-testing. The barrier also verifies a second actor accessing the same canonical storage path; this remains same-process evidence.
+
 Further actual tests exercise a real HTTP 503 outage, successful local capture during failure, recovery after the connectivity trigger, and reopening a native session with persisted configuration. Existing pinned Taskwarrior 3.5.0 two-way encrypted synchronization checks remain enabled alongside these tests. All fixture data/configuration is isolated from personal accounts.
 
 Tests: `durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked`, `automaticSynchronizationRecoversAfterRealServerFailureAndConnectivitySignal`, `reopenedNativeSessionLoadsConfigurationAndUsesCommonAutomaticPolicy`, and Core single-flight/coalescing/failed-commit tests. Enable native network tests with `TSK_SYNC_TEST_URL`, `TSK_SYNC_TEST_CLIENT_ID`, and `TSK_SYNC_TEST_SECRET`; pinned Taskwarrior checks additionally use `TSK_TASKWARRIOR_BINARY`. The controlled proxy uses Python 3.
