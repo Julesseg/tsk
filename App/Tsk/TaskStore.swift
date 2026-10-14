@@ -21,6 +21,8 @@ final class TaskStore {
     var currentDate: Date { fixedDate ?? Date() }
     var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: tasks, at: currentDate) }
     private var reloadGeneration = 0
+    var nextFilterEvaluation: Date?
+    var filterRefreshGeneration = 0
 
     init() throws {
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
@@ -50,6 +52,8 @@ final class TaskStore {
             tasks = snapshot.tasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
+            nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil
+            filterRefreshGeneration += 1
             error = nil
         } catch {
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }

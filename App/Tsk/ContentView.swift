@@ -68,6 +68,13 @@ struct ContentView: View {
             path = []
             await store.reload()
         }
+        .task(id: scenePhase == .active ? store.filterRefreshGeneration : nil) {
+            guard scenePhase == .active, let next = store.nextFilterEvaluation else { return }
+            do {
+                try await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
+                await store.reload()
+            } catch {}
+        }
         .task {
             synchronization.startObserving(tasks: store)
             await synchronization.loadConfiguration()
