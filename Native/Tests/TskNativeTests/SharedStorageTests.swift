@@ -9,7 +9,7 @@ import TskNative
     let legacy = root.appendingPathComponent("private")
     let container = root.appendingPathComponent("group")
     let original = TaskManager(replica: TaskChampionReplica(directory: legacy))
-    let task = try await original.create(TaskDraft(description: "Before upgrade", attributes: ["opaque": "retain", "annotation_1792015000": "Existing note"]))
+    let task = try await original.create(TaskDraft(description: "Before upgrade", attributes: ["opaque": "retain", "annotation_1792015000": "Existing note", "café": "composed", "cafe\u{301}": "decomposed"]))
     let connection = try SyncConfiguration(serverURL: "https://sync.example.com", clientID: UUID(), encryptionSecret: "isolated migration fixture")
     try await SyncConfigurationStore(directory: legacy).save(connection)
     let shared = try TaskChampionSession.prepareShared(container: container, legacy: legacy)

@@ -26,3 +26,31 @@ import TskNative
     #expect(try await app.tasks().count == 1)
 }
 #endif
+
+#if canImport(AppIntents)
+@available(macOS 13, iOS 16, *)
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil))
+func nativeIntentCaptureUsesPersistedConnectionAndAutomaticallyReachesAnIndependentReplica() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let directory = root.appendingPathComponent("intent")
+    let client = try #require(environment["TSK_SYNC_TEST_CLIENT_ID"])
+    let identity = try #require(UUID(uuidString: client))
+    let configuration = try SyncConfiguration(serverURL: try #require(environment["TSK_SYNC_TEST_URL"]), clientID: identity, encryptionSecret: try #require(environment["TSK_SYNC_TEST_SECRET"]))
+    try await SyncConfigurationStore(directory: directory).save(configuration)
+    let result = try await CreateTaskIntent(description: "Automatic native intent fixture", directory: directory).perform()
+    let taskID = try #require(result.value?.id)
+    let peer = TaskManager(replica: TaskChampionReplica(directory: root.appendingPathComponent("peer")))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+    while true {
+        _ = try await peer.synchronize(using: configuration)
+        if let received = try await peer.tasks().first(where: { $0.id == taskID }) {
+            #expect(received.description == "Automatic native intent fixture")
+            break
+        }
+        guard ContinuousClock.now < deadline else { throw TaskManagementError.storage("The persisted intent capture did not synchronize") }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+}
+#endif

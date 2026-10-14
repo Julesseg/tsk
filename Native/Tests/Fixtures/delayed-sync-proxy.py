@@ -37,7 +37,7 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         data = response.read()
         status = response.status
         outgoing = dict(response.headers)
-        if self.command == method and not (control / 'released').exists():
+        if self.command == method and status == 200 and not (control / 'released').exists():
             with mutex:
                 if not (control / 'blocked.json').exists():
                     (control / 'blocked.json').write_text(json.dumps({'method': self.command, 'status': status, 'path': self.path}))

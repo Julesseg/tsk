@@ -7,7 +7,7 @@ fn copy_directory(source: &Path, destination: &Path) -> Result<(), String> {
     fs::create_dir_all(destination).map_err(|e| e.to_string())?;
     for entry in fs::read_dir(source).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
-        if entry.file_name().to_string_lossy().starts_with(".tsk-") { continue; }
+        if [".tsk-sync-generation", ".tsk-operation", ".tsk-local-priority", ".tsk-semantic-mutation", ".tsk-migrated-to", ".tsk-shared-ready"].iter().any(|name| entry.file_name() == *name) { continue; }
         let kind = entry.file_type().map_err(|e| e.to_string())?;
         if kind.is_symlink() { return Err("Legacy storage contains an unsupported symbolic link".into()); }
         let target = destination.join(entry.file_name());
@@ -55,10 +55,21 @@ pub async fn prepare(destination: &str, source: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn sync_tree(path: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() { sync_tree(&entry.path())?; }
+        else { fs::File::open(entry.path()).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?; }
+    }
+    fs::File::open(path).and_then(|file| file.sync_all()).map_err(|e| e.to_string())
+}
+
 fn finish(staging: &Path, destination: &Path) -> Result<(), String> {
+    sync_tree(staging)?;
     let marker = staging.join(".tsk-shared-ready");
     fs::write(&marker, b"1").map_err(|e| e.to_string())?;
     fs::File::open(marker).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?;
+    fs::File::open(staging).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?;
     fs::rename(staging, destination).map_err(|e| e.to_string())?;
     fs::File::open(destination.parent().ok_or("Missing shared container")?).and_then(|file| file.sync_all()).map_err(|e| e.to_string())?;
     Ok(())

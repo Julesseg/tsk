@@ -10,8 +10,7 @@ struct ContentView: View {
     @State private var isConfiguringSync = false
     @State private var editingTask: TaskRecord?
 
-    init() {
-        let store = TaskStore()
+    init(store: TaskStore) {
         _store = State(initialValue: store)
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
@@ -99,6 +98,10 @@ struct ContentView: View {
             }
             .navigationTitle("Tasks")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink { TaskShortcutsView() } label: { Label("Shortcuts and Siri", systemImage: "square.stack.3d.up") }
+                        .accessibilityIdentifier("task-shortcuts")
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }
                         .accessibilityIdentifier("synchronization-settings")
