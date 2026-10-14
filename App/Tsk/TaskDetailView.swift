@@ -24,6 +24,7 @@ struct TaskDetailView: View {
                     .accessibilityIdentifier("complete-task")
                 }
             }
+            TaskAvailabilityView(task: task, store: store, isDetail: true)
             Section("Planning") { TaskPlanningSummary(task: task) }
             Section("Attributes") {
                 ForEach(task.attributes.keys.sorted(), id: \.self) { key in

@@ -41,6 +41,7 @@ struct ContentView: View {
                                     Text(project).font(.caption).foregroundStyle(.secondary)
                                 }
                                 TaskPlanningCaption(task: task)
+                                TaskAvailabilityView(task: task, store: store)
                                 if task.status != "pending" || task.isRecurring {
                                     Text(task.isRecurring ? "Recurring task · read only" : task.status.capitalized)
                                         .font(.caption).foregroundStyle(.secondary)
