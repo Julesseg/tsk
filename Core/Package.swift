@@ -8,6 +8,7 @@ import PackageDescription
 // layer on top.
 let package = Package(
     name: "TskCore",
+    platforms: [.iOS(.v13), .macOS(.v10_15)],
     products: [
         .library(name: "TskCore", targets: ["TskCore"]),
     ],
