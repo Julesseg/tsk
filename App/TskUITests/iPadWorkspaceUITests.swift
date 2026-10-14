@@ -94,7 +94,7 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testNativeSidebarCustomViewAndAccessibilityText() throws {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
+        XCTAssertTrue(revealTaskElement(app.buttons["custom-views"], in: "workspace-sidebar", app: app))
         app.buttons["custom-views"].tap()
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
@@ -102,7 +102,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         name.tap()
         name.typeText("All local tasks")
         app.buttons["save-custom-view"].tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(revealTaskElement(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch, in: "workspace-sidebar", app: app))
         capture("iPad native custom view sidebar at accessibility text size", app: app)
     }
 
