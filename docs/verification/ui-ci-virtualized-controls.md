@@ -1,0 +1,13 @@
+# Virtualized controls and keyboard dismissal
+
+The canonical UI run `38650850252` on `5d06c32` passed automatic synchronization failure/relaunch, manual synchronization settings/disconnect, description editing/completion, and organization. The capture test also passed its corrected validation and durable-save steps before reaching its detail assertion. Four failures remained:
+
+- Planning and Waiting enabled Planned day successfully, then queried the frame of a Deadline switch that was no longer in the accessibility tree after the planned-date controls expanded. XCTest threw before the helper could scroll. The helper now checks existence before taking a snapshot and reveals controls with bounded, direction-aware scrolling in the identified editor form.
+- Upcoming had a focused description field and visible keyboard, but no keyboard toolbar button in either its screenshot or accessibility hierarchy. The production Hide keyboard action now lives in the editor's safe-area content whenever an editor field is focused, rather than depending on the intermittent native keyboard accessory toolbar.
+- Capture reached the expected persisted task detail. Identity was below the visible form after organization/planning/attributes were added. The test now scrolls the identified detail form until Identity is visible; it still asserts that section and captures the resulting raw-attribute/identity state.
+
+The shared reveal helper checks a finite control frame inside the visible form before interacting, changes scrolling direction when a known element is above the viewport, and searches both directions with a fixed bound when virtualization removes an element. Date tests select the nested native switch when available and still verify the requested state. No expected date, persistence, identity, waiting, project, or completion behavior was removed.
+
+The corrected app and XCUITest targets passed a generic arm64 simulator `build-for-testing` with ad-hoc signing after merging integration `5823840`, including App Groups, dependency context, and custom views. This is compilation/signing evidence only. No simulator was booted locally and no flaky rerun was requested. Canonical UI execution of these changes remains required.
+
+The original result bundle is `/tmp/tsk-issue-3/ui-38650850252`; focused screenshots, accessibility trees, touch events and videos are under `/tmp/tsk-issue-3/ui-ci-3-planning`, `ui-ci-3-upcoming`, and `ui-ci-3-capture`. Build log: `/tmp/tsk-issue-3/ui-ci-3-fix-integrated-build.log`. The single-file evidence report is `/tmp/tsk-issue-3/ui-ci-3-report.html`; it explicitly lists missing after captures and iPad/appearance evidence.

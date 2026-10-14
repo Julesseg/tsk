@@ -32,7 +32,7 @@ final class TskUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Buy milk from the market"].waitForExistence(timeout: 10))
         screenshot("Tasks after relaunch", app: app)
         app.staticTexts["Buy milk from the market"].tap()
-        XCTAssertTrue(app.staticTexts["Identity"].waitForExistence(timeout: 5))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["Identity"], in: "task-detail-form", app: app))
         screenshot("Raw attributes and identity", app: app)
     }
 

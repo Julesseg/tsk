@@ -41,6 +41,7 @@ struct TaskDetailView: View {
                 Section { Text(error).foregroundStyle(.red).accessibilityIdentifier("task-action-error") }
             }
         }
+        .accessibilityIdentifier("task-detail-form")
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
