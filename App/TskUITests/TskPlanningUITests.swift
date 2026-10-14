@@ -11,8 +11,8 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         app.buttons["new-task"].tap()
         enterDescription("Planned and due independently", app: app)
-        tapSwitch("planned-day-enabled", app: app)
-        tapSwitch("deadline-enabled", app: app)
+        setDateSwitch("planned-day-enabled", to: true, app: app)
+        setDateSwitch("deadline-enabled", to: true, app: app)
         capture("Independent planned day and deadline editors", app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["Planned and due independently"].waitForExistence(timeout: 10))
@@ -36,7 +36,7 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Planned and due independently"].waitForExistence(timeout: 10))
         app.staticTexts["Planned and due independently"].tap()
         app.buttons["edit-task"].tap()
-        tapSwitch("deadline-enabled", app: app)
+        setDateSwitch("deadline-enabled", to: false, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -75,12 +75,6 @@ final class TskPlanningUITests: XCTestCase {
         field.typeText(text)
     }
 
-    private func tapSwitch(_ identifier: String, app: XCUIApplication) {
-        let control = app.switches[identifier]
-        for _ in 0..<4 where !control.isHittable { app.swipeUp() }
-        XCTAssertTrue(control.waitForExistence(timeout: 5))
-        control.tap()
-    }
 
     private func tapButton(_ identifier: String, app: XCUIApplication) {
         let control = app.buttons[identifier]
