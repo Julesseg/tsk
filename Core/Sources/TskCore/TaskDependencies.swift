@@ -47,8 +47,8 @@ public extension TaskManager {
     }
 
     func addDependency(id: UUID, prerequisiteID: UUID) async throws -> TaskRecord {
-        await acquireDependencyMutation()
-        defer { releaseDependencyMutation() }
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         try Task.checkCancellation()
         let records = try await tasks()
         guard let source = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
@@ -82,34 +82,19 @@ private enum TaskDependencies {
 
 public extension TaskManager {
     func removeDependency(id: UUID, reference: String) async throws -> TaskRecord {
-        await acquireDependencyMutation()
-        defer { releaseDependencyMutation() }
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         try Task.checkCancellation()
         let source = try await task(id: id)
         guard source.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let key = "dep_\(reference)"
         guard source.attributes[key] != nil else { throw TaskManagementError.dependencyReferenceNotFound(reference) }
         let remaining = source.dependencyReferences.filter { !($0.utf8.elementsEqual(reference.utf8)) }
-        var patch: [String: String?] = ["modified": String(Int(now().timeIntervalSince1970))]
+        var patch: TaskAttributePatch = ["modified": String(Int(now().timeIntervalSince1970))]
         patch.updateValue(nil, forKey: key)
         patch.updateValue(remaining.isEmpty ? nil : remaining.joined(separator: ","), forKey: "depends")
         let saved = try await replica.update(id: id, changes: patch)
         localChangeWasCommitted()
         return saved
-    }
-}
-
-extension TaskManager {
-    private func acquireDependencyMutation() async {
-        if dependencyMutationInProgress {
-            await withCheckedContinuation { dependencyMutationWaiters.append($0) }
-        } else {
-            dependencyMutationInProgress = true
-        }
-    }
-
-    private func releaseDependencyMutation() {
-        if dependencyMutationWaiters.isEmpty { dependencyMutationInProgress = false }
-        else { dependencyMutationWaiters.removeFirst().resume() }
     }
 }

@@ -89,8 +89,8 @@ public actor TaskManager {
     var synchronizationTask: Task<Void, Never>?
     var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
-    var dependencyMutationInProgress = false
-    var dependencyMutationWaiters: [CheckedContinuation<Void, Never>] = []
+    var mutationInProgress = false
+    var mutationWaiters: [CheckedContinuation<Void, Never>] = []
     private let calendar: Calendar
 
     public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) {
@@ -135,6 +135,8 @@ public actor TaskManager {
     }
 
     public func create(_ draft: TaskDraft) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
         guard draft.attributes["recur"] == nil, draft.attributes["parent"] == nil,
@@ -154,6 +156,8 @@ public actor TaskManager {
     }
 
     public func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags", "depends"])
@@ -175,6 +179,8 @@ public actor TaskManager {
     }
 
     public func complete(id: UUID) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }
