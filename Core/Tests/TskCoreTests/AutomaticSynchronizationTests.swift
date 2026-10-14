@@ -79,3 +79,23 @@ private actor AutomaticSyncTestReplica: TaskSynchronizingReplica {
     #expect(await replica.syncCalls == 0)
     #expect(await manager.synchronizationStatus() == .ready)
 }
+
+@Test func annotationAddAndEditRequestSynchronizationOnlyAfterDurableCommit() async throws {
+    let replica = AutomaticSyncTestReplica()
+    let manager = TaskManager(replica: replica)
+    let task = try await manager.create(TaskDraft(description: "Annotation sync"))
+    let configuration = try SyncConfiguration(serverURL: "https://tasks.example.test", clientID: UUID(), encryptionSecret: "isolated-secret")
+    await manager.configureSynchronization(configuration)
+    let added = try await manager.addAnnotation(id: task.id, text: "Initial")
+    await replica.waitUntilStarted()
+    let reference = try #require(added.annotations.first?.reference.rawValue)
+    _ = try await manager.editAnnotation(id: task.id, reference: reference, text: "Edited during synchronization")
+    let updates = await manager.synchronizationUpdates()
+    await replica.release()
+    for await state in updates {
+        if case .synchronized = state { break }
+        if case .failed(let error) = state { Issue.record("Synchronization failed: \(error)"); break }
+    }
+    #expect(await replica.syncCalls == 2)
+    #expect(try await manager.annotations(id: task.id).first?.text == "Edited during synchronization")
+}

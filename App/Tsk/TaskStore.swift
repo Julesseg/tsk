@@ -15,6 +15,7 @@ final class TaskStore {
     var projectSelection: TaskProjectSelection = .all
     var availableProjects: [String] = []
     var error: String?
+    var presentedTaskPanels: Set<UUID> = []
     var isSaving = false
     var isLoading = false
     private let fixedDate: Date?
@@ -73,6 +74,14 @@ final class TaskStore {
 
     func removeDependency(id: UUID, reference: String) async -> TaskRecord? {
         await perform { try await $0.removeDependency(id: id, reference: reference) }
+    }
+
+    func addAnnotation(id: UUID, text: String) async -> TaskRecord? {
+        await perform { try await $0.addAnnotation(id: id, text: text) }
+    }
+
+    func editAnnotation(id: UUID, reference: String, text: String) async -> TaskRecord? {
+        await perform { try await $0.editAnnotation(id: id, reference: reference, text: text) }
     }
 
     func complete(id: UUID) async -> TaskRecord? {
