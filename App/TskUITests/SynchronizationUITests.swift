@@ -24,6 +24,7 @@ final class SynchronizationUITests: XCTestCase {
         let secret = app.secureTextFields["sync-encryption-secret"]
         secret.tap()
         secret.typeText("isolated-ui-test-secret")
+        if app.buttons["dismiss-sync-keyboard"].exists { app.buttons["dismiss-sync-keyboard"].tap() }
         app.buttons["save-sync-connection"].tap()
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["sync-error"].label.contains("client ID"))
@@ -31,6 +32,7 @@ final class SynchronizationUITests: XCTestCase {
         let client = app.textFields["sync-client-id"]
         client.tap()
         client.typeText("6F88CFF9-4727-4699-8B5E-EE6D530498E4")
+        if app.buttons["dismiss-sync-keyboard"].exists { app.buttons["dismiss-sync-keyboard"].tap() }
         app.buttons["save-sync-connection"].tap()
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         capture("Connection saved before server verification", app)
@@ -86,8 +88,12 @@ final class SynchronizationUITests: XCTestCase {
         let encryption = app.secureTextFields["sync-encryption-secret"]
         encryption.tap()
         encryption.typeText(secret)
+        if app.buttons["dismiss-sync-keyboard"].exists { app.buttons["dismiss-sync-keyboard"].tap() }
         app.buttons["save-sync-connection"].tap()
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: app.buttons["sync-now"])
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed)
+        XCTAssertTrue(revealTaskElement(app.buttons["sync-now"], in: "sync-settings-form", app: app))
         app.buttons["sync-now"].tap()
         XCTAssertTrue(app.staticTexts["Synchronized with server"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["sync-error"].exists)

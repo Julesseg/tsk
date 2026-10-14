@@ -4,7 +4,7 @@ Complete Task and Reschedule Task are App Intents with task entities identified 
 
 `TaskManager.reschedule(id:role:to:)` delegates to the existing guarded update transaction. It also supports removing one date with `nil`. It retains unrelated attributes and uses the same cross-process semantic mutation lease and automatic synchronization request as app edits. Complete Task delegates to the existing completion behavior, including stopping active work and preserving identity. An action acknowledges the local durable commit; network completion is opportunistic and opening the app retries pending work.
 
-The app's Shortcuts and Siri page explains all four actions and the independent date roles. The DEBUG UI fixture executes the actual intent `perform()` against the isolated App Group test directory before opening the production TaskStore. It neither edits records directly nor substitutes a separate in-memory store.
+The app's Shortcuts and Siri page explains all four actions and the independent date roles. The synchronization form provides a keyboard-dismiss control in its focused safe area so connection actions remain reachable while entering server settings. The DEBUG UI fixture executes the actual intent `perform()` against the isolated App Group test directory before opening the production TaskStore. It neither edits records directly nor substitutes a separate in-memory store.
 
 ## Verification
 
@@ -26,4 +26,4 @@ The iPhone successful-server UI test requires the fixture values instead of skip
 
 CI uploads both `App/TestResults.xcresult` and `.build/ui-sync`. Because multiple paths share the artifact root, locate `TestResults.xcresult/Info.plist` recursively after extraction rather than assuming it is at the archive root. The fixture directory contains version/client/token metadata, server log, encrypted server database, independent peer database/proof, and a stopped marker; it does not record the encryption secret in fixture metadata.
 
-The local full native suite exposed two older fixture assumptions: a blocked GET needs a previously uploaded remote version, and Foundation Process cleanup in an asynchronous test must resume on the actor where it launched. The affected fixtures now seed a real remote version explicitly and keep asynchronous Process lifetime on MainActor. The sample of the original wait is retained outside the repository; no production sync behavior changed for this correction.
+The local full native suite exposed older fixture assumptions: a blocked GET needs a previously uploaded remote version, and Foundation Process cleanup in an asynchronous test must resume on the actor where it launched. The affected fixtures now seed a real remote version explicitly, atomically publish their barrier metadata before readers can observe it, and keep asynchronous Process lifetime on MainActor. The sample of the original wait is retained outside the repository; no production sync behavior changed for this correction.

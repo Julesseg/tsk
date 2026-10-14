@@ -8,6 +8,8 @@ struct SyncSettingsView: View {
     @State private var clientID = ""
     @State private var secret = ""
     @State private var savedConnection = false
+    @FocusState private var focusedField: Field?
+    private enum Field { case server, client, secret }
 
     private var hasUnsavedChanges: Bool {
         guard let configuration = synchronization.configuration else { return true }
@@ -25,15 +27,18 @@ struct SyncSettingsView: View {
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .server)
                         .accessibilityIdentifier("sync-server-url")
                     TextField("Client ID", text: $clientID)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .client)
                         .accessibilityIdentifier("sync-client-id")
                     SecureField("Encryption secret", text: $secret)
                         .textContentType(.password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .secret)
                         .accessibilityIdentifier("sync-encryption-secret")
                     Button("Save connection") {
                         Task { savedConnection = await synchronization.saveConnection(serverURL: serverURL, clientID: clientID, secret: secret) }
@@ -72,6 +77,20 @@ struct SyncSettingsView: View {
                     if synchronization.configuration != nil {
                         Text("Disconnecting keeps all tasks saved on this device.").font(.footnote)
                     }
+                }
+            }
+            .accessibilityIdentifier("sync-settings-form")
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if focusedField != nil {
+                    HStack {
+                        Spacer()
+                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { focusedField = nil }
+                            .accessibilityIdentifier("dismiss-sync-keyboard")
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial)
                 }
             }
             .navigationTitle("Synchronization")
