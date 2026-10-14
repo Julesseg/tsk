@@ -21,6 +21,12 @@ private actor SynchronizingTestReplica: TaskSynchronizingReplica {
         records[id] = record
         return record
     }
+    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+        guard var record = records[id] else { throw TaskManagementError.taskNotFound(id) }
+        for (key, value) in changes { record.attributes[key] = value }
+        records[id] = record
+        return record
+    }
     func synchronize(using configuration: SyncConfiguration) async throws {
         throw SynchronizationError.failed("Server unavailable")
     }

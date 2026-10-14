@@ -19,6 +19,10 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         try request(command: "create", id: id, attributes: attributes)
     }
 
+    public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+        try request(command: "update", id: id, changes: changes)
+    }
+
     public func synchronize(using configuration: SyncConfiguration) async throws {
         do {
             let _: Bool = try request(command: "synchronize", configuration: configuration)
@@ -29,8 +33,8 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         }
     }
 
-    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, configuration: SyncConfiguration? = nil) throws -> T {
-        let request = Request(path: directory.path, command: command, id: id, attributes: attributes, configuration: configuration)
+    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, changes: [String: String?]? = nil, configuration: SyncConfiguration? = nil) throws -> T {
+        let request = Request(path: directory.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
             throw TaskManagementError.storage("Could not encode the task operation.")
@@ -54,6 +58,7 @@ private struct Request: Encodable {
     let command: String
     let id: UUID?
     let attributes: [String: String]?
+    let changes: [String: String?]?
     let configuration: SyncConfiguration?
 }
 

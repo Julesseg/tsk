@@ -11,7 +11,21 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
 
     public var description: String { attributes["description"] ?? "Untitled task" }
     public var status: String { attributes["status"] ?? "unknown" }
-    public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil }
+    public var canEdit: Bool { !isRecurring && (status == "pending" || status == "completed") }
+    public var canComplete: Bool { canEdit && status == "pending" }
+    public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil }
+}
+
+public enum TaskQuery: String, CaseIterable, Sendable {
+    case all, unfinished, completed
+
+    public func includes(_ task: TaskRecord) -> Bool {
+        switch self {
+        case .all: true
+        case .unfinished: task.status == "pending"
+        case .completed: task.status == "completed"
+        }
+    }
 }
 
 public struct TaskDraft: Equatable, Sendable {
@@ -27,18 +41,21 @@ public struct TaskDraft: Equatable, Sendable {
 public protocol TaskReplica: Sendable {
     func tasks() async throws -> [TaskRecord]
     func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord
+    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord
 }
 
 public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
     case emptyDescription
     case unsupportedTaskKind
+    case reservedAttribute(String)
     case taskNotFound(UUID)
     case storage(String)
 
     public var errorDescription: String? {
         switch self {
         case .emptyDescription: "Enter a task description before saving."
-        case .unsupportedTaskKind: "Recurring tasks require the recurrence editor. This capture flow creates ordinary tasks."
+        case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
+        case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
         case .taskNotFound: "This task is no longer available."
         case .storage(let message): "Local task storage failed: \(message)"
         }
@@ -54,8 +71,8 @@ public actor TaskManager {
         self.now = now
     }
 
-    public func tasks() async throws -> [TaskRecord] {
-        try await replica.tasks().sorted {
+    public func tasks(query: TaskQuery = .all) async throws -> [TaskRecord] {
+        try await replica.tasks().filter { query.includes($0) }.sorted {
             if $0.attributes["entry"] != $1.attributes["entry"] {
                 return ($0.attributes["entry"] ?? "") > ($1.attributes["entry"] ?? "")
             }
@@ -74,6 +91,7 @@ public actor TaskManager {
         let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
         guard draft.attributes["recur"] == nil, draft.attributes["parent"] == nil,
+              draft.attributes["mask"] == nil, draft.attributes["imask"] == nil,
               draft.attributes["status"] == nil || draft.attributes["status"] == "pending" else {
             throw TaskManagementError.unsupportedTaskKind
         }
@@ -85,4 +103,34 @@ public actor TaskManager {
         attributes["modified"] = timestamp
         return try await replica.create(id: UUID(), attributes: attributes)
     }
+
+    public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+        let task = try await self.task(id: id)
+        guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask"])
+        if let key = changes.keys.sorted().first(where: { reserved.contains($0) }) {
+            throw TaskManagementError.reservedAttribute(key)
+        }
+        guard !changes.isEmpty else { return task }
+        var patch = changes
+        if changes.keys.contains("description") {
+            let description = (changes["description"] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
+            patch["description"] = description
+        }
+        patch["modified"] = String(Int(now().timeIntervalSince1970))
+        return try await replica.update(id: id, changes: patch)
+    }
+
+    public func complete(id: UUID) async throws -> TaskRecord {
+        let task = try await self.task(id: id)
+        guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
+        if task.status == "completed" { return task }
+        let timestamp = String(Int(now().timeIntervalSince1970))
+        return try await replica.update(id: id, changes: [
+            "status": "completed", "end": task.attributes["end"] ?? timestamp,
+            "modified": timestamp, "start": nil
+        ])
+    }
+
 }

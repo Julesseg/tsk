@@ -71,3 +71,60 @@ private func runTaskwarrior(binary: String, config: URL, arguments: [String]) th
     #expect(process.terminationStatus == 0)
     return data
 }
+
+@Test func editsAndCompletionSurviveReopeningWithoutLosingAttributes() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1792015200) })
+    let original = try await manager.create(TaskDraft(description: "Original", attributes: ["opaque": "retain", "annotation_1792015000": "Note", "tag_home": "", "start": "1792015100"]))
+    _ = try await manager.update(id: original.id, changes: ["description": "Revised"])
+    let reopened = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1792015260) })
+    #expect(try await reopened.task(id: original.id).description == "Revised")
+    let completed = try await reopened.complete(id: original.id)
+    let final = TaskManager(replica: TaskChampionReplica(directory: directory))
+    #expect(try await final.task(id: original.id) == completed)
+    #expect(completed.attributes["status"] == "completed")
+    #expect(completed.attributes["end"] == "1792015260")
+    #expect(completed.attributes["modified"] == "1792015260")
+    #expect(completed.attributes["start"] == nil)
+    #expect(completed.attributes["opaque"] == "retain")
+    #expect(completed.attributes["annotation_1792015000"] == "Note")
+    #expect(completed.attributes["tag_home"] == "")
+    #expect(try await final.tasks(query: .unfinished).isEmpty)
+    #expect(try await final.tasks(query: .completed) == [completed])
+}
+
+@Test func removingOneRawAttributePreservesEveryOtherField() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory))
+    let original = try await manager.create(TaskDraft(description: "Keep fields", attributes: ["removeMe": "value", "keepMe": "opaque"]))
+    _ = try await manager.update(id: original.id, changes: ["removeMe": nil])
+    let reopened = TaskManager(replica: TaskChampionReplica(directory: directory))
+    let updated = try await reopened.task(id: original.id)
+    #expect(updated.attributes["removeMe"] == nil)
+    #expect(updated.attributes["keepMe"] == "opaque")
+    #expect(updated.id == original.id)
+    #expect(updated.description == "Keep fields")
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
+func taskwarriorRecognizesNativeCompletionAndStoppedWork() async throws {
+    let binary = try #require(ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"])
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1792015260) })
+    let original = try await manager.create(TaskDraft(description: "Finish task", attributes: ["start": "1792015000", "opaque": "retain"]))
+    _ = try await manager.update(id: original.id, changes: ["description": "Finished native edit"])
+    _ = try await manager.complete(id: original.id)
+    let config = directory.appendingPathComponent("taskrc")
+    try "data.location=\(directory.path)\nuda.opaque.type=string\nconfirmation=no\n".write(to: config, atomically: true, encoding: .utf8)
+    let output = try runTaskwarrior(binary: binary, config: config, arguments: ["export"])
+    let records = try #require(JSONSerialization.jsonObject(with: output) as? [[String: Any]])
+    let record = try #require(records.first)
+    #expect(record["description"] as? String == "Finished native edit")
+    #expect(record["status"] as? String == "completed")
+    #expect(record["end"] as? String == "20261014T220100Z")
+    #expect(record["opaque"] as? String == "retain")
+    #expect(record["start"] == nil)
+}
