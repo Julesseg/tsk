@@ -1,106 +1,12 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
-use std::sync::{Arc, Mutex, OnceLock};
-use tokio::sync::Notify;
 use taskchampion::{storage::{AccessMode, sqlite::SqliteStorage}, Replica, ServerConfig, TaskData};
 use uuid::Uuid;
-
-
-struct PathAdmission {
-    locals: usize,
-    generation: u64,
-    synchronization: Option<Arc<Notify>>,
-    available: Arc<Notify>,
-}
-
-impl Default for PathAdmission {
-    fn default() -> Self {
-        Self { locals: 0, generation: 0, synchronization: None, available: Arc::new(Notify::new()) }
-    }
-}
-
-static ADMISSION: OnceLock<Mutex<HashMap<String, PathAdmission>>> = OnceLock::new();
-
-fn admission() -> &'static Mutex<HashMap<String, PathAdmission>> {
-    ADMISSION.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-struct LocalAccess(String);
-
-impl LocalAccess {
-    fn new(path: &str) -> Self {
-        let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-        let slot = paths.entry(path.to_owned()).or_default();
-        slot.locals += 1;
-        slot.generation += 1;
-        if let Some(signal) = &slot.synchronization { signal.notify_one(); }
-        Self(path.to_owned())
-    }
-}
-
-impl Drop for LocalAccess {
-    fn drop(&mut self) {
-        let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-        if let Some(slot) = paths.get_mut(&self.0) {
-            slot.locals -= 1;
-            if slot.locals == 0 { slot.available.notify_one(); }
-        }
-    }
-}
-
-struct SyncAccess {
-    path: String,
-    interrupted: Arc<Notify>,
-}
-
-impl SyncAccess {
-    async fn new(path: &str, expected_generation: Option<u64>) -> Result<Self, String> {
-        loop {
-            let available = {
-                let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-                let slot = paths.entry(path.to_owned()).or_default();
-                if expected_generation.is_some_and(|generation| generation != slot.generation) {
-                    return Err("TSK_SYNC_INTERRUPTED".to_owned());
-                }
-                if slot.locals == 0 && slot.synchronization.is_none() {
-                    let interrupted = Arc::new(Notify::new());
-                    slot.synchronization = Some(interrupted.clone());
-                    return Ok(Self { path: path.to_owned(), interrupted });
-                }
-                slot.available.clone()
-            };
-            available.notified().await;
-        }
-    }
-}
-
-impl Drop for SyncAccess {
-    fn drop(&mut self) {
-        let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-        if let Some(slot) = paths.get_mut(&self.path) {
-            slot.synchronization = None;
-            slot.available.notify_one();
-        }
-    }
-}
-
-fn interrupt_sync(path: &str) -> bool {
-    let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-    let slot = paths.entry(path.to_owned()).or_default();
-    slot.generation += 1;
-    slot.available.notify_one();
-    if let Some(signal) = &slot.synchronization {
-        signal.notify_one();
-        true
-    } else { false }
-}
-
-fn sync_generation(path: &str) -> u64 {
-    let mut paths = admission().lock().unwrap_or_else(|poison| poison.into_inner());
-    paths.entry(path.to_owned()).or_default().generation
-}
+mod admission;
+mod migration;
+use admission::{LocalAccess, SyncAccess, interrupt_sync, sync_generation};
 
 #[derive(Deserialize)]
 struct Request {
@@ -112,9 +18,10 @@ struct Request {
     configuration: Option<SyncConfiguration>,
     #[serde(rename = "syncGeneration")]
     sync_generation: Option<u64>,
+    source: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SyncConfiguration {
     #[serde(rename = "serverURL")]
@@ -124,9 +31,52 @@ struct SyncConfiguration {
     encryption_secret: String,
 }
 
+impl SyncConfiguration {
+    fn validate(&self) -> Result<(), String> {
+        let url = url::Url::parse(&self.server_url).map_err(|e| e.to_string())?;
+        if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some() || self.server_url.chars().any(char::is_whitespace) { return Err("Invalid synchronization server URL".into()); }
+        if self.encryption_secret.is_empty() { return Err("Empty encryption secret".into()); }
+        Ok(())
+    }
+}
+
 async fn execute(request: Request) -> Result<Value, String> {
+    if request.command == "prepareShared" {
+        migration::prepare(&request.path, request.source.as_deref().ok_or("Missing legacy storage path")?).await?;
+        return Ok(json!(true));
+    }
+    if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
     let synchronization = if request.command == "synchronize" { Some(SyncAccess::new(&request.path, request.sync_generation).await?) } else { None };
-    let _local = if synchronization.is_none() { Some(LocalAccess::new(&request.path)) } else { None };
+    let _local = if synchronization.is_none() { Some(LocalAccess::new(&request.path)?) } else { None };
+    if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
+    if request.command.starts_with("configuration") {
+        let file = std::path::Path::new(&request.path).join("sync-configuration.json");
+        return match request.command.as_str() {
+            "configurationLoad" => {
+                if !file.exists() { return Ok(Value::Null); }
+                let config: SyncConfiguration = serde_json::from_slice(&std::fs::read(file).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+                config.validate()?;
+                serde_json::to_value(config).map_err(|e| e.to_string())
+            }
+            "configurationSave" => {
+                let config = request.configuration.ok_or("Missing synchronization configuration")?;
+                config.validate()?;
+                let temporary = file.with_extension("json.pending");
+                let data = serde_json::to_vec(&config).map_err(|e| e.to_string())?;
+                use std::io::Write;
+                use std::os::unix::fs::OpenOptionsExt;
+                let mut output = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&temporary).map_err(|e| e.to_string())?;
+                output.write_all(&data).and_then(|_| output.sync_all()).map_err(|e| e.to_string())?;
+                std::fs::rename(temporary, file).map_err(|e| e.to_string())?;
+                Ok(json!(true))
+            }
+            "configurationRemove" => {
+                if file.exists() { std::fs::remove_file(file).map_err(|e| e.to_string())?; }
+                Ok(json!(true))
+            }
+            _ => Err("Unsupported configuration command".into())
+        };
+    }
     let storage = SqliteStorage::new(&request.path, AccessMode::ReadWrite, true).await.map_err(|e| e.to_string())?;
     let mut replica = Replica::new(storage);
     match request.command.as_str() {
@@ -179,7 +129,7 @@ async fn execute(request: Request) -> Result<Value, String> {
             let access = synchronization.as_ref().ok_or("Missing sync admission")?;
             tokio::select! {
                 biased;
-                _ = access.interrupted.notified() => Err("TSK_SYNC_INTERRUPTED".to_owned()),
+                result = access.interrupted() => { result?; Err("TSK_SYNC_INTERRUPTED".to_owned()) },
                 result = replica.sync(&mut server, true) => {
                     result.map_err(|e| format!("{e:#}"))?;
                     Ok(json!(true))
@@ -219,7 +169,7 @@ pub unsafe extern "C" fn tsk_tc_free(output: *mut c_char) {
 pub unsafe extern "C" fn tsk_tc_interrupt_sync(path: *const c_char) -> i32 {
     if path.is_null() { return 0; }
     match CStr::from_ptr(path).to_str() {
-        Ok(path) => i32::from(interrupt_sync(path)),
+        Ok(path) => i32::from(interrupt_sync(path).is_ok()),
         Err(_) => 0,
     }
 }
@@ -228,7 +178,7 @@ pub unsafe extern "C" fn tsk_tc_interrupt_sync(path: *const c_char) -> i32 {
 pub unsafe extern "C" fn tsk_tc_sync_generation(path: *const c_char) -> u64 {
     if path.is_null() { return 0; }
     match CStr::from_ptr(path).to_str() {
-        Ok(path) => sync_generation(path),
+        Ok(path) => sync_generation(path).unwrap_or(0),
         Err(_) => 0,
     }
 }
