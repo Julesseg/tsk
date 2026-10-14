@@ -21,7 +21,7 @@ struct TaskEditorView: View {
         original = task
         self.onSave = onSave
         var draft = TaskDraft(description: task?.description ?? "", attributes: task?.attributes ?? [:])
-        if task == nil, let project = store.projectSelection.projectName { draft.project = project }
+        if task == nil, store.customView == nil, let project = store.projectSelection.projectName { draft.project = project }
         _draft = State(initialValue: draft)
     }
 

@@ -22,6 +22,8 @@ jobs:
     container: swift:6.0.3
     steps:
       - uses: actions/checkout@v4
+      - name: Install standard C++ development headers
+        run: apt-get update && apt-get install -y g++
       - name: Run Core tests
         working-directory: Core
         run: swift test
@@ -35,7 +37,7 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           apt-get update
-          apt-get install -y curl gcc
+          apt-get install -y curl gcc g++
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: Swatinem/rust-cache@v2
@@ -95,7 +97,11 @@ jobs:
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
             -resultBundlePath TestResults.xcresult \
+            -derivedDataPath ../.build/ui \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+
+      - name: Verify simulator intent metadata and shared storage entitlement
+        run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
 
       - name: Upload test results
         if: ${{ !cancelled() }}
