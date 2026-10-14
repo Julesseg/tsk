@@ -1,0 +1,23 @@
+# Local typed task attributes
+
+Task detail includes an advanced editor and a local definition manager. The manager is also available in the native iPad sidebar and the compact workspace's More menu. Definitions support all five registered Taskwarrior UDA types: string, numeric, date, duration, and UUID. Definitions stay in the shared device-local task directory; they are not imported from desktop configuration or synchronized as tasks. Removing a definition retains every stored task value.
+
+Definition and attribute identities use UTF8String, preserving canonically distinct Unicode names. Names cannot collide with Taskwarrior's registered fields or independent tag/dependency/annotation keys. Labels and types can change without rewriting task values. Atomic JSON persistence uses the same App Group directory and common TaskChampionSession.makeManager factory as saved views. The full definition read-modify-save/delete sequence holds the semantic mutation lease, including across processes. Metadata-only operations do not request task synchronization.
+
+The advanced editor supports multiline string values, finite numeric literals, native date/time selection, Taskwarrior duration input, and full or partial UUID values. Explicitly clearing a value removes its attribute. Date values use Unix seconds, preserving their independence from scheduled/planned work and due/deadline. Duration validation delegates to shared TaskwarriorDuration lexical parsing and normalizes fixed UDA seconds to ISO duration text. Recurrence calendar stepping remains separate.
+
+TaskManager.updateUserAttributes, common update, and create validate registered values through Core. Only explicitly changed fields are validated during an update: malformed or unfamiliar existing values survive other edits. Unknown fields remain stored and visible in the raw attribute viewer. A missing definition, invalid value, or storage failure yields a genuine error; no successful write is acknowledged. Task value updates retain UUID and use the existing semantic lease, durable commit, projection refresh, and synchronization hook. Native editors keep errors visible above scrolling content and provide explicit keyboard dismissal.
+
+## Taskwarrior conformance
+
+Pinned Taskwarrior 3.5.0 registers UUID UDAs in Column.cpp and validates them with Lexer::isUUID, not Foundation UUID. It accepts uppercase/full UUIDs and prefixes of at least eight hexadecimal characters, including partial hyphenated spellings. Its lexer also accepts a valid prefix followed by whitespace or a single-character operator; Core preserves that observed behavior and original bytes. Invalid prefixes such as xyz or abcdef12junk fail.
+
+Real isolated CLI fixtures establish numeric -1.25, exponent input, rejection of numeric 001/NaN/12x, duration 1.5h -> PT1H30M, ISO P1DT30M, rejection of combined human 1h30min, and UUID prefix/boundary behavior. They are recorded under /tmp/tsk-issue-3/issue-15/type-oracle/results.json. This editor accepts typed literal values and native dates; it does not claim arbitrary Taskwarrior arithmetic or date-expression input.
+
+Actual TaskChampion tests verify all five types after reopening, preservation of unknown values and planning fields, definition removal without data loss, byte-exact shared factory definitions, real corrupt-file failures without overwriting the file, and a two-process definition race held before snapshot loading. Taskwarrior export reads the native values with the expected JSON types/timestamps; its later edits are read back through Core.
+
+## UI evidence
+
+TaskAttributeUITests runs in the canonical full iPhone suite and the dedicated iPad lane. It creates all five definitions, validates bad numeric input, edits typed fields and a native date, reopens persisted values, clears a UUID field, and confirms the description is preserved. It uses the common form-reveal and switch helpers with explicit form IDs and keeps screenshot attachments. Existing helper defaults remain unchanged for task date editors.
+
+Local signed generic App/XCUITest compilation passed. Core and native checks are recorded in the issue handoff. No local simulator was booted; canonical runtime execution and screenshot inspection remain pending on the published integration branch. Physical keyboard/device behavior has not been verified and cannot be inferred from injected simulator keys. The HTML UI report explicitly lists every uncaptured before/after and new state.

@@ -51,7 +51,7 @@ public extension TaskManager {
     func saveAttributeDefinition(name: String, label: String = "", type: TaskAttributeType) async throws -> TaskAttributeDefinition {
         let letters = CharacterSet.letters.union(.nonBaseCharacters)
         let first = name.unicodeScalars.first
-        guard let first, first == "_" || letters.contains(first),
+        guard let first, first == "_" || CharacterSet.letters.contains(first),
               name.unicodeScalars.allSatisfy({ letters.contains($0) || CharacterSet.decimalDigits.contains($0) || $0 == "_" || $0 == "-" }) else { throw TaskAttributeError.invalidName(name) }
         guard !TaskFilterSchema.standard.contains(name) else { throw TaskAttributeError.reservedName(name) }
         guard let userAttributeDefinitions else { throw TaskAttributeError.storageNotConfigured }
