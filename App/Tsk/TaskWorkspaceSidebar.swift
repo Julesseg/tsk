@@ -8,6 +8,7 @@ struct TaskWorkspaceSidebar: View {
     let customViews: () -> Void
     let synchronization: () -> Void
     let shortcuts: () -> Void
+    let attributeDefinitions: () -> Void
 
     var body: some View {
         List {
@@ -36,6 +37,8 @@ struct TaskWorkspaceSidebar: View {
                     .accessibilityIdentifier("custom-views")
             }
             Section {
+                Button("Attribute definitions", systemImage: "slider.horizontal.3", action: attributeDefinitions)
+                    .accessibilityIdentifier("attribute-definitions")
                 Button("Synchronization", systemImage: "arrow.triangle.2.circlepath", action: synchronization)
                     .accessibilityIdentifier("synchronization-settings")
                 Button("Shortcuts and Siri", systemImage: "square.stack.3d.up", action: shortcuts)

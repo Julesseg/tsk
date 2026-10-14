@@ -1,12 +1,12 @@
 import XCTest
 
 extension XCTestCase {
-    func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, in containerID: String = "task-editor-form", keyboardDismissIdentifier: String = "dismiss-editor-keyboard", file: StaticString = #filePath, line: UInt = #line) {
         let tutorial = app.buttons["Continue"]
         if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists {
             tutorial.tap()
         }
-        let keyboardDone = app.buttons["dismiss-editor-keyboard"]
+        let keyboardDone = app.buttons[keyboardDismissIdentifier]
         if app.keyboards.firstMatch.exists {
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
             keyboardDone.tap()
@@ -14,7 +14,7 @@ extension XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, "Keyboard still covers task dates", file: file, line: line)
         }
         let control = app.switches[identifier].firstMatch
-        guard revealTaskElement(control, in: "task-editor-form", app: app, file: file, line: line) else { return }
+        guard revealTaskElement(control, in: containerID, app: app, file: file, line: line) else { return }
         let expected = enabled ? "1" : "0"
         if control.value as? String != expected {
             let thumb = control.switches.firstMatch

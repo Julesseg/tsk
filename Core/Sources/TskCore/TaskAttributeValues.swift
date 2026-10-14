@@ -44,36 +44,7 @@ public enum TaskAttributeValues {
     }
 
     public static func durationSeconds(_ raw: String) -> Int64? {
-        if let seconds = Int64(raw), seconds != .min { return seconds }
-        let pattern = #"^(-)?P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$"#
-        if let match = try? NSRegularExpression(pattern: pattern).firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)) {
-            let source = raw as NSString
-            var total: Int64 = 0
-            var parts = 0
-            for (group, unit) in [(2, Int64(31536000)), (3, 2592000), (4, 86400), (5, 3600), (6, 60), (7, 1)] where match.range(at: group).location != NSNotFound {
-                guard let amount = Int64(source.substring(with: match.range(at: group))) else { return nil }
-                let product = amount.multipliedReportingOverflow(by: unit)
-                let sum = total.addingReportingOverflow(product.partialValue)
-                guard !product.overflow, !sum.overflow else { return nil }
-                total = sum.partialValue
-                parts += 1
-            }
-            guard parts > 0, !raw.hasSuffix("T") else { return nil }
-            return match.range(at: 1).location == NSNotFound ? total : -total
-        }
-        if let match = try? NSRegularExpression(pattern: #"^(-)?P(\d+)W$"#).firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
-           let weeks = Int64((raw as NSString).substring(with: match.range(at: 2))) {
-            let result = weeks.multipliedReportingOverflow(by: 604800)
-            guard !result.overflow else { return nil }
-            return match.range(at: 1).location == NSNotFound ? result.partialValue : -result.partialValue
-        }
-        let units: [String: Int64] = ["s": 1, "sec": 1, "secs": 1, "second": 1, "seconds": 1, "min": 60, "mins": 60, "minute": 60, "minutes": 60, "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600, "d": 86400, "day": 86400, "days": 86400, "w": 604800, "wk": 604800, "wks": 604800, "week": 604800, "weeks": 604800, "m": 2592000, "mo": 2592000, "month": 2592000, "months": 2592000, "y": 31536000, "yr": 31536000, "year": 31536000, "years": 31536000]
-        guard let match = try? NSRegularExpression(pattern: #"^(-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))\s?([a-z]+)$"#).firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
-              let number = Double((raw as NSString).substring(with: match.range(at: 1))),
-              let unit = units[(raw as NSString).substring(with: match.range(at: 2))] else { return nil }
-        let seconds = number * Double(unit)
-        guard seconds.isFinite, let result = Int64(exactly: seconds.rounded(.towardZero)), result != .min else { return nil }
-        return result
+        TaskwarriorDuration(raw)?.seconds
     }
 
     private static func durationString(_ seconds: Int64) -> String {

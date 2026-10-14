@@ -9,6 +9,7 @@ final class TaskStore {
     let directory: URL
     var tasks: [TaskRecord] = []
     var savedViews: [SavedTaskView] = []
+    var attributeDefinitions: [TaskAttributeDefinition] = []
     var customView: CustomViewSelection?
     var allTasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
@@ -78,6 +79,12 @@ final class TaskStore {
 
     func removeDependency(id: UUID, reference: String) async -> TaskRecord? {
         await perform { try await $0.removeDependency(id: id, reference: reference) }
+    }
+
+    func loadAttributeDefinitions() async throws { attributeDefinitions = try await manager.attributeDefinitions() }
+
+    func updateUserAttributes(id: UUID, changes: TaskAttributePatch) async -> TaskRecord? {
+        await perform { try await $0.updateUserAttributes(id: id, changes: changes) }
     }
 
     func addAnnotation(id: UUID, text: String) async -> TaskRecord? {

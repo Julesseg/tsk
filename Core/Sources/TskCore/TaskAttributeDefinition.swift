@@ -35,7 +35,7 @@ public enum TaskAttributeError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .storageNotConfigured: "Local attribute-definition storage is unavailable."
         case .invalidName(let name): "Attribute ‘\(name)’ needs a name beginning with a letter or underscore, followed by letters, numbers, underscores, or hyphens."
-        case .reservedName(let name): "‘\(name)’ is a Taskwarrior field with its own task editor. Choose a different attribute name."
+        case .reservedName(let name): "‘\(name)’ is a reserved Taskwarrior field. Choose a different attribute name."
         case .missingDefinition(let name): "The local definition for ‘\(name)’ no longer exists. Reopen the advanced editor."
         case .invalidValue(let name, let type, let guidance): "‘\(name)’ requires a \(type.rawValue) value. \(guidance)"
         }
@@ -51,9 +51,9 @@ public extension TaskManager {
     func saveAttributeDefinition(name: String, label: String = "", type: TaskAttributeType) async throws -> TaskAttributeDefinition {
         let letters = CharacterSet.letters.union(.nonBaseCharacters)
         let first = name.unicodeScalars.first
-        guard let first, first == "_" || letters.contains(first),
+        guard let first, first == "_" || CharacterSet.letters.contains(first),
               name.unicodeScalars.allSatisfy({ letters.contains($0) || CharacterSet.decimalDigits.contains($0) || $0 == "_" || $0 == "-" }) else { throw TaskAttributeError.invalidName(name) }
-        guard !TaskFilterSchema.standard.contains(name) else { throw TaskAttributeError.reservedName(name) }
+        guard !TaskFilterSchema.standard.contains(name), !["annotations", "modification"].contains(where: { $0.matchesBytes(name) }) else { throw TaskAttributeError.reservedName(name) }
         guard let userAttributeDefinitions else { throw TaskAttributeError.storageNotConfigured }
         let lease = try await beginMutation()
         defer { endMutation(lease) }
