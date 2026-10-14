@@ -3,11 +3,13 @@ import TskCore
 
 struct TaskDetailView: View {
     let store: TaskStore
+    let edit: ((TaskRecord) -> Void)?
     @State private var task: TaskRecord
     @State private var isEditing = false
 
-    init(store: TaskStore, task: TaskRecord) {
+    init(store: TaskStore, task: TaskRecord, edit: ((TaskRecord) -> Void)? = nil) {
         self.store = store
+        self.edit = edit
         _task = State(initialValue: task)
     }
 
@@ -45,10 +47,12 @@ struct TaskDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if task.canEdit {
-                Button("Edit") { isEditing = true }
+                Button("Edit") {
+                    if let edit { edit(task) } else { isEditing = true }
+                }
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("edit-task")
-                    .keyboardShortcut("e", modifiers: .command)
+                    .keyboardShortcut(edit == nil ? KeyboardShortcut("e", modifiers: .command) : nil)
             }
         }
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }

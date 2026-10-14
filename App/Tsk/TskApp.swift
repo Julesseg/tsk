@@ -10,5 +10,6 @@ struct TskApp: App {
         WindowGroup {
             TaskStorageRootView()
         }
+        .commands { TaskWorkspaceCommands() }
     }
 }
