@@ -25,4 +25,8 @@ Path(sys.argv[1]).unlink(missing_ok=True)
 PY
 }
 trap cleanup EXIT
+if [[ "$was_booted" == no ]]; then
+    xcrun simctl boot "$simulator_id"
+fi
+xcrun simctl bootstatus "$simulator_id" -b
 xcodebuild test -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "$@"
