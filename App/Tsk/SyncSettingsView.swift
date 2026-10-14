@@ -70,6 +70,15 @@ struct SyncSettingsView: View {
                     Text("Use the same server, client ID and encryption secret as your Taskwarrior clients. Local saves work offline. Synchronization runs after task changes, app opening and restored connectivity; background opportunities depend on iOS. Saving a connection does not mean synchronization succeeded.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if synchronization.configuration != nil {
+                        Text("Disconnecting keeps all tasks saved on this device.").font(.footnote)
+                    }
+                }
+            }
+            .navigationTitle("Synchronization")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if synchronization.configuration != nil {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button("Disconnect", role: .destructive) {
                             Task {
                                 await synchronization.disconnect()
@@ -80,13 +89,8 @@ struct SyncSettingsView: View {
                             }
                         }
                         .disabled(synchronization.isSyncing || synchronization.isSaving)
-                        Text("Disconnecting keeps all tasks saved on this device.").font(.footnote)
                     }
                 }
-            }
-            .navigationTitle("Synchronization")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .onChange(of: serverURL) { savedConnection = false }

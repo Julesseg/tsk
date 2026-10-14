@@ -5,6 +5,7 @@ struct TaskOrganizationSection: View {
     @Binding var draft: TaskDraft
     @Binding var tagInput: String
     let tagError: String?
+    let focus: FocusState<TaskEditorField?>.Binding
     let addTag: () -> Void
 
     var body: some View {
@@ -15,6 +16,7 @@ struct TaskOrganizationSection: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("task-project")
+                    .focused(focus, equals: .project)
             }
             Picker("Priority", selection: $draft.priority) {
                 Text("None").tag("")
@@ -48,6 +50,7 @@ struct TaskOrganizationSection: View {
                     .submitLabel(.done)
                     .onSubmit(addTag)
                     .accessibilityIdentifier("task-tag-input")
+                    .focused(focus, equals: .tag)
                 Button("Add", action: addTag)
                     .buttonStyle(.borderless)
                     .disabled(tagInput.isEmpty)
