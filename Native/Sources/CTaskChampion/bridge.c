@@ -60,3 +60,25 @@ char *tsk_bridge_request(const char *library, const char *input) {
 }
 #endif
 void tsk_bridge_free(char *output) { free(output); }
+
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
+int tsk_bridge_acquire_mutation(const char *path) {
+    int descriptor = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (descriptor < 0) return -errno;
+    while (flock(descriptor, LOCK_EX) != 0) {
+        if (errno == EINTR) continue;
+        int error = errno;
+        close(descriptor);
+        return -error;
+    }
+    return descriptor;
+}
+
+void tsk_bridge_release_mutation(int descriptor) {
+    flock(descriptor, LOCK_UN);
+    close(descriptor);
+}

@@ -1,0 +1,24 @@
+# Dependencies verification
+
+Dependencies use authoritative independent `dep_<raw-reference>` attributes. Reads preserve exact UTF-8 spelling and UUID case; uppercase references do not silently resolve to lowercase Taskwarrior identities. Missing/malformed references produce explicit diagnostics and do not falsely block. Existing self-links and cycles are diagnosed and preserved until explicitly removed. Legacy `depends` remains untouched on unrelated changes and is reconciled only during dedicated link mutation.
+
+`TaskManager.addDependency(id:prerequisiteID:)` resolves stable identities, writes canonical lowercase references, makes duplicate adds idempotent, and rejects self-links, missing targets, and newly introduced cycles. `removeDependency(id:reference:)` removes an exact stored raw reference, including malformed ones; absent links fail explicitly. Dedicated writes atomically patch independent/legacy metadata and modification time while preserving unrelated fields, then call the same durable-commit autosync hook as other task actions. The shared semantic mutation lease from #24 spans validation and commit across managers/processes; no awaited network operation runs under that lease.
+
+`TaskRecord.availability(at:tasks:)` uses full task context to project independent waiting and blocked reasons. Both endpoints block unless completed/deleted, matching the pinned Taskwarrior scan, including recurring/nonstandard endpoint states. Missing references are diagnostic, not blockers. Completion changes availability without discarding dependency metadata. `TaskManager.viewSnapshot(query:project:)` obtains one all-records read and returns selected tasks, full cached context, and project names. UI mutation updates that cache immediately before reload; clock rendering never queries SQLite. Detail also observes the full cache so related or filtered-out records update.
+
+The native dependency section selects prerequisites by task description/status/UUID, navigates to the common detail screen, removes exact links, and exposes genuine validation/storage errors. Matching Today and Upcoming entries retain visibility and display both waiting and blocked reasons. Completed prerequisites remain linked and visible as completed.
+
+## Verified locally
+
+- Full Core suite: 36 tests after combining UTF8 and #24 prerequisites. Dependency coverage includes outside-view prerequisites; both reasons; completion preserving metadata; add/remove/duplicate/self/missing/cycle guards; case-exact and malformed references; imported cycle diagnostics; completed/deleted/recurring/unknown endpoint rules; targeted UTF8-invalid-reference repair; filtered snapshot context. A concurrent opposite-edge regression failed before shared mutation serialization and now passes.
+- Actual TaskChampion SQLite plus Taskwarrior 3.5.0: save/reopen links, `+BLOCKED`/`+BLOCKING` agreement, prerequisite completion preserving links and unrelated fields, exact removal, uppercase/missing/malformed diagnostics with `+UNBLOCKED` agreement, and repair without deleting other references.
+- Real encrypted sync fixture: dedicated dependency add automatically reaches Taskwarrior; desktop prerequisite completion syncs back and removes blocking without deleting the link; dedicated removal automatically reaches Taskwarrior, retaining UUID/opaque fields.
+- Generic arm64 iOS Simulator build-for-testing compiles App and XCUITest, including #24 App storage infrastructure.
+
+## Canonical UI gate and prerequisite
+
+`TskDependencyUITests.testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday` creates an unscheduled prerequisite and planned/waiting dependent, selects the prerequisite outside Today, verifies both reasons, rejects a reverse cycle in the selector, completes through nested common detail, checks only blocking disappears, relaunches with retained completed link, removes it, and verifies durable removal. Screenshot checkpoints are attached when executed.
+
+This branch includes #24 prerequisite chain through `1def54c`: shared storage/semantic coordination, throwing storage factory, and App storage error/retry root. Its App Group container needs #24's ad-hoc signed simulator CI lane. Generic compilation does not prove unsigned simulator container access. Root must batch the next push with that CI signing change and the current editor/keyboard interaction fixes before canonical UI acceptance.
+
+No local simulator or browser started. Canonical UI execution, actual signed simulator App Group access, physical picker/selection ergonomics, iPad/adaptive appearance, and before/after screenshots remain unverified locally. The local report `/tmp/tsk-issue-3/issue-13-ui-report.html` lists all missing captures; it contains no screenshots and has not been visually inspected. The separate #24 owner holds the actual two-process semantic race proof; this ticket does not duplicate that fixture.

@@ -74,10 +74,15 @@ indirect enum FilterExpression: Sendable {
 
 extension TaskManager {
     public func tasks(filter expression: String, schema: TaskFilterSchema = .standard) async throws -> [TaskRecord] {
+        try await viewSnapshot(filter: expression, schema: schema).tasks
+    }
+
+    public func viewSnapshot(filter expression: String, schema: TaskFilterSchema = .standard) async throws -> TaskViewSnapshot {
         let filter = try CompiledTaskFilter(expression, schema: schema)
-        let records = try await replica.tasks()
-        let context = TaskFilterContext(tasks: records, now: now(), calendar: .autoupdatingCurrent)
-        return try records.filter { try filter.includes($0, context: context) }.sorted { $0.id.uuidString < $1.id.uuidString }
+        let records = try await tasks()
+        let context = TaskFilterContext(tasks: records, now: now(), calendar: calendar)
+        let visible = try records.filter { try filter.includes($0, context: context) }
+        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
     }
 
     public func validateFilter(_ expression: String, schema: TaskFilterSchema = .standard) throws {
