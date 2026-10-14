@@ -26,6 +26,7 @@ struct TaskDetailView: View {
                 }
             }
             TaskAvailabilityView(task: task, store: store, isDetail: true)
+            TaskDependenciesSection(store: store, task: task, onSave: { task = $0 })
             Section("Planning") { TaskPlanningSummary(task: task) }
             Section("Attributes") {
                 ForEach(task.attributes.keyIdentities) { key in
@@ -59,7 +60,7 @@ struct TaskDetailView: View {
                 }
             }
         }
-        .onChange(of: store.tasks) { _, tasks in
+        .onChange(of: store.allTasks) { _, tasks in
             if let updated = tasks.first(where: { $0.id == task.id }) { task = updated }
         }
     }

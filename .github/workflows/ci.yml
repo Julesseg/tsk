@@ -46,7 +46,9 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           scripts/build-native.sh host
-          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+          swift build --package-path Native --product tsk-native-probe
+          TSK_NATIVE_PROBE_BINARY="$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
+            TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
 
   app-ui-tests:
     name: App · XCUITest (macOS)
@@ -93,7 +95,7 @@ jobs:
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
             -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
 
       - name: Upload test results
         if: ${{ !cancelled() }}

@@ -53,6 +53,9 @@ public protocol TaskReplica: Sendable {
 public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
     case invalidTag(String)
     case invalidPriority(String)
+    case dependencySelfReference
+    case dependencyCycle
+    case dependencyReferenceNotFound(String)
     case emptyDescription
     case unsupportedTaskKind
     case reservedAttribute(String)
@@ -63,6 +66,9 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .invalidTag(let tag): "The tag ‘\(tag)’ is invalid. Use a name without whitespace or a colon after its first character. Do not start with a digit or operator. Names made only of A–Z letters are reserved."
         case .invalidPriority(let priority): "Priority ‘\(priority)’ is unsupported. Choose H, M, L, or no priority."
+        case .dependencySelfReference: "A task cannot depend on itself."
+        case .dependencyCycle: "This dependency would create a cycle. Choose a different prerequisite."
+        case .dependencyReferenceNotFound(let reference): "The dependency ‘\(reference)’ is no longer linked to this task."
         case .emptyDescription: "Enter a task description before saving."
         case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
@@ -83,7 +89,9 @@ public actor TaskManager {
     var synchronizationTask: Task<Void, Never>?
     var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
-    private let calendar: Calendar
+    var mutationInProgress = false
+    var mutationWaiters: [CheckedContinuation<Void, Never>] = []
+    let calendar: Calendar
 
     public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) {
         self.replica = replica
@@ -102,8 +110,9 @@ public actor TaskManager {
     }
 
     public func availability(id: UUID) async throws -> TaskAvailability {
-        let record = try await task(id: id)
-        return record.availability(at: now())
+        let records = try await tasks()
+        guard let record = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
+        return record.availability(at: now(), tasks: records)
     }
 
     public func upcomingDays() async throws -> [UpcomingDay] {
@@ -119,6 +128,8 @@ public actor TaskManager {
     }
 
     public func create(_ draft: TaskDraft) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let description = draft.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
         guard draft.attributes["recur"] == nil, draft.attributes["parent"] == nil,
@@ -138,10 +149,12 @@ public actor TaskManager {
     }
 
     public func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
-        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags"])
-        if let key = changes.keys.sorted().first(where: { reserved.contains($0) }) {
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags", "depends"])
+        if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }
         guard !changes.isEmpty else { return task }
@@ -159,6 +172,8 @@ public actor TaskManager {
     }
 
     public func complete(id: UUID) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }

@@ -8,6 +8,7 @@ final class TaskStore {
     let manager: TaskManager
     let directory: URL
     var tasks: [TaskRecord] = []
+    var allTasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
     var projectSelection: TaskProjectSelection = .all
     var availableProjects: [String] = []
@@ -19,16 +20,16 @@ final class TaskStore {
     var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: tasks, at: currentDate) }
     private var reloadGeneration = 0
 
-    init() {
+    init() throws {
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
-        directory = TaskChampionSession.directory(testName: testName)
+        directory = try TaskChampionSession.directory(testName: testName)
         let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
         fixedDate = fixed
         manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
     }
 
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
-        task.availability(at: fixedDate ?? date)
+        task.availability(at: fixedDate ?? date, tasks: allTasks)
     }
 
     func reload() async {
@@ -39,11 +40,11 @@ final class TaskStore {
         isLoading = true
         defer { if generation == reloadGeneration { isLoading = false } }
         do {
-            let loaded = try await manager.tasks(query: requestedQuery, project: requestedProject)
-            let projects = try await manager.projects()
+            let snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject)
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
-            tasks = loaded
-            availableProjects = projects
+            tasks = snapshot.tasks
+            allTasks = snapshot.allTasks
+            availableProjects = snapshot.projects
             error = nil
         } catch {
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
@@ -59,6 +60,16 @@ final class TaskStore {
         await perform { try await $0.update(id: id, changes: changes) }
     }
 
+    func dependencyLinks(for task: TaskRecord) -> [TaskDependencyLink] { task.dependencyLinks(in: allTasks) }
+
+    func addDependency(id: UUID, prerequisiteID: UUID) async -> TaskRecord? {
+        await perform { try await $0.addDependency(id: id, prerequisiteID: prerequisiteID) }
+    }
+
+    func removeDependency(id: UUID, reference: String) async -> TaskRecord? {
+        await perform { try await $0.removeDependency(id: id, reference: reference) }
+    }
+
     func complete(id: UUID) async -> TaskRecord? {
         await perform { try await $0.complete(id: id) }
     }
@@ -69,6 +80,8 @@ final class TaskStore {
         defer { isSaving = false }
         do {
             let saved = try await action(manager)
+            allTasks.removeAll { $0.id == saved.id }
+            allTasks.append(saved)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
             if query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }

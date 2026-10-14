@@ -34,7 +34,7 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
         let execution = BackgroundSynchronizationExecution()
         task.expirationHandler = { Task { @MainActor in await execution.expire() } }
         do {
-            let directory = TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
+            let directory = try TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
             let manager = try await TaskChampionSession.open(directory: directory)
             execution.manager = manager
             guard !execution.expired else {
