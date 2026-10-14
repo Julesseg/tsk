@@ -2,9 +2,9 @@ import Foundation
 
 public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
-    public var attributes: [String: String]
+    public var attributes: TaskAttributes
 
-    public init(id: UUID, attributes: [String: String]) {
+    public init(id: UUID, attributes: TaskAttributes) {
         self.id = id
         self.attributes = attributes
     }
@@ -31,10 +31,14 @@ public enum TaskQuery: String, CaseIterable, Sendable {
 }
 
 public struct TaskDraft: Equatable, Sendable {
-    public var description: String
-    public var attributes: [String: String]
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.description.matchesBytes(rhs.description) && lhs.attributes == rhs.attributes
+    }
 
-    public init(description: String = "", attributes: [String: String] = [:]) {
+    public var description: String
+    public var attributes: TaskAttributes
+
+    public init(description: String = "", attributes: TaskAttributes = [:]) {
         self.description = description
         self.attributes = attributes
     }
@@ -42,8 +46,8 @@ public struct TaskDraft: Equatable, Sendable {
 
 public protocol TaskReplica: Sendable {
     func tasks() async throws -> [TaskRecord]
-    func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord
-    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord
+    func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord
+    func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord
 }
 
 public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
@@ -133,7 +137,7 @@ public actor TaskManager {
         return saved
     }
 
-    public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+    public func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags"])

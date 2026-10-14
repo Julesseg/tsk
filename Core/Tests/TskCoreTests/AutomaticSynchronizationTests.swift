@@ -36,13 +36,13 @@ private actor AutomaticSyncTestReplica: TaskSynchronizingReplica {
     var startedWaiter: CheckedContinuation<Void, Never>?
     var releaseWaiter: CheckedContinuation<Void, Never>?
     func tasks() async throws -> [TaskRecord] { Array(records.values) }
-    func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord {
+    func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord {
         if writesFail { throw TaskManagementError.storage("Injected commit failure") }
         let record = TaskRecord(id: id, attributes: attributes)
         records[id] = record
         return record
     }
-    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+    func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
         guard var record = records[id] else { throw TaskManagementError.taskNotFound(id) }
         for (key, value) in changes { record.attributes[key] = value }
         records[id] = record

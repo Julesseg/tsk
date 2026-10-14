@@ -42,7 +42,7 @@ struct TaskEditorView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: tagInput) { _, _ in tagError = nil }
+            .onChange(of: UTF8String(tagInput)) { _, _ in tagError = nil }
             .navigationTitle(original == nil ? "New task" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -87,14 +87,10 @@ struct TaskEditorView: View {
         }
     }
 
-    private var changes: [String: String?] {
+    private var changes: TaskAttributePatch {
         guard let original else { return [:] }
         var edited = draft.attributes
         edited["description"] = draft.description
-        var patch: [String: String?] = [:]
-        for key in Set(edited.keys).union(original.attributes.keys) where edited[key] != original.attributes[key] {
-            patch.updateValue(edited[key], forKey: key)
-        }
-        return patch
+        return edited.changes(comparedTo: original.attributes)
     }
 }
