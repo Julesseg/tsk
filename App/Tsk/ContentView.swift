@@ -156,7 +156,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, editingTask == nil, !store.isSaving else { return nil }
+        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },

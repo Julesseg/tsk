@@ -95,6 +95,7 @@ struct TaskEditorView: View {
             }
             .interactiveDismissDisabled(store.isSaving)
             .onAppear { focusedField = .description }
+            .modifier(TaskWorkspacePanel(store: store))
         }
     }
 

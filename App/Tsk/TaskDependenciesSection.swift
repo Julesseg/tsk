@@ -95,6 +95,7 @@ struct TaskDependencySelection: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(store.isSaving) } }
             .interactiveDismissDisabled(store.isSaving)
+            .modifier(TaskWorkspacePanel(store: store))
         }
     }
 
