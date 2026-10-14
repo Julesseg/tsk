@@ -56,6 +56,9 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
     case dependencySelfReference
     case dependencyCycle
     case dependencyReferenceNotFound(String)
+    case emptyAnnotation
+    case invalidAnnotationTimestamp
+    case annotationNotFound(String)
     case emptyDescription
     case unsupportedTaskKind
     case reservedAttribute(String)
@@ -69,6 +72,9 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         case .dependencySelfReference: "A task cannot depend on itself."
         case .dependencyCycle: "This dependency would create a cycle. Choose a different prerequisite."
         case .dependencyReferenceNotFound(let reference): "The dependency ‘\(reference)’ is no longer linked to this task."
+        case .emptyAnnotation: "Enter annotation text before saving."
+        case .invalidAnnotationTimestamp: "A valid timestamp could not be assigned to this annotation."
+        case .annotationNotFound: "This annotation is no longer available. Reopen the task and try again."
         case .emptyDescription: "Enter a task description before saving."
         case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
@@ -156,7 +162,7 @@ public actor TaskManager {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags", "depends"])
-        if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) }) {
+        if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) || $0.utf8.starts(with: "annotation_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }
         guard !changes.isEmpty else { return task }
