@@ -35,6 +35,10 @@ struct TaskDetailView: View {
             Section("Attributes") {
                 ForEach(task.attributes.keyIdentities) { key in
                     LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(key.rawValue)
+                        .accessibilityValue(task.attributes[key.rawValue] ?? "")
+                        .accessibilityIdentifier("raw-attribute-\(key.rawValue)")
                 }
             }
             Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }

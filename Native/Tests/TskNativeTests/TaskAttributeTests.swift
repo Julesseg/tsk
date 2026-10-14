@@ -61,6 +61,10 @@ func taskwarriorReadsAllFiveNativeAttributeTypesAndNativeReadsItsEdits() async t
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = ["rc:\(config.path)", "rc.recurrence=off"] + arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["TASKRC"] = config.path
+        environment["TASKDATA"] = directory.path
+        process.environment = environment
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice

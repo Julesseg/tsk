@@ -53,11 +53,13 @@ struct TaskAdvancedAttributesEditor: View {
                         }))
                         .disabled(!task.canEdit || store.isSaving)
                         .accessibilityIdentifier("uda-enabled-\(definition.name.rawValue)")
+                        .accessibilityLabel("Set \(definition.label.isEmpty ? definition.name.rawValue : definition.label) value")
                         if let raw = value(definition) {
                             if definition.type == .date {
                                 if let date = TaskAttributeValues.date(raw) {
                                     DatePicker("Value", selection: Binding(get: { date }, set: { edits[definition.name.rawValue] = String(Int($0.timeIntervalSince1970)) }), displayedComponents: [.date, .hourAndMinute])
                                         .disabled(!task.canEdit || store.isSaving).accessibilityIdentifier("uda-date-\(definition.name.rawValue)")
+                                        .accessibilityLabel(definition.label.isEmpty ? definition.name.rawValue : definition.label)
                                 } else {
                                     Text("Unrecognized value: \(raw)").font(.footnote)
                                     Button("Use current date") { edits[definition.name.rawValue] = String(Int(store.currentDate.timeIntervalSince1970)) }

@@ -85,7 +85,7 @@ actor AttributeDefinitionTestStore: TaskAttributeDefinitionsStore {
     #expect(schema.contains("annotation_bad"))
     #expect(schema.contains("dep_bad"))
     #expect(schema.contains("tag_\u{301}"))
-    for name in ["due", "priority", "uuid", "tag_test", "annotation_1"] {
+    for name in ["due", "priority", "uuid", "tag_test", "annotation_1", "annotations", "modification"] {
         await #expect(throws: TaskAttributeError.reservedName(name)) { try await manager.saveAttributeDefinition(name: name, type: .string) }
     }
     for name in ["", "1invalid", "has space", "field.type"] {

@@ -68,6 +68,19 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Task with local typed values")
+        openAdvanced(app)
+        app.buttons["manage-attribute-definitions"].tap()
+        let scoreDefinition = app.buttons["attribute-definition-score"]
+        XCTAssertTrue(revealTaskElement(scoreDefinition, in: "attribute-definitions-list", app: app))
+        scoreDefinition.swipeLeft()
+        app.buttons["Remove definition"].tap()
+        XCTAssertTrue(scoreDefinition.waitForNonExistence(timeout: 10))
+        app.buttons["Done"].tap()
+        app.buttons["Cancel"].tap()
+        let storedScore = app.descendants(matching: .any).matching(identifier: "raw-attribute-score").firstMatch
+        XCTAssertTrue(revealTaskElement(storedScore, in: "task-detail-form", app: app))
+        XCTAssertEqual(storedScore.value as? String, "-1.25")
+        capture("Removing a local definition keeps the raw task value", app: app)
     }
 
     private func openAdvanced(_ app: XCUIApplication) {
