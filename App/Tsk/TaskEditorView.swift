@@ -40,7 +40,20 @@ struct TaskEditorView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            .accessibilityIdentifier("task-editor-form")
             .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if focusedField != nil {
+                    HStack {
+                        Spacer()
+                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { focusedField = nil }
+                            .accessibilityIdentifier("dismiss-editor-keyboard")
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial)
+                }
+            }
             .safeAreaInset(edge: .top) {
                 if let error = error ?? tagError {
                     Text(error)
@@ -55,11 +68,6 @@ struct TaskEditorView: View {
             .navigationTitle(original == nil ? "New task" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .accessibilityIdentifier("dismiss-editor-keyboard")
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }.disabled(store.isSaving)
                 }
