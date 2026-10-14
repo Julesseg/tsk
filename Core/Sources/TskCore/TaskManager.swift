@@ -91,7 +91,7 @@ public actor TaskManager {
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
-    private let calendar: Calendar
+    let calendar: Calendar
 
     public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) {
         self.replica = replica
@@ -107,13 +107,6 @@ public actor TaskManager {
             }
             return $0.id.uuidString < $1.id.uuidString
         }
-    }
-
-    public func viewSnapshot(query: TaskQuery = .all, project: TaskProjectSelection = .all) async throws -> TaskViewSnapshot {
-        let records = try await tasks()
-        let instant = now()
-        let visible = records.filter { query.includes($0, now: instant, calendar: calendar) && project.includes($0) }
-        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: try await projects())
     }
 
     public func availability(id: UUID) async throws -> TaskAvailability {

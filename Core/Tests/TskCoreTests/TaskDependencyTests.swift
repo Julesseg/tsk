@@ -140,3 +140,22 @@ private func dependencyAttempt(_ manager: TaskManager, id: UUID, prerequisiteID:
     #expect(!updated.tasks[0].availability(at: Date(timeIntervalSince1970: 1791972000), tasks: updated.allTasks).isBlocked)
     #expect(updated.tasks[0].dependencyReferences == [target.id.uuidString.lowercased()])
 }
+
+@Test func invalidDependencyReferencesKeepDistinctUTF8IdentitiesAndAllowTargetedRepair() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let composed = "caf\u{00E9}"
+    let decomposed = "cafe\u{0301}"
+    let leadingMark = "\u{0301}reference"
+    let task = try await manager.create(TaskDraft(description: "Raw references", attributes: ["dep_\(composed)": "composed", "dep_\(decomposed)": "decomposed", "dep_\(leadingMark)": "leading mark", "depends": "opaque legacy"]))
+    let links = try await manager.dependencyLinks(id: task.id)
+    #expect(Set(links.map(\.id)).count == 3)
+    #expect(links.contains { $0.reference.utf8.elementsEqual(leadingMark.utf8) })
+    #expect(links.allSatisfy { $0.issue == .invalidReference })
+    _ = try await manager.update(id: task.id, changes: ["description": "Unrelated edit"])
+    #expect(try await manager.task(id: task.id).attributes["depends"] == "opaque legacy")
+    let repaired = try await manager.removeDependency(id: task.id, reference: decomposed)
+    #expect(repaired.attributes["dep_\(decomposed)"] == nil)
+    #expect(repaired.attributes["dep_\(composed)"] == "composed")
+    #expect(repaired.attributes["dep_\(leadingMark)"] == "leading mark")
+    #expect(!((try await manager.availability(id: task.id)).isBlocked))
+}
