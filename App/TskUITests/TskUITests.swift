@@ -36,6 +36,44 @@ final class TskUITests: XCTestCase {
         screenshot("Raw attributes and identity", app: app)
     }
 
+    func testDescriptionEditAndCompletionPersistAcrossRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        app.buttons["new-task"].tap()
+        let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText("Original task")
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Original task"].waitForExistence(timeout: 10))
+        app.staticTexts["Original task"].tap()
+        app.buttons["edit-task"].tap()
+        let editor = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.typeText(" revised")
+        screenshot("Edited draft", app: app)
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Original task revised"].waitForExistence(timeout: 10))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Original task revised"].waitForExistence(timeout: 10))
+        screenshot("Edited task after relaunch", app: app)
+        app.staticTexts["Original task revised"].tap()
+        XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 5))
+        app.buttons["complete-task"].tap()
+        XCTAssertFalse(app.buttons["complete-task"].waitForExistence(timeout: 2))
+        screenshot("Completed detail", app: app)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Original task revised"].exists)
+        app.segmentedControls["task-status-view"].buttons["Completed"].tap()
+        XCTAssertTrue(app.staticTexts["Original task revised"].waitForExistence(timeout: 10))
+        screenshot("Completed list after relaunch", app: app)
+    }
+
     private func screenshot(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

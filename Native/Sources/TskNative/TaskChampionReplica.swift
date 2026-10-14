@@ -19,8 +19,12 @@ public actor TaskChampionReplica: TaskReplica {
         try request(command: "create", id: id, attributes: attributes)
     }
 
-    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil) throws -> T {
-        let request = Request(path: directory.path, command: command, id: id, attributes: attributes)
+    public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+        try request(command: "update", id: id, changes: changes)
+    }
+
+    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, changes: [String: String?]? = nil) throws -> T {
+        let request = Request(path: directory.path, command: command, id: id, attributes: attributes, changes: changes)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
             throw TaskManagementError.storage("Could not encode the task operation.")
@@ -41,6 +45,7 @@ private struct Request: Encodable {
     let command: String
     let id: UUID?
     let attributes: [String: String]?
+    let changes: [String: String?]?
 }
 
 private struct Response<T: Decodable>: Decodable {

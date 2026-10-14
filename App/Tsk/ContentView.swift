@@ -4,6 +4,7 @@ import TskCore
 struct ContentView: View {
     @State private var store = TaskStore()
     @State private var isCapturing = false
+    @State private var editingTask: TaskRecord?
 
     var body: some View {
         NavigationStack {
@@ -17,11 +18,11 @@ struct ContentView: View {
                         Button("Retry") { Task { await store.reload() } }
                     }
                 } else if store.tasks.isEmpty {
-                    ContentUnavailableView("No tasks yet", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                    ContentUnavailableView(store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
                 } else {
                     List(store.tasks) { task in
                         NavigationLink {
-                            TaskDetailView(task: task)
+                            TaskDetailView(store: store, task: task)
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(task.description)
@@ -35,6 +36,19 @@ struct ContentView: View {
                             }
                         }
                         .accessibilityIdentifier("task-\(task.id.uuidString)")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if task.canComplete {
+                                Button("Complete", systemImage: "checkmark") {
+                                    Task { _ = await store.complete(id: task.id) }
+                                }
+                                .tint(.green)
+                                .disabled(store.isSaving)
+                            }
+                            if task.canEdit {
+                                Button("Edit", systemImage: "pencil") { editingTask = task }
+                                    .disabled(store.isSaving)
+                            }
+                        }
                     }
                     .refreshable { await store.reload() }
                 }
@@ -50,88 +64,30 @@ struct ContentView: View {
                     .background(.regularMaterial)
                 }
             }
+            .safeAreaInset(edge: .top) {
+                Picker("Task status", selection: $store.query) {
+                    Text("Unfinished").tag(TaskQuery.unfinished)
+                    Text("Completed").tag(TaskQuery.completed)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+                .accessibilityIdentifier("task-status-view")
+            }
             .navigationTitle("Tasks")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("New task", systemImage: "plus") { isCapturing = true }
+                    Button("New task", systemImage: "plus") { store.query = .unfinished; isCapturing = true }
                         .accessibilityIdentifier("new-task")
                         .keyboardShortcut("n", modifiers: .command)
                 }
             }
             .overlay { if store.isLoading && store.tasks.isEmpty { ProgressView() } }
             .sheet(isPresented: $isCapturing) {
-                TaskDraftView(store: store)
+                TaskEditorView(store: store)
             }
-            .task { await store.reload() }
+            .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
+            .task(id: store.query) { await store.reload() }
         }
-    }
-}
-
-struct TaskDraftView: View {
-    let store: TaskStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var draft = TaskDraft()
-    @State private var error: String?
-    @FocusState private var isDescriptionFocused: Bool
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Task") {
-                    TextField("What needs to be done?", text: $draft.description, axis: .vertical)
-                        .accessibilityIdentifier("task-description")
-                        .focused($isDescriptionFocused)
-                }
-                Section {
-                    Text("Review your task before saving. It will be stored locally and available offline.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(.red).accessibilityIdentifier("draft-error")
-                    }
-                }
-            }
-            .navigationTitle("New task")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.disabled(store.isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            if await store.save(draft) { dismiss() } else { error = store.error }
-                        }
-                    }
-                    .disabled(store.isSaving)
-                    .accessibilityIdentifier("save-task")
-                    .keyboardShortcut(.return, modifiers: .command)
-                }
-            }
-            .interactiveDismissDisabled(store.isSaving)
-            .onAppear { isDescriptionFocused = true }
-        }
-    }
-}
-
-struct TaskDetailView: View {
-    let task: TaskRecord
-
-    var body: some View {
-        Form {
-            Section("Description") { Text(task.description).textSelection(.enabled) }
-            Section("Attributes") {
-                ForEach(task.attributes.keys.sorted(), id: \.self) { key in
-                    LabeledContent(key, value: task.attributes[key] ?? "")
-                }
-            }
-            Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }
-            if task.isRecurring {
-                Section { Text("Recurring templates and occurrences are preserved. Editing requires the recurrence editor.").font(.footnote) }
-            }
-        }
-        .navigationTitle("Task")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
