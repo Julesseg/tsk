@@ -55,8 +55,12 @@ public enum TaskChampionSession {
         return destination
     }
 
+    public static func makeManager(directory: URL, library: String? = nil, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) -> TaskManager {
+        TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, viewDefinitions: LocalTaskViewStore(directory: directory))
+    }
+
     public static func open(directory: URL, library: String? = nil) async throws -> TaskManager {
-        let manager = TaskManager(replica: TaskChampionReplica(directory: directory, library: library))
+        let manager = makeManager(directory: directory, library: library)
         let configuration = try await SyncConfigurationStore(directory: directory, library: library).load()
         await manager.configureSynchronization(configuration)
         return manager

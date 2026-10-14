@@ -27,7 +27,7 @@ final class TaskStore {
         directory = try TaskChampionSession.directory(testName: testName)
         let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
         fixedDate = fixed
-        manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() }, viewDefinitions: LocalTaskViewStore(directory: LocalTaskViewStore.directory(testName: testName)))
+        manager = TaskChampionSession.makeManager(directory: directory, now: { fixed ?? Date() })
     }
 
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {

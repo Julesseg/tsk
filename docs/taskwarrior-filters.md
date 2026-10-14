@@ -2,8 +2,9 @@
 
 A custom view evaluates its raw Taskwarrior expression over all locally stored
 tasks. There is no added pending-status or project predicate. View names and
-expressions are saved only on this device, separately from the TaskChampion
-replica, with an atomic write before acknowledgement. Task edits and completion
+expressions are saved only on this device as metadata in the shared App Group
+replica directory, with an atomic write before acknowledgement. They are shared
+with local app participants but do not enter TaskChampion synchronization. Task edits and completion
 use the existing Core actions and refresh membership after durable commit.
 
 The reference client is Taskwarrior **3.5.0**, with `regex=1` and
@@ -44,7 +45,12 @@ Core owns the lexer, boolean AST, schema, predicate evaluation and saved-view
 validation. `TaskManager.tasks(filter:schema:)` and `validateFilter` are the
 public query boundary; `savedViews`, `saveView`, and `deleteView` handle local
 view definitions through an injected external store. The native implementation
-stores protected JSON in Application Support outside the synchronized replica.
+stores protected JSON beside the shared SQLite database. The native app and
+participant factories inject the same store. Saved-view read-modify-save
+operations hold the common semantic mutation lease across the entire operation,
+including awaited storage calls, preventing actor reentrancy and cross-process
+lost updates. View-only changes do not trigger task synchronization. An absent
+optional view store produces an explicit read/write error.
 
 The small portable C++17 helper uses `std::regex` ECMAScript and
 `regex_search`, matching the pinned upstream

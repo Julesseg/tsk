@@ -7,13 +7,6 @@ public actor LocalTaskViewStore: TaskViewDefinitionsStore {
 
     public init(directory: URL) { self.directory = directory }
 
-    public static func directory(testName: String? = nil) -> URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        var directory = support.appendingPathComponent("tsk-local-views", isDirectory: true)
-        if let testName { directory.appendPathComponent("ui-tests/\(testName)", isDirectory: true) }
-        return directory
-    }
-
     public func load() throws -> [SavedTaskView] {
         guard FileManager.default.fileExists(atPath: file.path) else { return [] }
         return try JSONDecoder().decode([SavedTaskView].self, from: Data(contentsOf: file))
