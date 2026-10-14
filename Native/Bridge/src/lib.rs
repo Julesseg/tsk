@@ -25,6 +25,8 @@ struct Request {
     #[serde(rename = "syncGeneration")]
     sync_generation: Option<u64>,
     source: Option<String>,
+    #[serde(rename = "allowMigration")]
+    allow_migration: Option<bool>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -48,7 +50,7 @@ impl SyncConfiguration {
 
 async fn execute(request: Request) -> Result<Value, String> {
     if request.command == "prepareShared" {
-        migration::prepare(&request.path, request.source.as_deref().ok_or("Missing legacy storage path")?).await?;
+        migration::prepare(&request.path, request.source.as_deref().ok_or("Missing legacy storage path")?, request.allow_migration.unwrap_or(false)).await?;
         return Ok(json!(true));
     }
     if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }

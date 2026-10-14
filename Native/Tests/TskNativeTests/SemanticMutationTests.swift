@@ -4,7 +4,7 @@ import TskCore
 import TskNative
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_NATIVE_PROBE_BINARY"] != nil))
-func separateProcessesCannotCommitOpposingDependencyEdgesFromStaleValidatedSnapshots() async throws {
+@MainActor func separateProcessesCannotCommitOpposingDependencyEdgesFromStaleValidatedSnapshots() async throws {
     for coordinated in [false, true] {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -33,6 +33,7 @@ func separateProcessesCannotCommitOpposingDependencyEdgesFromStaleValidatedSnaps
         }
         try Data().write(to: release)
         try await waitForProbe { FileManager.default.fileExists(atPath: aOutput.path) && FileManager.default.fileExists(atPath: bOutput.path) }
+        try await waitForProbe { !a.isRunning && !b.isRunning }
         let outputs = try [aOutput, bOutput].map { try #require(JSONSerialization.jsonObject(with: Data(contentsOf: $0)) as? [String: String]) }
         #expect(outputs.filter { $0["saved"] != nil }.count == (coordinated ? 1 : 2))
         if coordinated { #expect(outputs.contains { $0["error"] == TaskManagementError.dependencyCycle.localizedDescription }) }
@@ -52,7 +53,7 @@ private func launchMutationProbe(storage: URL, source: UUID, prerequisite: UUID,
     return process
 }
 
-private func waitForProbe(_ condition: () -> Bool) async throws {
+@MainActor private func waitForProbe(_ condition: () -> Bool) async throws {
     let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while !condition() {
         guard ContinuousClock.now < deadline else { throw TaskManagementError.storage("Mutation process probe timed out") }

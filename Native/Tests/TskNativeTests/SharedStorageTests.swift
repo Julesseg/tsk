@@ -32,3 +32,20 @@ import TskNative
     #expect(try await original.task(id: task.id) == task)
     #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("group/TaskChampion").path))
 }
+
+@Test func aParticipatingExtensionCannotCreateAnEmptyGroupBeforeTheAppMigratesItsTasks() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let container = root.appendingPathComponent("group")
+    let legacy = root.appendingPathComponent("app-private")
+    let manager = TaskManager(replica: TaskChampionReplica(directory: legacy))
+    let original = try await manager.create(TaskDraft(description: "Existing app task"))
+    #expect(throws: (any Error).self) {
+        try TaskChampionSession.prepareShared(container: container, legacy: root.appendingPathComponent("extension-private"), allowMigration: false)
+    }
+    #expect(!FileManager.default.fileExists(atPath: container.appendingPathComponent("TaskChampion").path))
+    let shared = try TaskChampionSession.prepareShared(container: container, legacy: legacy)
+    let participant = try TaskChampionSession.prepareShared(container: container, legacy: root.appendingPathComponent("extension-private"), allowMigration: false)
+    #expect(participant == shared)
+    #expect(try await TaskChampionSession.open(directory: participant).task(id: original.id) == original)
+}
