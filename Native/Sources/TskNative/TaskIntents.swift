@@ -73,7 +73,9 @@ public struct CreateTaskIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult & ReturnsValue<IntentTaskEntity> & ProvidesDialog {
         let manager = try await IntentTaskSession.open(directory: directory)
-        let task = try await manager.create(TaskDraft(description: taskDescription, attributes: project.map { ["project": $0] } ?? [:]))
+        var attributes: TaskAttributes = [:]
+        if let project { attributes["project"] = project }
+        let task = try await manager.create(TaskDraft(description: taskDescription, attributes: attributes))
         return .result(value: IntentTaskEntity(task), dialog: "Saved locally: \(task.description)")
     }
 }

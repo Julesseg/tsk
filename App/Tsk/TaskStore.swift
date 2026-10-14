@@ -19,9 +19,9 @@ final class TaskStore {
     var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: tasks, at: currentDate) }
     private var reloadGeneration = 0
 
-    init() {
+    init() throws {
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
-        directory = TaskChampionSession.directory(testName: testName)
+        directory = try TaskChampionSession.directory(testName: testName)
         let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
         fixedDate = fixed
         manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })

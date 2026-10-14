@@ -34,7 +34,7 @@ library, backend, client, secret = sys.argv[1:]
 native = connect(library)
 root = pathlib.Path(tempfile.mkdtemp(prefix='tsk-process-admission-'))
 print('Fixture:', root, flush=True)
-attrs_pairs = os.environ.get('TSK_NATIVE_ATTRIBUTE_PAIRS') == '1'
+attrs_pairs = True
 
 
 def attributes(value):
