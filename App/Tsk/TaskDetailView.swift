@@ -28,8 +28,8 @@ struct TaskDetailView: View {
             TaskAvailabilityView(task: task, store: store, isDetail: true)
             Section("Planning") { TaskPlanningSummary(task: task) }
             Section("Attributes") {
-                ForEach(task.attributes.keys.sorted(), id: \.self) { key in
-                    LabeledContent(key, value: task.attributes[key] ?? "")
+                ForEach(task.attributes.keyIdentities) { key in
+                    LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
                 }
             }
             Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }

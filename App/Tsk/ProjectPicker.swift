@@ -10,8 +10,8 @@ struct ProjectPicker: View {
             Picker("Project", selection: $store.projectSelection) {
                 Text("All projects").tag(TaskProjectSelection.all)
                 Text("Without a project").tag(TaskProjectSelection.unassigned)
-                ForEach(projects, id: \.self) { project in
-                    Text(project).tag(TaskProjectSelection.project(project))
+                ForEach(projects.map { UTF8String($0) }) { project in
+                    Text(project.rawValue).tag(TaskProjectSelection.project(project.rawValue))
                 }
             }
         } label: {
@@ -21,7 +21,7 @@ struct ProjectPicker: View {
     }
 
     private var projects: [String] {
-        Array(Set(store.availableProjects + [store.projectSelection.projectName].compactMap { $0 })).sorted()
+        Array(Set((store.availableProjects + [store.projectSelection.projectName].compactMap { $0 }).map { UTF8String($0) })).sorted().map(\.rawValue)
     }
 
     private var title: String {

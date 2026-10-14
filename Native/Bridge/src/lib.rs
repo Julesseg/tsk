@@ -103,12 +103,18 @@ fn sync_generation(path: &str) -> u64 {
 }
 
 #[derive(Deserialize)]
+struct Attribute<T> {
+    key: String,
+    value: T,
+}
+
+#[derive(Deserialize)]
 struct Request {
     path: String,
     command: String,
     id: Option<Uuid>,
-    attributes: Option<HashMap<String, String>>,
-    changes: Option<HashMap<String, Option<String>>>,
+    attributes: Option<Vec<Attribute<String>>>,
+    changes: Option<Vec<Attribute<Option<String>>>>,
     configuration: Option<SyncConfiguration>,
     #[serde(rename = "syncGeneration")]
     sync_generation: Option<u64>,
@@ -141,7 +147,7 @@ async fn execute(request: Request) -> Result<Value, String> {
             }
             let mut operations = taskchampion::Operations::new();
             let mut task = TaskData::create(id, &mut operations);
-            for (key, value) in request.attributes.ok_or("Missing attributes")? {
+            for Attribute { key, value } in request.attributes.ok_or("Missing attributes")? {
                 task.update(key, Some(value), &mut operations);
             }
             replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
@@ -157,15 +163,15 @@ async fn execute(request: Request) -> Result<Value, String> {
             if !matches!(task.get("status"), Some("pending") | Some("completed")) {
                 return Err("Unsupported task state".into());
             }
-            if changes.keys().any(|key| ["uuid", "id", "entry", "recur", "parent", "mask", "imask"].contains(&key.as_str())) {
+            if changes.iter().any(|attribute| ["uuid", "id", "entry", "recur", "parent", "mask", "imask"].contains(&attribute.key.as_str())) {
                 return Err("Reserved task attribute cannot be changed by this action".into());
             }
-            if let Some(status) = changes.get("status") {
-                if status.as_deref() != Some("completed") { return Err("Unsupported status transition".into()); }
+            if let Some(status) = changes.iter().find(|attribute| attribute.key == "status") {
+                if status.value.as_deref() != Some("completed") { return Err("Unsupported status transition".into()); }
                 if task.get("status") == Some("completed") { return Ok(record(task)); }
             }
             let mut operations = vec![taskchampion::Operation::UndoPoint];
-            for (key, value) in changes { task.update(key, value, &mut operations); }
+            for Attribute { key, value } in changes { task.update(key, value, &mut operations); }
             replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
             Ok(record(task))
         }
@@ -191,7 +197,7 @@ async fn execute(request: Request) -> Result<Value, String> {
 }
 
 fn record(task: TaskData) -> Value {
-    json!({"id": task.get_uuid(), "attributes": task.iter().collect::<HashMap<_, _>>()})
+    json!({"id": task.get_uuid(), "attributes": task.iter().map(|(key, value)| json!({"key": key, "value": value})).collect::<Vec<_>>()})
 }
 
 #[no_mangle]

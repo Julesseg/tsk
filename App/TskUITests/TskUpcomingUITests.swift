@@ -17,8 +17,8 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
         description.typeText("One task two future dates")
-        tapSwitch("planned-day-enabled", app: app)
-        tapSwitch("deadline-enabled", app: app)
+        setDateSwitch("planned-day-enabled", to: true, app: app)
+        setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["One task two future dates"].waitForExistence(timeout: 10))
         app.terminate()
@@ -84,12 +84,6 @@ final class TskUpcomingUITests: XCTestCase {
         app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-day-"))
     }
 
-    private func tapSwitch(_ identifier: String, app: XCUIApplication) {
-        let control = app.switches[identifier]
-        for _ in 0..<4 where !control.isHittable { app.swipeUp() }
-        XCTAssertTrue(control.waitForExistence(timeout: 5))
-        control.tap()
-    }
 
     private func tapButton(_ identifier: String, app: XCUIApplication) {
         let control = app.buttons[identifier]
