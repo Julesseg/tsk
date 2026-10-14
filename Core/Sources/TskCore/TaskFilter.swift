@@ -68,6 +68,7 @@ struct CompiledTaskFilter: Sendable {
     }
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
+        // Taskwarrior 3.5 narrows a plain +ACTIVE query before evaluating its predicates.
         if root.requiresWorkingSet, task.status == "completed" || task.status == "deleted" { return false }
         return try root.includes(task, context: context)
     }

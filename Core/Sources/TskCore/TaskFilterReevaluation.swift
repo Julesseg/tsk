@@ -12,6 +12,7 @@ extension FilterExpression {
             case .date(let date):
                 return date.operand.nextEvaluation(context: context)
             case .virtualTag(let tag, _): return tag.nextEvaluation(context: context)
+            case .comparison(let name, _, _) where name == "status": return FilterVirtualTag.waiting.nextEvaluation(context: context)
             default: return nil
             }
         }

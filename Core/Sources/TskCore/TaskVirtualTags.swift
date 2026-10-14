@@ -41,10 +41,10 @@ enum FilterVirtualTag: String, CaseIterable, Sendable {
         case .project: return task.attributes["project"] != nil
         case .priority: return task.attributes["priority"] != nil
         case .uda:
-            return context.schema.attributes.keys.contains { TaskFilterSchema.standard.attributes[$0] == nil && task.attributes[$0.rawValue] != nil }
+            return task.attributes.keys.contains { context.schema.isUserDefined($0) }
         case .orphan:
             return task.attributes.keys.contains { key in
-                context.schema.attributes[UTF8String(key)] == nil && !["annotation_", "tag_", "dep_"].contains { key.utf8.starts(with: $0.utf8) }
+                !context.schema.contains(key)
             }
         default:
             guard !terminal, let due = FilterDateExpression.storedDate(task.attributes["due"]), due.timeIntervalSince1970 > 0 else { return false }

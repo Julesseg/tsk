@@ -9,25 +9,20 @@ indirect enum FilterDateExpression: Sendable {
 
     init(_ raw: String) throws {
         if raw.isEmpty { self = .empty; return }
-        if let parts = Self.captures("^(.+)([+-])([0-9]+(?:\\.[0-9]+)?[a-z]+|P[0-9A-Z.]+)$", raw) {
-            let seconds = try Self.duration(parts[3])
-            self = .offset(try Self(parts[1]), parts[2] == "+" ? seconds : -seconds)
-            return
-        }
         if Self.captures("^-?[0-9]+$", raw) != nil, let seconds = TimeInterval(raw), seconds.isFinite, abs(seconds) <= 253402300799 {
             self = .epoch(seconds); return
         }
-        if let parts = Self.captures("^([0-9]{4})-?([0-9]{2})-?([0-9]{2})(?:[T ]([0-9]{2}):?([0-9]{2})(?::?([0-9]{2}))?(Z|[+-][0-9]{2}:?[0-9]{2})?)?$", raw) {
+        if let parts = Self.captures("^([0-9]{4})-?([0-9]{2})-?([0-9]{2})(?:[T ]([0-9]{2}):?([0-9]{2})(?::?([0-9]{2}))?(Z|[+-][0-9]{2}(?::?[0-9]{2})?)?)?$", raw) {
             let values = parts.dropFirst().prefix(6).map { Int($0) ?? 0 }
             let year = values[0], month = values[1], day = values[2]
             let hour = values[3], minute = values[4], second = values[5]
-            guard (1...9999).contains(year), (1...12).contains(month), (1...31).contains(day), (0...23).contains(hour), (0...59).contains(minute), (0...59).contains(second) else { throw Self.invalid(raw) }
+            guard (1900...9999).contains(year), (1...12).contains(month), (1...31).contains(day), (0...23).contains(hour), (0...59).contains(minute), (0...59).contains(second) else { throw Self.invalid(raw) }
             let zone = parts[7]
             let offset: Int?
             if zone == "Z" { offset = 0 }
             else if !zone.isEmpty {
                 let digits = zone.dropFirst().replacingOccurrences(of: ":", with: "")
-                let hours = Int(digits.prefix(2))!, minutes = Int(digits.suffix(2))!
+                let hours = Int(digits.prefix(2))!, minutes = digits.count == 2 ? 0 : Int(digits.suffix(2))!
                 guard hours <= 23, minutes <= 59 else { throw Self.invalid(raw) }
                 offset = (hours * 3600 + minutes * 60) * (zone.first == "+" ? 1 : -1)
             } else { offset = nil }
@@ -37,6 +32,16 @@ indirect enum FilterDateExpression: Sendable {
             guard let date = utc.date(from: components), utc.dateComponents([.year, .month, .day], from: date).year == year,
                   utc.component(.month, from: date) == month, utc.component(.day, from: date) == day else { throw Self.invalid(raw) }
             self = .absolute(components, offset: offset); return
+        }
+        if let components = Self.alternateDate(raw) { self = .absolute(components, offset: nil); return }
+        let bytes = Array(raw.utf8)
+        for index in bytes.indices.reversed() where index > 0 && (bytes[index] == 43 || bytes[index] == 45) {
+            let suffix = String(decoding: bytes[(index + 1)...], as: UTF8.self)
+            let prefix = String(decoding: bytes[..<index], as: UTF8.self)
+            if let duration = TaskwarriorDuration(suffix), let base = try? Self(prefix) {
+                self = .offset(base, TimeInterval(duration.seconds) * (bytes[index] == 43 ? 1 : -1))
+                return
+            }
         }
         if Self.isNamed(raw) {
             if let parts = Self.captures("^([0-9]+)(st|nd|rd|th)$", raw), let ordinal = Int(parts[1]) {
@@ -68,8 +73,8 @@ indirect enum FilterDateExpression: Sendable {
             if name == "now" { return context.now.addingTimeInterval(1) }
             if (name.count >= 3 && "later".hasPrefix(name)) || (name.count >= 4 && "someday".hasPrefix(name)) { return nil }
             let nextDay = context.calendar.date(byAdding: .day, value: 1, to: context.calendar.startOfDay(for: context.now))!
-            if Self.captures("^[0-9]+:[0-9]{2}(?::[0-9]{2})?$", name) != nil {
-                return min(nextDay, (try? resolve(context)) ?? nextDay)
+            if Self.informalTime(name) != nil {
+                return min(nextDay, ((try? resolve(context)) ?? nextDay).addingTimeInterval(1))
             }
             if Self.holidays.contains(name) {
                 let boundary = Self.holiday(name.hasPrefix("mid") || name == "juhannus" ? name : "easter", context: context).addingTimeInterval(1)
@@ -85,7 +90,10 @@ indirect enum FilterDateExpression: Sendable {
         case .epoch(let seconds): return Date(timeIntervalSince1970: seconds)
         case .absolute(let components, let offset):
             var calendar = context.calendar
-            if let offset { calendar.timeZone = TimeZone(secondsFromGMT: offset)! }
+            if let offset {
+                calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+                return calendar.date(from: components)?.addingTimeInterval(TimeInterval(-offset))
+            }
             return calendar.date(from: components)
         case .named(let name): return try Self.named(name, context: context)
         case .offset(let base, let seconds): return try base.resolve(context)?.addingTimeInterval(seconds)
@@ -94,35 +102,20 @@ indirect enum FilterDateExpression: Sendable {
 
     static func storedDate(_ raw: String?) -> Date? {
         guard let raw else { return nil }
-        let bytes = Array(raw.utf8.drop(while: { [9, 10, 13, 32].contains($0) }))
+        let bytes = Array(raw.utf8.drop(while: { [9, 10, 11, 12, 13, 32].contains($0) }))
         let signed = bytes.first == 45 || bytes.first == 43
         let digits = bytes.dropFirst(signed ? 1 : 0).prefix { (48...57).contains($0) }
         guard !digits.isEmpty else { return nil }
-        var value = UInt64(String(decoding: digits, as: UTF8.self)) ?? .max
-        if bytes.first == 45 { value = 0 &- value }
+        let parsed = UInt64(String(decoding: digits, as: UTF8.self))
+        var value = parsed ?? .max
+        if parsed != nil, bytes.first == 45 { value = 0 &- value }
         let seconds = Int64(bitPattern: value)
         return seconds == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(seconds))
     }
 
     static func duration(_ raw: String) throws -> TimeInterval {
-        let units: [String: Double] = [
-            "s": 1, "sec": 1, "secs": 1, "second": 1, "seconds": 1,
-            "min": 60, "mins": 60, "minute": 60, "minutes": 60,
-            "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600,
-            "d": 86400, "day": 86400, "days": 86400, "daily": 86400, "weekdays": 86400,
-            "w": 604800, "wk": 604800, "wks": 604800, "week": 604800, "weeks": 604800, "weekly": 604800,
-            "fortnight": 1209600, "biweekly": 1209600, "sennight": 1209600,
-            "m": 2592000, "mo": 2592000, "mos": 2592000, "mth": 2592000, "mths": 2592000, "mnths": 2592000, "month": 2592000, "months": 2592000, "monthly": 2592000,
-            "bimonthly": 5270400, "q": 7862400, "qtr": 7862400, "qtrs": 7862400, "qrtr": 7862400, "qrtrs": 7862400, "quarter": 7862400, "quarters": 7862400, "quarterly": 7862400,
-            "y": 31536000, "yr": 31536000, "yrs": 31536000, "year": 31536000, "years": 31536000, "yearly": 31536000, "annual": 31536000,
-            "semiannual": 15811200, "biannual": 63072000, "biyearly": 63072000
-        ]
-        if let seconds = units[raw] { return seconds }
-        if let parts = captures("^(-?[0-9]+(?:\\.[0-9]+)?)([a-z]+)$", raw), let quantity = Double(parts[1]), let unit = units[parts[2]] { return quantity * unit }
-        if let parts = captures("^P(?:(-?[0-9]+(?:\\.[0-9]+)?)Y)?(?:(-?[0-9]+(?:\\.[0-9]+)?)M)?(?:(-?[0-9]+(?:\\.[0-9]+)?)W)?(?:(-?[0-9]+(?:\\.[0-9]+)?)D)?(?:T(?:(-?[0-9]+(?:\\.[0-9]+)?)H)?(?:(-?[0-9]+(?:\\.[0-9]+)?)M)?(?:(-?[0-9]+(?:\\.[0-9]+)?)S)?)?$", raw), parts.dropFirst().contains(where: { !$0.isEmpty }) {
-            return zip(parts.dropFirst(), [31536000.0, 2592000, 604800, 86400, 3600, 60, 1]).reduce(0) { $0 + (Double($1.0) ?? 0) * $1.1 }
-        }
-        throw invalid(raw)
+        guard let duration = TaskwarriorDuration(raw) else { throw invalid(raw) }
+        return TimeInterval(duration.seconds)
     }
 
     static let periodNames = Set(["sopd", "sod", "sond", "eopd", "eod", "eond", "sopw", "sow", "sonw", "eopw", "eow", "eonw", "sopww", "soww", "sonww", "eopww", "eoww", "eonww", "sopm", "som", "sonm", "eopm", "eom", "eonm", "sopq", "soq", "sonq", "eopq", "eoq", "eonq", "sopy", "soy", "sony", "eopy", "eoy", "eony"])
@@ -130,13 +123,43 @@ indirect enum FilterDateExpression: Sendable {
     static let months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
     static let holidays = ["eastermonday", "easter", "ascension", "pentecost", "goodfriday", "midsommar", "midsommarafton", "juhannus"]
 
+    private static func informalTime(_ raw: String) -> (Int, Int, Int)? {
+        guard let parts = captures("^([0-9]{1,2})(?::([0-9]{2})(?::([0-9]+))?)?(am|a|pm|p)?$", raw),
+              !parts[2].isEmpty || !parts[4].isEmpty,
+              var hour = Int(parts[1]), let minute = Int(parts[2].isEmpty ? "0" : parts[2]),
+              let second = Int(parts[3].isEmpty ? "0" : parts[3]) else { return nil }
+        if parts[4].hasPrefix("a"), hour == 12 { hour = 0 }
+        if parts[4].hasPrefix("p"), hour != 12 { hour += 12 }
+        guard hour < 24, minute < 60, second < 60 else { return nil }
+        return (hour, minute, second)
+    }
+
+    private static func alternateDate(_ raw: String) -> DateComponents? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        if let parts = captures("^([0-9]{4})-([0-9]{2})$", raw), let year = Int(parts[1]), let month = Int(parts[2]), (1900...9999).contains(year), (1...12).contains(month) {
+            return DateComponents(year: year, month: month, day: 1)
+        }
+        if let parts = captures("^([0-9]{4})-([0-9]{3})$", raw), let year = Int(parts[1]), let ordinal = Int(parts[2]), (1900...9999).contains(year), (1...366).contains(ordinal),
+           let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)), let date = calendar.date(byAdding: .day, value: ordinal - 1, to: start), calendar.component(.year, from: date) == year {
+            return calendar.dateComponents([.year, .month, .day], from: date)
+        }
+        if let parts = captures("^([0-9]{4})-W([0-9]{2})(?:-([0-9]))?$", raw), let year = Int(parts[1]), let week = Int(parts[2]), (1900...9999).contains(year), (1...53).contains(week),
+           let weekday = Int(parts[3].isEmpty ? "0" : parts[3]), (0...6).contains(weekday),
+           let jan4 = calendar.date(from: DateComponents(year: year, month: 1, day: 4)), let start = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
+           let date = calendar.date(byAdding: .day, value: week * 7 + weekday - (calendar.component(.weekday, from: jan4) - 1) - 4, to: start) {
+            return calendar.dateComponents([.year, .month, .day], from: date)
+        }
+        return nil
+    }
+
     private static func isNamed(_ raw: String) -> Bool {
         if raw == "now" || periodNames.contains(raw) || holidays.contains(raw) { return true }
         if ["today", "tomorrow", "yesterday", "later"].contains(where: { raw.utf8.count >= 3 && $0.hasPrefix(raw) }) { return true }
         if raw.count >= 4 && "someday".hasPrefix(raw) { return true }
         if raw.count >= 3 && (days + months).contains(where: { $0.hasPrefix(raw.lowercased()) }) { return true }
         if captures("^([1-9]|[12][0-9]|3[01])(st|nd|rd|th)$", raw) != nil { return true }
-        return captures("^[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?$", raw) != nil
+        return informalTime(raw) != nil
     }
 
     static func named(_ raw: String, context: TaskFilterContext) throws -> Date {
@@ -166,11 +189,9 @@ indirect enum FilterDateExpression: Sendable {
             let base = calendar.date(byAdding: .month, value: ordinal <= calendar.component(.day, from: day) ? 1 : 0, to: month)!
             return calendar.date(byAdding: .day, value: ordinal - 1, to: base)!
         }
-        if let parts = captures("^([0-9]+):([0-9]{2})(?::([0-9]{2}))?$", raw) {
-            let hour = Int(parts[1])!, minute = Int(parts[2])!, second = Int(parts[3]) ?? 0
-            guard hour <= 23, minute <= 59, second <= 59 else { throw invalid(raw) }
+        if let (hour, minute, second) = informalTime(raw) {
             let date = calendar.date(bySettingHour: hour, minute: minute, second: second, of: day)!
-            return date <= context.now ? calendar.date(byAdding: .day, value: 1, to: date)! : date
+            return date < context.now ? calendar.date(byAdding: .day, value: 1, to: date)! : date
         }
         if holidays.contains(raw) { return holiday(raw, context: context) }
         throw invalid(raw)
