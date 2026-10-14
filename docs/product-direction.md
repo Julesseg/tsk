@@ -2,6 +2,8 @@
 
 This brief records the product choices accepted during the design interview. It describes intended behavior; the repository currently contains the app scaffold, not these features.
 
+The [PRD](prd.md) expands this direction into user stories, implementation decisions, testing decisions, and explicit exclusions.
+
 ## Purpose and audience
 
 tsk is a first-class iOS Taskwarrior client with TaskChampion as its intended backend. Its distinguishing characteristic is its Taskwarrior foundation, combined with a modern interface and integration with the rest of iOS.
