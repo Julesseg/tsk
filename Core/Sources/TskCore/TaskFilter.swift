@@ -56,6 +56,7 @@ struct TaskFilterContext: Sendable {
     let tasks: [TaskRecord]
     let now: Date
     let calendar: Calendar
+    let schema: TaskFilterSchema
 }
 
 struct CompiledTaskFilter: Sendable {
@@ -67,8 +68,12 @@ struct CompiledTaskFilter: Sendable {
     }
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
-        try root.includes(task, context: context)
+        // Taskwarrior 3.5 narrows a plain +ACTIVE query before evaluating its predicates.
+        if root.requiresWorkingSet, task.status == "completed" || task.status == "deleted" { return false }
+        return try root.includes(task, context: context)
     }
+
+    func nextEvaluation(context: TaskFilterContext) -> Date? { root.nextEvaluation(context: context) }
 }
 
 indirect enum FilterExpression: Sendable {
@@ -78,6 +83,29 @@ indirect enum FilterExpression: Sendable {
     case and(FilterExpression, FilterExpression)
     case or(FilterExpression, FilterExpression)
     case xor(FilterExpression, FilterExpression)
+
+    var requiresWorkingSet: Bool {
+        guard !hasDisjunction else { return false }
+        return hasActiveTag
+    }
+
+    private var hasDisjunction: Bool {
+        switch self {
+        case .or, .xor: true
+        case .not(let child): child.hasDisjunction
+        case .and(let left, let right): left.hasDisjunction || right.hasDisjunction
+        default: false
+        }
+    }
+
+    private var hasActiveTag: Bool {
+        switch self {
+        case .predicate(.virtualTag(.active, let required)): required
+        case .and(let left, let right): left.hasActiveTag || right.hasActiveTag
+        case .not(let child): child.hasActiveTag
+        default: false
+        }
+    }
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
@@ -100,9 +128,12 @@ extension TaskManager {
         let schema = try await effectiveFilterSchema(base: schema)
         let filter = try CompiledTaskFilter(expression, schema: schema)
         let records = try await tasks()
-        let context = TaskFilterContext(tasks: records, now: now(), calendar: calendar)
+        var filterCalendar = Calendar(identifier: .gregorian)
+        filterCalendar.timeZone = calendar.timeZone
+        let instant = Date(timeIntervalSince1970: floor(now().timeIntervalSince1970))
+        let context = TaskFilterContext(tasks: records, now: instant, calendar: filterCalendar, schema: schema)
         let visible = try records.filter { try filter.includes($0, context: context) }
-        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
+        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records), nextEvaluation: filter.nextEvaluation(context: context))
     }
 
     public func validateFilter(_ expression: String, schema: TaskFilterSchema = .standard) async throws {

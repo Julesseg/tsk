@@ -142,6 +142,8 @@ struct FilterParser {
         if !quoted, let first = bytes.first, first == 43 || first == 45 {
             let tag = String(decoding: bytes.dropFirst(), as: UTF8.self)
             guard !tag.isEmpty else { throw TaskFilterError.syntax("Expected a tag name.", byteOffset: offset) }
+            if let virtual = FilterVirtualTag(rawValue: tag) { return .virtualTag(virtual, present: first == 43) }
+            if tag == "LATEST" { throw TaskFilterError.unsupported("+LATEST requires device-local Taskwarrior working-set IDs.") }
             if tag.unicodeScalars.allSatisfy({ (65...90).contains($0.value) }) {
                 throw TaskFilterError.unsupported("Virtual tag ‘\(tag)’ requires the virtual-tag filter support.")
             }
@@ -154,6 +156,7 @@ struct FilterParser {
             let name = parts.count > 1 ? parts.dropLast().joined(separator: ".") : attribute
             let modifier = parts.count > 1 ? String(parts.last!) : ""
             guard let type = schema.attributes[UTF8String(name)] else { throw TaskFilterError.unknownAttribute(name) }
+            if type == .date { return .date(try FilterDatePredicate(name: name, modifier: modifier, value: value)) }
             guard type == .string else { throw TaskFilterError.unsupported("\(name) uses \(type.rawValue) semantics; this schema type requires its typed filter support.") }
             return try .attribute(name, modifier: modifier, value: value)
         }

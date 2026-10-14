@@ -56,7 +56,7 @@ import Testing
     } catch let error as TaskFilterError {
         if case .invalidRegex = error {} else { Issue.record("Expected invalidRegex, got \(error)") }
     }
-    for expression in ["+READY", "due:today", "project.word:Work", "1", "project == Work"] {
+    for expression in ["+LATEST", "recur:daily", "project.word:Work", "1", "project == Work"] {
         do {
             _ = try await manager.tasks(filter: expression)
             Issue.record("Expected an explicit unsupported error for \(expression)")
