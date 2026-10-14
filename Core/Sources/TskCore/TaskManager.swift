@@ -80,6 +80,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 
 public actor TaskManager {
     let replica: any TaskReplica
+    let viewDefinitions: (any TaskViewDefinitionsStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
     var synchronizationState: SynchronizationState = .localOnly
@@ -93,8 +94,9 @@ public actor TaskManager {
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil) {
         self.replica = replica
+        self.viewDefinitions = viewDefinitions
         self.now = now
         self.calendar = calendar
     }
