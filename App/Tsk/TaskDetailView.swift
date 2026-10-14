@@ -32,9 +32,14 @@ struct TaskDetailView: View {
             TaskDependenciesSection(store: store, task: task, onSave: { task = $0 })
             Section("Planning") { TaskPlanningSummary(task: task) }
             TaskAnnotationsSection(store: store, task: task, onSave: { task = $0 })
+            TaskAdvancedAttributesSection(store: store, task: task, onSave: { task = $0 })
             Section("Attributes") {
                 ForEach(task.attributes.keyIdentities) { key in
                     LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(key.rawValue)
+                        .accessibilityValue(task.attributes[key.rawValue] ?? "")
+                        .accessibilityIdentifier("raw-attribute-\(key.rawValue)")
                 }
             }
             Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }

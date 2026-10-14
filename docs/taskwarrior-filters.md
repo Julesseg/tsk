@@ -8,9 +8,11 @@ with local app participants but do not enter TaskChampion synchronization. Task 
 use the existing Core actions and refresh membership after durable commit.
 
 The reference client is Taskwarrior **3.5.0**, with `regex=1` and
-`search.case.sensitive=1`. The initial filter slice supports:
+`search.case.sensitive=1`. The current filter implementation supports:
 
 - String attributes, ordinary `+tag`/`-tag`, full UUIDs, and status predicates.
+- Date predicates with named dates, durations and offsets; computed availability,
+  dependency, date, presence, status, local-UDA and orphan virtual tags.
 - Partial `attribute:value`, exact `.is`/`.equals`, `.isnt`, partial `.not`,
   `.none`, `.any`, and string `.before`/`.under`/`.below`,
   `.after`/`.over`/`.above`, `.by` comparisons.
@@ -33,13 +35,48 @@ becoming text searches. Invalid modifiers, parentheses, quotes and regexes
 produce errors before querying or saving. A failed saved-view edit retains
 its previous definition and the editor draft.
 
-Date and virtual-tag expressions, local UDA types/value order, and computed
-or arithmetic operands are extended by the following filter slices. This
-slice returns explicit unsupported errors for them, including priority
-ordering, numeric working-set IDs, and regex flags. `.word`/`.noword` are
-also rejected because pinned Taskwarrior implements different boundaries on
-Darwin and Linux; an explicit supported ECMAScript pattern is available.
-Unsupported input is never reinterpreted as a narrower builder query.
+Numeric/duration/UUID UDA comparison, local value ordering and computed or
+arithmetic operands are extended by the following filter slices. These remain
+explicit unsupported errors, including priority ordering, numeric working-set
+IDs, `+LATEST` and regex flags. `.word`/`.noword` are also rejected because
+pinned Taskwarrior implements different boundaries on Darwin and Linux; an
+explicit supported ECMAScript pattern is available. Unsupported input is never
+reinterpreted as a narrower builder query.
+
+Date fields retain separate meanings: `due:today` filters deadlines and does
+not substitute `scheduled`. A partial date predicate compares the local
+calendar day; `.is`/`.equals` compare instants, `.before` and `.after` are strict,
+and `.by` includes equality. `.none` and `.any` retain empty-date behavior.
+Relative operands include `now`, `today`, `yesterday`, `tomorrow`, weekday/month
+names, ordinals, start/end of previous/current/next day, week, workweek, month,
+quarter and year, and the pinned client's holiday aliases. Informal times,
+extended ISO calendar/ordinal/week dates, UTC offsets, duration aliases and
+signed offsets such as `now-1week` and `today+P1D` use the same public query.
+Invalid dates fail before saving. Raw stored date strings are never rewritten.
+
+The query uses the injected clock and a Gregorian calendar with the injected
+timezone. Day boundaries follow local daylight-saving transitions; duration
+arithmetic uses Taskwarrior's fixed seconds. Defaults match Taskwarrior 3.5.0
+(`due=7`, relative times, Sunday week numbering). Its named week boundaries
+are Monday based, and its midsummer calculation follows the actual pinned
+source, including the weekday subtraction, rather than a locale assumption.
+
+Virtual tags include `READY`, `BLOCKED`, `BLOCKING`, `UNBLOCKED`, date tags
+(`DUE`, `TODAY`, `YESTERDAY`, `TOMORROW`, `OVERDUE`, `WEEK`, `MONTH`, `QUARTER`,
+`YEAR`), status and attribute-presence tags, `UDA` and `ORPHAN`. They evaluate
+against the entire replica, including prerequisites outside the view. READY
+requires pending status, no future wait, no incomplete prerequisite and a
+scheduled instant strictly before now when present. Completed/deleted tasks
+remain available to explicit queries; date virtual tags exclude terminal tasks.
+Plain `+ACTIVE` mirrors Taskwarrior's working-set optimization; an expression
+with `or`/`xor` uses all records. UDA/ORPHAN use the effective byte-exact local
+schema, including the default priority UDA and recognized native raw prefixes.
+
+A custom snapshot publishes `nextEvaluation`. The app rearms a cancellable
+foreground refresh after each snapshot and reloads on significant clock changes
+and foreground activation. Midnight, wait expiry, scheduled/overdue boundaries
+and moving `now` operands therefore update membership without resaving a view.
+Task mutations and prerequisite completion reload the same expression.
 
 Core owns the lexer, boolean AST, schema, predicate evaluation and saved-view
 validation. `TaskManager.tasks(filter:schema:)` and `validateFilter` are the
@@ -74,4 +111,4 @@ raw-record read supplies the selected rows, all records for dependency context,
 and byte-exact project names. A prerequisite outside a custom view continues
 to explain blocking, and completing it updates availability without deleting
 link metadata. The injected Core clock and calendar remain query inputs for
-the later temporal and computed predicate extensions.
+temporal evaluation and the later computed predicate extensions.

@@ -80,6 +80,9 @@ extension TaskManager {
             }
         }
         var attributes = try TaskOrganization.normalizedAttributes(draft.task.attributes)
+        let typed = try await normalizedUserAttributes(attributes.mapValues { Optional($0) })
+        attributes = [:]
+        for (name, value) in typed { if let value { attributes[name] = value } }
         let timestamp = String(Int(now().timeIntervalSince1970))
         attributes["description"] = description
         attributes["status"] = "recurring"

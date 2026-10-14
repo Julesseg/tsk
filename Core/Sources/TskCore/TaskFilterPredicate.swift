@@ -38,6 +38,8 @@ enum FilterComparison: Sendable {
 
 enum FilterPredicate: Sendable {
     case tag(String, present: Bool)
+    case virtualTag(FilterVirtualTag, present: Bool)
+    case date(FilterDatePredicate)
     case comparison(name: String, operation: FilterComparison, value: String)
 
     static func search(_ pattern: String) throws -> Self {
@@ -79,11 +81,13 @@ enum FilterPredicate: Sendable {
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
+        case .date(let predicate): return try predicate.includes(task, context: context)
+        case .virtualTag(let tag, let present): return try tag.includes(task, context: context) == present
         case .tag(let tag, let present): return (task.attributes["tag_\(tag)"] != nil) == present
         case .comparison(let name, let operation, let value):
             let actual: String
             if name == "uuid" { actual = task.id.uuidString.lowercased() }
-            else if name == "status", task.availability(at: context.now).isWaiting { actual = "waiting" }
+            else if name == "status", FilterVirtualTag.isWaiting(task, at: context.now) { actual = "waiting" }
             else if name == "tags" { actual = task.tags.joined(separator: ",") }
             else { actual = task.attributes[name] ?? "" }
             switch operation {

@@ -42,7 +42,7 @@ extension TaskManager {
     public func saveView(id: UUID? = nil, name: String, expression: String, schema: TaskFilterSchema = .standard) async throws -> SavedTaskView {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw TaskViewError.emptyName }
-        try validateFilter(expression, schema: schema)
+        try await validateFilter(expression, schema: schema)
         guard let viewDefinitions else { throw TaskViewError.storageNotConfigured }
         let lease = try await beginMutation()
         defer { endMutation(lease) }

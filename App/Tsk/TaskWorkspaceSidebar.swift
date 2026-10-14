@@ -9,6 +9,7 @@ struct TaskWorkspaceSidebar: View {
     let synchronization: () -> Void
     let shortcuts: () -> Void
     let recurring: () -> Void
+    let attributeDefinitions: () -> Void
 
     var body: some View {
         List {
@@ -38,6 +39,8 @@ struct TaskWorkspaceSidebar: View {
             }
             Section {
                 Button("Recurring templates", systemImage: "repeat", action: recurring).accessibilityIdentifier("recurring-templates")
+                Button("Attribute definitions", systemImage: "slider.horizontal.3", action: attributeDefinitions)
+                    .accessibilityIdentifier("attribute-definitions")
                 Button("Synchronization", systemImage: "arrow.triangle.2.circlepath", action: synchronization)
                     .accessibilityIdentifier("synchronization-settings")
                 Button("Shortcuts and Siri", systemImage: "square.stack.3d.up", action: shortcuts)

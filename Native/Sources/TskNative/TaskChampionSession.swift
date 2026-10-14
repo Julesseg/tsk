@@ -56,7 +56,7 @@ public enum TaskChampionSession {
     }
 
     public static func makeManager(directory: URL, library: String? = nil, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) -> TaskManager {
-        TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, viewDefinitions: LocalTaskViewStore(directory: directory))
+        TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, viewDefinitions: LocalTaskViewStore(directory: directory), attributeDefinitions: LocalTaskAttributeStore(directory: directory))
     }
 
     public static func open(directory: URL, library: String? = nil) async throws -> TaskManager {
