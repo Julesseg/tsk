@@ -6,6 +6,15 @@ Bootstrapped from [iOS-Swift-app-template](https://github.com/Julesseg/iOS-Swift
 The app currently runs the template greeting screen. TaskChampion integration,
 task management, and synchronization are yet to be implemented.
 
+The [PRD](docs/prd.md) defines the initial product requirements, implementation
+decisions, and testing seams. The [product brief](docs/product-direction.md)
+summarizes the agreed direction, with shared terms in [GLOSSARY.md](GLOSSARY.md),
+decisions in [docs/adr](docs/adr/), and source-based feasibility findings in
+[docs/research](docs/research/).
+
+The PRD is published as [spec #3](https://github.com/Julesseg/tsk/issues/3) in
+the issue tracker for implementation planning.
+
 ## Development
 
 - Open `App/Tsk.xcodeproj` in Xcode and select the `Tsk` scheme.
