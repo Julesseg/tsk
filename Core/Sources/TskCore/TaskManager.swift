@@ -17,7 +17,7 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
 }
 
 public enum TaskQuery: String, CaseIterable, Sendable {
-    case all, unfinished, completed, today
+    case all, unfinished, completed, today, upcoming
 
     public func includes(_ task: TaskRecord, now: Date = Date(), calendar: Calendar = .autoupdatingCurrent) -> Bool {
         switch self {
@@ -25,6 +25,7 @@ public enum TaskQuery: String, CaseIterable, Sendable {
         case .unfinished: task.status == "pending"
         case .completed: task.status == "completed"
         case .today: task.isInToday(at: now, calendar: calendar)
+        case .upcoming: task.isInUpcoming(at: now, calendar: calendar)
         }
     }
 }
@@ -86,6 +87,11 @@ public actor TaskManager {
             }
             return $0.id.uuidString < $1.id.uuidString
         }
+    }
+
+    public func upcomingDays() async throws -> [UpcomingDay] {
+        let records = try await replica.tasks()
+        return UpcomingDay.groups(tasks: records, at: now(), calendar: calendar)
     }
 
     public func task(id: UUID) async throws -> TaskRecord {

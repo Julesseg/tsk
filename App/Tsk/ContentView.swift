@@ -27,7 +27,9 @@ struct ContentView: View {
                         Button("Retry") { Task { await store.reload() } }
                     }
                 } else if store.tasks.isEmpty {
-                    ContentUnavailableView(store.query == .today ? "Nothing planned or due today" : store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                    ContentUnavailableView(store.query == .upcoming ? "No upcoming plans or deadlines" : store.query == .today ? "Nothing planned or due today" : store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                } else if store.query == .upcoming {
+                    UpcomingTaskList(store: store) { editingTask = $0 }
                 } else {
                     List(store.tasks) { task in
                         NavigationLink {
@@ -79,6 +81,7 @@ struct ContentView: View {
                     ProjectPicker(store: store)
                     Picker("Task status", selection: $store.query) {
                     Text("Today").tag(TaskQuery.today)
+                    Text("Upcoming").tag(TaskQuery.upcoming)
                     Text("Unfinished").tag(TaskQuery.unfinished)
                     Text("Completed").tag(TaskQuery.completed)
                 }
