@@ -31,6 +31,7 @@ struct TaskStorageRootView: View {
             if let description = ProcessInfo.processInfo.environment["TSK_TEST_INTENT_DESCRIPTION"] {
                 _ = try await CreateTaskIntent(description: description).perform()
             }
+            try await runTaskAutomationFixture()
             #endif
             store = try TaskStore()
             error = nil

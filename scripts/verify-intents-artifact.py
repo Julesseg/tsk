@@ -26,9 +26,9 @@ if 'group.com.julesseguin.tsk' not in groups:
     raise SystemExit('The simulator executable has no shared task App Group entitlement')
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if not {'CreateTaskIntent', 'FindTasksIntent'}.issubset(metadata['actions']):
-    raise SystemExit('The app metadata is missing its create/find actions')
+if not {'CreateTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(metadata['actions']):
+    raise SystemExit('The app metadata is missing its create/find/complete/reschedule actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
-if 'IntentTaskEntity' not in metadata['entities'] or not {'CreateTaskIntent', 'FindTasksIntent'}.issubset(shortcuts):
+if 'IntentTaskEntity' not in metadata['entities'] or not {'CreateTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified embedded simulator App Group entitlement and create/find App Shortcut metadata')
+print('Verified embedded simulator App Group entitlement and create/find/complete/reschedule App Shortcut metadata')
