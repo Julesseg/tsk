@@ -103,6 +103,8 @@ final class iPadWorkspaceUITests: XCTestCase {
         name.typeText("All local tasks")
         app.buttons["save-custom-view"].tap()
         XCTAssertTrue(revealTaskElement(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch, in: "workspace-sidebar", app: app))
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("iPad native custom view sidebar at accessibility text size", app: app)
     }
 

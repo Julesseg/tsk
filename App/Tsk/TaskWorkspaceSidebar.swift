@@ -55,7 +55,15 @@ struct TaskWorkspaceSidebar: View {
     }
 
     private func project(_ title: String, selection: TaskProjectSelection) -> some View {
-        Button { openProject(selection) } label: { Label(title, systemImage: "folder") }
+        Button { openProject(selection) } label: {
+            HStack {
+                Label(title, systemImage: "folder")
+                if store.customView == nil && store.projectSelection == selection {
+                    Spacer()
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                }
+            }
+        }
             .accessibilityIdentifier("sidebar-project-\(title)")
             .accessibilityAddTraits(store.customView == nil && store.projectSelection == selection ? .isSelected : [])
     }
