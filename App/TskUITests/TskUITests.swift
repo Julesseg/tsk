@@ -1,16 +1,45 @@
 import XCTest
 
-// Smoke test proving the XCUITest lane works end-to-end (build, launch,
-// query). Grow this suite with your app's acceptance-level UI behaviors;
-// keep the logic itself in Core where `swift test` covers it fast.
 final class TskUITests: XCTestCase {
-    override func setUpWithError() throws {
-        continueAfterFailure = false
+    override func setUpWithError() throws { continueAfterFailure = false }
+
+    func testCaptureReviewCancelSaveAndRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        screenshot("Tasks empty", app: app)
+        app.buttons["new-task"].tap()
+        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        description.tap()
+        description.typeText("Cancelled capture")
+        app.buttons["Cancel"].tap()
+        XCTAssertFalse(app.staticTexts["Cancelled capture"].exists)
+        app.buttons["new-task"].tap()
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
+        screenshot("Draft validation", app: app)
+        let reviewedDescription = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        reviewedDescription.tap()
+        reviewedDescription.typeText("Buy milk from the market")
+        screenshot("Draft review", app: app)
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Buy milk from the market"].waitForExistence(timeout: 10))
+        screenshot("Tasks saved", app: app)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Buy milk from the market"].waitForExistence(timeout: 10))
+        screenshot("Tasks after relaunch", app: app)
+        app.staticTexts["Buy milk from the market"].tap()
+        XCTAssertTrue(app.staticTexts["Identity"].waitForExistence(timeout: 5))
+        screenshot("Raw attributes and identity", app: app)
     }
 
-    func testAppLaunchesAndShowsGreeting() throws {
-        let app = XCUIApplication()
-        app.launch()
-        XCTAssertTrue(app.staticTexts["greeting"].waitForExistence(timeout: 10))
+    private func screenshot(_ name: String, app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }
