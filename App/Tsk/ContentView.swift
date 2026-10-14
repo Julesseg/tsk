@@ -2,6 +2,7 @@ import SwiftUI
 import TskCore
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
@@ -29,7 +30,9 @@ struct ContentView: View {
                         Button("Retry") { Task { await store.reload() } }
                     }
                 } else if store.tasks.isEmpty {
-                    ContentUnavailableView(store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                    ContentUnavailableView(store.query == .upcoming ? "No upcoming plans or deadlines" : store.query == .today ? "Nothing planned or due today" : store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                } else if store.query == .upcoming {
+                    UpcomingTaskList(store: store) { editingTask = $0 }
                 } else {
                     List(store.tasks) { task in
                         NavigationLink {
@@ -40,6 +43,7 @@ struct ContentView: View {
                                 if let project = task.attributes["project"], !project.isEmpty {
                                     Text(project).font(.caption).foregroundStyle(.secondary)
                                 }
+                                TaskPlanningCaption(task: task)
                                 if task.status != "pending" || task.isRecurring {
                                     Text(task.isRecurring ? "Recurring task · read only" : task.status.capitalized)
                                         .font(.caption).foregroundStyle(.secondary)
@@ -80,6 +84,8 @@ struct ContentView: View {
             }
             .safeAreaInset(edge: .top) {
                 Picker("Task status", selection: $store.query) {
+                    Text("Today").tag(TaskQuery.today)
+                    Text("Upcoming").tag(TaskQuery.upcoming)
                     Text("Unfinished").tag(TaskQuery.unfinished)
                     Text("Completed").tag(TaskQuery.completed)
                 }
@@ -125,6 +131,9 @@ struct ContentView: View {
                 } else if phase == .background {
                     opportunities.background()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                Task { await store.reload() }
             }
         }
     }
