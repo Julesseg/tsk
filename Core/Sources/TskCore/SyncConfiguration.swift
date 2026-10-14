@@ -36,6 +36,8 @@ public enum SynchronizationError: Error, Equatable, LocalizedError, Sendable {
     case notConfigured
     case unsupportedReplica
     case failed(String)
+    case interrupted
+    case configurationChanged
 
     public var errorDescription: String? {
         switch self {
@@ -43,6 +45,8 @@ public enum SynchronizationError: Error, Equatable, LocalizedError, Sendable {
         case .emptyEncryptionSecret: "Enter the encryption secret used by your other Taskwarrior clients."
         case .notConfigured: "Configure a TaskChampion server before synchronizing."
         case .unsupportedReplica: "This task storage adapter does not support synchronization."
+        case .configurationChanged: "Connection settings changed before synchronization finished. Retry using the saved connection."
+        case .interrupted: "Synchronization paused to prioritize local task access."
         case .failed(let message): "Synchronization failed: \(message). Your locally saved tasks remain on this device."
         }
     }

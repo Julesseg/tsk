@@ -5,6 +5,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
+    @State private var opportunities: SynchronizationOpportunities
     @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var editingTask: TaskRecord?
@@ -13,6 +14,7 @@ struct ContentView: View {
         let store = TaskStore()
         _store = State(initialValue: store)
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
+        _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
     }
 
     var body: some View {
@@ -67,14 +69,17 @@ struct ContentView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if let error = store.error, !store.tasks.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(error).font(.footnote)
-                        Button("Retry") { Task { await store.reload() } }
+                VStack(spacing: 0) {
+                    SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
+                    if let error = store.error, !store.tasks.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(error).font(.footnote)
+                            Button("Retry") { Task { await store.reload() } }
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.regularMaterial)
                     }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
                 }
             }
             .safeAreaInset(edge: .top) {
@@ -113,13 +118,26 @@ struct ContentView: View {
             }
             .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
             .task(id: TaskListSelection(query: store.query, project: store.projectSelection)) { await store.reload() }
+            .task {
+                synchronization.startObserving(tasks: store)
+                await synchronization.loadConfiguration()
+                opportunities.start()
+                await opportunities.foreground()
+            }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { Task { await store.reload() } }
+                if phase == .active {
+                    Task {
+                        await synchronization.loadConfiguration()
+                        await opportunities.foreground()
+                        await store.reload()
+                    }
+                } else if phase == .background {
+                    opportunities.background()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
                 Task { await store.reload() }
             }
-            .task { await synchronization.loadConfiguration() }
         }
     }
 }

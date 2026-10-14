@@ -14,9 +14,9 @@ final class TskWaitingUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
         description.typeText("Planned task waiting for tomorrow")
-        tapSwitch("planned-day-enabled", app: app)
-        tapSwitch("deadline-enabled", app: app)
-        tapSwitch("waiting-date-enabled", app: app)
+        setDateSwitch("planned-day-enabled", to: true, app: app)
+        setDateSwitch("deadline-enabled", to: true, app: app)
+        setDateSwitch("waiting-date-enabled", to: true, app: app)
         capture("Independent native waiting-date editor", app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["Planned task waiting for tomorrow"].waitForExistence(timeout: 10))
@@ -43,12 +43,8 @@ final class TskWaitingUITests: XCTestCase {
         capture("Wait expiry removes reason while carried-forward task remains", app: app)
         app.staticTexts["Planned task waiting for tomorrow"].tap()
         app.buttons["edit-task"].tap()
-        let enabled = app.switches["waiting-date-enabled"]
-        for _ in 0..<6 where !enabled.isHittable { app.swipeUp() }
-        XCTAssertTrue(enabled.exists)
-        XCTAssertEqual(enabled.value as? String, "1")
-        enabled.tap()
-        enabled.tap()
+        setDateSwitch("waiting-date-enabled", to: false, app: app)
+        setDateSwitch("waiting-date-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -56,7 +52,7 @@ final class TskWaitingUITests: XCTestCase {
         capture("Editing wait reintroduces reason without removing Today task", app: app)
         app.staticTexts["Planned task waiting for tomorrow"].tap()
         app.buttons["edit-task"].tap()
-        tapSwitch("waiting-date-enabled", app: app)
+        setDateSwitch("waiting-date-enabled", to: false, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -79,12 +75,6 @@ final class TskWaitingUITests: XCTestCase {
         app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "task-waiting-reason-"))
     }
 
-    private func tapSwitch(_ identifier: String, app: XCUIApplication) {
-        let control = app.switches[identifier]
-        for _ in 0..<6 where !control.isHittable { app.swipeUp() }
-        XCTAssertTrue(control.waitForExistence(timeout: 5))
-        control.tap()
-    }
 
     private func capture(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
