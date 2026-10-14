@@ -75,12 +75,28 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@1.99.0
 
+      - name: Check out pinned real TaskChampion sync server
+        uses: actions/checkout@v4
+        with:
+          repository: GothenburgBitFactory/taskchampion-sync-server
+          ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
+          path: .build/sync-server
+          persist-credentials: false
+
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: Native/Bridge
+          workspaces: |
+            Native/Bridge
+            .build/sync-server
 
       - name: Build pinned TaskChampion for iOS
         run: scripts/build-native.sh apple
+
+      - name: Build the real isolated synchronization fixture and independent peer
+        run: |
+          cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
+          scripts/build-native.sh host
+          swift build --package-path Native --product tsk-native-probe
 
       - name: Toolchain versions
         run: xcodebuild -version
@@ -107,9 +123,17 @@ jobs:
           set -o pipefail
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests)
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests)
           fi
-          ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
+          peer=()
+          if [[ "${{ matrix.family }}" == "iPhone" ]]; then
+            peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
+          fi
+          export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
+          python3 ../scripts/with-sync-fixture.py \
+            --server ../.build/sync-server/target/release/taskchampion-sync-server \
+            --output ../.build/ui-sync "${peer[@]}" -- \
+            ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" "${coverage[@]}" \
             -resultBundlePath TestResults.xcresult \
@@ -124,5 +148,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: App/TestResults.xcresult
+          path: |
+            App/TestResults.xcresult
+            .build/ui-sync
           if-no-files-found: ignore

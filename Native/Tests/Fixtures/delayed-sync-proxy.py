@@ -11,6 +11,11 @@ backend, directory, method = sys.argv[1:]
 control = pathlib.Path(directory)
 mutex = threading.Lock()
 
+def publish(name, value):
+    temporary = control / (name + '.tmp')
+    temporary.write_text(value)
+    temporary.replace(control / name)
+
 class Proxy(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -40,7 +45,7 @@ class Proxy(http.server.BaseHTTPRequestHandler):
         if self.command == method and status == 200 and not (control / 'released').exists():
             with mutex:
                 if not (control / 'blocked.json').exists():
-                    (control / 'blocked.json').write_text(json.dumps({'method': self.command, 'status': status, 'path': self.path}))
+                    publish('blocked.json', json.dumps({'method': self.command, 'status': status, 'path': self.path}))
             while not (control / 'released').exists():
                 time.sleep(0.01)
         try:
@@ -55,5 +60,5 @@ class Proxy(http.server.BaseHTTPRequestHandler):
             pass
 
 server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Proxy)
-(control / 'url').write_text('http://127.0.0.1:' + str(server.server_port))
+publish('url', 'http://127.0.0.1:' + str(server.server_port))
 server.serve_forever()

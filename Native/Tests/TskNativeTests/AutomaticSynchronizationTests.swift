@@ -10,7 +10,7 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     }
 }
 
-private func exerciseBlockedServerResponse(method: String) async throws {
+@MainActor private func exerciseBlockedServerResponse(method: String) async throws {
     let environment = ProcessInfo.processInfo.environment
     let backend = try #require(environment["TSK_SYNC_TEST_URL"])
     let secret = try #require(environment["TSK_SYNC_TEST_SECRET"])
@@ -34,6 +34,10 @@ private func exerciseBlockedServerResponse(method: String) async throws {
     let proxyURL = try String(contentsOf: directory.appendingPathComponent("url"), encoding: .utf8)
     let rawClientID = try #require(environment["TSK_SYNC_TEST_CLIENT_ID"])
     let clientID = try #require(UUID(uuidString: rawClientID))
+    let directConfiguration = try SyncConfiguration(serverURL: backend, clientID: clientID, encryptionSecret: secret)
+    let seed = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("seed")))
+    _ = try await seed.create(TaskDraft(description: "Remote version for automatic synchronization fixture"))
+    _ = try await seed.synchronize(using: directConfiguration)
     let configuration = try SyncConfiguration(serverURL: proxyURL, clientID: clientID, encryptionSecret: secret)
     let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("native")))
     let original = try await manager.create(TaskDraft(description: "Before blocked \(method)", attributes: ["opaque": "retain original"]))
@@ -87,7 +91,7 @@ private func waitForFile(_ file: URL) async throws {
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil))
-func automaticSynchronizationRecoversAfterRealServerFailureAndConnectivitySignal() async throws {
+@MainActor func automaticSynchronizationRecoversAfterRealServerFailureAndConnectivitySignal() async throws {
     let environment = ProcessInfo.processInfo.environment
     let backend = try #require(environment["TSK_SYNC_TEST_URL"])
     let secret = try #require(environment["TSK_SYNC_TEST_SECRET"])

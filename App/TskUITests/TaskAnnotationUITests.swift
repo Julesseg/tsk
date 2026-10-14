@@ -21,7 +21,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(description.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Task with supporting notes"].firstMatch.waitForExistence(timeout: 10))
         app.staticTexts["Task with supporting notes"].firstMatch.tap()
-        XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
         capture("Annotations empty in native task detail", app: app)
         app.buttons["add-annotation"].tap()
         let editor = app.textViews["annotation-editor-text"]
@@ -36,9 +36,9 @@ final class TaskAnnotationUITests: XCTestCase {
         capture("Multiline annotation review", app: app)
         app.buttons["save-annotation"].tap()
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(revealTaskElement(app.staticTexts["annotation-text-annotation_1792144800"], in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["annotation-text-annotation_1792144800"], in: "task-detail-form", app: app))
         XCTAssertEqual(app.staticTexts["annotation-text-annotation_1792144800"].label, "First supporting note\nAnother line")
-        XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
         app.buttons["add-annotation"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.typeText("Second independent note")
@@ -47,7 +47,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.exists)
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.typeKey("a", modifierFlags: .command)
@@ -61,12 +61,12 @@ final class TaskAnnotationUITests: XCTestCase {
         app.staticTexts["Task with supporting notes"].firstMatch.tap()
         let first = app.staticTexts["annotation-text-annotation_1792144800"]
         let second = app.staticTexts["annotation-text-annotation_1792144801"]
-        XCTAssertTrue(revealTaskElement(first, in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(first, in: "task-detail-form", app: app))
         XCTAssertEqual(first.label, "First supporting note\nAnother line revised")
-        XCTAssertTrue(revealTaskElement(second, in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(second, in: "task-detail-form", app: app))
         XCTAssertEqual(second.label, "Second independent note")
         capture("Both annotations after durable reopen", app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-content", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app))
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

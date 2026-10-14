@@ -25,6 +25,8 @@ Path(sys.argv[1]).unlink(missing_ok=True)
 PY
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [[ "$was_booted" == no ]]; then
     xcrun simctl boot "$simulator_id"
 fi

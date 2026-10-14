@@ -4,9 +4,10 @@ import SwiftUI
 struct TaskShortcutsView: View {
     var body: some View {
         Form {
-            Section("Create and find tasks") {
-                Text("Use Create Task and Find Tasks in Shortcuts, or ask Siri to create a task in tsk.")
-                Text("Created tasks use the same saved tasks and synchronization connection as this app. They are saved locally before the action finishes.")
+            Section("Task actions") {
+                Text("Use Create Task, Find Tasks, Complete Task, and Reschedule Task in Shortcuts, or ask Siri to create a task in tsk.")
+                Text("All actions use the same saved tasks and synchronization connection as this app. They are saved locally before the action finishes.")
+                Text("Reschedule Task changes either Planned day or Deadline. Choose the date role explicitly; the other date stays unchanged.")
                 ShortcutsLink()
             }
             Section("Synchronization") {
