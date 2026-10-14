@@ -14,24 +14,49 @@ extension XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, "Keyboard still covers task dates", file: file, line: line)
         }
         let control = app.switches[identifier].firstMatch
-        let form = app.collectionViews.firstMatch
-        let screen = app.frame
-        let navigationBottom = app.navigationBars.firstMatch.frame.maxY
-        for _ in 0..<8 {
-            let frame = control.frame
-            if frame.minY.isFinite, frame.width > 0, frame.minY >= navigationBottom,
-               frame.maxY < screen.maxY - 20, control.isHittable { break }
-            form.swipeUp()
-        }
-        XCTAssertTrue(control.waitForExistence(timeout: 5), "Missing date switch: \(identifier)", file: file, line: line)
-        XCTAssertGreaterThanOrEqual(control.frame.minY, navigationBottom, file: file, line: line)
-        XCTAssertLessThan(control.frame.maxY, screen.maxY - 20, file: file, line: line)
+        guard revealTaskElement(control, in: "task-editor-form", app: app, file: file, line: line) else { return }
         let expected = enabled ? "1" : "0"
         if control.value as? String != expected {
-            control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            let thumb = control.switches.firstMatch
+            if thumb.exists, thumb.isHittable { thumb.tap() }
+            else { control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
         }
         let state = NSPredicate(format: "value == %@", expected)
         let changed = expectation(for: state, evaluatedWith: control)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
     }
+    @discardableResult
+    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let form = app.collectionViews[containerID].firstMatch
+        guard form.waitForExistence(timeout: 5) else {
+            XCTFail("Missing task form: \(containerID)", file: file, line: line)
+            return false
+        }
+        let screen = app.frame
+        let navigationBottom = app.navigationBars.allElementsBoundByIndex
+            .filter { $0.exists && $0.frame.intersects(form.frame) }
+            .map { $0.frame.maxY }.max() ?? form.frame.minY
+        let viewport = form.frame.intersection(screen)
+        let top = max(viewport.minY, navigationBottom)
+        let bottom = viewport.maxY - 24
+        var scrollUp = true
+        var missingSteps = 0
+        for step in 0...14 {
+            if element.exists {
+                let frame = element.frame
+                if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
+                    if frame.minY >= top, frame.maxY <= bottom, element.isHittable { return true }
+                    scrollUp = frame.minY >= top
+                }
+            } else {
+                missingSteps += 1
+                if missingSteps == 7 { scrollUp.toggle() }
+            }
+            guard step < 14 else { break }
+            if scrollUp { form.swipeUp() } else { form.swipeDown() }
+        }
+        XCTFail("Task element could not be revealed in \(containerID): \(element)", file: file, line: line)
+        return false
+    }
+
 }
