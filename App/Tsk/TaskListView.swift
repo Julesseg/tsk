@@ -75,7 +75,7 @@ struct TaskListLabel: View {
             TaskPlanningCaption(task: task)
             TaskAvailabilityView(task: task, store: store)
             if task.status != "pending" || task.isRecurring {
-                Text(task.isRecurring ? "Recurring task · read only" : task.status.capitalized)
+                Text(task.recurrenceInspection.map { $0.kind == .template ? "Recurring template" : $0.kind == .occurrence ? "Generated occurrence · read only" : "Recurrence data · read only" } ?? task.status.capitalized)
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

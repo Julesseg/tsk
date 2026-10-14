@@ -8,6 +8,7 @@ struct TaskWorkspaceSidebar: View {
     let customViews: () -> Void
     let synchronization: () -> Void
     let shortcuts: () -> Void
+    let recurring: () -> Void
 
     var body: some View {
         List {
@@ -36,6 +37,7 @@ struct TaskWorkspaceSidebar: View {
                     .accessibilityIdentifier("custom-views")
             }
             Section {
+                Button("Recurring templates", systemImage: "repeat", action: recurring).accessibilityIdentifier("recurring-templates")
                 Button("Synchronization", systemImage: "arrow.triangle.2.circlepath", action: synchronization)
                     .accessibilityIdentifier("synchronization-settings")
                 Button("Shortcuts and Siri", systemImage: "square.stack.3d.up", action: shortcuts)

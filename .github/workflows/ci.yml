@@ -123,7 +123,7 @@ jobs:
           set -o pipefail
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests)
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests)
           fi
           peer=()
           if [[ "${{ matrix.family }}" == "iPhone" ]]; then
