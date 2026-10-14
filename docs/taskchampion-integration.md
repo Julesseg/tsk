@@ -44,10 +44,14 @@ Before building the Xcode app, run on a Mac with Xcode:
 
 ```sh
 scripts/build-native.sh apple
-xcodebuild test -project App/Tsk.xcodeproj -scheme Tsk -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' CODE_SIGNING_ALLOWED=NO
+scripts/run-ui-tests.sh <simulator-udid> -project App/Tsk.xcodeproj -scheme Tsk CODE_SIGNING_ALLOWED=NO
 ```
 
-The script builds arm64 devices and arm64/x86_64 simulators and assembles a
+The UI-test wrapper targets one explicit simulator with parallel testing disabled.
+It leaves an already booted target alone and shuts down only its own target after
+the run, including failures. Other simulators remain untouched.
+
+The build script builds arm64 devices and arm64/x86_64 simulators and assembles a
 universal simulator archive. Artifacts are ignored and rebuilt in CI, including
 signed archive workflows. The app statically links the bridge; the host tests
 load the built library explicitly. CI retains the independent fast Core lane,

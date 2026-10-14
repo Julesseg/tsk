@@ -75,19 +75,23 @@ jobs:
         id: sim
         run: |
           set -euo pipefail
-          NAME=$(xcrun simctl list devices available --json \
-            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; names=[x['name'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(sorted(names)[-1] if names else 'iPhone 16')")
-          echo "Using simulator: $NAME"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+          devices = json.load(sys.stdin)["devices"]
+          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith("iPhone")]
+          runtime, device = max(available, key=lambda item: (item[0], item[1]["name"]))
+          print("Using simulator: " + device["name"] + " (" + device["udid"] + ")")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("id=" + device["udid"] + "\n")
+          '
 
       - name: Build & run UI tests
         working-directory: App
         run: |
           set -o pipefail
-          ../scripts/run-ui-tests.sh \
+          ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }},OS=latest" \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 
