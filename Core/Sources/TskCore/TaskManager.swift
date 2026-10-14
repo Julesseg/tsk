@@ -17,13 +17,14 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
 }
 
 public enum TaskQuery: String, CaseIterable, Sendable {
-    case all, unfinished, completed
+    case all, unfinished, completed, today
 
-    public func includes(_ task: TaskRecord) -> Bool {
+    public func includes(_ task: TaskRecord, now: Date = Date(), calendar: Calendar = .autoupdatingCurrent) -> Bool {
         switch self {
         case .all: true
         case .unfinished: task.status == "pending"
         case .completed: task.status == "completed"
+        case .today: task.isInToday(at: now, calendar: calendar)
         }
     }
 }
@@ -65,14 +66,17 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 public actor TaskManager {
     let replica: any TaskReplica
     private let now: @Sendable () -> Date
+    private let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent) {
         self.replica = replica
         self.now = now
+        self.calendar = calendar
     }
 
     public func tasks(query: TaskQuery = .all) async throws -> [TaskRecord] {
-        try await replica.tasks().filter { query.includes($0) }.sorted {
+        let instant = now()
+        return try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) }.sorted {
             if $0.attributes["entry"] != $1.attributes["entry"] {
                 return ($0.attributes["entry"] ?? "") > ($1.attributes["entry"] ?? "")
             }

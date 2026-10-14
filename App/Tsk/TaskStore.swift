@@ -12,13 +12,17 @@ final class TaskStore {
     var error: String?
     var isSaving = false
     var isLoading = false
+    private let fixedDate: Date?
+    var currentDate: Date { fixedDate ?? Date() }
     private var reloadGeneration = 0
 
     init() {
         let support = URL.applicationSupportDirectory
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
         directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
-        manager = TaskManager(replica: TaskChampionReplica(directory: directory))
+        let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
+        fixedDate = fixed
+        manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
     }
 
     func reload() async {
@@ -58,8 +62,9 @@ final class TaskStore {
             let saved = try await action(manager)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
-            if query.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
+            if query.includes(saved, now: currentDate) { tasks.insert(saved, at: min(index, tasks.count)) }
             error = nil
+            await reload()
             return saved
         } catch {
             self.error = error.localizedDescription
