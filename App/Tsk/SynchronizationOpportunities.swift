@@ -26,6 +26,7 @@ final class SynchronizationOpportunities {
     }
 
     func foreground() async {
+        backgroundError = SynchronizationAppDelegate.schedulingError
         await manager.requestSynchronization(trigger: .appOpened)
     }
 

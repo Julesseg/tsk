@@ -6,7 +6,6 @@ struct ContentView: View {
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
-    @Environment(\.scenePhase) private var scenePhase
     @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var editingTask: TaskRecord?

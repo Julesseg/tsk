@@ -31,10 +31,17 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
 
     private static func refresh(_ task: BGTask) async {
         scheduleRefresh()
+        let execution = BackgroundSynchronizationExecution()
+        task.expirationHandler = { Task { @MainActor in await execution.expire() } }
         do {
             let directory = TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
             let manager = try await TaskChampionSession.open(directory: directory)
-            task.expirationHandler = { Task { await manager.suspendSynchronization() } }
+            execution.manager = manager
+            guard !execution.expired else {
+                await manager.suspendSynchronization()
+                task.setTaskCompleted(success: false)
+                return
+            }
             if await manager.synchronizationStatus() == .localOnly {
                 task.setTaskCompleted(success: true)
                 return
@@ -42,5 +49,16 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
             _ = try await manager.synchronize(trigger: .backgroundOpportunity)
             task.setTaskCompleted(success: true)
         } catch { task.setTaskCompleted(success: false) }
+    }
+}
+
+@MainActor
+private final class BackgroundSynchronizationExecution {
+    var manager: TaskManager?
+    var expired = false
+
+    func expire() async {
+        expired = true
+        await manager?.suspendSynchronization()
     }
 }

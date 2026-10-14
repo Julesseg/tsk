@@ -7,7 +7,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
     private let library: String
 
     public init(directory: URL, library: String? = nil) {
-        self.directory = directory
+        self.directory = directory.resolvingSymlinksInPath().standardizedFileURL
         self.library = library ?? ProcessInfo.processInfo.environment["TSK_TASKCHAMPION_LIBRARY"] ?? "libtsk_taskchampion.dylib"
     }
 

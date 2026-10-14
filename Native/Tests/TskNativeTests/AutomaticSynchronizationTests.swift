@@ -59,6 +59,11 @@ private func exerciseBlockedServerResponse(method: String) async throws {
     #expect(edited.attributes["opaque"] == "retain in-flight")
     #expect(completed.status == "completed")
     #expect(completed.attributes["opaque"] == "retain in-flight")
+    let samePath = directory.appendingPathComponent("native").resolvingSymlinksInPath()
+    let anotherManager = TaskManager(replica: TaskChampionReplica(directory: samePath))
+    let otherLocal = try await anotherManager.create(TaskDraft(description: "Another actor during blocked \(method)", attributes: ["opaque": "retain other actor"]))
+    let otherActorSavedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
+    #expect(otherActorSavedWhileBlocked)
     try Data().write(to: gate)
     _ = try await attempt.value
     _ = try await manager.synchronize(using: configuration)
@@ -69,6 +74,8 @@ private func exerciseBlockedServerResponse(method: String) async throws {
     #expect(final.filter { $0.id == created.id }.count == 1)
     #expect(try await received.task(id: original.id).attributes["opaque"] == "retain original")
     #expect(try await received.task(id: created.id) == completed)
+    #expect(try await received.task(id: otherLocal.id) == otherLocal)
+    #expect(final.filter { $0.id == otherLocal.id }.count == 1)
 }
 
 private func waitForFile(_ file: URL) async throws {
