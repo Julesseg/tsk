@@ -35,7 +35,7 @@ public enum TaskViewError: Error, Equatable, LocalizedError, Sendable {
 
 extension TaskManager {
     public func savedViews() async throws -> [SavedTaskView] {
-        guard let viewDefinitions else { return [] }
+        guard let viewDefinitions else { throw TaskViewError.storageNotConfigured }
         return try await viewDefinitions.load()
     }
 
@@ -44,6 +44,8 @@ extension TaskManager {
         guard !name.isEmpty else { throw TaskViewError.emptyName }
         try validateFilter(expression, schema: schema)
         guard let viewDefinitions else { throw TaskViewError.storageNotConfigured }
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         var definitions = try await viewDefinitions.load()
         let view = SavedTaskView(id: id ?? UUID(), name: name, expression: expression)
         if let id {
@@ -56,6 +58,8 @@ extension TaskManager {
 
     public func deleteView(id: UUID) async throws {
         guard let viewDefinitions else { throw TaskViewError.storageNotConfigured }
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
         var definitions = try await viewDefinitions.load()
         guard definitions.contains(where: { $0.id == id }) else { throw TaskViewError.missingView(id) }
         definitions.removeAll { $0.id == id }
