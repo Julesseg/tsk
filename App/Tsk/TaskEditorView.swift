@@ -4,15 +4,21 @@ import TskCore
 struct TaskEditorView: View {
     let store: TaskStore
     let original: TaskRecord?
+    let onSave: ((TaskRecord) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var draft: TaskDraft
     @State private var error: String?
+    @State private var tagInput = ""
+    @State private var tagError: String?
     @FocusState private var isDescriptionFocused: Bool
 
-    init(store: TaskStore, task: TaskRecord? = nil) {
+    init(store: TaskStore, task: TaskRecord? = nil, onSave: ((TaskRecord) -> Void)? = nil) {
         self.store = store
         original = task
-        _draft = State(initialValue: TaskDraft(description: task?.description ?? "", attributes: task?.attributes ?? [:]))
+        self.onSave = onSave
+        var draft = TaskDraft(description: task?.description ?? "", attributes: task?.attributes ?? [:])
+        if task == nil, let project = store.projectSelection.projectName { draft.project = project }
+        _draft = State(initialValue: draft)
     }
 
     var body: some View {
@@ -23,6 +29,7 @@ struct TaskEditorView: View {
                         .accessibilityIdentifier("task-description")
                         .focused($isDescriptionFocused)
                 }
+                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, addTag: { _ = addTag() })
                 Section {
                     Text("Review your task before saving. Changes are stored locally and available offline.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -33,6 +40,8 @@ struct TaskEditorView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: tagInput) { _, _ in tagError = nil }
             .navigationTitle(original == nil ? "New task" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -42,9 +51,13 @@ struct TaskEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         Task {
+                            if !tagInput.isEmpty, !addTag() { return }
                             let didSave: Bool
                             if let original {
-                                didSave = await store.update(id: original.id, changes: changes) != nil
+                                if let saved = await store.update(id: original.id, changes: changes) {
+                                    onSave?(saved)
+                                    didSave = true
+                                } else { didSave = false }
                             } else {
                                 didSave = await store.save(draft)
                             }
@@ -58,6 +71,18 @@ struct TaskEditorView: View {
             }
             .interactiveDismissDisabled(store.isSaving)
             .onAppear { isDescriptionFocused = true }
+        }
+    }
+
+    private func addTag() -> Bool {
+        do {
+            try draft.addTag(tagInput)
+            tagInput = ""
+            tagError = nil
+            return true
+        } catch {
+            tagError = error.localizedDescription
+            return false
         }
     }
 

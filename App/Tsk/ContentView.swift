@@ -65,7 +65,9 @@ struct ContentView: View {
                 }
             }
             .safeAreaInset(edge: .top) {
-                Picker("Task status", selection: $store.query) {
+                VStack(spacing: 8) {
+                    ProjectPicker(store: store)
+                    Picker("Task status", selection: $store.query) {
                     Text("Unfinished").tag(TaskQuery.unfinished)
                     Text("Completed").tag(TaskQuery.completed)
                 }
@@ -73,6 +75,7 @@ struct ContentView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 8)
                 .accessibilityIdentifier("task-status-view")
+                }
             }
             .navigationTitle("Tasks")
             .toolbar {
@@ -87,7 +90,12 @@ struct ContentView: View {
                 TaskEditorView(store: store)
             }
             .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
-            .task(id: store.query) { await store.reload() }
+            .task(id: TaskListSelection(query: store.query, project: store.projectSelection)) { await store.reload() }
         }
     }
+}
+
+private struct TaskListSelection: Equatable {
+    let query: TaskQuery
+    let project: TaskProjectSelection
 }
