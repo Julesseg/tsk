@@ -65,3 +65,26 @@ import Testing
         }
     }
 }
+
+@Test func customViewSnapshotKeepsPrerequisitesOutsideTheRawExpression() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let prerequisite = try await manager.create(TaskDraft(description: "Prerequisite", attributes: ["project": "Other"]))
+    let child = try await manager.create(TaskDraft(description: "Selected", attributes: ["project": "Work"]))
+    _ = try await manager.addDependency(id: child.id, prerequisiteID: prerequisite.id)
+    let snapshot = try await manager.viewSnapshot(filter: "project.is:Work")
+    let selected = try #require(snapshot.tasks.first)
+    #expect(snapshot.tasks.map(\.id) == [child.id])
+    #expect(!selected.availability(at: Date(), tasks: snapshot.allTasks).isAvailable)
+    _ = try await manager.complete(id: prerequisite.id)
+    let refreshed = try await manager.viewSnapshot(filter: "project.is:Work")
+    #expect(try #require(refreshed.tasks.first).availability(at: Date(), tasks: refreshed.allTasks).isAvailable)
+}
+
+@Test func ECMAScriptQueriesUseUTF8ByteLengthsIncludingEmbeddedNul() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let nul = try await manager.create(TaskDraft(description: "A\0B"))
+    let unicode = try await manager.create(TaskDraft(description: "é"))
+    #expect(try await manager.tasks(filter: "/^A.B$/").map(\.id) == [nul.id])
+    #expect(try await manager.tasks(filter: "/^.$/").isEmpty)
+    #expect(try await manager.tasks(filter: "/^..$/").map(\.id) == [unicode.id])
+}

@@ -28,3 +28,19 @@ import TskNative
     try await reopened.deleteView(id: saved.id)
     #expect(try await manager().savedViews().isEmpty)
 }
+
+@Test func genuineSavedViewWriteFailureLeavesDurableTaskAvailable() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let blockedDirectory = directory.appendingPathComponent("not-a-directory")
+    try Data("occupied".utf8).write(to: blockedDirectory)
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("replica")), viewDefinitions: LocalTaskViewStore(directory: blockedDirectory))
+    let task = try await manager.create(TaskDraft(description: "Durable task", attributes: ["opaque": "retain"]))
+    await #expect(throws: (any Error).self) {
+        try await manager.saveView(name: "Work", expression: "description:Durable")
+    }
+    #expect(try await manager.savedViews().isEmpty)
+    #expect(try await manager.tasks(filter: "description:Durable").map(\.id) == [task.id])
+    #expect(try await manager.task(id: task.id).attributes["opaque"] == "retain")
+}

@@ -62,3 +62,10 @@ filter arguments would corrupt the reference query. No filters run through a
 shell. UI tests cover validation, save/edit/relaunch/open, result completion
 and deletion. Compilation, UI execution, device rendering and physical
 keyboard behavior remain distinct verification gates.
+
+Custom queries also expose `TaskManager.viewSnapshot(filter:schema:)`: one
+raw-record read supplies the selected rows, all records for dependency context,
+and byte-exact project names. A prerequisite outside a custom view continues
+to explain blocking, and completing it updates availability without deleting
+link metadata. The injected Core clock and calendar remain query inputs for
+the later temporal and computed predicate extensions.
