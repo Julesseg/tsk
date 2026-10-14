@@ -120,3 +120,15 @@ actor AttributeDefinitionTestStore: TaskAttributeDefinitionsStore {
     _ = try await manager.saveAttributeDefinition(name: "next", type: .numeric)
     #expect(try await manager.attributeDefinitions().count == 2)
 }
+
+@Test func typedDatesRejectCalendarAndClockRolloversAndAcceptLeapZones() async throws {
+    let manager = TaskManager(replica: TestReplica(), attributeDefinitions: AttributeDefinitionTestStore())
+    _ = try await manager.saveAttributeDefinition(name: "review", type: .date)
+    let task = try await manager.create(TaskDraft(description: "Date validation", attributes: ["review": "1792144800"]))
+    for invalid in ["2026-02-30T00:00:00Z", "20260230T000000Z", "2026-02-28T24:00:00Z", "2026-02-28T25:00:00Z", "2026-02-28T23:59:60Z", "2026-02-28T23:60:00Z"] {
+        await #expect(throws: (any Error).self) { try await manager.updateUserAttributes(id: task.id, changes: ["review": invalid]) }
+        #expect(try await manager.task(id: task.id) == task)
+    }
+    let valid = try await manager.updateUserAttributes(id: task.id, changes: ["review": "2028-02-29T00:00:00+02:00"])
+    #expect(valid.attributes["review"] == "1835388000")
+}
