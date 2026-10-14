@@ -18,12 +18,12 @@ import Testing
 actor TestReplica: TaskReplica {
     var records: [UUID: TaskRecord] = [:]
     func tasks() async throws -> [TaskRecord] { Array(records.values) }
-    func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord {
+    func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord {
         let task = TaskRecord(id: id, attributes: attributes)
         records[id] = task
         return task
     }
-    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
+    func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
         guard var task = records[id] else { throw TaskManagementError.taskNotFound(id) }
         for (key, value) in changes { task.attributes[key] = value }
         records[id] = task
@@ -98,6 +98,6 @@ actor TestReplica: TaskReplica {
 private struct UnwritableReplica: TaskReplica {
     let task: TaskRecord
     func tasks() async throws -> [TaskRecord] { [task] }
-    func create(id: UUID, attributes: [String: String]) async throws -> TaskRecord { throw TaskManagementError.storage("Disk is full") }
-    func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord { throw TaskManagementError.storage("Disk is full") }
+    func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord { throw TaskManagementError.storage("Disk is full") }
+    func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord { throw TaskManagementError.storage("Disk is full") }
 }

@@ -7,7 +7,7 @@ import Testing
     calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
     let replica = TestReplica()
     let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 1791972000) }, calendar: calendar)
-    let fixtures: [(String, [String: String])] = [
+    let fixtures: [(String, TaskAttributes)] = [
         ("Carried forward", ["scheduled": "1791842400"]),
         ("Planned today at last second", ["scheduled": "1792015199"]),
         ("Tomorrow begins", ["scheduled": "1792015200"]),
