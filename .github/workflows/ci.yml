@@ -95,7 +95,11 @@ jobs:
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
             -resultBundlePath TestResults.xcresult \
+            -derivedDataPath ../.build/ui \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+
+      - name: Verify simulator intent metadata and shared storage entitlement
+        run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
 
       - name: Upload test results
         if: ${{ !cancelled() }}

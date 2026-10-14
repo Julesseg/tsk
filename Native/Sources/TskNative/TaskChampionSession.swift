@@ -8,7 +8,7 @@ public enum SharedStorageError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: "Shared task storage is unavailable. Open tsk and check its App Group configuration before retrying."
+        case .unavailable: "Task storage is unavailable in this build. Your existing tasks have not been changed."
         case .initialization(let message): "Shared task storage could not be opened: \(message). Existing tasks were preserved."
         }
     }
