@@ -6,8 +6,8 @@ All task exchange runs through Core's `TaskManager.synchronize(using:)` and the 
 
 ## Verified locally
 
-- Core suite: 5 tests passed. Failed synchronization retains the exact previously saved task and unknown attributes.
-- Native suite: 7 tests passed with the real server and pinned Taskwarrior enabled. Connection settings, including the exact encryption secret, survive a new configuration-store instance; disconnect removes settings.
+- Integrated Core suite: 9 tests passed. Failed synchronization retains the exact previously saved task and unknown attributes.
+- Integrated native suite: 10 tests passed with the real server and pinned Taskwarrior enabled. Connection settings, including the exact encryption secret, survive a new configuration-store instance; disconnect removes settings.
 - Native failure: an actual connection refusal at an isolated localhost endpoint returns TaskChampion's synchronization error and preserves the previously committed task.
 - Real encrypted interoperability: TaskChampion 3.1.0, Taskwarrior 3.5.0 and taskchampion-sync-server 0.7.1 exchanged tasks through an isolated localhost server. A native-created task reached desktop with the same UUID and opaque attribute; a desktop edit returned to native preserving annotations and opaque fields. A desktop-created task reached native with the same UUID and project. Repeating sync produced one record per tested identity. A wrong encryption secret failed while retaining a new local task.
 
