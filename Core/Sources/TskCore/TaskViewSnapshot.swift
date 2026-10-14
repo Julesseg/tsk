@@ -4,6 +4,14 @@ public struct TaskViewSnapshot: Equatable, Sendable {
     public let tasks: [TaskRecord]
     public let allTasks: [TaskRecord]
     public let projects: [String]
+    public let nextEvaluation: Date?
+
+    public init(tasks: [TaskRecord], allTasks: [TaskRecord], projects: [String], nextEvaluation: Date? = nil) {
+        self.tasks = tasks
+        self.allTasks = allTasks
+        self.projects = projects
+        self.nextEvaluation = nextEvaluation
+    }
 }
 
 public extension TaskManager {

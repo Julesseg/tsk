@@ -40,7 +40,7 @@ struct RawFilterEditorView: View {
                         .frame(minHeight: 120)
                         .accessibilityLabel("Taskwarrior filter expression")
                         .accessibilityIdentifier("raw-filter-expression")
-                    Text("Example: project:Work and +home\nA blank expression shows all tasks, including completed tasks.")
+                    Text("Example: due:today and +READY\nA blank expression shows all tasks, including completed tasks.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Check results") { focusedField = nil; Task { await preview() } }
                         .disabled(isWorking).accessibilityIdentifier("check-filter")
@@ -51,6 +51,17 @@ struct RawFilterEditorView: View {
                         .disabled(isWorking).accessibilityIdentifier("apply-filter")
                     Text("Saved views stay on this device. Search uses case-sensitive Taskwarrior 3.5 defaults.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("raw-filter-form")
+            .safeAreaInset(edge: .bottom) {
+                if focusedField != nil {
+                    HStack {
+                        Spacer()
+                        Button("Done") { focusedField = nil }
+                            .accessibilityIdentifier("dismiss-filter-keyboard")
+                    }
+                    .padding().background(.regularMaterial)
                 }
             }
             .safeAreaInset(edge: .top) {
@@ -64,11 +75,6 @@ struct RawFilterEditorView: View {
             .navigationTitle(original == nil ? "New custom view" : "Edit custom view")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .accessibilityIdentifier("dismiss-filter-keyboard")
-                }
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isWorking) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { focusedField = nil; Task { await save() } }
