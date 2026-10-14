@@ -107,7 +107,7 @@ jobs:
           set -o pipefail
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests)
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests)
           fi
           ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \

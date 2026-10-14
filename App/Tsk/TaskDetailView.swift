@@ -15,7 +15,7 @@ struct TaskDetailView: View {
 
     var body: some View {
         Form {
-            Section("Description") { Text(task.description).textSelection(.enabled) }
+            Section("Description") { Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description") }
             TaskOrganizationSummary(task: task)
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
@@ -30,6 +30,7 @@ struct TaskDetailView: View {
             TaskAvailabilityView(task: task, store: store, isDetail: true)
             TaskDependenciesSection(store: store, task: task, onSave: { task = $0 })
             Section("Planning") { TaskPlanningSummary(task: task) }
+            TaskAnnotationsSection(store: store, task: task, onSave: { task = $0 })
             Section("Attributes") {
                 ForEach(task.attributes.keyIdentities) { key in
                     LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
