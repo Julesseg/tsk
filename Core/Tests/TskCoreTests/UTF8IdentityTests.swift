@@ -39,3 +39,17 @@ import Testing
     #expect(saved.attributes["café"] == "one")
     #expect(saved.attributes["cafe\u{301}"] == nil)
 }
+
+@Test func tagPrefixSeparatesUTF8BytesFromLeadingCombiningMark() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let tag = "\u{301}note"
+    var draft = TaskDraft(description: "Combining tag")
+    try draft.addTag(tag)
+    let saved = try await manager.create(draft)
+    #expect(saved.tags.map { UTF8String($0) } == [UTF8String(tag)])
+    #expect(saved.attributes["tags"]?.matchesBytes(tag) == true)
+    _ = try await manager.update(id: saved.id, changes: ["tag_\(tag)": nil])
+    let revised = try await manager.task(id: saved.id)
+    #expect(revised.tags.isEmpty)
+    #expect(revised.attributes["tags"] == nil)
+}

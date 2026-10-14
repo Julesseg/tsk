@@ -79,8 +79,8 @@ extension TaskManager {
 enum TaskOrganization {
     static func tags(in attributes: TaskAttributes) -> [String] {
         attributes.keys.compactMap { key in
-            guard key.hasPrefix("tag_"), key.count > 4 else { return nil }
-            return String(key.dropFirst(4))
+            guard key.utf8.starts(with: "tag_".utf8), key.utf8.count > 4 else { return nil }
+            return String(decoding: key.utf8.dropFirst(4), as: UTF8.self)
         }.sorted { UTF8String($0) < UTF8String($1) }
     }
 
@@ -114,9 +114,9 @@ enum TaskOrganization {
             }
             patch.updateValue(priority?.isEmpty == false ? priority : nil, forKey: "priority")
         }
-        let tagKeys = changes.keys.filter { $0.hasPrefix("tag_") }
+        let tagKeys = changes.keys.filter { $0.utf8.starts(with: "tag_".utf8) }
         for key in tagKeys where changes[key] != .some(nil) {
-            try validateTag(String(key.dropFirst(4)))
+            try validateTag(String(decoding: key.utf8.dropFirst(4), as: UTF8.self))
         }
         if !tagKeys.isEmpty {
             var attributes = original
