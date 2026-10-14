@@ -15,7 +15,7 @@ public enum TaskAttributeValues {
             return result
         case .date:
             guard let date = date(value), let seconds = Int64(exactly: date.timeIntervalSince1970.rounded(.towardZero)) else {
-                throw invalid(definition, "Choose a date or enter Unix seconds or an ISO 8601 timestamp.")
+                throw invalid(definition, "Choose a date or enter Unix seconds or a valid ISO 8601 timestamp. Use a real calendar day, hours 00–23, and minutes/seconds 00–59.")
             }
             return String(seconds)
         case .duration:
@@ -29,18 +29,31 @@ public enum TaskAttributeValues {
 
     public static func date(_ raw: String) -> Date? {
         if let seconds = Int64(raw), abs(Double(seconds)) <= 253402300799 { return Date(timeIntervalSince1970: Double(seconds)) }
-        let formatter = ISO8601DateFormatter()
-        if let date = formatter.date(from: raw), abs(date.timeIntervalSince1970) <= 253402300799 { return date }
-        formatter.formatOptions.insert(.withFractionalSeconds)
-        if let date = formatter.date(from: raw), abs(date.timeIntervalSince1970) <= 253402300799 { return date }
-        let compact = DateFormatter()
-        compact.locale = Locale(identifier: "en_US_POSIX")
-        compact.calendar = Calendar(identifier: .gregorian)
-        compact.timeZone = TimeZone(secondsFromGMT: 0)
-        compact.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
-        compact.isLenient = false
-        guard let date = compact.date(from: raw), compact.string(from: date).matchesBytes(raw) else { return nil }
-        return date
+        let extended = #"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})$"#
+        let compact = #"^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})$"#
+        guard let parts = TaskwarriorDuration.captures(extended, raw) ?? TaskwarriorDuration.captures(compact, raw),
+              let year = Int(parts[1]), let month = Int(parts[2]), let day = Int(parts[3]),
+              let hour = Int(parts[4]), let minute = Int(parts[5]), let second = Int(parts[6]),
+              (1...12).contains(month), (0...23).contains(hour), (0...59).contains(minute), (0...59).contains(second) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let monthStart = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let days = calendar.range(of: .day, in: .month, for: monthStart), days.contains(day),
+              let midnight = calendar.date(from: DateComponents(year: year, month: month, day: day)) else { return nil }
+        let components = calendar.dateComponents([.year, .month, .day], from: midnight)
+        guard components.year == year, components.month == month, components.day == day else { return nil }
+        var offset = 0
+        if parts[8] != "Z" {
+            let sign = parts[8].hasPrefix("-") ? -1 : 1
+            let digits = parts[8].dropFirst().filter { $0 != ":" }
+            guard let hours = Int(digits.prefix(2)), let minutes = Int(digits.suffix(2)),
+                  (0...23).contains(hours), (0...59).contains(minutes) else { return nil }
+            offset = sign * (hours * 3600 + minutes * 60)
+        }
+        let fraction = parts[7].isEmpty ? 0 : Double("0." + parts[7]) ?? 0
+        let seconds = midnight.timeIntervalSince1970 + Double(hour * 3600 + minute * 60 + second - offset) + fraction
+        guard seconds.isFinite, abs(seconds) <= 253402300799 else { return nil }
+        return Date(timeIntervalSince1970: seconds)
     }
 
     public static func durationSeconds(_ raw: String) -> Int64? {
