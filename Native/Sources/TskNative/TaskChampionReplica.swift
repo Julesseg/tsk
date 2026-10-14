@@ -2,7 +2,7 @@ import CTaskChampion
 import Foundation
 import TskCore
 
-public actor TaskChampionReplica: TaskReplica {
+public actor TaskChampionReplica: TaskSynchronizingReplica {
     private let directory: URL
     private let library: String
 
@@ -19,8 +19,18 @@ public actor TaskChampionReplica: TaskReplica {
         try request(command: "create", id: id, attributes: attributes)
     }
 
-    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil) throws -> T {
-        let request = Request(path: directory.path, command: command, id: id, attributes: attributes)
+    public func synchronize(using configuration: SyncConfiguration) async throws {
+        do {
+            let _: Bool = try request(command: "synchronize", configuration: configuration)
+        } catch let error as SynchronizationError {
+            throw error
+        } catch {
+            throw SynchronizationError.failed(error.localizedDescription)
+        }
+    }
+
+    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, configuration: SyncConfiguration? = nil) throws -> T {
+        let request = Request(path: directory.path, command: command, id: id, attributes: attributes, configuration: configuration)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
             throw TaskManagementError.storage("Could not encode the task operation.")
@@ -30,7 +40,10 @@ public actor TaskChampionReplica: TaskReplica {
         }
         defer { tsk_bridge_free(output) }
         let response = try JSONDecoder().decode(Response<T>.self, from: Data(String(cString: output).utf8))
-        if let error = response.error { throw TaskManagementError.storage(error) }
+        if let error = response.error {
+            if command == "synchronize" { throw SynchronizationError.failed(error) }
+            throw TaskManagementError.storage(error)
+        }
         guard let value = response.value else { throw TaskManagementError.storage("TaskChampion returned no result.") }
         return value
     }
@@ -41,6 +54,7 @@ private struct Request: Encodable {
     let command: String
     let id: UUID?
     let attributes: [String: String]?
+    let configuration: SyncConfiguration?
 }
 
 private struct Response<T: Decodable>: Decodable {

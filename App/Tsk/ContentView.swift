@@ -2,8 +2,16 @@ import SwiftUI
 import TskCore
 
 struct ContentView: View {
-    @State private var store = TaskStore()
+    @State private var store: TaskStore
+    @State private var synchronization: SynchronizationStore
     @State private var isCapturing = false
+    @State private var isConfiguringSync = false
+
+    init() {
+        let store = TaskStore()
+        _store = State(initialValue: store)
+        _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
+    }
 
     var body: some View {
         NavigationStack {
@@ -52,6 +60,10 @@ struct ContentView: View {
             }
             .navigationTitle("Tasks")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }
+                        .accessibilityIdentifier("synchronization-settings")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("New task", systemImage: "plus") { isCapturing = true }
                         .accessibilityIdentifier("new-task")
@@ -62,7 +74,13 @@ struct ContentView: View {
             .sheet(isPresented: $isCapturing) {
                 TaskDraftView(store: store)
             }
-            .task { await store.reload() }
+            .sheet(isPresented: $isConfiguringSync) {
+                SyncSettingsView(synchronization: synchronization, tasks: store)
+            }
+            .task {
+                await store.reload()
+                await synchronization.loadConfiguration()
+            }
         }
     }
 }

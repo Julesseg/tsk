@@ -6,6 +6,7 @@ import TskNative
 @MainActor @Observable
 final class TaskStore {
     let manager: TaskManager
+    let directory: URL
     var tasks: [TaskRecord] = []
     var error: String?
     var isSaving = false
@@ -14,7 +15,7 @@ final class TaskStore {
     init() {
         let support = URL.applicationSupportDirectory
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
-        let directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
+        directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
         manager = TaskManager(replica: TaskChampionReplica(directory: directory))
     }
 
