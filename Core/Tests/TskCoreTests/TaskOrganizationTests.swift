@@ -56,3 +56,11 @@ import Testing
     #expect(cleared.attributes["opaque"] == "retain")
     #expect(try await manager.tasks(project: .unassigned) == [cleared])
 }
+
+@Test func projectNamesRetainExactWhitespaceAsWellAsCase() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let spaced = try await manager.create(TaskDraft(description: "Exact name", attributes: ["project": " Home "]))
+    #expect(spaced.project == " Home ")
+    #expect(try await manager.tasks(project: .project("Home")).isEmpty)
+    #expect(try await manager.tasks(project: .project(" Home ")) == [spaced])
+}

@@ -84,11 +84,11 @@ enum TaskOrganization {
     static func normalizedChanges(_ changes: [String: String?], original: [String: String]) throws -> [String: String?] {
         var patch = changes
         if changes.keys.contains("project") {
-            let project = (changes["project"] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let project = changes["project"] ?? nil
             patch.updateValue(project?.isEmpty == false ? project : nil, forKey: "project")
         }
         if changes.keys.contains("priority") {
-            let priority = (changes["priority"] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let priority = changes["priority"] ?? nil
             guard priority == nil || priority == "" || ["H", "M", "L"].contains(priority ?? "") else {
                 throw TaskManagementError.invalidPriority(priority ?? "")
             }

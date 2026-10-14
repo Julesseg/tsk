@@ -2,9 +2,18 @@ import SwiftUI
 import TskCore
 
 struct ContentView: View {
-    @State private var store = TaskStore()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var store: TaskStore
+    @State private var synchronization: SynchronizationStore
     @State private var isCapturing = false
+    @State private var isConfiguringSync = false
     @State private var editingTask: TaskRecord?
+
+    init() {
+        let store = TaskStore()
+        _store = State(initialValue: store)
+        _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
+    }
 
     var body: some View {
         NavigationStack {
@@ -18,7 +27,7 @@ struct ContentView: View {
                         Button("Retry") { Task { await store.reload() } }
                     }
                 } else if store.tasks.isEmpty {
-                    ContentUnavailableView(store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
+                    ContentUnavailableView(store.query == .today ? "Nothing planned or due today" : store.query == .completed ? "No completed tasks" : "No unfinished tasks", systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
                 } else {
                     List(store.tasks) { task in
                         NavigationLink {
@@ -29,6 +38,7 @@ struct ContentView: View {
                                 if let project = task.attributes["project"], !project.isEmpty {
                                     Text(project).font(.caption).foregroundStyle(.secondary)
                                 }
+                                TaskPlanningCaption(task: task)
                                 if task.status != "pending" || task.isRecurring {
                                     Text(task.isRecurring ? "Recurring task · read only" : task.status.capitalized)
                                         .font(.caption).foregroundStyle(.secondary)
@@ -68,6 +78,7 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     ProjectPicker(store: store)
                     Picker("Task status", selection: $store.query) {
+                    Text("Today").tag(TaskQuery.today)
                     Text("Unfinished").tag(TaskQuery.unfinished)
                     Text("Completed").tag(TaskQuery.completed)
                 }
@@ -79,6 +90,10 @@ struct ContentView: View {
             }
             .navigationTitle("Tasks")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }
+                        .accessibilityIdentifier("synchronization-settings")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("New task", systemImage: "plus") { store.query = .unfinished; isCapturing = true }
                         .accessibilityIdentifier("new-task")
@@ -89,8 +104,18 @@ struct ContentView: View {
             .sheet(isPresented: $isCapturing) {
                 TaskEditorView(store: store)
             }
+            .sheet(isPresented: $isConfiguringSync) {
+                SyncSettingsView(synchronization: synchronization, tasks: store)
+            }
             .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
             .task(id: TaskListSelection(query: store.query, project: store.projectSelection)) { await store.reload() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await store.reload() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                Task { await store.reload() }
+            }
+            .task { await synchronization.loadConfiguration() }
         }
     }
 }

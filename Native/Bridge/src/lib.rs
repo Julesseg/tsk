@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
-use taskchampion::{storage::{AccessMode, sqlite::SqliteStorage}, Replica, TaskData};
+use taskchampion::{storage::{AccessMode, sqlite::SqliteStorage}, Replica, ServerConfig, TaskData};
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -12,6 +12,17 @@ struct Request {
     id: Option<Uuid>,
     attributes: Option<HashMap<String, String>>,
     changes: Option<HashMap<String, Option<String>>>,
+    configuration: Option<SyncConfiguration>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncConfiguration {
+    #[serde(rename = "serverURL")]
+    server_url: String,
+    #[serde(rename = "clientID")]
+    client_id: Uuid,
+    encryption_secret: String,
 }
 
 async fn execute(request: Request) -> Result<Value, String> {
@@ -57,6 +68,16 @@ async fn execute(request: Request) -> Result<Value, String> {
             replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
             Ok(record(task))
         }
+        "synchronize" => {
+            let config = request.configuration.ok_or("Missing synchronization configuration")?;
+            let mut server = ServerConfig::Remote {
+                url: config.server_url,
+                client_id: config.client_id,
+                encryption_secret: config.encryption_secret.into_bytes(),
+            }.into_server().await.map_err(|e| e.to_string())?;
+            replica.sync(&mut server, true).await.map_err(|e| format!("{e:#}"))?;
+            Ok(json!(true))
+        }
         _ => Err("Unsupported replica command".into()),
     }
 }
@@ -71,7 +92,7 @@ pub unsafe extern "C" fn tsk_tc_request(input: *const c_char) -> *mut c_char {
         if input.is_null() { return Err("Missing request".to_string()); }
         let input = CStr::from_ptr(input).to_str().map_err(|e| e.to_string())?;
         let request: Request = serde_json::from_str(input).map_err(|e| e.to_string())?;
-        let runtime = tokio::runtime::Builder::new_current_thread().build().map_err(|e| e.to_string())?;
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e| e.to_string())?;
         runtime.block_on(execute(request))
     }).unwrap_or_else(|_| Err("TaskChampion aborted the operation".into()));
     let output = match result {

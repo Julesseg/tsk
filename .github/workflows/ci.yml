@@ -35,7 +35,7 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           apt-get update
-          apt-get install -y curl clang
+          apt-get install -y curl gcc
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: Swatinem/rust-cache@v2
@@ -46,7 +46,7 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           scripts/build-native.sh host
-          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --disable-index-store --package-path Native
+          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
 
   app-ui-tests:
     name: App · XCUITest (macOS)

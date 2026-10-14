@@ -30,6 +30,7 @@ struct TaskEditorView: View {
                         .focused($isDescriptionFocused)
                 }
                 TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, addTag: { _ = addTag() })
+                TaskPlanningSection(draft: $draft, now: store.currentDate)
                 Section {
                     Text("Review your task before saving. Changes are stored locally and available offline.")
                         .font(.footnote).foregroundStyle(.secondary)
