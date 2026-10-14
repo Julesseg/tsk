@@ -24,12 +24,13 @@ async fn records(path: &Path) -> Result<serde_json::Value, String> {
     Ok(serde_json::to_value(tasks.into_iter().map(|(id, task)| (id.to_string(), task.iter().map(|(key, value)| (key.to_owned(), value.to_owned())).collect::<std::collections::BTreeMap<_, _>>())).collect::<std::collections::BTreeMap<_, _>>()).map_err(|e| e.to_string())?)
 }
 
-pub async fn prepare(destination: &str, source: &str) -> Result<(), String> {
+pub async fn prepare(destination: &str, source: &str, allow_migration: bool) -> Result<(), String> {
     let destination = PathBuf::from(destination);
     let parent = destination.parent().ok_or("Invalid shared task storage location")?;
     let _migration = LocalAccess::new(parent.join(".tsk-migration-lock").to_str().ok_or("Invalid shared task storage path")?)?;
     let marker = destination.join(".tsk-shared-ready");
     if marker.exists() { let _destination = LocalAccess::new(destination.to_str().ok_or("Invalid shared path")?)?; records(&destination).await?; return Ok(()); }
+    if !allow_migration { return Err("Open tsk to finish shared storage migration before using this action".into()); }
     if destination.exists() { return Err("Shared storage is not initialized; existing data was preserved. Open the app to resolve migration.".into()); }
     let source = PathBuf::from(source);
     let staging = parent.join(".tsk-migration-staging");
