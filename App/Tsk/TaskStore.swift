@@ -8,6 +8,8 @@ final class TaskStore {
     let manager: TaskManager
     let directory: URL
     var tasks: [TaskRecord] = []
+    var savedViews: [SavedTaskView] = []
+    var customView: CustomViewSelection?
     var allTasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
     var projectSelection: TaskProjectSelection = .all
@@ -25,7 +27,7 @@ final class TaskStore {
         directory = try TaskChampionSession.directory(testName: testName)
         let fixed = testName.flatMap { _ in ProcessInfo.processInfo.environment["TSK_TEST_NOW"] }.flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:))
         fixedDate = fixed
-        manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
+        manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() }, viewDefinitions: LocalTaskViewStore(directory: LocalTaskViewStore.directory(testName: testName)))
     }
 
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
@@ -37,17 +39,20 @@ final class TaskStore {
         let generation = reloadGeneration
         let requestedQuery = query
         let requestedProject = projectSelection
+        let requestedCustom = customView
         isLoading = true
         defer { if generation == reloadGeneration { isLoading = false } }
         do {
-            let snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject)
-            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
+            let snapshot: TaskViewSnapshot
+            if let requestedCustom { snapshot = try await manager.viewSnapshot(filter: requestedCustom.expression) }
+            else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
             tasks = snapshot.tasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             error = nil
         } catch {
-            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject else { return }
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
             self.error = error.localizedDescription
         }
     }
@@ -84,7 +89,7 @@ final class TaskStore {
             allTasks.append(saved)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
-            if query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
+            if customView == nil && query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
             if !saved.project.isEmpty, !availableProjects.contains(where: { UTF8String($0) == UTF8String(saved.project) }) {
                 availableProjects.append(saved.project)
                 availableProjects.sort { UTF8String($0) < UTF8String($1) }
