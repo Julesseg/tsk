@@ -64,7 +64,15 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 
 public actor TaskManager {
     let replica: any TaskReplica
-    private let now: @Sendable () -> Date
+    let now: @Sendable () -> Date
+    var synchronizationConfiguration: SyncConfiguration?
+    var synchronizationState: SynchronizationState = .localOnly
+    var synchronizationConfigurationGeneration = 0
+    var synchronizationLocalGeneration = 0
+    var synchronizationRequested = false
+    var synchronizationTask: Task<Void, Never>?
+    var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
+    var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
 
     public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }) {
         self.replica = replica
@@ -101,7 +109,9 @@ public actor TaskManager {
         attributes["status"] = "pending"
         attributes["entry"] = timestamp
         attributes["modified"] = timestamp
-        return try await replica.create(id: UUID(), attributes: attributes)
+        let saved = try await replica.create(id: UUID(), attributes: attributes)
+        localChangeWasCommitted()
+        return saved
     }
 
     public func update(id: UUID, changes: [String: String?]) async throws -> TaskRecord {
@@ -119,7 +129,9 @@ public actor TaskManager {
             patch["description"] = description
         }
         patch["modified"] = String(Int(now().timeIntervalSince1970))
-        return try await replica.update(id: id, changes: patch)
+        let saved = try await replica.update(id: id, changes: patch)
+        localChangeWasCommitted()
+        return saved
     }
 
     public func complete(id: UUID) async throws -> TaskRecord {
@@ -127,10 +139,12 @@ public actor TaskManager {
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }
         let timestamp = String(Int(now().timeIntervalSince1970))
-        return try await replica.update(id: id, changes: [
+        let saved = try await replica.update(id: id, changes: [
             "status": "completed", "end": task.attributes["end"] ?? timestamp,
             "modified": timestamp, "start": nil
         ])
+        localChangeWasCommitted()
+        return saved
     }
 
 }

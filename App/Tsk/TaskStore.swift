@@ -15,9 +15,8 @@ final class TaskStore {
     private var reloadGeneration = 0
 
     init() {
-        let support = URL.applicationSupportDirectory
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]
-        directory = support.appendingPathComponent(testName.map { "UITests/\($0)" } ?? "TaskChampion", isDirectory: true)
+        directory = TaskChampionSession.directory(testName: testName)
         manager = TaskManager(replica: TaskChampionReplica(directory: directory))
     }
 
