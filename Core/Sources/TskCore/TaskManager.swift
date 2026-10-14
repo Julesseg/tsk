@@ -85,6 +85,11 @@ public actor TaskManager {
         }
     }
 
+    public func availability(id: UUID) async throws -> TaskAvailability {
+        let record = try await task(id: id)
+        return record.availability(at: now())
+    }
+
     public func upcomingDays() async throws -> [UpcomingDay] {
         let records = try await replica.tasks()
         return UpcomingDay.groups(tasks: records, at: now(), calendar: calendar)

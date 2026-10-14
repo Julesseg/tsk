@@ -26,6 +26,10 @@ final class TaskStore {
         manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { fixed ?? Date() })
     }
 
+    func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
+        task.availability(at: fixedDate ?? date)
+    }
+
     func reload() async {
         reloadGeneration += 1
         let generation = reloadGeneration

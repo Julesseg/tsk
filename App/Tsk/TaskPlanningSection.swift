@@ -29,21 +29,11 @@ struct TaskPlanningSection: View {
                 }
                 .accessibilityIdentifier("plan-tomorrow")
             }
-            Toggle("Deadline", isOn: Binding(
-                get: { draft.attributes["due"] != nil },
-                set: { draft.deadline = $0 ? now : nil }
-            ))
-            .accessibilityIdentifier("deadline-enabled")
-            if draft.attributes["due"] != nil {
-                if let date = draft.deadline {
-                    DatePicker("Deadline", selection: Binding(
-                        get: { date }, set: { draft.deadline = $0 }
-                    ), displayedComponents: [.date, .hourAndMinute])
-                    .accessibilityIdentifier("deadline-picker")
-                } else {
-                    Text("Unrecognized deadline: \(draft.attributes["due"] ?? "")").font(.caption)
-                    Button("Replace deadline with today") { draft.deadline = now }
-                }
+            OptionalTaskDateEditor(title: "Deadline", identifier: "deadline", rawValue: draft.attributes["due"], date: $draft.deadline, initialDate: now)
+            OptionalTaskDateEditor(title: "Waiting date", identifier: "waiting-date", rawValue: draft.attributes["wait"], date: $draft.waitUntil, initialDate: Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now)
+            if draft.attributes["wait"] != nil {
+                Text("Waiting tasks keep their planned day and deadline. A matching task stays visible in Today with its waiting reason.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
             Text("The planned day is when you intend to work. The deadline is when the task must be finished.")
                 .font(.footnote).foregroundStyle(.secondary)

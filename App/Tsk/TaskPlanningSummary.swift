@@ -16,6 +16,12 @@ struct TaskPlanningSummary: View {
         } else if let raw = task.attributes["due"] {
             LabeledContent("Deadline", value: "Unrecognized date: \(raw)")
         }
+        if let date = task.waitUntil {
+            LabeledContent("Waiting date") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
+                .accessibilityIdentifier("task-waiting-date")
+        } else if let raw = task.attributes["wait"] {
+            LabeledContent("Waiting date", value: "Unrecognized date: \(raw)")
+        }
         if let date = task.startedAt {
             LabeledContent("Started") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
                 .accessibilityIdentifier("task-started")

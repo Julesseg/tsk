@@ -25,6 +25,7 @@ struct UpcomingTaskList: View {
                                     }
                                 }
                                 .font(.caption).foregroundStyle(.secondary)
+                                TaskAvailabilityView(task: entry.task, store: store)
                                 if entry.task.isRecurring {
                                     Text("Recurring task · read only").font(.caption).foregroundStyle(.secondary)
                                 }
