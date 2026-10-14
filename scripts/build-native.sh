@@ -7,6 +7,7 @@ if [[ "${1:-host}" == host ]]; then
     cargo build --locked --release --manifest-path "$manifest"
     exit
 fi
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-26.0}"
 if [[ "${1:-}" == simulator ]]; then
     rustup target add aarch64-apple-ios-sim
     cargo build --locked --release --manifest-path "$manifest" --target aarch64-apple-ios-sim

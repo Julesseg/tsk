@@ -40,7 +40,7 @@ struct SyncSettingsView: View {
                     }
                     .accessibilityIdentifier("save-sync-connection")
                     if savedConnection {
-                        Text("Connection saved on this device. Synchronize to verify server access.")
+                        Text("Connection saved on this device. Automatic synchronization will verify server access.")
                             .font(.footnote).accessibilityIdentifier("sync-connection-saved")
                     }
                 }
@@ -67,7 +67,7 @@ struct SyncSettingsView: View {
                     }
                 }
                 Section {
-                    Text("Use the same server, client ID and encryption secret as your Taskwarrior clients. Local task saves work offline; saving a connection does not mean synchronization succeeded.")
+                    Text("Use the same server, client ID and encryption secret as your Taskwarrior clients. Local saves work offline. Synchronization runs after task changes, app opening and restored connectivity; background opportunities depend on iOS. Saving a connection does not mean synchronization succeeded.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if synchronization.configuration != nil {
                         Button("Disconnect", role: .destructive) {

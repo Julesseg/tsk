@@ -7,6 +7,14 @@
 #if TARGET_OS_IPHONE
 extern char *tsk_tc_request(const char *input);
 extern void tsk_tc_free(char *output);
+extern int tsk_tc_interrupt_sync(const char *path);
+extern uint64_t tsk_tc_sync_generation(const char *path);
+uint64_t tsk_bridge_sync_generation(const char *library, const char *path) {
+    return tsk_tc_sync_generation(path);
+}
+int tsk_bridge_interrupt_sync(const char *library, const char *path) {
+    return tsk_tc_interrupt_sync(path);
+}
 char *tsk_bridge_request(const char *library, const char *input) {
     char *rust_output = tsk_tc_request(input);
     if (!rust_output) return NULL;
@@ -19,11 +27,27 @@ char *tsk_bridge_request(const char *library, const char *input) {
 #include <pthread.h>
 static pthread_mutex_t load_mutex = PTHREAD_MUTEX_INITIALIZER;
 static void *loaded_library = NULL;
-char *tsk_bridge_request(const char *library, const char *input) {
+static void *load_library(const char *library) {
     pthread_mutex_lock(&load_mutex);
     if (!loaded_library) loaded_library = dlopen(library, RTLD_NOW | RTLD_LOCAL);
     void *handle = loaded_library;
     pthread_mutex_unlock(&load_mutex);
+    return handle;
+}
+uint64_t tsk_bridge_sync_generation(const char *library, const char *path) {
+    void *handle = load_library(library);
+    if (!handle) return 0;
+    uint64_t (*generation)(const char *) = dlsym(handle, "tsk_tc_sync_generation");
+    return generation ? generation(path) : 0;
+}
+int tsk_bridge_interrupt_sync(const char *library, const char *path) {
+    void *handle = load_library(library);
+    if (!handle) return 0;
+    int (*interrupt)(const char *) = dlsym(handle, "tsk_tc_interrupt_sync");
+    return interrupt ? interrupt(path) : 0;
+}
+char *tsk_bridge_request(const char *library, const char *input) {
+    void *handle = load_library(library);
     if (!handle) return NULL;
     char *(*request)(const char *) = dlsym(handle, "tsk_tc_request");
     void (*release)(char *) = dlsym(handle, "tsk_tc_free");

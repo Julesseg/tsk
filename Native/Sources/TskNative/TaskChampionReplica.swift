@@ -7,7 +7,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
     private let library: String
 
     public init(directory: URL, library: String? = nil) {
-        self.directory = directory
+        self.directory = directory.resolvingSymlinksInPath().standardizedFileURL
         self.library = library ?? ProcessInfo.processInfo.environment["TSK_TASKCHAMPION_LIBRARY"] ?? "libtsk_taskchampion.dylib"
     }
 
@@ -25,7 +25,16 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
 
     public func synchronize(using configuration: SyncConfiguration) async throws {
         do {
-            let _: Bool = try request(command: "synchronize", configuration: configuration)
+            let generation = tsk_bridge_sync_generation(library, directory.standardizedFileURL.path)
+            try Task.checkCancellation()
+            try await withTaskCancellationHandler {
+                let operation = Task.detached { [self] in
+                    let _: Bool = try request(command: "synchronize", configuration: configuration, syncGeneration: generation)
+                }
+                try await operation.value
+            } onCancel: { [self] in
+                _ = tsk_bridge_interrupt_sync(library, directory.standardizedFileURL.path)
+            }
         } catch let error as SynchronizationError {
             throw error
         } catch {
@@ -33,8 +42,8 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         }
     }
 
-    private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, changes: [String: String?]? = nil, configuration: SyncConfiguration? = nil) throws -> T {
-        let request = Request(path: directory.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration)
+    nonisolated private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: [String: String]? = nil, changes: [String: String?]? = nil, configuration: SyncConfiguration? = nil, syncGeneration: UInt64? = nil) throws -> T {
+        let request = Request(path: directory.standardizedFileURL.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration, syncGeneration: syncGeneration)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
             throw TaskManagementError.storage("Could not encode the task operation.")
@@ -45,6 +54,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica {
         defer { tsk_bridge_free(output) }
         let response = try JSONDecoder().decode(Response<T>.self, from: Data(String(cString: output).utf8))
         if let error = response.error {
+            if error == "TSK_SYNC_INTERRUPTED" { throw SynchronizationError.interrupted }
             if command == "synchronize" { throw SynchronizationError.failed(error) }
             throw TaskManagementError.storage(error)
         }
@@ -60,6 +70,7 @@ private struct Request: Encodable {
     let attributes: [String: String]?
     let changes: [String: String?]?
     let configuration: SyncConfiguration?
+    let syncGeneration: UInt64?
 }
 
 private struct Response<T: Decodable>: Decodable {
