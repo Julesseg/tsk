@@ -26,6 +26,28 @@ jobs:
         working-directory: Core
         run: swift test
 
+  native-tests:
+    name: TaskChampion · persistent replica (Linux)
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: |
+          apt-get update
+          apt-get install -y curl clang
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Native/Bridge
+
+      - name: Build native bridge and exercise persistent Core flows
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          scripts/build-native.sh host
+          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+
   app-ui-tests:
     name: App · XCUITest (macOS)
     runs-on: macos-15
@@ -37,6 +59,15 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - uses: dtolnay/rust-toolchain@1.99.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Native/Bridge
+
+      - name: Build pinned TaskChampion for iOS
+        run: scripts/build-native.sh apple
+
       - name: Toolchain versions
         run: xcodebuild -version
 
@@ -44,19 +75,23 @@ jobs:
         id: sim
         run: |
           set -euo pipefail
-          NAME=$(xcrun simctl list devices available --json \
-            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; names=[x['name'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(sorted(names)[-1] if names else 'iPhone 16')")
-          echo "Using simulator: $NAME"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, sys
+          devices = json.load(sys.stdin)["devices"]
+          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith("iPhone")]
+          runtime, device = max(available, key=lambda item: (item[0], item[1]["name"]))
+          print("Using simulator: " + device["name"] + " (" + device["udid"] + ")")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("id=" + device["udid"] + "\n")
+          '
 
       - name: Build & run UI tests
         working-directory: App
         run: |
           set -o pipefail
-          xcodebuild test \
+          ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }},OS=latest" \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 

@@ -11,3 +11,7 @@ build/
 
 # macOS
 .DS_Store
+
+# Reproducible TaskChampion build outputs
+Native/Bridge/target/
+Native/Artifacts/
