@@ -53,8 +53,18 @@ jobs:
             TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
 
   app-ui-tests:
-    name: App · XCUITest (macOS)
+    name: ${{ matrix.job-name }}
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: iPhone
+            job-name: App · XCUITest (macOS)
+            artifact: ui-test-results
+          - family: iPad
+            job-name: App · XCUITest (iPad)
+            artifact: ui-test-results-ipad
     steps:
       - uses: actions/checkout@v4
 
@@ -75,15 +85,17 @@ jobs:
       - name: Toolchain versions
         run: xcodebuild -version
 
-      - name: Resolve an available iPhone simulator
+      - name: Resolve an available ${{ matrix.family }} simulator
+        env:
+          DEVICE_FAMILY: ${{ matrix.family }}
         id: sim
         run: |
           set -euo pipefail
           xcrun simctl list devices available --json | python3 -c '
           import json, os, sys
           devices = json.load(sys.stdin)["devices"]
-          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith("iPhone")]
-          runtime, device = max(available, key=lambda item: (item[0], item[1]["name"]))
+          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith(os.environ["DEVICE_FAMILY"])]
+          runtime, device = max(available, key=lambda item: (item[0], "13-inch" in item[1]["name"] or "12.9-inch" in item[1]["name"], "Pro" in item[1]["name"], item[1]["name"]))
           print("Using simulator: " + device["name"] + " (" + device["udid"] + ")")
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("id=" + device["udid"] + "\n")
@@ -93,9 +105,13 @@ jobs:
         working-directory: App
         run: |
           set -o pipefail
+          coverage=()
+          if [[ "${{ matrix.family }}" == "iPad" ]]; then
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests)
+          fi
           ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \
-            -scheme "$APP_NAME" \
+            -scheme "$APP_NAME" "${coverage[@]}" \
             -resultBundlePath TestResults.xcresult \
             -derivedDataPath ../.build/ui \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
@@ -107,6 +123,6 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ui-test-results
+          name: ${{ matrix.artifact }}
           path: App/TestResults.xcresult
           if-no-files-found: ignore
