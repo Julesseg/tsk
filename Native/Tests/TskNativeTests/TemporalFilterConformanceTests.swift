@@ -85,6 +85,8 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
     cases += [
         ("+ACTIVE or status:completed", ["+ACTIVE", "or", "status:completed"]),
         ("-ACTIVE", ["-ACTIVE"]),
+        ("!(+ACTIVE)", ["!", "(", "+ACTIVE", ")"]),
+        ("+ACTIVE and !project:Other", ["+ACTIVE", "and", "!", "project:Other"]),
         ("due:today", ["due:today"]), ("due.not:today", ["due.not:today"]),
         ("due.before:tomorrow", ["due.before:tomorrow"]), ("due.after:yesterday", ["due.after:yesterday"]),
         ("due.by:today", ["due.by:today"]), ("due.none:", ["due.none:"]), ("due.any:", ["due.any:"]),

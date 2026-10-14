@@ -85,14 +85,15 @@ indirect enum FilterExpression: Sendable {
     case xor(FilterExpression, FilterExpression)
 
     var requiresWorkingSet: Bool {
-        guard !hasDisjunctionOrNegation else { return false }
+        guard !hasDisjunction else { return false }
         return hasActiveTag
     }
 
-    private var hasDisjunctionOrNegation: Bool {
+    private var hasDisjunction: Bool {
         switch self {
-        case .or, .xor, .not: true
-        case .and(let left, let right): left.hasDisjunctionOrNegation || right.hasDisjunctionOrNegation
+        case .or, .xor: true
+        case .not(let child): child.hasDisjunction
+        case .and(let left, let right): left.hasDisjunction || right.hasDisjunction
         default: false
         }
     }
@@ -101,6 +102,7 @@ indirect enum FilterExpression: Sendable {
         switch self {
         case .predicate(.virtualTag(.active, let required)): required
         case .and(let left, let right): left.hasActiveTag || right.hasActiveTag
+        case .not(let child): child.hasActiveTag
         default: false
         }
     }
