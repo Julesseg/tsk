@@ -2,13 +2,17 @@ import CTaskChampion
 import Foundation
 import TskCore
 
-public actor TaskChampionReplica: TaskSynchronizingReplica {
+public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordinatingReplica {
     private let directory: URL
     private let library: String
 
     public init(directory: URL, library: String? = nil) {
         self.directory = directory.resolvingSymlinksInPath().standardizedFileURL
         self.library = library ?? ProcessInfo.processInfo.environment["TSK_TASKCHAMPION_LIBRARY"] ?? "libtsk_taskchampion.dylib"
+    }
+
+    public func acquireMutationLease() async throws -> any TaskMutationLease {
+        try await Task.detached { [directory] in try NativeMutationLease(directory: directory) }.value
     }
 
     public func tasks() async throws -> [TaskRecord] {

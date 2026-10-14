@@ -106,3 +106,14 @@ pub fn interrupt_sync(path: &str) -> Result<(), String> {
 pub fn sync_generation(path: &str) -> Result<u64, String> {
     generation_at(&directory(path)?, false)
 }
+
+pub struct SemanticAccess { _lock: FileLock }
+
+impl SemanticAccess {
+    pub fn new(path: &str) -> Result<Self, String> {
+        let path = directory(path)?;
+        let lock = FileLock::open(&path.join(".tsk-semantic-mutation"))?;
+        lock.lock(libc::LOCK_EX)?;
+        Ok(Self { _lock: lock })
+    }
+}

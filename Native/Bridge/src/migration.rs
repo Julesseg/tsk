@@ -1,4 +1,4 @@
-use crate::admission::LocalAccess;
+use crate::admission::{LocalAccess, SemanticAccess};
 use std::fs;
 use std::path::{Path, PathBuf};
 use taskchampion::{storage::{AccessMode, sqlite::SqliteStorage}, Replica};
@@ -35,6 +35,7 @@ pub async fn prepare(destination: &str, source: &str) -> Result<(), String> {
     let staging = parent.join(".tsk-migration-staging");
     if staging.exists() { fs::remove_dir_all(&staging).map_err(|e| e.to_string())?; }
     if source.exists() {
+        let _semantic = SemanticAccess::new(source.to_str().ok_or("Invalid legacy task storage path")?)?;
         let _source = LocalAccess::new(source.to_str().ok_or("Invalid legacy task storage path")?)?;
         let configuration = source.join("sync-configuration.json");
         if configuration.exists() {
