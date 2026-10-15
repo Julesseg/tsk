@@ -11,7 +11,7 @@ import time
 def capture(device, output, stop, maximum_seconds=60):
     path = pathlib.Path(output)
     stop = pathlib.Path(stop)
-    predicate = 'process == "corespotlightd" OR subsystem CONTAINS[c] "corespotlight" OR (process == "Tsk" AND eventMessage CONTAINS[c] "spotlight")'
+    predicate = 'process == "corespotlightd" OR subsystem CONTAINS[c] "corespotlight" OR subsystem BEGINSWITH[c] "com.apple.spotlight" OR (process == "searchd" AND (eventMessage CONTAINS[c] "IndexAgent" OR eventMessage CONTAINS[c] "SearchAgent")) OR (process == "Tsk" AND subsystem != "com.apple.dt.xctest" AND eventMessage CONTAINS[c] "spotlight")'
     command = ['xcrun', 'simctl', 'spawn', device, 'log', 'stream', '--style', 'compact', '--level', 'debug', '--predicate', predicate]
     metadata = dict(device=device, startedUTC=datetime.datetime.now(datetime.timezone.utc).isoformat(), maximumSeconds=maximum_seconds, command=command)
     child = None

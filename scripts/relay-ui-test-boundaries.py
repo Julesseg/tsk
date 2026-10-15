@@ -119,6 +119,7 @@ class BoundaryCapture:
                         self.started.add(method)
                         self.spotlight_current = method
                         self.spotlight_pids[method] = set()
+                        self.search_context(method, 'method-start')
                         stop = self.evidence / ('spotlight-' + method + '.stop')
                         try:
                             stop.unlink(missing_ok=True)
@@ -132,6 +133,8 @@ class BoundaryCapture:
                             self.active[method] = entry
                 else:
                     self.record('test-end', method=method, outcome=outcome)
+                    if method in self.started:
+                        self.search_context(method, 'method-end')
                     self.stop(method, 'test-end')
                     if self.spotlight_current == method:
                         self.spotlight_current = None
