@@ -20,7 +20,7 @@ CASES = [(protection, order) for protection in ("protected", "default-named")
          for order in ("delete-first", "index-first")]
 OBSERVATION_SECONDS = 120
 MAX_RECEIPT_BYTES = 65536
-STAGES = {"protected-data.availability", "index.availability", "observation.finished"} | {
+STAGES = {"protected-data.availability", "index.availability", "observation.finished", "app.main-actor.heartbeat"} | {
     operation + "." + phase for operation in ("initial-delete", "cleanup-delete", "index", "inserted-query", "empty-query")
     for phase in ("submit", "returned", "callback")}
 
@@ -145,15 +145,29 @@ def read_receipt(path, expected):
             document["indexName"] != "tsk.native-control." + expected["protection"] + "." + expected["token"] or
             type(document["pid"]) is not int or not 0 < document["pid"] < 2 ** 31):
         raise ValueError("invalid native identity")
+    heartbeat_count = 0
+    last_heartbeat_uptime = None
     for event in document["events"]:
         if (not isinstance(event, dict) or event.get("stage") not in STAGES or
                 not {"stage", "time", "uptime", "mainThread"} <= set(event) or
-                set(event) - {"stage", "time", "uptime", "mainThread", "error", "count", "exactIdentity", "available"}):
+                set(event) - {"stage", "time", "uptime", "mainThread", "error", "count", "exactIdentity", "available", "heartbeatOrdinal"}):
             raise ValueError("invalid native event fields")
+        if event["stage"] == "app.main-actor.heartbeat":
+            heartbeat_count += 1
+            if (set(event) != {"stage", "time", "uptime", "mainThread", "heartbeatOrdinal"} or
+                    event["mainThread"] is not True or type(event["heartbeatOrdinal"]) is not int or
+                    event["heartbeatOrdinal"] != heartbeat_count or heartbeat_count > 24):
+                raise ValueError("invalid heartbeat schema or sequence")
+        elif "heartbeatOrdinal" in event:
+            raise ValueError("unexpected heartbeat ordinal")
         for field in ("time", "uptime"):
             value = event[field]
             if type(value) not in (int, float) or not 0 <= value < 2 ** 53 or not math.isfinite(value):
                 raise ValueError("invalid native timestamp")
+        if event["stage"] == "app.main-actor.heartbeat":
+            if last_heartbeat_uptime is not None and event["uptime"] - last_heartbeat_uptime < 5 - 1e-6:
+                raise ValueError("invalid heartbeat interval")
+            last_heartbeat_uptime = event["uptime"]
         for field in ("mainThread", "available", "exactIdentity"):
             if field in event and type(event[field]) is not bool:
                 raise ValueError("invalid native boolean")
@@ -259,8 +273,17 @@ def run_cells(commands, output, app, observe=observe):
                                                name + ".launch", env=environment)
                 container = commands.run(["xcrun", "simctl", "get_app_container", identifier, BUNDLE, "data"],
                                          name + ".container")
-                receipt = observe(Path(container) / "Documents/native-index-control.json", configuration,
-                                  destination, started)
+                observation_started = time.monotonic()
+                cell["hostObservation"] = {"startEpochSeconds": time.time()}
+                write_json(output / "result.json", result)
+                try:
+                    receipt = observe(Path(container) / "Documents/native-index-control.json", configuration,
+                                      destination, started)
+                finally:
+                    observation_ended = time.monotonic()
+                    cell["hostObservation"].update(endEpochSeconds=time.time(),
+                                                  elapsedSeconds=observation_ended - observation_started,
+                                                  launchInclusiveElapsedSeconds=observation_ended - started)
                 cell["native"] = receipt
                 cell["outcome"] = receipt["outcome"]
                 if receipt["outcome"] != "completed":

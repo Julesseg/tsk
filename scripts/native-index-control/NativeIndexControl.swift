@@ -43,6 +43,7 @@ struct Event: Encodable, Sendable {
     var count: Int?
     var exactIdentity: Bool?
     var available: Bool?
+    var heartbeatOrdinal: Int?
 }
 
 final class Recorder: @unchecked Sendable {
@@ -62,18 +63,28 @@ final class Recorder: @unchecked Sendable {
                           indexName: configuration.index, itemIdentifier: configuration.item)
     }
 
-    func record(_ event: Event, outcome: String? = nil) {
+    @discardableResult
+    func record(_ event: Event, outcome: String? = nil) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        guard receipt.events.count < 64 else { return }
-        receipt.events.append(event)
-        if let outcome { receipt.outcome = outcome }
+        guard receipt.events.count < 64 else { return false }
+        var candidate = receipt
+        candidate.events.append(event)
+        if let outcome { candidate.outcome = outcome }
         do {
             let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try JSONEncoder().encode(receipt).write(to: directory.appendingPathComponent("native-index-control.json"), options: .atomic)
+            let data = try JSONEncoder().encode(candidate)
+            guard data.count <= 65536 else {
+                NSLog("TSK_NATIVE_INDEX_CONTROL receipt-write-failed")
+                return false
+            }
+            try data.write(to: directory.appendingPathComponent("native-index-control.json"), options: .atomic)
+            receipt = candidate
+            return true
         } catch {
             NSLog("TSK_NATIVE_INDEX_CONTROL receipt-write-failed")
+            return false
         }
     }
 }
@@ -197,6 +208,7 @@ actor NativeControl {
 final class NativeIndexControlApp: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
     private var control: NativeControl?
+    private var heartbeat: Task<Void, Never>?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         guard let configuration = Configuration() else { return false }
@@ -214,6 +226,12 @@ final class NativeIndexControlApp: UIResponder, UIApplicationDelegate {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         self.window = window
+        heartbeat = Task { @MainActor in
+            for ordinal in 1...24 {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                guard recorder.record(Event(stage: "app.main-actor.heartbeat", heartbeatOrdinal: ordinal)) else { return }
+            }
+        }
         Task { await control.start() }
         return true
     }

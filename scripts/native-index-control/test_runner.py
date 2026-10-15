@@ -324,5 +324,117 @@ except runner.Interrupted as error:
         self.assertEqual(commands.next_id, 0)
 
 
+class ObservabilityTests(unittest.TestCase):
+    def receipt(self, events):
+        configuration = {"token": "OWNED", "protection": "protected", "order": "delete-first", "bundle": runner.BUNDLE}
+        receipt = {"configuration": configuration, "pid": 12, "domain": "tsk.native-control.OWNED",
+                   "indexName": "tsk.native-control.protected.OWNED", "itemIdentifier": "tsk.native-control.OWNED/item",
+                   "outcome": "pending", "events": events}
+        return configuration, receipt
+
+    def read(self, events):
+        configuration, receipt = self.receipt(events)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "receipt.json"
+            path.write_text(json.dumps(receipt))
+            return runner.read_receipt(path, configuration)
+
+    def heartbeat(self, ordinal, uptime):
+        return {"stage": "app.main-actor.heartbeat", "time": uptime + 1000,
+                "uptime": uptime, "mainThread": True, "heartbeatOrdinal": ordinal}
+
+    def test_pending_heartbeat_receipt_accepts_full_bound_and_delayed_intervals(self):
+        events = [{"stage": "initial-delete.returned", "time": 1000, "uptime": 0, "mainThread": False}]
+        events += [self.heartbeat(index, index * 5.0 + (30 if index > 3 else 0)) for index in range(1, 25)]
+        actual = self.read(events)
+        self.assertEqual(actual["outcome"], "pending")
+        self.assertEqual(actual["events"], events)
+        self.assertEqual(self.read([])["events"], [])
+
+    def test_heartbeat_rejects_untyped_ordinal_thread_and_arbitrary_fields(self):
+        cases = [("heartbeatOrdinal", True), ("heartbeatOrdinal", 0), ("heartbeatOrdinal", 25),
+                 ("heartbeatOrdinal", 1.0), ("mainThread", False), ("count", 0),
+                 ("available", True), ("error", {"domain": "owned", "code": 1}), ("rawContent", "owned")]
+        for key, value in cases:
+            with self.subTest(key=key, value=value):
+                event = self.heartbeat(1, 5)
+                event[key] = value
+                with self.assertRaises(ValueError):
+                    self.read([event])
+        event = self.heartbeat(1, 5)
+        del event["heartbeatOrdinal"]
+        with self.assertRaises(ValueError):
+            self.read([event])
+        event = self.heartbeat(1, 5)
+        event["stage"] = "index.returned"
+        with self.assertRaises(ValueError):
+            self.read([event])
+
+    def test_heartbeat_sequence_rejects_duplicates_gaps_fast_and_nonfinite_values(self):
+        for events in ([self.heartbeat(2, 10)],
+                       [self.heartbeat(1, 5), self.heartbeat(1, 10)],
+                       [self.heartbeat(1, 5), self.heartbeat(3, 15)],
+                       [self.heartbeat(1, 5), self.heartbeat(2, 9.9)],
+                       [self.heartbeat(1, float("nan"))]):
+            with self.subTest(events=events), self.assertRaises(ValueError):
+                self.read(events)
+        events = [self.heartbeat(1, 5), self.heartbeat(2, 9.9999999)]
+        self.assertEqual(self.read(events)["events"], events)
+
+    def test_host_span_excludes_launch_container_time_without_extending_ceiling(self):
+        commands = OwnedDevices()
+        original = commands.run
+        clock = [0.0]
+        starts = []
+        def run(args, stage, **kwargs):
+            if stage.endswith(".launch"):
+                clock[0] += 30
+            if stage.endswith(".container"):
+                clock[0] += 20
+            return original(args, stage, **kwargs)
+        def observe(path, configuration, destination, started):
+            starts.append((started, clock[0]))
+            clock[0] = started + runner.OBSERVATION_SECONDS
+            return {"outcome": "pending"}
+        commands.run = run
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner.time, "monotonic", side_effect=lambda: clock[0]), patch.object(runner.time, "time", side_effect=lambda: 1000 - clock[0]):
+            output = Path(directory)
+            code = runner.run_cells(commands, output, output / "Control.app", observe=observe)
+            result = json.loads((output / "result.json").read_text())
+        self.assertEqual(code, 1)
+        self.assertEqual(starts, [(0, 50), (120, 170), (240, 290), (360, 410)])
+        for cell in result["cells"]:
+            span = cell["hostObservation"]
+            self.assertEqual(span["elapsedSeconds"], 70)
+            self.assertEqual(span["launchInclusiveElapsedSeconds"], 120)
+            self.assertGreater(span["startEpochSeconds"], span["endEpochSeconds"])
+            self.assertEqual(set(span), {"startEpochSeconds", "endEpochSeconds", "elapsedSeconds", "launchInclusiveElapsedSeconds"})
+
+    def test_observation_interruption_records_end_span_and_preserves_cleanup_status(self):
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            commands = OwnedDevices()
+            clock = [0.0]
+            def interrupted(*args):
+                clock[0] += 3
+                raise runner.Interrupted(signum)
+            with tempfile.TemporaryDirectory() as directory, patch.object(runner.time, "monotonic", side_effect=lambda: clock[0]), patch.object(runner.time, "time", side_effect=lambda: 1000 + clock[0]):
+                output = Path(directory)
+                code = runner.run_cells(commands, output, output / "Control.app", observe=interrupted)
+                result = json.loads((output / "result.json").read_text())
+            self.assertEqual(code, 128 + signum)
+            self.assertEqual(result["cells"][0]["hostObservation"]["elapsedSeconds"], 3)
+            self.assertEqual([item["stage"] for item in result["cells"][0]["cleanup"]], ["shutdown", "delete", "remaining-booted"])
+
+    def test_launch_failure_has_no_fake_observation_span(self):
+        commands = OwnedDevices("protected-delete-first.launch")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            code = runner.run_cells(commands, output, output / "Control.app", observe=lambda *args: self.fail("Must not observe failed launch"))
+            result = json.loads((output / "result.json").read_text())
+        self.assertEqual(code, 70)
+        self.assertNotIn("hostObservation", result["cells"][0])
+        self.assertEqual(commands.next_id, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

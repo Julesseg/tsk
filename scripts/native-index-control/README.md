@@ -39,7 +39,25 @@ preserve their code, and command timeout is 124.
 `result.json` and bounded per-cell receipts retain actual protection/index
 availability, synthetic bundle/index/domain/item identity, PID, submit/return/
 callback timestamps, query counts, exact-identity booleans and cleanup statuses.
-Events are capped at 64 per cell and files at 64 KiB; tooling output is capped at
+A retained main-actor task records a heartbeat after each five-second sleep, at
+most 24 times, through the same recorder. The exact typed ordinal and native
+uptime show only that the main actor executed at those instants; absent events
+do not prove process death. It makes no native index calls and never changes a
+pipeline outcome. A failed heartbeat write stops only that task.
+
+The host records actual receipt-observation start/end epochs and monotonic
+elapsed time, separately from elapsed time since launch began. Both retain the
+same launch-inclusive 120-second ceiling; a failed launch has no pretend
+observation span. Compare native submit and heartbeat uptimes within their own
+process; do not subtract them from host clock values.
+
+Events are capped at 64 per cell and files at 64 KiB. The recorder encodes and
+atomically writes a bounded candidate before committing it; a failure retains
+the last valid receipt and emits a fixed write-failure marker. An unpublished
+terminal outcome cannot turn a prior pending or missing receipt into success.
+The reader permits only the known heartbeat shape and ordered ordinals, rejects
+intervals shorter than five seconds beyond floating-point tolerance, and retains
+longer intervals as actual scheduling observations. Tooling output is capped at
 1 MiB per command. Stdout emits a small fixed-field summary. There are no
 screenshots, videos, xcresults, provider content or error descriptions. Signature
 details, source/executable hashes and actual toolchain/SDK/architecture are retained.
