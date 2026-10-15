@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import array
 import datetime
+import fcntl
 import json
 import os
 import pathlib
@@ -9,6 +11,7 @@ import selectors
 import signal
 import subprocess
 import sys
+import termios
 import time
 
 
@@ -19,6 +22,9 @@ SPOTLIGHT_METHODS = {
 }
 WIDGET_METHOD = 'testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError'
 CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests|WidgetUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
+POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
+POST_GROUP_SIGNAL_DRAIN_SECONDS = 0.25
+SEARCH_SURFACE = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual system Search surface before first-run handling'$")
 PROVIDER = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual tsk provider cell in native widget gallery'$")
 
 
@@ -39,6 +45,10 @@ class BoundaryCapture:
         self.widget_contexts = set()
         self.remote_pids = set()
         self.remote_pids_truncated = False
+        self.spotlight_current = None
+        self.spotlight_pids = {}
+        self.spotlight_pids_truncated = set()
+        self.search_contexts = set()
         try:
             self.evidence.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -82,6 +92,20 @@ class BoundaryCapture:
         self.record('widget-context-request', name=name, observedPIDs=sorted(self.remote_pids))
         self.spawn(arguments, 'context', name)
 
+    def search_context(self, method, boundary):
+        key = method + '-' + boundary
+        if key in self.search_contexts:
+            return
+        self.search_contexts.add(key)
+        pids = sorted(self.spotlight_pids.get(method, set()))
+        name = 'spotlight-' + key
+        arguments = [sys.executable, str(self.scripts / 'capture-simulator-search-context.py'), self.device,
+                     str(self.evidence / (name + '-context.json'))]
+        for pid in pids:
+            arguments += ['--observed-pid', pid]
+        self.record('spotlight-context-request', method=method, boundary=boundary, observedPIDs=pids)
+        self.spawn(arguments, 'context', name)
+
     def line(self, raw):
         line = raw.decode('utf-8', errors='replace').rstrip('\r')
         match = CASE.fullmatch(line)
@@ -93,6 +117,8 @@ class BoundaryCapture:
                         self.record('duplicate-start', method=method)
                     else:
                         self.started.add(method)
+                        self.spotlight_current = method
+                        self.spotlight_pids[method] = set()
                         stop = self.evidence / ('spotlight-' + method + '.stop')
                         try:
                             stop.unlink(missing_ok=True)
@@ -107,9 +133,24 @@ class BoundaryCapture:
                 else:
                     self.record('test-end', method=method, outcome=outcome)
                     self.stop(method, 'test-end')
+                    if self.spotlight_current == method:
+                        self.spotlight_current = None
             elif suite == 'WidgetUITests' and method == WIDGET_METHOD:
                 self.widget_active = outcome == 'started.'
                 self.record('widget-test-boundary', outcome=outcome)
+        if self.spotlight_current is not None:
+            method = self.spotlight_current
+            pids = self.spotlight_pids[method]
+            for pid in re.findall(r'remote element in process (\d+)', line):
+                if len(pids) < 32:
+                    pids.add(pid)
+                elif pid not in pids and method not in self.spotlight_pids_truncated:
+                    self.spotlight_pids_truncated.add(method)
+                    self.record('spotlight-observed-pids-truncated', method=method, maximum=32)
+            if SEARCH_SURFACE.fullmatch(line):
+                self.search_context(method, 'search-before')
+            if ' : failed - Actual system Spotlight search field must be available' in line:
+                self.search_context(method, 'search-missing-field')
         if self.widget_active:
             for pid in re.findall(r'remote element in process (\d+)', line):
                 if len(self.remote_pids) < 32:
@@ -156,18 +197,44 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
     broken_output = False
     pending = b''
     discarding = False
+    pipe_held_open = False
     old_handlers = {}
 
     def interrupt(number, _frame):
         nonlocal interrupted
         interrupted = number
 
-    def signal_owned(number):
-        if process is not None and process.poll() is None:
+    def signal_owned(number, include_exited=False):
+        if process is not None and (include_exited or process.poll() is None):
             try:
                 os.killpg(process.pid, number)
             except ProcessLookupError:
                 pass
+
+    def consume(chunk):
+        nonlocal broken_output, interrupted, pending, discarding
+        if not broken_output:
+            try:
+                sys.stdout.buffer.write(chunk)
+                sys.stdout.buffer.flush()
+            except BrokenPipeError:
+                broken_output = True
+                interrupted = signal.SIGTERM
+                with open(os.devnull, 'wb') as sink:
+                    os.dup2(sink.fileno(), sys.stdout.fileno())
+        pending += chunk
+        while b'\n' in pending:
+            line, pending = pending.split(b'\n', 1)
+            if not discarding:
+                try:
+                    capture.line(line)
+                except Exception as error:
+                    capture.record('boundary-error', error=str(error))
+            discarding = False
+        if len(pending) > 65536:
+            capture.record('oversized-line-ignored')
+            pending = b''
+            discarding = True
 
     for number in (signal.SIGINT, signal.SIGTERM):
         old_handlers[number] = signal.signal(number, interrupt)
@@ -180,7 +247,39 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
             selector.register(process.stdout, selectors.EVENT_READ)
             signalled = False
             stop_deadline = None
+            parent_exit_at = None
+            group_signalled_at = None
+            group_killed_at = None
             while selector.get_map():
+                now = time.monotonic()
+                if process.poll() is not None and parent_exit_at is None:
+                    parent_exit_at = now
+                    capture.record('parent-exit-observed', returnCode=process.returncode)
+                if parent_exit_at is not None and now - parent_exit_at >= POST_PARENT_EXIT_DRAIN_SECONDS:
+                    if group_signalled_at is None:
+                        pipe_held_open = True
+                        group_signalled_at = now
+                        capture.record('inherited-pipe-held-open', returnCode=process.returncode, drainSeconds=POST_PARENT_EXIT_DRAIN_SECONDS)
+                        signal_owned(signal.SIGTERM, include_exited=True)
+                    elif group_killed_at is None and now - group_signalled_at >= POST_GROUP_SIGNAL_DRAIN_SECONDS:
+                        group_killed_at = now
+                        signal_owned(signal.SIGKILL, include_exited=True)
+                    elif group_killed_at is not None and now - group_killed_at >= POST_GROUP_SIGNAL_DRAIN_SECONDS:
+                        for key in list(selector.get_map().values()):
+                            os.set_blocking(key.fileobj.fileno(), False)
+                            buffered = array.array('i', [0])
+                            fcntl.ioctl(key.fileobj.fileno(), termios.FIONREAD, buffered, True)
+                            remaining = max(0, buffered[0])
+                            while remaining:
+                                chunk = os.read(key.fileobj.fileno(), min(65536, remaining))
+                                if not chunk:
+                                    break
+                                consume(chunk)
+                                remaining -= len(chunk)
+                            selector.unregister(key.fileobj)
+                            key.fileobj.close()
+                            capture.record('inherited-pipe-drain-closed', bufferedBytes=buffered[0], unreadSnapshotBytes=remaining)
+                        break
                 if interrupted is not None and not signalled:
                     signal_owned(interrupted)
                     signalled = True
@@ -192,28 +291,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
                     if not chunk:
                         selector.unregister(key.fileobj)
                         break
-                    if not broken_output:
-                        try:
-                            sys.stdout.buffer.write(chunk)
-                            sys.stdout.buffer.flush()
-                        except BrokenPipeError:
-                            broken_output = True
-                            interrupted = signal.SIGTERM
-                            with open(os.devnull, 'wb') as sink:
-                                os.dup2(sink.fileno(), sys.stdout.fileno())
-                    pending += chunk
-                    while b'\n' in pending:
-                        line, pending = pending.split(b'\n', 1)
-                        if not discarding:
-                            try:
-                                capture.line(line)
-                            except Exception as error:
-                                capture.record('boundary-error', error=str(error))
-                        discarding = False
-                    if len(pending) > 65536:
-                        capture.record('oversized-line-ignored')
-                        pending = b''
-                        discarding = True
+                    consume(chunk)
                 capture.reap()
             if pending and not discarding:
                 try:
@@ -237,8 +315,10 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
         capture.record('xcodebuild-end', returnCode=code, status=status)
     except OSError as error:
         capture.record('relay-error', error=str(error))
+        if process is not None and process.poll() is not None:
+            status = process.returncode if process.returncode >= 0 else 128 - process.returncode
     finally:
-        signal_owned(signal.SIGTERM)
+        signal_owned(signal.SIGKILL if pipe_held_open else signal.SIGTERM, include_exited=pipe_held_open)
         if process is not None and process.poll() is None:
             try:
                 process.wait(timeout=5)
