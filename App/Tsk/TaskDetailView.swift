@@ -17,6 +17,7 @@ struct TaskDetailView: View {
         Form {
             Section("Description") { Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description") }
             TaskOrganizationSummary(task: task)
+            TaskRecurrenceSection(task: task, store: store)
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
                 if task.canComplete {
@@ -42,7 +43,7 @@ struct TaskDetailView: View {
                 }
             }
             Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }
-            if !task.canEdit {
+            if !task.canEdit, task.recurrenceInspection == nil {
                 Section { Text("These task attributes are preserved. Recurring tasks and unsupported states require their dedicated editor.").font(.footnote) }
             }
             if let error = store.error {
