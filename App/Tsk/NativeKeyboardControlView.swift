@@ -61,16 +61,16 @@ private final class NativeKeyboardControlTextView: UITextView {
     private(set) var commandNCount = 0
     private(set) var commandReturnCount = 0
     private lazy var controlCommands: [UIKeyCommand] = {
-        let commands = [UIKeyCommand(input: "n", modifierFlags: .command, action: #selector(commandN)), UIKeyCommand(input: "\r", modifierFlags: .command, action: #selector(commandReturn))]
+        let commands = [UIKeyCommand(input: "n", modifierFlags: .command, action: #selector(commandN(_:))), UIKeyCommand(input: "\r", modifierFlags: .command, action: #selector(commandReturn(_:)))]
         commands.forEach { $0.wantsPriorityOverSystemBehavior = true }
         return commands
     }()
     override var keyCommands: [UIKeyCommand]? { (super.keyCommands ?? []) + controlCommands }
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(commandN) || action == #selector(commandReturn) { return true }
+        if action == #selector(commandN(_:)) || action == #selector(commandReturn(_:)) { return true }
         return super.canPerformAction(action, withSender: sender)
     }
-    @objc private func commandN() { commandNCount += 1; changed?() }
-    @objc private func commandReturn() { commandReturnCount += 1; changed?() }
+    @objc private func commandN(_ sender: UIKeyCommand) { commandNCount += 1; changed?() }
+    @objc private func commandReturn(_ sender: UIKeyCommand) { commandReturnCount += 1; changed?() }
 }
 #endif
