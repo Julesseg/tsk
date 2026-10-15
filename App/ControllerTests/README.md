@@ -1,5 +1,8 @@
 # Calendar controller regression checks
 
+The macOS CI jobs run this package after building the host TaskChampion bridge
+and before creating their simulator.
+
 Run on macOS 14 or later with the matching TaskChampion bridge:
 
 ```sh

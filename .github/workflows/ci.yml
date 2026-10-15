@@ -101,6 +101,9 @@ jobs:
           scripts/build-native.sh host
           swift build --package-path Native --product tsk-native-probe
 
+      - name: Run Calendar controller regressions
+        run: TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib" swift test --package-path App/ControllerTests
+
       - name: Validate target-specific release profile rules
         run: python3 scripts/test-provisioning-profiles.py
 
