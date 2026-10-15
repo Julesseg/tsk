@@ -41,9 +41,26 @@ import Testing
     #expect(fetch.cancellations == 0)
 }
 
+@Test @MainActor func fixtureReadbackWithoutRetainedNativeCallbackStillReachesDeadline() async throws {
+    let fetch = ControlledFixtureFetch()
+    let observation = Task { @MainActor in
+        let outcome = await FixtureReadbackDeadline<Int>.observe(timeoutNanoseconds: 10_000_000) { _ in
+            return { fetch.cancellations += 1 }
+        }
+        if case .timedOut = outcome { fetch.timeoutObserved = true }
+    }
+    let limit = Date().addingTimeInterval(1)
+    while !fetch.timeoutObserved, Date() < limit { try await Task.sleep(nanoseconds: 5_000_000) }
+    #expect(fetch.timeoutObserved, "The deadline must own its lifetime even when native code discards the callback")
+    #expect(fetch.cancellations == 1)
+    if fetch.timeoutObserved { await observation.value }
+    else { observation.cancel() }
+}
+
 @MainActor private final class ControlledFixtureFetch {
     var callback: (@Sendable (Int) -> Void)?
     var cancellations = 0
     var events: [String] = []
+    var timeoutObserved = false
 }
 #endif

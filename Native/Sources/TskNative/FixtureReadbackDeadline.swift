@@ -15,9 +15,9 @@ enum FixtureReadbackOutcome<Value: Sendable>: Sendable {
         let observation = FixtureReadbackDeadline()
         return await withCheckedContinuation { continuation in
             observation.continuation = continuation
-            observation.deadline = Task { [weak observation] in
+            observation.deadline = Task {
                 do { try await Task.sleep(nanoseconds: timeoutNanoseconds) } catch { return }
-                observation?.finish(.timedOut, cancel: true)
+                observation.finish(.timedOut, cancel: true)
             }
             observation.cancelFetch = start { value in
                 Task { @MainActor in observation.finish(.received(value), cancel: false) }
