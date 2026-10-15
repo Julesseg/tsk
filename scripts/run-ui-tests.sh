@@ -67,5 +67,23 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
 fi
 xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
-xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult"
-xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path"
+share_status=0
+xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?
+printf 'Share-first UI status: %s\n' "$share_status"
+case "$share_status" in
+    0|65) ;;
+    130|143) exit "$share_status" ;;
+    *) exit "$share_status" ;;
+esac
+main_status=0
+xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+printf 'Remaining UI status: %s\n' "$main_status"
+case "$main_status" in
+    0|65) ;;
+    130|143) exit "$main_status" ;;
+    *) exit "$main_status" ;;
+esac
+if [[ "$share_status" -ne 0 ]]; then
+    exit "$share_status"
+fi
+exit "$main_status"
