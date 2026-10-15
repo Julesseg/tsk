@@ -12,7 +12,7 @@ public struct TaskRecurrenceInspection: Sendable {
 
     public init?(_ task: TaskRecord) {
         guard task.isRecurring else { return nil }
-        kind = task.attributes["parent"] != nil ? .occurrence : task.status == "recurring" ? .template : .unrecognized
+        kind = task.attributes["parent"] != nil ? .occurrence : (task.status == "recurring" || task.isRetiredRecurringTemplate) ? .template : .unrecognized
         rule = task.attributes["recur"]
         firstDue = task.deadline
         parentID = task.attributes["parent"].flatMap(UUID.init(uuidString:))
