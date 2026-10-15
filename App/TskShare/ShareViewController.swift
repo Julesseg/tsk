@@ -1,11 +1,14 @@
 import UIKit
 import SwiftUI
+import TskNative
 
 @MainActor final class ShareViewController: UIViewController {
+    private let diagnosticRequest = UUID()
+    deinit { TaskParticipantDiagnostics.endShareRequest(diagnosticRequest) }
     override func viewDidLoad() {
         super.viewDidLoad()
         guard let context = extensionContext else { return }
-        let host = UIHostingController(rootView: ShareCaptureRoot(context: context))
+        let host = UIHostingController(rootView: ShareCaptureRoot(context: context, diagnosticRequest: diagnosticRequest))
         addChild(host)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(host.view)

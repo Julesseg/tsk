@@ -6,11 +6,12 @@ struct ShareCaptureRoot: View {
     let context: NSExtensionContext
     @State private var draft: SharedTaskDraft?
     @State private var error: String?
+    let diagnosticRequest: UUID
 
     var body: some View {
         Group {
             if let draft {
-                ShareTaskEditor(initial: draft, cancel: cancel, complete: finish)
+                ShareTaskEditor(initial: draft, diagnosticRequest: diagnosticRequest, cancel: cancel, complete: finish)
             } else {
                 NavigationStack {
                     Group {
@@ -26,6 +27,11 @@ struct ShareCaptureRoot: View {
     }
 
     private func load() async {
+        TaskParticipantDiagnostics.beginShareRequest(diagnosticRequest)
+        await TaskParticipantDiagnostics.$shareRequest.withValue(diagnosticRequest) { await loadContent() }
+    }
+
+    private func loadContent() async {
         do {
             let items = context.inputItems.compactMap { $0 as? NSExtensionItem }
             let providers = items.flatMap { $0.attachments ?? [] }
@@ -35,22 +41,33 @@ struct ShareCaptureRoot: View {
             }
             #if DEBUG && targetEnvironment(simulator)
             for case .url(let url) in content where url.scheme == "https" && url.host == "example.com" && url.path == "/tsk-share" {
-                if let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "fixture" })?.value, let token = UUID(uuidString: raw) { TaskParticipantDiagnostics.enableShareFixture(token) }
+                if let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "fixture" })?.value, let token = UUID(uuidString: raw) { TaskParticipantDiagnostics.enableShareFixture(token, request: diagnosticRequest) }
             }
             #endif
             draft = try TaskManager.sharedDraft(from: content)
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.localizedDescription
+            TaskParticipantDiagnostics.endShareRequest(diagnosticRequest)
+        }
     }
     private func finish() {
         let trace = TaskParticipantDiagnostics.begin("share.complete-request")
-        context.completeRequest(returningItems: nil) { _ in TaskParticipantDiagnostics.end("share.complete-request", id: trace) }
+        let request = diagnosticRequest
+        context.completeRequest(returningItems: nil) { _ in
+            TaskParticipantDiagnostics.end("share.complete-request", id: trace)
+            TaskParticipantDiagnostics.endShareRequest(request)
+        }
     }
-    private func cancel() { context.cancelRequest(withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)) }
+    private func cancel() {
+        TaskParticipantDiagnostics.endShareRequest(diagnosticRequest)
+        context.cancelRequest(withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError))
+    }
 }
 
 private struct ShareTaskEditor: View {
     @State var draft: SharedTaskDraft
+    let diagnosticRequest: UUID
     let cancel: () -> Void
     let complete: () -> Void
     @State private var manager: TaskManager?
@@ -61,8 +78,8 @@ private struct ShareTaskEditor: View {
     @FocusState private var focus: TaskEditorField?
     @FocusState private var contentFocused: Bool
 
-    init(initial: SharedTaskDraft, cancel: @escaping () -> Void, complete: @escaping () -> Void) {
-        _draft = State(initialValue: initial); self.cancel = cancel; self.complete = complete
+    init(initial: SharedTaskDraft, diagnosticRequest: UUID, cancel: @escaping () -> Void, complete: @escaping () -> Void) {
+        _draft = State(initialValue: initial); self.diagnosticRequest = diagnosticRequest; self.cancel = cancel; self.complete = complete
     }
 
     var body: some View {
@@ -102,6 +119,9 @@ private struct ShareTaskEditor: View {
     }
 
     private func open() async {
+        await TaskParticipantDiagnostics.$shareRequest.withValue(diagnosticRequest) { await openStorage() }
+    }
+    private func openStorage() async {
         guard !opening else { return }
         opening = true
         let trace = TaskParticipantDiagnostics.begin("share.storage-open")
@@ -119,17 +139,20 @@ private struct ShareTaskEditor: View {
         if !tagInput.isEmpty, !addTag() { return }
         saving = true
         Task {
-            let trace = TaskParticipantDiagnostics.begin("share.capture")
-            defer { saving = false; TaskParticipantDiagnostics.end("share.capture", id: trace) }
-            do {
-                let saved = try await manager.captureSharedTask(draft)
-                TaskParticipantDiagnostics.event("share.capture.durable-result", details: ["id": saved.id.uuidString])
-                complete()
-            } catch {
-                let native = error as NSError
-                TaskParticipantDiagnostics.event("share.capture.error", details: ["domain": native.domain, "code": String(native.code)])
-                self.error = error.localizedDescription
-            }
+            await TaskParticipantDiagnostics.$shareRequest.withValue(diagnosticRequest) { await capture(using: manager) }
+        }
+    }
+    private func capture(using manager: TaskManager) async {
+        let trace = TaskParticipantDiagnostics.begin("share.capture")
+        defer { saving = false; TaskParticipantDiagnostics.end("share.capture", id: trace) }
+        do {
+            let saved = try await manager.captureSharedTask(draft)
+            TaskParticipantDiagnostics.event("share.capture.durable-result", details: ["id": saved.id.uuidString])
+            complete()
+        } catch {
+            let native = error as NSError
+            TaskParticipantDiagnostics.event("share.capture.error", details: ["domain": native.domain, "code": String(native.code)])
+            self.error = error.localizedDescription
         }
     }
 }
