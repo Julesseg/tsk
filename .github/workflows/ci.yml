@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      diagnostic_only:
+        description: Run only the existing diagnostic iPhone lane
+        type: boolean
+        required: false
+        default: false
 
 # The one project-specific value in this workflow. Must match the name of the
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
@@ -12,11 +19,12 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
   core-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -29,6 +37,7 @@ jobs:
         run: swift test
 
   native-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -58,17 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - family: iPhone
-            job-name: App · XCUITest (macOS)
-            artifact: ui-test-results
-          - family: iPad
-            job-name: App · XCUITest (iPad)
-            artifact: ui-test-results-ipad
-          - family: iPhone
-            job-name: App · Diagnostic UI boundaries (iPhone)
-            artifact: ui-diagnostic-boundaries
-            diagnostic: true
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"},{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]') }}
     steps:
       - uses: actions/checkout@v4
 
