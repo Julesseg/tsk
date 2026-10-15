@@ -1,4 +1,5 @@
 import base64
+import binascii
 import datetime
 import os
 import pathlib
@@ -31,6 +32,16 @@ def validate(profile, bundle, team, now):
 
 
 def main():
+    missing = [secret for _, secret, _ in TARGETS if not os.environ.get(secret, '').strip(' \t\r\n\v\f')]
+    if missing:
+        raise SystemExit('Missing provisioning profile secrets: ' + ', '.join(missing) + '. Create App, Share, and Widget Ad Hoc profiles with group.com.julesseguin.tsk enabled')
+    payloads = {}
+    for bundle, secret, _ in TARGETS:
+        try:
+            encoded = os.environ[secret].encode('ascii').translate(None, b' \t\r\n\v\f')
+            payloads[bundle] = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error):
+            raise SystemExit(f'Invalid {secret}: provide the profile as ASCII base64; only ASCII whitespace may separate encoded characters') from None
     temporary = pathlib.Path(os.environ['RUNNER_TEMP'])
     installed = pathlib.Path.home() / 'Library/MobileDevice/Provisioning Profiles'
     installed.mkdir(parents=True, exist_ok=True)
@@ -38,11 +49,8 @@ def main():
     environment = []
     profiles = []
     for bundle, secret, setting in TARGETS:
-        raw = os.environ.get(secret)
-        if not raw:
-            raise SystemExit(f'Missing {secret}: create an Ad Hoc profile for {bundle} with group.com.julesseguin.tsk enabled')
         encoded = temporary / (bundle + '.mobileprovision')
-        encoded.write_bytes(base64.b64decode(raw, validate=True))
+        encoded.write_bytes(payloads[bundle])
         encoded.chmod(0o600)
         decoded = subprocess.check_output(['security', 'cms', '-D', '-i', str(encoded)])
         profile = plistlib.loads(decoded)
