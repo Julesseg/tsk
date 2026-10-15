@@ -176,7 +176,7 @@ public actor TaskManager {
     func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
-        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "start", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
         if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) || $0.utf8.starts(with: "annotation_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }

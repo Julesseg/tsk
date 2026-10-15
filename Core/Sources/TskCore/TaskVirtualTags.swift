@@ -27,7 +27,7 @@ enum FilterVirtualTag: String, CaseIterable, Sendable {
         case .ready:
             return task.status == "pending" && !waiting && !availability.isBlocked &&
                 (task.attributes["scheduled"] == nil || (FilterDateExpression.storedDate(task.attributes["scheduled"]) ?? Date(timeIntervalSince1970: 0)) < context.now)
-        case .active: return task.attributes["start"] != nil
+        case .active: return task.isActive
         case .scheduled: return task.attributes["scheduled"] != nil
         case .child, .instance: return task.attributes["parent"] != nil || task.attributes["template"] != nil
         case .until: return task.attributes["until"] != nil
