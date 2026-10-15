@@ -108,22 +108,25 @@ jobs:
         run: |
           set -euo pipefail
           xcrun simctl list devices available --json | python3 -c '
-          import json, os, sys
+          import json, os, subprocess, sys
           devices = json.load(sys.stdin)["devices"]
           available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith(os.environ["DEVICE_FAMILY"])]
           runtime, device = max(available, key=lambda item: (item[0], "13-inch" in item[1]["name"] or "12.9-inch" in item[1]["name"], "Pro" in item[1]["name"], item[1]["name"]))
-          print("Using simulator: " + device["name"] + " (" + device["udid"] + ")")
+          identifier = subprocess.check_output(["xcrun", "simctl", "create", "tsk isolated " + os.environ["DEVICE_FAMILY"], device["deviceTypeIdentifier"], runtime], text=True).strip()
+          print("Created isolated simulator: " + device["name"] + " (" + identifier + ")")
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write("id=" + device["udid"] + "\n")
+              output.write("id=" + identifier + "\n")
           '
 
       - name: Build & run UI tests
         working-directory: App
         run: |
           set -o pipefail
+          export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
+          export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/TaskAttributeUITests)
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/ReminderImportUITests)
           fi
           peer=()
           if [[ "${{ matrix.family }}" == "iPhone" ]]; then
@@ -143,6 +146,12 @@ jobs:
       - name: Verify simulator intent metadata and shared storage entitlement
         run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
 
+      - name: Remove owned isolated simulator
+        if: ${{ always() && steps.sim.outputs.id != '' }}
+        run: |
+          xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
+          xcrun simctl delete "${{ steps.sim.outputs.id }}"
+
       - name: Upload test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -151,4 +160,5 @@ jobs:
           path: |
             App/TestResults.xcresult
             .build/ui-sync
+            .build/eventkit-fixture
           if-no-files-found: ignore
