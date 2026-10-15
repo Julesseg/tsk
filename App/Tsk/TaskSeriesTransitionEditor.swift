@@ -94,7 +94,7 @@ struct TaskSeriesTransitionEditor: View {
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
-            .focusedSceneValue(\.taskEditor, store.isSaving || isPreviewing ? nil : TaskEditorActions(save: { if let preview { save(preview) } else { buildPreview() } }))
+            .taskKeyboardCommands(store.isSaving || isPreviewing ? TaskKeyboardCommand.suspended : TaskEditorActions(save: { if let preview { save(preview) } else { buildPreview() } }).keyboardCommands)
             .modifier(TaskWorkspacePanel(store: store))
         }
     }

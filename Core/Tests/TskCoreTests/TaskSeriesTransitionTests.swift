@@ -106,3 +106,21 @@ import Testing
     #expect(!TaskQuery.unfinished.includes(retired))
     #expect(!retired.canEdit && !retired.canComplete)
 }
+
+@Test func transitionWithNoAffectedFutureCreatesOnlyTheSeparateUnallocatedTemplate() async throws {
+    let parent = UUID(), done = UUID(), overdue = UUID()
+    let template = TaskRecord(id: parent, attributes: ["status": "recurring", "due": "100", "recur": "monthly", "mask": "+-", "opaque": "keep"])
+    let history = TaskRecord(id: done, attributes: ["status": "completed", "parent": parent.uuidString, "imask": "0", "due": "100", "end": "150"])
+    let pending = TaskRecord(id: overdue, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "1", "due": "200"])
+    let replica = OccurrenceReplica(records: [template, history, pending])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 1000) })
+    let preview = try await manager.previewSeriesTransition(id: parent, draft: TaskSeriesTransitionDraft(effectiveDate: Date(timeIntervalSince1970: 1000), firstDue: Date(timeIntervalSince1970: 4000100000), recurrence: "monthly", generatorTimeZone: "UTC"))
+    #expect(preview.affected.isEmpty && preview.moved.isEmpty)
+    #expect(preview.successor.attributes["mask"] == nil)
+    #expect(preview.nextGeneratorDue == preview.successor.deadline)
+    _ = try await manager.applySeriesTransition(preview)
+    #expect(try await manager.tasks().count == 4)
+    #expect(try await manager.task(id: parent).attributes["mask"] == "+-")
+    #expect(try await manager.task(id: done) == history)
+    #expect(try await manager.task(id: overdue) == pending)
+}
