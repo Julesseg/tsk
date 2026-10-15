@@ -57,13 +57,23 @@ extension XCTestCase {
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        guard element.waitForExistence(timeout: 5), element.isEnabled, element.isHittable,
-              element.frame.width > 0, element.frame.height > 0, app.frame.contains(element.frame) else {
-            recordTaskInteraction(app, detail: "Cannot activate \(element)")
-            XCTFail("Control has no valid visible hit area: \(element)", file: file, line: line)
+        let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }) {
+            guard element.exists else { return TaskControlReadinessSample(exists: false) }
+            guard element.isEnabled else { return TaskControlReadinessSample(exists: true, enabled: false) }
+            guard element.isHittable else { return TaskControlReadinessSample(exists: true, enabled: true, hittable: false) }
+            let frame = element.frame
+            let appFrame = app.frame
+            return TaskControlReadinessSample(exists: true, enabled: true, hittable: true, elementFrame: frame, appFrame: appFrame)
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in attempt.evaluate() }, object: nil)
+        let result = XCTWaiter.wait(for: [ready], timeout: attempt.remainingTime)
+        guard attempt.finish(waitCompleted: result == .completed, perform: { geometry in
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: geometry.elementFrame.midX - geometry.appFrame.minX, dy: geometry.elementFrame.midY - geometry.appFrame.minY)).tap()
+        }) else {
+            recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(result) \(attempt.diagnostic)")
+            XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)
             return
         }
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: element.frame.midX - app.frame.minX, dy: element.frame.midY - app.frame.minY)).tap()
     }
 
     func focusTaskText(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {

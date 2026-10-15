@@ -1,0 +1,88 @@
+import Foundation
+import CoreGraphics
+
+enum TaskControlReadinessFailure: String {
+    case missing, disabled, unhittable, unsampled, nonpositiveFrame, outsideApp
+    case deadlineExpired, waiterIncomplete, alreadyFinished
+}
+
+struct TaskControlReadinessGeometry {
+    let elementFrame: CGRect
+    let appFrame: CGRect
+}
+
+struct TaskControlReadinessSample {
+    let exists: Bool
+    var enabled: Bool?
+    var hittable: Bool?
+    var elementFrame: CGRect?
+    var appFrame: CGRect?
+
+    var failureReason: TaskControlReadinessFailure? {
+        guard exists else { return .missing }
+        guard let enabled else { return .unsampled }
+        guard enabled else { return .disabled }
+        guard let hittable else { return .unsampled }
+        guard hittable else { return .unhittable }
+        guard let elementFrame, let appFrame else { return .unsampled }
+        guard elementFrame.width > 0, elementFrame.height > 0 else { return .nonpositiveFrame }
+        guard appFrame.contains(elementFrame) else { return .outsideApp }
+        return nil
+    }
+
+    var diagnostic: String {
+        func value<T>(_ field: T?) -> String { field.map { String(describing: $0) } ?? "null" }
+        let contained = elementFrame.flatMap { frame in appFrame.map { $0.contains(frame) } }
+        return "exists=\(exists) enabled=\(value(enabled)) hittable=\(value(hittable)) elementFrame=\(value(elementFrame)) appFrame=\(value(appFrame)) positiveWidth=\(value(elementFrame.map { $0.width > 0 })) positiveHeight=\(value(elementFrame.map { $0.height > 0 })) contained=\(value(contained)) sampleReason=\(failureReason?.rawValue ?? "ready")"
+    }
+}
+
+final class TaskControlReadinessAttempt {
+    private let now: () -> TimeInterval
+    private let sample: () -> TaskControlReadinessSample
+    private let started: TimeInterval
+    private let deadline: TimeInterval
+    private var accepted: TaskControlReadinessGeometry?
+    private var finished = false
+    private var lastSample: TaskControlReadinessSample?
+    private var sampleCount = 0
+    private(set) var failureReason: TaskControlReadinessFailure? = .unsampled
+
+    init(now: @escaping () -> TimeInterval, sample: @escaping () -> TaskControlReadinessSample) {
+        self.now = now
+        self.sample = sample
+        started = now()
+        deadline = started + 5
+    }
+
+    var remainingTime: TimeInterval { max(0, deadline - now()) }
+    var diagnostic: String {
+        "elapsed=\(now() - started) samples=\(sampleCount) deadlineExpired=\(now() >= deadline) reason=\(failureReason?.rawValue ?? "ready") \(lastSample?.diagnostic ?? "sample=null")"
+    }
+
+    func evaluate() -> Bool {
+        guard !finished else { return false }
+        accepted = nil
+        guard now() < deadline else { failureReason = .deadlineExpired; return false }
+        let current = sample()
+        lastSample = current
+        sampleCount += 1
+        guard now() < deadline else { failureReason = .deadlineExpired; return false }
+        failureReason = current.failureReason
+        if failureReason == nil, let frame = current.elementFrame, let appFrame = current.appFrame {
+            accepted = TaskControlReadinessGeometry(elementFrame: frame, appFrame: appFrame)
+        }
+        return accepted != nil
+    }
+
+    func finish(waitCompleted: Bool, perform: (TaskControlReadinessGeometry) -> Void) -> Bool {
+        guard !finished else { failureReason = .alreadyFinished; return false }
+        finished = true
+        guard waitCompleted else { failureReason = .waiterIncomplete; accepted = nil; return false }
+        guard now() < deadline else { failureReason = .deadlineExpired; accepted = nil; return false }
+        guard let accepted else { return false }
+        perform(accepted)
+        self.accepted = nil
+        return true
+    }
+}
