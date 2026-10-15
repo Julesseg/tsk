@@ -1,8 +1,11 @@
 # tsk
 
-An iOS Taskwarrior client with TaskChampion as its intended backend.
-The repository currently contains the app scaffold; TaskChampion integration
-and task-management features are future implementation work.
+A native iOS/iPadOS Taskwarrior client. `Core/` owns task behavior; `Native/`
+connects TaskChampion and system services; `App/` contains thin SwiftUI app,
+Share and widget interfaces. Shared storage, encrypted sync and task workflows
+are implemented. Use canonical iPhone/iPad XCUITest for runtime verification;
+source, host tests and generic builds do not establish system delivery,
+physical input, account behavior or distribution provisioning.
 
 ## Agent skills
 
