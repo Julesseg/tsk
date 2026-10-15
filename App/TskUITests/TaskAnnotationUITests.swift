@@ -10,10 +10,10 @@ final class TaskAnnotationUITests: XCTestCase {
     }
 
     func testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations() throws {
-        try exerciseAnnotationRoundTrip { $0.buttons["save-annotation"].tap() }
+        try exerciseAnnotationRoundTrip(keyboardShortcuts: false) { $0.buttons["save-annotation"].tap() }
     }
 
-    private func exerciseAnnotationRoundTrip(save: (XCUIApplication) -> Void) throws {
+    private func exerciseAnnotationRoundTrip(keyboardShortcuts: Bool = true, save: (XCUIApplication) -> Void) throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
@@ -51,16 +51,25 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
         editor.typeText("Second independent note")
-        app.typeKey("n", modifierFlags: .command)
-        XCTAssertFalse(app.textFields["task-description"].exists)
-        XCTAssertTrue(editor.exists)
+        if keyboardShortcuts {
+            app.typeKey("n", modifierFlags: .command)
+            XCTAssertFalse(app.textFields["task-description"].exists)
+            XCTAssertTrue(editor.exists)
+        }
         save(app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
-        editor.typeKey("a", modifierFlags: .command)
+        if keyboardShortcuts {
+            editor.typeKey("a", modifierFlags: .command)
+        } else {
+            let original = try XCTUnwrap(editor.value as? String)
+            XCTAssertEqual(original, "First supporting note\nAnother line")
+            editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.count))
+            XCTAssertEqual(editor.value as? String, "")
+        }
         editor.typeText("First supporting note\nAnother line revised")
         capture("Edit annotation keeps its original timestamp", app: app)
         save(app)
