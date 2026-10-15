@@ -42,8 +42,9 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("native")))
     let original = try await manager.create(TaskDraft(description: "Before blocked \(method)", attributes: ["opaque": "retain original"]))
     let fixtureReplica = TaskChampionReplica(directory: directory.appendingPathComponent("native"))
-    let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-", "opaque": "preserve series"])
+    let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": "--", "opaque": "preserve series"])
     let occurrence = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "0", "opaque": "preserve occurrence"])
+    let futureOccurrence = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "1", "due": "4000000000", "opaque": "preserve future"])
     let attempt = Task { try await manager.synchronize(using: configuration) }
     let deadline = Task.detached {
         try await Task.sleep(for: .seconds(5))
@@ -69,7 +70,11 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     let completedOccurrence = try await manager.complete(id: occurrence.id)
     #expect(!FileManager.default.fileExists(atPath: gate.path), "Atomic occurrence completion must finish while the real HTTP response remains held")
     #expect(completedOccurrence.status == "completed")
-    #expect(try await manager.task(id: series.id).attributes["mask"] == "+")
+    #expect(try await manager.task(id: series.id).attributes["mask"] == "+-")
+    let seriesPreview = try await manager.previewSeriesMetadata(id: series.id, changes: ["description": "Metadata during blocked \(method)", "project": "Series.Work"])
+    #expect(seriesPreview.affected.map(\.id) == [futureOccurrence.id])
+    _ = try await manager.applySeriesMetadata(seriesPreview)
+    #expect(!FileManager.default.fileExists(atPath: gate.path), "Atomic series metadata must finish while the actual HTTP response remains held")
     let samePath = directory.appendingPathComponent("native").resolvingSymlinksInPath()
     let anotherManager = TaskManager(replica: TaskChampionReplica(directory: samePath))
     let otherLocal = try await anotherManager.create(TaskDraft(description: "Another actor during blocked \(method)", attributes: ["opaque": "retain other actor"]))
@@ -88,7 +93,10 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     #expect(try await received.task(id: otherLocal.id) == otherLocal)
     #expect(final.filter { $0.id == otherLocal.id }.count == 1)
     #expect(try await received.task(id: occurrence.id) == completedOccurrence)
-    #expect(try await received.task(id: series.id).attributes["mask"] == "+")
+    #expect(try await received.task(id: series.id).attributes["mask"] == "+-")
+    #expect(try await received.task(id: series.id).description == "Metadata during blocked \(method)")
+    #expect(try await received.task(id: futureOccurrence.id).project == "Series.Work")
+    #expect(try await received.task(id: futureOccurrence.id).attributes["opaque"] == "preserve future")
 }
 
 private func waitForFile(_ file: URL) async throws {

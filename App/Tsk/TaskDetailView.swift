@@ -56,6 +56,9 @@ struct TaskDetailView: View {
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if task.status == "recurring", task.attributes["parent"] == nil {
+                Button("Edit series metadata") { panel = .series }.disabled(store.isSaving).accessibilityIdentifier("edit-series-metadata")
+            }
             if task.canEdit {
                 Button(task.isOccurrence ? "Edit occurrence" : "Edit") {
                     if let edit { edit(task) } else { isEditing = true }
@@ -68,6 +71,7 @@ struct TaskDetailView: View {
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
         .sheet(item: $panel) { panel in
             switch panel {
+            case .series: TaskSeriesMetadataEditor(store: store, template: task, onSave: { task = $0 })
             case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
             case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
             case .attributes: TaskAdvancedAttributesEditor(store: store, task: task, onSave: { task = $0 })
@@ -88,10 +92,11 @@ struct TaskDetailView: View {
 }
 
 private enum TaskDetailPanel: Identifiable {
-    case dependency, annotation(TaskAnnotation?), attributes
+    case dependency, annotation(TaskAnnotation?), attributes, series
 
     var id: String {
         switch self {
+        case .series: "series"
         case .dependency: "dependency"
         case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
         case .attributes: "attributes"

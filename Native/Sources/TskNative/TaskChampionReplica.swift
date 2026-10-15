@@ -2,7 +2,7 @@ import CTaskChampion
 import Foundation
 import TskCore
 
-public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordinatingReplica, TaskAtomicMutatingReplica {
+public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordinatingReplica, TaskAtomicSnapshotMutatingReplica {
     private let directory: URL
     private let library: String
 
@@ -31,6 +31,10 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         try request(command: "updateAtomically", updates: updates)
     }
 
+    public func updateAtomically(_ updates: [TaskAtomicUpdate], expecting records: [TaskRecord]) async throws -> [TaskRecord] {
+        try request(command: "updateSnapshotAtomically", updates: updates, snapshot: records)
+    }
+
     public func synchronize(using configuration: SyncConfiguration) async throws {
         do {
             let generation = tsk_bridge_sync_generation(library, directory.standardizedFileURL.path)
@@ -50,8 +54,8 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         }
     }
 
-    nonisolated private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: TaskAttributes? = nil, changes: TaskAttributePatch? = nil, configuration: SyncConfiguration? = nil, syncGeneration: UInt64? = nil, updates: [TaskAtomicUpdate]? = nil) throws -> T {
-        let request = Request(path: directory.standardizedFileURL.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration, syncGeneration: syncGeneration, updates: updates)
+    nonisolated private func request<T: Decodable>(command: String, id: UUID? = nil, attributes: TaskAttributes? = nil, changes: TaskAttributePatch? = nil, configuration: SyncConfiguration? = nil, syncGeneration: UInt64? = nil, updates: [TaskAtomicUpdate]? = nil, snapshot: [TaskRecord]? = nil) throws -> T {
+        let request = Request(path: directory.standardizedFileURL.path, command: command, id: id, attributes: attributes, changes: changes, configuration: configuration, syncGeneration: syncGeneration, updates: updates, snapshot: snapshot)
         let data = try JSONEncoder().encode(request)
         guard let json = String(data: data, encoding: .utf8) else {
             throw TaskManagementError.storage("Could not encode the task operation.")
@@ -80,6 +84,7 @@ private struct Request: Encodable {
     let configuration: SyncConfiguration?
     let syncGeneration: UInt64?
     let updates: [TaskAtomicUpdate]?
+    let snapshot: [TaskRecord]?
 }
 
 private struct Response<T: Decodable>: Decodable {
