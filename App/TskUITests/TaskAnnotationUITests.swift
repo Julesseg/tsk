@@ -19,8 +19,8 @@ final class TaskAnnotationUITests: XCTestCase {
         description.typeText("Task with supporting notes")
         app.buttons["save-task"].tap()
         XCTAssertTrue(description.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Task with supporting notes"].firstMatch.waitForExistence(timeout: 10))
-        app.staticTexts["Task with supporting notes"].firstMatch.tap()
+        XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
+        taskRow(named: "Task with supporting notes", app: app).tap()
         XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
         capture("Annotations empty in native task detail", app: app)
         app.buttons["add-annotation"].tap()
@@ -57,8 +57,8 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Task with supporting notes"].firstMatch.waitForExistence(timeout: 10))
-        app.staticTexts["Task with supporting notes"].firstMatch.tap()
+        XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
+        taskRow(named: "Task with supporting notes", app: app).tap()
         let first = app.staticTexts["annotation-text-annotation_1792144800"]
         let second = app.staticTexts["annotation-text-annotation_1792144801"]
         XCTAssertTrue(revealTaskElement(first, in: "task-detail-form", app: app))

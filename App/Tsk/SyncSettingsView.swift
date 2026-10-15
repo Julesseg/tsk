@@ -41,6 +41,7 @@ struct SyncSettingsView: View {
                         .focused($focusedField, equals: .secret)
                         .accessibilityIdentifier("sync-encryption-secret")
                     Button("Save connection") {
+                        focusedField = nil
                         Task { savedConnection = await synchronization.saveConnection(serverURL: serverURL, clientID: clientID, secret: secret) }
                     }
                     .accessibilityIdentifier("save-sync-connection")
@@ -56,6 +57,7 @@ struct SyncSettingsView: View {
                         LabeledContent("Last synchronized", value: date.formatted(date: .abbreviated, time: .shortened))
                     }
                     Button(synchronization.error == nil ? "Sync now" : "Retry synchronization") {
+                        focusedField = nil
                         Task {
                             _ = await synchronization.synchronize()
                             await tasks.reload()
@@ -99,6 +101,7 @@ struct SyncSettingsView: View {
                 if synchronization.configuration != nil {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Disconnect", role: .destructive) {
+                            focusedField = nil
                             Task {
                                 await synchronization.disconnect()
                                 serverURL = ""
@@ -110,7 +113,7 @@ struct SyncSettingsView: View {
                         .disabled(synchronization.isSyncing || synchronization.isSaving)
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { focusedField = nil; dismiss() } }
             }
             .onChange(of: serverURL) { savedConnection = false }
             .onChange(of: clientID) { savedConnection = false }

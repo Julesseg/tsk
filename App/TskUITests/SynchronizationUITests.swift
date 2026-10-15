@@ -14,7 +14,8 @@ final class SynchronizationUITests: XCTestCase {
         draft.tap()
         draft.typeText("Offline work survives server failure")
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["Offline work survives server failure"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
         let server = app.textFields["sync-server-url"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
@@ -41,10 +42,11 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sync-error"].label.contains("locally saved tasks remain"))
         capture("Real server connection failure", app)
         app.buttons["Done"].tap()
-        XCTAssertTrue(app.staticTexts["Offline work survives server failure"].exists)
+        XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).exists)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Offline work survives server failure"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
         XCTAssertTrue(server.waitForExistence(timeout: 5))
         XCTAssertEqual(server.value as? String, "http://127.0.0.1:1")
@@ -55,7 +57,7 @@ final class SynchronizationUITests: XCTestCase {
         app.buttons["Disconnect"].tap()
         XCTAssertEqual(app.staticTexts["sync-status"].label, "Local tasks only")
         app.buttons["Done"].tap()
-        XCTAssertTrue(app.staticTexts["Offline work survives server failure"].exists)
+        XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).exists)
     }
 
     func testSuccessfulManualSynchronizationUsesRealConfiguredServer() throws {
@@ -75,8 +77,8 @@ final class SynchronizationUITests: XCTestCase {
         draft.typeText("Hosted task " + token)
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["Hosted task " + token].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["synchronization-settings"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
         let server = app.textFields["sync-server-url"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
@@ -102,7 +104,7 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].exists)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Hosted task " + token].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
     }
 
     func testRealFixtureSettingsReachTheUITestRunner() throws {
@@ -116,6 +118,13 @@ final class SynchronizationUITests: XCTestCase {
         proof.name = "Real server settings received by UI runner"
         proof.lifetime = .keepAlways
         add(proof)
+    }
+
+    private func revealSynchronizationSettings(_ app: XCUIApplication) -> Bool {
+        if app.collectionViews["workspace-sidebar"].exists {
+            return revealTaskElement(app.buttons["synchronization-settings"], in: "workspace-sidebar", app: app)
+        }
+        return app.buttons["synchronization-settings"].waitForExistence(timeout: 10)
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {
