@@ -23,12 +23,18 @@ struct TaskDetailView: View {
                 LabeledContent("Status", value: task.status.capitalized)
                     .accessibilityIdentifier("task-detail-status")
                 if task.canComplete {
-                    Button("Complete task", systemImage: "checkmark.circle") {
+                    Button(task.isOccurrence ? "Complete occurrence" : "Complete task", systemImage: "checkmark.circle") {
                         Task { if let completed = await store.complete(id: task.id) { task = completed } }
                     }
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("complete-task")
                 }
+            }
+            Section("Activity") {
+                if !task.isActive { Text("Not active").accessibilityIdentifier("task-activity-inactive") }
+                TaskActivityCaption(task: task)
+                TaskActivityButton(task: task, store: store, isDetail: true, onSave: { task = $0 })
+                if !task.canChangeActivity { Text("Start and stop are available for unfinished tasks with valid task state.").font(.footnote) }
             }
             TaskAvailabilityView(task: task, store: store, isDetail: true)
             TaskDependenciesSection(store: store, task: task, onSave: { task = $0 }, select: { panel = .dependency })
@@ -53,11 +59,20 @@ struct TaskDetailView: View {
             }
         }
         .accessibilityIdentifier("task-detail-form")
+        .safeAreaInset(edge: .top) {
+            if let error = store.error {
+                Text(error).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
+                    .accessibilityIdentifier("task-action-banner")
+            }
+        }
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if task.status == "recurring", task.attributes["parent"] == nil {
+                Button("Edit series metadata") { panel = .series }.disabled(store.isSaving).accessibilityIdentifier("edit-series-metadata")
+            }
             if task.canEdit {
-                Button("Edit") {
+                Button(task.isOccurrence ? "Edit occurrence" : "Edit") {
                     if let edit { edit(task) } else { isEditing = true }
                 }
                     .disabled(store.isSaving)
@@ -68,6 +83,7 @@ struct TaskDetailView: View {
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
         .sheet(item: $panel) { panel in
             switch panel {
+            case .series: TaskSeriesMetadataEditor(store: store, template: task, onSave: { task = $0 })
             case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
             case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
             case .attributes: TaskAdvancedAttributesEditor(store: store, task: task, onSave: { task = $0 })
@@ -88,10 +104,11 @@ struct TaskDetailView: View {
 }
 
 private enum TaskDetailPanel: Identifiable {
-    case dependency, annotation(TaskAnnotation?), attributes
+    case dependency, annotation(TaskAnnotation?), attributes, series
 
     var id: String {
         switch self {
+        case .series: "series"
         case .dependency: "dependency"
         case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
         case .attributes: "attributes"

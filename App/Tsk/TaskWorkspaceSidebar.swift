@@ -11,6 +11,7 @@ struct TaskWorkspaceSidebar: View {
     let recurring: () -> Void
     let attributeDefinitions: () -> Void
     let reminders: () -> Void
+    let continuousReminders: () -> Void
 
     var body: some View {
         List {
@@ -39,6 +40,8 @@ struct TaskWorkspaceSidebar: View {
                     .accessibilityIdentifier("custom-views")
             }
             Section {
+                Button("Move from Reminders automatically", systemImage: "arrow.down.forward.circle", action: continuousReminders)
+                    .accessibilityIdentifier("continuous-reminders-settings")
                 Button("Copy from Reminders", systemImage: "square.and.arrow.down", action: reminders)
                     .accessibilityIdentifier("reminders-import")
                 Button("Recurring templates", systemImage: "repeat", action: recurring).accessibilityIdentifier("recurring-templates")

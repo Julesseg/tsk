@@ -20,7 +20,7 @@ struct TaskRecurrenceSection: View {
                             NavigationLink("View recurring template") { TaskDetailView(store: store, task: template) }.accessibilityIdentifier("occurrence-template")
                         } else { Text("The linked template has not arrived in this saved dataset.") }
                     }
-                    Text("This occurrence is read only here to preserve its series bookkeeping.").accessibilityIdentifier("occurrence-read-only")
+                    Text(task.status == "completed" ? "This completed occurrence remains in the series history." : "Edits and completion apply only to this occurrence. Other occurrences and the template remain unchanged.").accessibilityIdentifier("occurrence-only-explanation")
                 }
                 ForEach(recurrence.issues, id: \.self) { Text($0).foregroundStyle(.orange) }
             }

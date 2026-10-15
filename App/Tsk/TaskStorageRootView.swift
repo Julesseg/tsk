@@ -29,6 +29,7 @@ struct TaskStorageRootView: View {
         do {
             #if DEBUG
             try cleanReminderFixtureIfRequested()
+            try addForegroundReminderFixtureIfRequested()
             if let description = ProcessInfo.processInfo.environment["TSK_TEST_INTENT_DESCRIPTION"] {
                 _ = try await CreateTaskIntent(description: description).perform()
             }

@@ -34,6 +34,12 @@ final class TaskStore {
         manager = TaskChampionSession.makeManager(directory: directory, now: { fixed ?? Date() })
     }
 
+    init(manager: TaskManager, directory: URL) {
+        self.manager = manager
+        self.directory = directory
+        fixedDate = nil
+    }
+
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
         task.availability(at: fixedDate ?? date, tasks: allTasks)
     }
@@ -99,6 +105,10 @@ final class TaskStore {
     func editAnnotation(id: UUID, reference: String, text: String) async -> TaskRecord? {
         await perform { try await $0.editAnnotation(id: id, reference: reference, text: text) }
     }
+
+    func start(id: UUID) async -> TaskRecord? { await perform { try await $0.start(id: id) } }
+
+    func stop(id: UUID) async -> TaskRecord? { await perform { try await $0.stop(id: id) } }
 
     func complete(id: UUID) async -> TaskRecord? {
         await perform { try await $0.complete(id: id) }

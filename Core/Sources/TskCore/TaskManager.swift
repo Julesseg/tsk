@@ -11,7 +11,8 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
 
     public var description: String { attributes["description"] ?? "Untitled task" }
     public var status: String { attributes["status"] ?? "unknown" }
-    public var canEdit: Bool { !isRecurring && (status == "pending" || status == "completed") }
+    public var isOccurrence: Bool { attributes["parent"] != nil }
+    public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && Int(attributes["imask"] ?? "").map { $0 >= 0 } == true && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
     public var canComplete: Bool { canEdit && status == "pending" }
     public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }
@@ -76,7 +77,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         case .invalidAnnotationTimestamp: "A valid timestamp could not be assigned to this annotation."
         case .annotationNotFound: "This annotation is no longer available. Reopen the task and try again."
         case .emptyDescription: "Enter a task description before saving."
-        case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
+        case .unsupportedTaskKind: "This action is unavailable for recurring templates or this saved task state. Its attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
         case .taskNotFound: "This task is no longer available."
         case .storage(let message): "Local task storage failed: \(message)"
@@ -88,6 +89,7 @@ public actor TaskManager {
     let replica: any TaskReplica
     let viewDefinitions: (any TaskViewDefinitionsStore)?
     let userAttributeDefinitions: (any TaskAttributeDefinitionsStore)?
+    let reminderImportConfiguration: (any ContinuousReminderConfigurationStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
     var synchronizationState: SynchronizationState = .localOnly
@@ -97,14 +99,17 @@ public actor TaskManager {
     var synchronizationTask: Task<Void, Never>?
     var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
+    var reminderMoveInProgress = false
+    var reminderImportPaused = false
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.userAttributeDefinitions = attributeDefinitions
+        self.reminderImportConfiguration = reminderImportConfiguration
         self.now = now
         self.calendar = calendar
     }
@@ -171,7 +176,7 @@ public actor TaskManager {
     func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
-        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "start", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
         if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) || $0.utf8.starts(with: "annotation_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }
@@ -184,6 +189,7 @@ public actor TaskManager {
         }
         patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
         patch["modified"] = String(Int(now().timeIntervalSince1970))
+        if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)
         localChangeWasCommitted()
         return saved
@@ -193,6 +199,10 @@ public actor TaskManager {
         let lease = try await beginMutation()
         defer { endMutation(lease) }
         let task = try await self.task(id: id)
+        if task.isOccurrence {
+            let timestamp = String(Int(now().timeIntervalSince1970))
+            return try await saveOccurrence(task, changes: ["status": "completed", "end": task.attributes["end"] ?? timestamp, "modified": timestamp, "start": nil], completing: true)
+        }
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }
         let timestamp = String(Int(now().timeIntervalSince1970))

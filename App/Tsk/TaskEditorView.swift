@@ -65,7 +65,7 @@ struct TaskEditorView: View {
                 }
             }
             .onChange(of: UTF8String(tagInput)) { _, _ in tagError = nil }
-            .navigationTitle(original == nil ? "New task" : "Edit task")
+            .navigationTitle(original == nil ? "New task" : original?.isOccurrence == true ? "Edit occurrence" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

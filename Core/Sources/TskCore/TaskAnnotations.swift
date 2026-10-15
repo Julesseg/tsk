@@ -42,8 +42,7 @@ public extension TaskManager {
             guard !next.overflow else { throw TaskManagementError.invalidAnnotationTimestamp }
             timestamp = next.partialValue
         }
-        let saved = try await replica.update(id: id, changes: ["annotation_\(timestamp)": text, "modified": String(initialTimestamp)])
-        localChangeWasCommitted()
+        let saved = try await saveTaskMutation(source, changes: ["annotation_\(timestamp)": text, "modified": String(initialTimestamp)])
         return saved
     }
 }
@@ -57,8 +56,7 @@ public extension TaskManager {
         guard reference.utf8.starts(with: "annotation_".utf8), source.attributes[reference] != nil else { throw TaskManagementError.annotationNotFound(reference) }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TaskManagementError.emptyAnnotation }
         if source.attributes[reference]?.matchesBytes(text) == true { return source }
-        let saved = try await replica.update(id: id, changes: [reference: text, "modified": String(Int(now().timeIntervalSince1970))])
-        localChangeWasCommitted()
+        let saved = try await saveTaskMutation(source, changes: [reference: text, "modified": String(Int(now().timeIntervalSince1970))])
         return saved
     }
 }

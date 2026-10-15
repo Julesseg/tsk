@@ -28,18 +28,22 @@ struct TaskListView: View {
                             .tag(task.id)
                             .accessibilityIdentifier("task-\(task.id.uuidString)")
                             .contextMenu {
-                                if task.canEdit { Button("Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
+                                TaskActivityButton(task: task, store: store)
+                                if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
                                 if task.canComplete {
-                                    Button("Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }.disabled(store.isSaving)
+                                    Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }.disabled(store.isSaving)
                                 }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                TaskActivityButton(task: task, store: store).tint(.orange)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 if task.canComplete {
-                                    Button("Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }
+                                    Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }
                                         .tint(.green).disabled(store.isSaving)
                                 }
                                 if task.canEdit {
-                                    Button("Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
+                                    Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
                                 }
                             }
                         }
@@ -72,10 +76,11 @@ struct TaskListLabel: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.description)
             if !task.project.isEmpty { Text(task.project).font(.caption).foregroundStyle(.secondary) }
+            TaskActivityCaption(task: task)
             TaskPlanningCaption(task: task)
             TaskAvailabilityView(task: task, store: store)
             if task.status != "pending" || task.isRecurring {
-                Text(task.recurrenceInspection.map { $0.kind == .template ? "Recurring template" : $0.kind == .occurrence ? "Generated occurrence · read only" : "Recurrence data · read only" } ?? task.status.capitalized)
+                Text(task.recurrenceInspection.map { $0.kind == .template ? "Recurring template" : $0.kind == .occurrence ? task.status == "completed" ? "Completed occurrence" : "Generated occurrence" : "Recurrence data · read only" } ?? task.status.capitalized)
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
