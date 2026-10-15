@@ -22,15 +22,15 @@ struct RecurringTemplateTests {
     let manager = try await TaskChampionSession.open(directory: appDirectory)
     let formatter = ISO8601DateFormatter()
     let cases: [(rule: String, first: String, until: String?, expected: [String])] = [
-        ("weekly", "2027-01-01T10:00:00Z", nil, ["20270101T100000Z", "20270108T100000Z", "20270115T100000Z"]),
-        ("daily", "2027-03-27T08:00:00Z", nil, ["20270327T080000Z", "20270328T080000Z", "20270329T080000Z"]),
-        ("monthly", "2027-01-31T10:00:00Z", nil, ["20270131T100000Z", "20270228T100000Z", "20270328T090000Z"]),
-        ("2m", "2027-01-31T10:00:00Z", nil, ["20270131T100000Z", "20270331T090000Z", "20270531T090000Z"]),
-        ("P2M", "2027-01-31T10:00:00Z", nil, ["20270131T100000Z", "20270330T220000Z", "20270530T220000Z"]),
-        ("P3M", "2027-01-31T10:00:00Z", nil, ["20270131T100000Z", "20270429T220000Z", "20270729T220000Z"]),
-        ("quarterly", "2027-01-31T10:00:00Z", nil, ["20270131T100000Z", "20270430T090000Z", "20270730T090000Z"]),
-        ("yearly", "2028-02-29T10:00:00Z", nil, ["20280229T100000Z", "20290228T100000Z", "20300228T100000Z"]),
-        ("weekly", "2027-01-01T10:00:00Z", "2027-01-03T10:00:00Z", ["20270101T100000Z", "20270108T100000Z"])
+        ("weekly", "2094-01-01T10:00:00Z", nil, ["20940101T100000Z", "20940108T100000Z", "20940115T100000Z"]),
+        ("daily", "2094-03-27T08:00:00Z", nil, ["20940327T080000Z", "20940328T080000Z", "20940329T080000Z"]),
+        ("monthly", "2094-01-31T10:00:00Z", nil, ["20940131T100000Z", "20940228T100000Z", "20940328T090000Z"]),
+        ("2m", "2094-01-31T10:00:00Z", nil, ["20940131T100000Z", "20940331T090000Z", "20940531T090000Z"]),
+        ("P2M", "2094-01-31T10:00:00Z", nil, ["20940131T100000Z", "20940330T220000Z", "20940530T220000Z"]),
+        ("P3M", "2094-01-31T10:00:00Z", nil, ["20940131T100000Z", "20940429T220000Z", "20940729T220000Z"]),
+        ("quarterly", "2094-01-31T10:00:00Z", nil, ["20940131T100000Z", "20940430T090000Z", "20940730T090000Z"]),
+        ("yearly", "2096-02-29T10:00:00Z", nil, ["20960229T100000Z", "20970228T100000Z", "20980228T100000Z"]),
+        ("weekly", "2094-01-01T10:00:00Z", "2094-01-03T10:00:00Z", ["20940101T100000Z", "20940108T100000Z"])
     ]
     var templates: [TaskRecord] = []
     for fixture in cases {
@@ -63,7 +63,7 @@ struct RecurringTemplateTests {
         var isolated = environment
         isolated["TASKRC"] = taskrc.path
         isolated["TASKDATA"] = desktop.path
-        isolated["TZ"] = "Europe/Paris"
+        isolated["TZ"] = "CET-1CEST,M3.5.0/2,M10.5.0/3"
         process.environment = isolated
         let output = Pipe(), errors = Pipe()
         process.standardOutput = output
@@ -137,7 +137,7 @@ func nativeTemplateCreationRequestsAutomaticSynchronizationWithoutGeneratingAnyC
     let appDirectory = directory.appendingPathComponent("app")
     try await SyncConfigurationStore(directory: appDirectory).save(configuration)
     let app = try await TaskChampionSession.open(directory: appDirectory)
-    let template = try await app.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Automatic external-generation template", attributes: ["opaque": "automatic retention"]), firstDue: Date(timeIntervalSince1970: 1801399200), recurrence: "weekly"))
+    let template = try await app.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Automatic external-generation template", attributes: ["opaque": "automatic retention"]), firstDue: ISO8601DateFormatter().date(from: "2094-02-01T10:00:00Z"), recurrence: "weekly"))
     let peer = try await TaskChampionSession.open(directory: directory.appendingPathComponent("peer"))
     let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while true {

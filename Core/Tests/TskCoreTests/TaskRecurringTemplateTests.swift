@@ -76,3 +76,18 @@ import TskCore
     #expect(try await manager.task(id: malformed.id) == malformed)
     #expect(!malformed.canEdit)
 }
+
+@Test func recurringAuthoringUsesTheSameLocalTypedAttributeValidationAsOrdinaryCapture() async throws {
+    let manager = TaskManager(replica: TestReplica(), attributeDefinitions: AttributeDefinitionTestStore())
+    _ = try await manager.saveAttributeDefinition(name: "effort", type: .duration)
+    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
+    let valid = try await manager.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Typed recurring template", attributes: ["effort": "2h", "score": "1e2", "opaque": "retain"]), firstDue: Date(timeIntervalSince1970: 1792224000), recurrence: "monthly"))
+    #expect(valid.attributes["effort"] == "PT2H")
+    #expect(valid.attributes["score"] == "100")
+    #expect(valid.attributes["recur"] == "monthly")
+    #expect(valid.attributes["opaque"] == "retain")
+    await #expect(throws: (any Error).self) {
+        try await manager.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Invalid typed template", attributes: ["score": "NaN"]), firstDue: Date(timeIntervalSince1970: 1792224000)))
+    }
+    #expect(try await manager.tasks() == [valid])
+}
