@@ -88,8 +88,13 @@ final class ReminderRecurrenceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
         if app.collectionViews["workspace-sidebar"].exists {
             XCTAssertTrue(revealTaskElement(app.buttons[identifier], in: "workspace-sidebar", app: app))
-        } else { app.buttons["workspace-more"].tap() }
-        app.buttons[identifier].tap()
+        } else if identifier != "recurring-templates" { app.buttons["workspace-more"].tap() }
+        let button = app.buttons[identifier]
+        guard button.waitForExistence(timeout: 5), button.isEnabled, button.isHittable else {
+            XCTFail("The requested task destination must be an actionable button: \(identifier)")
+            return
+        }
+        button.tap()
     }
 
     private func prepareAndSelect(_ token: String, in container: String, app: XCUIApplication) {
