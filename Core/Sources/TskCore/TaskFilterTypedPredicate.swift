@@ -16,7 +16,7 @@ struct FilterTypedPredicate: Sendable {
         let operand: FilterScalar
         if quoted || raw.isEmpty || FilterScalar.isUUIDLiteral(raw) { operand = .text(raw) }
         else if let number = FilterScalar.numericOperand(raw) { operand = .number(number) }
-        else if type == .duration, let duration = TaskwarriorDuration(raw, allowRawSeconds: false) { operand = .duration(duration.seconds) }
+        else if type == .duration, let duration = TaskwarriorDuration(raw, allowRawSeconds: false) { operand = .duration(duration.filterSeconds) }
         else if case .regex = operation {
             guard !raw.utf8.contains(where: { [43, 45, 42, 47, 94, 37].contains($0) }) else {
                 throw TaskFilterError.unsupported("Quote typed regex patterns containing expression operators.")
@@ -33,7 +33,8 @@ struct FilterTypedPredicate: Sendable {
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         let actual: FilterScalar
-        if let stored = task.attributes[name] {
+        if name == "urgency" { actual = .number(TaskDefaultUrgency.value(for: task, context: context)) }
+        else if let stored = task.attributes[name] {
             switch type {
             case .numeric:
                 guard stored.isEmpty || Float(stored)?.isFinite == true else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
@@ -44,7 +45,7 @@ struct FilterTypedPredicate: Sendable {
                 actual = .text(stored)
             case .duration:
                 guard stored.isEmpty || TaskwarriorDuration(stored, allowRawSeconds: false) != nil else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
-                actual = .duration(TaskwarriorDuration(stored, allowRawSeconds: false)?.seconds ?? 0)
+                actual = .duration(TaskwarriorDuration(stored, allowRawSeconds: false)?.filterSeconds ?? 0)
             default: throw TaskFilterError.unsupported("This attribute type has no scalar predicate.")
             }
         } else { actual = .text("") }
@@ -92,7 +93,7 @@ enum FilterScalar: Sendable {
         switch self {
         case .duration(let value): value
         case .number(let value): Int64(exactly: value.rounded(.towardZero))
-        case .text(let value): TaskwarriorDuration(value, allowRawSeconds: false)?.seconds ?? 0
+        case .text(let value): TaskwarriorDuration(value, allowRawSeconds: false)?.filterSeconds ?? 0
         }
     }
 

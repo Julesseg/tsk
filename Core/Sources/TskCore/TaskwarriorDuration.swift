@@ -49,6 +49,12 @@ public struct TaskwarriorDuration: Equatable, Sendable {
         syntax = .iso
     }
 
+    // The pinned Duration::resolve evaluates ISO component sums as signed int32.
+    var filterSeconds: Int64 {
+        if case .iso = syntax { return Int64(Int32(truncatingIfNeeded: seconds)) }
+        return seconds
+    }
+
     static func captures(_ pattern: String, _ raw: String) -> [String]? {
         guard let expression = try? NSRegularExpression(pattern: pattern),
               let match = expression.firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
