@@ -13,7 +13,7 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
     public var status: String { attributes["status"] ?? "unknown" }
     public var canEdit: Bool { !isRecurring && (status == "pending" || status == "completed") }
     public var canComplete: Bool { canEdit && status == "pending" }
-    public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil }
+    public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }
 
 public enum TaskQuery: String, CaseIterable, Sendable {
@@ -144,6 +144,7 @@ public actor TaskManager {
         guard !description.isEmpty else { throw TaskManagementError.emptyDescription }
         guard draft.attributes["recur"] == nil, draft.attributes["parent"] == nil,
               draft.attributes["mask"] == nil, draft.attributes["imask"] == nil,
+              draft.attributes["rtype"] == nil, draft.attributes["template"] == nil, draft.attributes["last"] == nil,
               draft.attributes["status"] == nil || draft.attributes["status"] == "pending" else {
             throw TaskManagementError.unsupportedTaskKind
         }
@@ -170,7 +171,7 @@ public actor TaskManager {
     func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
-        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "parent", "mask", "imask", "tags", "depends"])
+        let reserved = Set(["uuid", "id", "status", "entry", "modified", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
         if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) || $0.utf8.starts(with: "annotation_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }

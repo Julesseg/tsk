@@ -11,7 +11,9 @@ struct ContentView: View {
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
     @State private var isShowingShortcuts = false
+    @State private var isShowingRecurring = false
     @State private var isDefiningAttributes = false
+    @State private var isImportingReminders = false
     @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
@@ -28,7 +30,7 @@ struct ContentView: View {
         Group {
             if sizeClass == .regular {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, attributeDefinitions: { isDefiningAttributes = true })
+                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true })
                         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                 } content: {
                     taskList(selection: $selectedTaskID)
@@ -59,10 +61,12 @@ struct ContentView: View {
             }
         }
         .focusedSceneValue(\.taskWorkspace, workspaceActions)
+        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
         .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
         .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
         .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
+        .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
         .sheet(isPresented: $isShowingShortcuts) { NavigationStack { TaskShortcutsView().toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { isShowingShortcuts = false } } } } }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
         .task(id: TaskListSelection(query: store.query, project: store.projectSelection, customView: store.customView)) {
@@ -107,6 +111,7 @@ struct ContentView: View {
             .toolbar {
                 if sizeClass != .regular {
                     ToolbarItemGroup(placement: .topBarLeading) {
+                        Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
                         Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
                         Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }.accessibilityIdentifier("synchronization-settings")
                         Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
@@ -115,6 +120,7 @@ struct ContentView: View {
                 if sizeClass != .regular {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu("More", systemImage: "ellipsis") {
+                            Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                             Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
                         }.accessibilityIdentifier("workspace-more")
                     }
@@ -165,7 +171,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isDefiningAttributes, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },

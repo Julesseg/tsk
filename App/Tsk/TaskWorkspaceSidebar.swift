@@ -8,7 +8,9 @@ struct TaskWorkspaceSidebar: View {
     let customViews: () -> Void
     let synchronization: () -> Void
     let shortcuts: () -> Void
+    let recurring: () -> Void
     let attributeDefinitions: () -> Void
+    let reminders: () -> Void
 
     var body: some View {
         List {
@@ -37,6 +39,9 @@ struct TaskWorkspaceSidebar: View {
                     .accessibilityIdentifier("custom-views")
             }
             Section {
+                Button("Copy from Reminders", systemImage: "square.and.arrow.down", action: reminders)
+                    .accessibilityIdentifier("reminders-import")
+                Button("Recurring templates", systemImage: "repeat", action: recurring).accessibilityIdentifier("recurring-templates")
                 Button("Attribute definitions", systemImage: "slider.horizontal.3", action: attributeDefinitions)
                     .accessibilityIdentifier("attribute-definitions")
                 Button("Synchronization", systemImage: "arrow.triangle.2.circlepath", action: synchronization)
