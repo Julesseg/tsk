@@ -6,9 +6,11 @@ public enum TaskFilterError: Error, Equatable, LocalizedError, Sendable {
     case unsupported(String)
     case invalidRegex(String, String)
     case invalidStoredValue(UUID, String, TaskFilterAttributeType)
+    case evaluation(String)
 
     public var errorDescription: String? {
         switch self {
+        case .evaluation(let message): "Filter evaluation: \(message)"
         case .syntax(let message, let offset): "Filter at byte \(offset + 1): \(message)"
         case .unknownAttribute(let name): "Unknown filter attribute ‘\(name)’. Define its local schema before filtering it."
         case .unsupported(let message): "Unsupported filter: \(message)"
@@ -70,8 +72,16 @@ struct CompiledTaskFilter: Sendable {
     let root: FilterExpression
 
     init(_ expression: String, schema: TaskFilterSchema) throws {
-        var parser = try FilterParser(expression, schema: schema)
-        root = try parser.parse()
+        var values = try TaskExpressionParser(expression, schema: schema)
+        if values.hasValueOperators {
+            let expression = try values.parse()
+            try expression.validate(schema: schema)
+            root = .value(expression)
+        }
+        else {
+            var parser = try FilterParser(expression, schema: schema)
+            root = try parser.parse()
+        }
     }
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
@@ -85,6 +95,7 @@ struct CompiledTaskFilter: Sendable {
 
 indirect enum FilterExpression: Sendable {
     case all
+    case value(TaskValueExpression)
     case predicate(FilterPredicate)
     case not(FilterExpression)
     case and(FilterExpression, FilterExpression)
@@ -92,21 +103,23 @@ indirect enum FilterExpression: Sendable {
     case xor(FilterExpression, FilterExpression)
 
     var requiresWorkingSet: Bool {
-        guard !hasDisjunction else { return false }
+        guard !disablesWorkingSet else { return false }
         return hasActiveTag
     }
 
-    private var hasDisjunction: Bool {
+    private var disablesWorkingSet: Bool {
         switch self {
+        case .value(let expression): expression.disablesWorkingSet
         case .or, .xor: true
-        case .not(let child): child.hasDisjunction
-        case .and(let left, let right): left.hasDisjunction || right.hasDisjunction
+        case .not(let child): child.disablesWorkingSet
+        case .and(let left, let right): left.disablesWorkingSet || right.disablesWorkingSet
         default: false
         }
     }
 
     private var hasActiveTag: Bool {
         switch self {
+        case .value(let expression): expression.hasActiveTag
         case .predicate(.virtualTag(.active, let required)): required
         case .and(let left, let right): left.hasActiveTag || right.hasActiveTag
         case .not(let child): child.hasActiveTag
@@ -116,12 +129,17 @@ indirect enum FilterExpression: Sendable {
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
-        case .all: true
-        case .predicate(let predicate): try predicate.includes(task, context: context)
-        case .not(let expression): try !expression.includes(task, context: context)
-        case .and(let left, let right): try left.includes(task, context: context) && right.includes(task, context: context)
-        case .or(let left, let right): try left.includes(task, context: context) || right.includes(task, context: context)
-        case .xor(let left, let right): try left.includes(task, context: context) != right.includes(task, context: context)
+        case .value(let expression): return try expression.evaluation(task, context).selected
+        case .all: return true
+        case .predicate(let predicate): return try predicate.includes(task, context: context)
+        case .not(let expression): return try !expression.includes(task, context: context)
+        case .and(let left, let right):
+            let lhs = try left.includes(task, context: context), rhs = try right.includes(task, context: context)
+            return lhs && rhs
+        case .or(let left, let right):
+            let lhs = try left.includes(task, context: context), rhs = try right.includes(task, context: context)
+            return lhs || rhs
+        case .xor(let left, let right): return try left.includes(task, context: context) != right.includes(task, context: context)
         }
     }
 }

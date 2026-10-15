@@ -25,7 +25,7 @@ func typedNumericFiltersAgreeWithPinnedTaskwarriorAndReopenedSavedViews() async 
 }
 
 @MainActor
-private final class TypedFilterFixture {
+final class TypedFilterFixture {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let config: URL
     let binary: String
@@ -41,11 +41,13 @@ private final class TypedFilterFixture {
 
     func remove() { try? FileManager.default.removeItem(at: directory) }
 
-    func compare(_ expression: String, manager: TaskManager) async throws {
+    @discardableResult
+    func compare(_ expression: String, manager: TaskManager) async throws -> FilterConformanceSelection {
         let data = try task([expression, "_uuids"])
         let expected = Set(String(decoding: data, as: UTF8.self).split(whereSeparator: \.isWhitespace).map(String.init))
         let actual = Set(try await manager.tasks(filter: expression).map { $0.id.uuidString.lowercased() })
         #expect(actual == expected, "\(expression)")
+        return FilterConformanceSelection(expression: expression, selected: expected.sorted(), actual: actual.sorted())
     }
 
     func task(_ arguments: [String], expectedFailure: Bool = false) throws -> Data {
@@ -166,4 +168,10 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     #expect(saved.attributes["score"] == "5")
     #expect(saved.attributes["unknown_é"] == "composed")
     #expect(saved.attributes["unknown_e\u{301}"] == "decomposed")
+}
+
+struct FilterConformanceSelection: Codable {
+    let expression: String
+    let selected: [String]
+    let actual: [String]
 }

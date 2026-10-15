@@ -63,12 +63,13 @@ containing expression operators. In pinned Taskwarrior, typed `.left`/`.right`
 reuse the original evaluated operand without the string-only anchors; ordinary
 string `.left`/`.right` retain their prefix/suffix behavior.
 
-Computed or arithmetic operands are extended by the following expression slice.
-These remain explicit unsupported errors, including numeric working-set IDs,
-`+LATEST` and regex flags. `.word`/`.noword` are also rejected because
-pinned Taskwarrior implements different boundaries on Darwin and Linux; an
-explicit supported ECMAScript pattern is available. Unsupported input is never
-reinterpreted as a narrower builder query.
+Computed default urgency and typed arithmetic use the versioned
+[Taskwarrior 3.5 expression contract](verification/taskwarrior-3.5-expression-contract.md).
+Direct comparisons, arithmetic, temporal and DOM values compose with the same
+modifiers and boolean predicates. For example `urgency + 1 > 4.9 and +PENDING`
+selects the default Medium-priority Float boundary explicitly. No pending predicate
+is added by the app. Genuine desktop-ID, platform-dependent and unsafe-expression
+exclusions report actionable errors rather than a narrower builder query.
 
 Date fields retain separate meanings: `due:today` filters deadlines and does
 not substitute `scheduled`. A partial date predicate compares the local

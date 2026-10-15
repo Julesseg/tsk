@@ -14,7 +14,7 @@ struct FilterDatePredicate: Sendable {
             if !quoted, let duration = TaskwarriorDuration(raw, allowRawSeconds: false) {
                 operand = .empty
                 evaluatesPattern = false
-                self.operation = .regex(try FilterRegex(TaskAttributeValues.durationString(duration.seconds)), inverted: inverted)
+                self.operation = .regex(try FilterRegex(TaskAttributeValues.durationString(duration.filterSeconds)), inverted: inverted)
             } else if !quoted, let expression = try? FilterDateExpression(raw), expression.numericVariant == nil, !raw.isEmpty {
                 operand = expression
                 evaluatesPattern = true
