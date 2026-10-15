@@ -25,9 +25,23 @@ final class TaskKeyboardRouter {
     private var diagnostics: [[String: Any]] = []
     #if DEBUG && targetEnvironment(simulator)
     private var recordingDiagnostic = false
+    private var editingObserver: TaskKeyboardEditingObserver?
+    private var editingDiagnosticCount = 0
+    private var editingChanges: [ObjectIdentifier: Int] = [:]
+    private var refreshCount = 0
+    private var installationCount = 0
+    private var removalCount = 0
+    private var menuRebuildCount = 0
     #endif
 
-    init() { Self.routers[id] = WeakKeyboardRouter(self) }
+    init() {
+        Self.routers[id] = WeakKeyboardRouter(self)
+        #if DEBUG && targetEnvironment(simulator)
+        if ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"].flatMap(UUID.init(uuidString:)) != nil {
+            editingObserver = TaskKeyboardEditingObserver(router: self)
+        }
+        #endif
+    }
     var commands: [TaskKeyboardCommand] { order.last.flatMap { scopes[$0] } ?? [] }
 
     func set(_ commands: [TaskKeyboardCommand], for id: UUID, controller: UIViewController) {
@@ -44,6 +58,10 @@ final class TaskKeyboardRouter {
         refresh()
     }
     private func refresh() {
+        #if DEBUG && targetEnvironment(simulator)
+        refreshCount += 1
+        removalCount += installed.values.reduce(0) { $0 + $1.1.count }
+        #endif
         for (_, (controller, keys)) in installed { keys.forEach { controller.value?.removeKeyCommand($0) } }
         installed.removeAll()
         for controller in controllers.values.compactMap(\.value) {
@@ -56,9 +74,15 @@ final class TaskKeyboardRouter {
                 return key
             }
             keys.forEach(controller.addKeyCommand)
+            #if DEBUG && targetEnvironment(simulator)
+            installationCount += keys.count
+            #endif
             installed[identity] = (WeakKeyboardController(controller), keys)
         }
         UIMenuSystem.main.setNeedsRebuild()
+        #if DEBUG && targetEnvironment(simulator)
+        menuRebuildCount += 1
+        #endif
         diagnostic("scope changed")
     }
 
@@ -83,14 +107,14 @@ final class TaskKeyboardRouter {
         command.action()
     }
 
-    func diagnostic(_ event: String) {
+    func diagnostic(_ event: String, force: Bool = false) {
         #if DEBUG && targetEnvironment(simulator)
         guard let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil, !recordingDiagnostic else { return }
         recordingDiagnostic = true
         defer { recordingDiagnostic = false }
         let hosts = controllers.values.compactMap(\.value).map { String(describing: type(of: $0)) }
         let text = event + " scopes=" + commands.map(\.id).joined(separator: ",") + " hosts=" + hosts.joined(separator: ",")
-        guard lastDiagnostic != text else { return }
+        guard force || lastDiagnostic != text else { return }
         lastDiagnostic = text
         var chain: [String] = []
         let capture = TaskFirstResponderCapture()
@@ -114,7 +138,22 @@ final class TaskKeyboardRouter {
                     "presenting": controller.presentingViewController.map { String(describing: type(of: $0)) } ?? "nil",
                     "inputs": keys.map { ["input": $0.input ?? "nil", "modifiers": $0.modifierFlags.rawValue, "action": $0.action.map { NSStringFromSelector($0) } ?? "nil"] as [String: Any] }]
         }
-        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "runtimeCommands": runtimeCommands, "declarations": declarations])
+        var directChains: [[String: Any]] = []
+        var windows = Set<ObjectIdentifier>()
+        for controller in controllers.values.compactMap(\.value) {
+            guard let window = controller.viewIfLoaded?.window, windows.insert(ObjectIdentifier(window)).inserted else { continue }
+            var current = window.tskFirstResponder ?? controllers.values.compactMap(\.value).first { $0.isFirstResponder && $0.viewIfLoaded?.window === window }
+            var values: [[String: Any]] = []
+            while let responder = current, values.count < 30 {
+                values.append(["responder": String(describing: type(of: responder)), "firstResponder": responder.isFirstResponder,
+                               "returnCommands": diagnosticReturnCommands(responder)])
+                current = responder.next
+            }
+            directChains.append(["keyWindow": window.isKeyWindow, "chain": values])
+        }
+        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "runtimeCommands": runtimeCommands, "declarations": declarations,
+                            "directWindowResponders": directChains, "refreshCount": refreshCount, "installationCount": installationCount,
+                            "removalCount": removalCount, "menuRebuildCount": menuRebuildCount])
         diagnostics = Array(diagnostics.suffix(80))
         NSLog("tsk keyboard %@ chain=%@", text, chain.joined(separator: ">"))
         if let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
@@ -128,6 +167,19 @@ final class TaskKeyboardRouter {
     }
 
     #if DEBUG && targetEnvironment(simulator)
+    fileprivate func editingNotification(_ notification: Notification) {
+        guard editingDiagnosticCount < 32, let view = notification.object as? UIView, let window = view.window,
+              controllers.values.contains(where: { $0.value?.viewIfLoaded?.window === window }) else { return }
+        let identity = ObjectIdentifier(view)
+        let changed = notification.name == UITextView.textDidChangeNotification || notification.name == UITextField.textDidChangeNotification
+        if changed {
+            guard editingChanges[identity, default: 0] < 4 else { return }
+            editingChanges[identity, default: 0] += 1
+        } else { editingChanges[identity] = 0 }
+        editingDiagnosticCount += 1
+        diagnostic("editing notification=\(notification.name.rawValue) view=\(String(describing: type(of: view))) firstResponder=\(view.isFirstResponder)", force: true)
+    }
+
     private func diagnosticReturnCommands(_ responder: UIResponder) -> [[String: Any]] {
         (responder.keyCommands ?? []).filter { $0.input == "\r" && $0.modifierFlags.contains(.command) }.map { command in
             var record: [String: Any] = ["input": command.input ?? "nil", "modifiers": command.modifierFlags.rawValue,
@@ -143,6 +195,27 @@ final class TaskKeyboardRouter {
     }
     #endif
 }
+
+#if DEBUG && targetEnvironment(simulator)
+@MainActor private final class TaskKeyboardEditingObserver: NSObject {
+    private weak var router: TaskKeyboardRouter?
+
+    @MainActor init(router: TaskKeyboardRouter) {
+        self.router = router
+        super.init()
+        for name in [UITextView.textDidBeginEditingNotification, UITextView.textDidChangeNotification, UITextView.textDidEndEditingNotification,
+                     UITextField.textDidBeginEditingNotification, UITextField.textDidChangeNotification, UITextField.textDidEndEditingNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(observed(_:)), name: name, object: nil)
+        }
+    }
+
+    @objc private func observed(_ notification: Notification) {
+        router?.editingNotification(notification)
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+}
+#endif
 
 private struct TaskKeyboardRouterKey: EnvironmentKey {
     static let defaultValue: TaskKeyboardRouter? = nil

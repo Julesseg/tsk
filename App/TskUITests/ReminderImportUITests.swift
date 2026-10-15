@@ -8,7 +8,7 @@ final class ReminderImportUITests: XCTestCase {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", "Run the real fixture only in the canonical disposable simulator lane.")
         let token = UUID().uuidString
         let app = XCUIApplication()
-        app.resetAuthorizationStatus(for: .reminders)
+        resetOwnedReminderAuthorization(app, token: token, stage: "ordinary-before-launch")
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_REMINDERS_FIXTURE"] = token
@@ -20,7 +20,7 @@ final class ReminderImportUITests: XCTestCase {
             app.launch()
             XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
             app.terminate()
-            app.resetAuthorizationStatus(for: .reminders)
+            self.resetOwnedReminderAuthorization(app, token: token, stage: "ordinary-after-cleanup")
         }
         app.launch()
         openImport(app)
