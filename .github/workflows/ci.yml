@@ -156,6 +156,7 @@ jobs:
           name: ${{ matrix.artifact }}
           path: |
             App/TestResults.xcresult
+            App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
           if-no-files-found: ignore

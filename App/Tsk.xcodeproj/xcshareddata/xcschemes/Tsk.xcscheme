@@ -20,6 +20,9 @@
                ReferencedContainer = "container:Tsk.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="260000000000000000000021" BuildableName="TskShareFixture.app" BlueprintName="TskShareFixture" ReferencedContainer="container:Tsk.xcodeproj" />
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
