@@ -6,6 +6,7 @@ struct TaskDetailView: View {
     let edit: ((TaskRecord) -> Void)?
     @State private var task: TaskRecord
     @State private var isEditing = false
+    @State private var panel: TaskDetailPanel?
 
     init(store: TaskStore, task: TaskRecord, edit: ((TaskRecord) -> Void)? = nil) {
         self.store = store
@@ -20,6 +21,7 @@ struct TaskDetailView: View {
             TaskRecurrenceSection(task: task, store: store)
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
+                    .accessibilityIdentifier("task-detail-status")
                 if task.canComplete {
                     Button("Complete task", systemImage: "checkmark.circle") {
                         Task { if let completed = await store.complete(id: task.id) { task = completed } }
@@ -29,10 +31,10 @@ struct TaskDetailView: View {
                 }
             }
             TaskAvailabilityView(task: task, store: store, isDetail: true)
-            TaskDependenciesSection(store: store, task: task, onSave: { task = $0 })
+            TaskDependenciesSection(store: store, task: task, onSave: { task = $0 }, select: { panel = .dependency })
             Section("Planning") { TaskPlanningSummary(task: task) }
-            TaskAnnotationsSection(store: store, task: task, onSave: { task = $0 })
-            TaskAdvancedAttributesSection(store: store, task: task, onSave: { task = $0 })
+            TaskAnnotationsSection(store: store, task: task, edit: { panel = .annotation($0) })
+            TaskAdvancedAttributesSection(store: store, task: task, edit: { panel = .attributes })
             Section("Attributes") {
                 ForEach(task.attributes.keyIdentities) { key in
                     LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
@@ -64,6 +66,13 @@ struct TaskDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
+        .sheet(item: $panel) { panel in
+            switch panel {
+            case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
+            case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
+            case .attributes: TaskAdvancedAttributesEditor(store: store, task: task, onSave: { task = $0 })
+            }
+        }
         .onChange(of: isEditing) { _, editing in
             if !editing {
                 Task {
@@ -74,6 +83,18 @@ struct TaskDetailView: View {
         }
         .onChange(of: store.allTasks) { _, tasks in
             if let updated = tasks.first(where: { $0.id == task.id }) { task = updated }
+        }
+    }
+}
+
+private enum TaskDetailPanel: Identifiable {
+    case dependency, annotation(TaskAnnotation?), attributes
+
+    var id: String {
+        switch self {
+        case .dependency: "dependency"
+        case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
+        case .attributes: "attributes"
         }
     }
 }
