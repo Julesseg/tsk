@@ -69,10 +69,11 @@ final class TaskNotificationUITests: XCTestCase {
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
         let toggle = notificationPermissionSwitch(in: settings)
-        recordTaskSwitchInteraction(row: toggle, selected: toggle, phase: "before-revocation", app: settings)
-        if toggle.value as? String == "1" { tapTaskControl(toggle, app: settings) }
+        let selectedToggle = notificationSwitchControl(toggle)
+        recordTaskSwitchInteraction(row: toggle, selected: selectedToggle, phase: "before-revocation", app: settings)
+        if toggle.value as? String == "1" { tapTaskControl(selectedToggle, app: settings) }
         let revoked = XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: toggle)], timeout: 5)
-        recordTaskSwitchInteraction(row: toggle, selected: toggle, phase: "after-revocation", app: settings)
+        recordTaskSwitchInteraction(row: toggle, selected: selectedToggle, phase: "after-revocation", app: settings)
         XCTAssertEqual(revoked, .completed)
         app.activate()
         let denied = app.buttons["notification-fixture-denied"]
@@ -82,10 +83,11 @@ final class TaskNotificationUITests: XCTestCase {
         reveal(link, in: app); link.tap()
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
         let restoredToggle = notificationPermissionSwitch(in: settings)
-        recordTaskSwitchInteraction(row: restoredToggle, selected: restoredToggle, phase: "before-restoration", app: settings)
-        if restoredToggle.value as? String == "0" { tapTaskControl(restoredToggle, app: settings) }
+        let selectedRestoredToggle = notificationSwitchControl(restoredToggle)
+        recordTaskSwitchInteraction(row: restoredToggle, selected: selectedRestoredToggle, phase: "before-restoration", app: settings)
+        if restoredToggle.value as? String == "0" { tapTaskControl(selectedRestoredToggle, app: settings) }
         let restored = XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: restoredToggle)], timeout: 5)
-        recordTaskSwitchInteraction(row: restoredToggle, selected: restoredToggle, phase: "after-restoration", app: settings)
+        recordTaskSwitchInteraction(row: restoredToggle, selected: selectedRestoredToggle, phase: "after-restoration", app: settings)
         XCTAssertEqual(restored, .completed)
         app.activate()
     }
@@ -153,8 +155,11 @@ final class TaskNotificationUITests: XCTestCase {
         revealTaskElement(element, in: "notification-settings-form", app: app, initialScrollUp: !towardsTop, maximumSteps: 12)
     }
     private func tapNotificationSwitch(_ element: XCUIElement, app: XCUIApplication) {
+        tapTaskControl(notificationSwitchControl(element), app: app)
+    }
+    private func notificationSwitchControl(_ element: XCUIElement) -> XCUIElement {
         let thumb = element.switches.firstMatch
-        tapTaskControl(thumb.exists ? thumb : element, app: app)
+        return thumb.exists ? thumb : element
     }
     private func wait(_ element: XCUIElement, prefix: String, timeout: TimeInterval) -> Bool {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in element.exists && element.label.hasPrefix(prefix) }, object: nil)], timeout: timeout) == .completed
