@@ -159,6 +159,9 @@ struct ContentView: View {
     private var applicationLifecycle: some View {
         participantLifecycle
         .onChange(of: scenePhase) { _, phase in
+            #if DEBUG && targetEnvironment(simulator)
+            continuousReminders.source.recordAccessDiagnostic("reminders.scene", details: ["phase": String(describing: phase)])
+            #endif
             if phase == .active {
                 Task {
                     await synchronization.loadConfiguration()
