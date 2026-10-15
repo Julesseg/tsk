@@ -55,9 +55,13 @@ final class SeriesMetadataUITests: XCTestCase {
         project.tap()
         project.typeText("Series.Work")
         hideKeyboard(app)
-        let note = app.textFields["series-new-annotation"].exists ? app.textFields["series-new-annotation"] : app.textViews["series-new-annotation"]
-        XCTAssertTrue(revealTaskElement(note, in: "series-metadata-form", app: app))
-        note.tap()
+        let note = app.descendants(matching: .any)["series-new-annotation"].firstMatch
+        guard revealTaskElement(note, in: "series-metadata-form", app: app) else { return }
+        guard note.elementType == .textField || note.elementType == .textView else {
+            XCTFail("The revealed series annotation must be a native text input: " + note.debugDescription)
+            return
+        }
+        tapTaskControl(note, app: app)
         note.typeText("Series metadata note")
         hideKeyboard(app)
         app.buttons["preview-series-metadata"].tap()
