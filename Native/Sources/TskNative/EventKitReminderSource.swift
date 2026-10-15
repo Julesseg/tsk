@@ -25,16 +25,75 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     let store: EKEventStore
     #if DEBUG && targetEnvironment(simulator)
     public var fixtureBeforeRemoval: (@MainActor @Sendable () async throws -> Void)?
+    private let diagnosticStoreID = UUID().uuidString
     #endif
     public init() { store = EKEventStore() }
 
     public func requestAccess() async throws {
+        #if DEBUG && targetEnvironment(simulator)
+        let requestID = UUID().uuidString
+        let context = accessDiagnosticContext
+        let trace = context == nil ? nil : TaskParticipantDiagnostics.begin("reminders.access")
+        defer { TaskParticipantDiagnostics.end("reminders.access", id: trace) }
+        recordAccessDiagnostic("reminders.access.begin", details: ["request": requestID])
+        do {
+            let granted: Bool = try await withCheckedThrowingContinuation { continuation in
+                store.requestFullAccessToReminders(completion: Self.accessCallback(continuation, context: context, requestID: requestID))
+            }
+            recordAccessDiagnostic("reminders.access.returned", details: ["request": requestID, "granted": String(granted)])
+            guard granted else { throw ReminderAccessError.accessRequired }
+        } catch {
+            let native = error as NSError
+            recordAccessDiagnostic("reminders.access.error", details: ["request": requestID, "errorDomain": native.domain, "errorCode": String(native.code)])
+            throw error
+        }
+        #else
         guard try await store.requestFullAccessToReminders() else { throw ReminderAccessError.accessRequired }
+        #endif
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    private var accessDiagnosticContext: [String: String]? {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
+              ["TSK_TEST_REMINDERS_FIXTURE", "TSK_TEST_REMINDERS_RECURRING_FIXTURE", "TSK_TEST_REMINDERS_VERIFY_TOKEN"].contains(where: { environment[$0].flatMap(UUID.init(uuidString:)) != nil }) else { return nil }
+        return ["store": diagnosticStoreID]
+    }
+
+    public func recordAccessDiagnostic(_ stage: String, details: [String: String] = [:]) {
+        guard var context = accessDiagnosticContext else { return }
+        context.merge(details) { _, value in value }
+        context["authorization"] = String(EKEventStore.authorizationStatus(for: .reminder).rawValue)
+        context["mainThread"] = String(Thread.isMainThread)
+        TaskParticipantDiagnostics.event(stage, details: context)
+    }
+
+    nonisolated private static func accessCallback(_ continuation: CheckedContinuation<Bool, any Error>, context: [String: String]?, requestID: String) -> @Sendable (Bool, (any Error)?) -> Void {
+        { granted, error in
+            if var context {
+                context["request"] = requestID
+                context["granted"] = String(granted)
+                context["mainThread"] = String(Thread.isMainThread)
+                context["authorization"] = String(EKEventStore.authorizationStatus(for: .reminder).rawValue)
+                if let native = error as NSError? { context["errorDomain"] = native.domain; context["errorCode"] = String(native.code) }
+                TaskParticipantDiagnostics.event("reminders.access.callback", details: context)
+            }
+            if let error { continuation.resume(throwing: error) }
+            else { continuation.resume(returning: granted) }
+        }
+    }
+    #endif
+
     public func lists() async throws -> [ReminderList] {
+        #if DEBUG && targetEnvironment(simulator)
+        recordAccessDiagnostic("reminders.lists.begin")
+        #endif
         try requireAccess()
-        return store.calendars(for: .reminder).map { ReminderList(id: $0.calendarIdentifier, title: $0.title) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        let lists = store.calendars(for: .reminder).map { ReminderList(id: $0.calendarIdentifier, title: $0.title) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        #if DEBUG && targetEnvironment(simulator)
+        recordAccessDiagnostic("reminders.lists.returned", details: ["count": String(lists.count)])
+        #endif
+        return lists
     }
 
     public func incompleteReminders(in listIDs: [String]) async throws -> [ReminderSnapshot] {
@@ -74,6 +133,9 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     }
 
     private func removeSource(reference: String, expected: ReminderSnapshot) async throws {
+        #if DEBUG && targetEnvironment(simulator)
+        recordAccessDiagnostic("reminders.move.removal.begin")
+        #endif
         try Task.checkCancellation()
         #if DEBUG && targetEnvironment(simulator)
         try await fixtureBeforeRemoval?()
@@ -115,7 +177,13 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     }
 
     private func requireAccess() throws {
-        guard EKEventStore.authorizationStatus(for: .reminder) == .fullAccess else { throw ReminderAccessError.accessRequired }
+        let authorization = EKEventStore.authorizationStatus(for: .reminder)
+        guard authorization == .fullAccess else {
+            #if DEBUG && targetEnvironment(simulator)
+            recordAccessDiagnostic("reminders.access.rejected", details: ["checkedAuthorization": String(authorization.rawValue)])
+            #endif
+            throw ReminderAccessError.accessRequired
+        }
     }
 }
 

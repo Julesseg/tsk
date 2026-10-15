@@ -46,8 +46,10 @@ final class ReminderRecurrenceUITests: XCTestCase {
     }
 
     private func inspectTemplate(_ app: XCUIApplication) {
-        let template = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "recurring-template-")).firstMatch
-        XCTAssertTrue(template.waitForExistence(timeout: 15)); template.tap()
+        let template = app.collectionViews["recurring-template-list"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "recurring-template-")).firstMatch
+        XCTAssertTrue(template.waitForExistence(timeout: 15))
+        XCTAssertNotNil(UUID(uuidString: String(template.identifier.dropFirst("recurring-template-".count))))
+        tapTaskControl(template, app: app)
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Weekly current anchor")
         XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))

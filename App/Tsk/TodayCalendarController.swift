@@ -28,7 +28,9 @@ import TskNative
 
     func refresh(requestingAccess: Bool = false) async {
         let request = UUID(); generation = request; isLoading = true; fixtureVerified = false
+        TaskUIBoundaryDiagnostics.event("calendar.refresh.begin", details: ["request": request.uuidString, "requestingAccess": String(requestingAccess)])
         var value = await manager.todayCalendar(from: source, requestingAccess: requestingAccess)
+        TaskUIBoundaryDiagnostics.event("calendar.refresh.snapshot", details: ["request": request.uuidString, "generation": generation.uuidString, "authorization": String(describing: value.authorization), "hasReadError": String(value.readError != nil)])
         #if DEBUG && targetEnvironment(simulator)
         if value.authorization == .fullAccess, !preparedFixture,
            let token = ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_FIXTURE"],
@@ -43,11 +45,16 @@ import TskNative
             catch { fixtureError = error.localizedDescription }
         }
         #endif
-        guard request == generation else { return }
+        guard request == generation else {
+            TaskUIBoundaryDiagnostics.event("calendar.refresh.discarded", details: ["request": request.uuidString, "generation": generation.uuidString])
+            return
+        }
         snapshot = value; isLoading = false
+        TaskUIBoundaryDiagnostics.event("calendar.refresh.published", details: ["request": request.uuidString, "authorization": String(describing: value.authorization), "hasReadError": String(value.readError != nil)])
     }
 
     func sourceChanged() {
+        TaskUIBoundaryDiagnostics.event("calendar.source.changed", details: ["displayingToday": String(isDisplayingToday), "generation": generation.uuidString])
         guard isDisplayingToday else { return }
         refreshTask?.cancel()
         refreshTask = Task {

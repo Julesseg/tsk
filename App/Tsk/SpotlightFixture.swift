@@ -7,9 +7,7 @@ import TskNative
     let environment = ProcessInfo.processInfo.environment
     guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", let token = environment["TSK_TEST_SPOTLIGHT_FIXTURE"], let id = UUID(uuidString: token) else { throw CocoaError(.coderInvalidValue) }
     let namespace = SpotlightTaskEffect.namespace(directory: store.directory)
-    var items = TaskSpotlightItem.projected(from: try await store.manager.tasks(), namespace: namespace)
-    items += TaskSpotlightItem.projected(from: [TaskRecord(id: id, attributes: ["status": "pending", "description": "tsk stale " + token])], namespace: namespace)
-    try await CoreSpotlightTaskIndex(namespace: namespace).replace(items)
+    try await SpotlightStaleResultFixture.install(manager: store.manager, directory: store.directory, token: id, index: CoreSpotlightTaskIndex(namespace: namespace))
     return "Actual stale fixture entry indexed for UUID " + id.uuidString
 }
 

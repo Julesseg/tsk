@@ -14,6 +14,7 @@ import Foundation
     public static func prepare(source: EventKitReminderSource, token: String) async throws -> String {
         guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
         let store = source.store
+        source.recordAccessDiagnostic("reminders.fixture.prepare.begin")
         var output: [String: Any] = ["sources": store.sources.map { ["title": $0.title, "type": $0.sourceType.rawValue] }]
         output["authorizationAtPreparation"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
         var stage = "create disposable lists and reminders"
@@ -62,12 +63,14 @@ import Foundation
             output["completionSequence"] = sequence
             output["beforeRemoval"] = await fetch(store, sequenceList, incomplete: false).map(summary)
             stage = "remove disposable incomplete weekly occurrence"
+            source.recordAccessDiagnostic("reminders.fixture.removal.begin")
             output["authorizationBeforeRemoval"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
             if let current = await fetch(store, sequenceList, incomplete: true).first {
                 output["removalCandidate"] = summary(current)
                 output["removalCandidateIdentifier"] = current.calendarItemIdentifier
                 output["removalCalendarWritable"] = current.calendar.allowsContentModifications
                 try store.remove(current, commit: true)
+                source.recordAccessDiagnostic("reminders.fixture.removal.returned")
             }
             stage = "read disposable weekly history after removal"
             try await Task.sleep(for: .milliseconds(300))
@@ -76,6 +79,7 @@ import Foundation
             guard sequence.count == 5 else { throw NSError(domain: "tsk.EventKitFixture", code: 2, userInfo: [NSLocalizedDescriptionKey: "The real EventKit recurrence sequence did not expose five incomplete occurrences."]) }
             output["fixtureStatus"] = "Real EventKit source, storage, five completions and removal observed"
         } catch {
+            source.recordAccessDiagnostic("reminders.fixture.prepare.error", details: ["stage": stage, "errorDomain": (error as NSError).domain, "errorCode": String((error as NSError).code)])
             output["error"] = error.localizedDescription
             output["failedStage"] = stage
             output["errorDomain"] = (error as NSError).domain

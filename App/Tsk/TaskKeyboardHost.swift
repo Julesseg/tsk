@@ -23,6 +23,9 @@ final class TaskKeyboardRouter {
     private static var routers: [UUID: WeakKeyboardRouter] = [:]
     private var lastDiagnostic: String?
     private var diagnostics: [[String: Any]] = []
+    #if DEBUG && targetEnvironment(simulator)
+    private var recordingDiagnostic = false
+    #endif
 
     init() { Self.routers[id] = WeakKeyboardRouter(self) }
     var commands: [TaskKeyboardCommand] { order.last.flatMap { scopes[$0] } ?? [] }
@@ -82,7 +85,9 @@ final class TaskKeyboardRouter {
 
     func diagnostic(_ event: String) {
         #if DEBUG && targetEnvironment(simulator)
-        guard ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"] != nil else { return }
+        guard let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil, !recordingDiagnostic else { return }
+        recordingDiagnostic = true
+        defer { recordingDiagnostic = false }
         let hosts = controllers.values.compactMap(\.value).map { String(describing: type(of: $0)) }
         let text = event + " scopes=" + commands.map(\.id).joined(separator: ",") + " hosts=" + hosts.joined(separator: ",")
         guard lastDiagnostic != text else { return }
@@ -91,7 +96,13 @@ final class TaskKeyboardRouter {
         let capture = TaskFirstResponderCapture()
         let captured = UIApplication.shared.sendAction(#selector(UIResponder.tskCaptureFirstResponder(_:)), to: nil, from: capture, for: nil)
         var responder = capture.responder
-        while let current = responder, chain.count < 30 { chain.append(String(describing: type(of: current))); responder = current.next }
+        var runtimeCommands: [[String: Any]] = []
+        while let current = responder, chain.count < 30 {
+            let name = String(describing: type(of: current))
+            chain.append(name)
+            runtimeCommands.append(["responder": name, "firstResponder": current.isFirstResponder, "returnCommands": diagnosticReturnCommands(current)])
+            responder = current.next
+        }
         let declarations = installed.values.compactMap { controller, keys -> [String: Any]? in
             guard let controller = controller.value else { return nil }
             var ancestors: [String] = []
@@ -99,10 +110,11 @@ final class TaskKeyboardRouter {
             while let current = parent, ancestors.count < 15 { ancestors.append(String(describing: type(of: current))); parent = current.parent }
             return ["controller": String(describing: type(of: controller)), "firstResponder": controller.isFirstResponder,
                     "windowAttached": controller.viewIfLoaded?.window != nil, "parents": ancestors,
+                    "runtimeReturnCommands": diagnosticReturnCommands(controller),
                     "presenting": controller.presentingViewController.map { String(describing: type(of: $0)) } ?? "nil",
                     "inputs": keys.map { ["input": $0.input ?? "nil", "modifiers": $0.modifierFlags.rawValue, "action": $0.action.map { NSStringFromSelector($0) } ?? "nil"] as [String: Any] }]
         }
-        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "declarations": declarations])
+        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "runtimeCommands": runtimeCommands, "declarations": declarations])
         diagnostics = Array(diagnostics.suffix(80))
         NSLog("tsk keyboard %@ chain=%@", text, chain.joined(separator: ">"))
         if let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
@@ -115,6 +127,21 @@ final class TaskKeyboardRouter {
         #endif
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    private func diagnosticReturnCommands(_ responder: UIResponder) -> [[String: Any]] {
+        (responder.keyCommands ?? []).filter { $0.input == "\r" && $0.modifierFlags.contains(.command) }.map { command in
+            var record: [String: Any] = ["input": command.input ?? "nil", "modifiers": command.modifierFlags.rawValue,
+                "action": command.action.map { NSStringFromSelector($0) } ?? "nil",
+                "wantsPriorityOverSystemBehavior": command.wantsPriorityOverSystemBehavior,
+                "attributes": command.attributes.rawValue]
+            if let action = command.action {
+                record["canPerformAction"] = responder.canPerformAction(action, withSender: command)
+                record["target"] = responder.target(forAction: action, withSender: command).map { String(describing: type(of: $0)) } ?? "nil"
+            }
+            return record
+        }
+    }
+    #endif
 }
 
 private struct TaskKeyboardRouterKey: EnvironmentKey {

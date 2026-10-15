@@ -86,6 +86,9 @@ struct ContinuousReminderSettingsView: View {
                     }
                     #endif
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.background)
             }
             .safeAreaInset(edge: .bottom) {
                 if editingProject { HStack { Spacer(); Button("Done") { editingProject = false }.accessibilityIdentifier("dismiss-reminders-keyboard") }.padding().background(.bar) }

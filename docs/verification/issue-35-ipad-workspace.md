@@ -2,6 +2,10 @@
 
 Wide windows use the native three-column `NavigationSplitView`: task views, projects, and saved filters in the sidebar; the existing task list in the content column; and the shared task detail in the detail column. Narrow windows use the native navigation stack and existing segmented/project controls. Native lists, forms, sidebar styles, materials, toolbars, Dynamic Type, and semantic labels retain system appearance, including Liquid Glass on supported systems.
 
+At accessibility Dynamic Type sizes, regular windows use a two-column sidebar and task navigation stack. Body-scaled sidebar width hints are bounded by the available window width so task content retains space. Selecting a task opens the same shared detail within the stack, and Back returns to the list. Ordinary text keeps the three-column workspace; narrow windows keep the compact controls. The selected UUID remains shared across these presentations, without capping text scaling.
+
+The largest-type XCUITest retains custom-view assertions and captures, and additionally checks sidebar/content geometry, capture and edit/save, and returning from detail to the same task identity. The source correction follows the actual CI14 largest-type capture, which showed cramped columns despite the earlier test passing. New runtime screenshots and presentation-transition verification remain pending canonical CI; generic compilation does not establish the resulting readability.
+
 Task selection uses UUIDs. Upcoming rows retain their separate date/role presentation identities while selecting the same underlying task. Keyboard movement follows the visible list order, visits each task once, stops at the ends, and scrolls the selected row into view. Arrow movement uses cached records through the pure public TaskManager selection operation, without a storage query or synchronization interruption. Editing and completion use the existing TaskManager mutations, semantic mutation lease, persistence, and synchronization hooks.
 
 The native Tasks command menu exposes:

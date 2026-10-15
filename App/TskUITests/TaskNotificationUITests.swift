@@ -69,8 +69,11 @@ final class TaskNotificationUITests: XCTestCase {
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
         let toggle = notificationPermissionSwitch(in: settings)
+        recordTaskSwitchInteraction(row: toggle, selected: toggle, phase: "before-revocation", app: settings)
         if toggle.value as? String == "1" { tapTaskControl(toggle, app: settings) }
-        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: toggle)], timeout: 5), .completed)
+        let revoked = XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: toggle)], timeout: 5)
+        recordTaskSwitchInteraction(row: toggle, selected: toggle, phase: "after-revocation", app: settings)
+        XCTAssertEqual(revoked, .completed)
         app.activate()
         let denied = app.buttons["notification-fixture-denied"]
         reveal(denied, in: app); denied.tap()
@@ -79,8 +82,11 @@ final class TaskNotificationUITests: XCTestCase {
         reveal(link, in: app); link.tap()
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
         let restoredToggle = notificationPermissionSwitch(in: settings)
+        recordTaskSwitchInteraction(row: restoredToggle, selected: restoredToggle, phase: "before-restoration", app: settings)
         if restoredToggle.value as? String == "0" { tapTaskControl(restoredToggle, app: settings) }
-        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: restoredToggle)], timeout: 5), .completed)
+        let restored = XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: restoredToggle)], timeout: 5)
+        recordTaskSwitchInteraction(row: restoredToggle, selected: restoredToggle, phase: "after-restoration", app: settings)
+        XCTAssertEqual(restored, .completed)
         app.activate()
     }
 

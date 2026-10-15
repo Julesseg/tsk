@@ -55,9 +55,13 @@ final class SeriesMetadataUITests: XCTestCase {
         project.tap()
         project.typeText("Series.Work")
         hideKeyboard(app)
-        let note = app.textFields["series-new-annotation"].exists ? app.textFields["series-new-annotation"] : app.textViews["series-new-annotation"]
-        XCTAssertTrue(revealTaskElement(note, in: "series-metadata-form", app: app))
-        note.tap()
+        let note = app.descendants(matching: .any)["series-new-annotation"].firstMatch
+        guard revealTaskElement(note, in: "series-metadata-form", app: app) else { return }
+        guard note.elementType == .textField || note.elementType == .textView else {
+            XCTFail("The revealed series annotation must be a native text input: " + note.debugDescription)
+            return
+        }
+        tapTaskControl(note, app: app)
         note.typeText("Series metadata note")
         hideKeyboard(app)
         app.buttons["preview-series-metadata"].tap()
@@ -84,8 +88,16 @@ final class SeriesMetadataUITests: XCTestCase {
 
     private func openTemplate(_ id: String, app: XCUIApplication) {
         let templates = app.buttons["recurring-templates"]
-        if !templates.isHittable { XCTAssertTrue(revealTaskElement(templates, in: "workspace-sidebar", app: app)) }
-        templates.tap()
+        let sidebar = app.collectionViews["workspace-sidebar"].firstMatch
+        if sidebar.exists && !templates.isHittable {
+            guard revealTaskElement(templates, in: sidebar, app: app) else { return }
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in templates.exists && templates.isHittable }, object: nil)
+        guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+            XCTFail("Recurring templates control is unavailable: " + app.debugDescription)
+            return
+        }
+        tapTaskControl(templates, app: app)
         let row = app.buttons["recurring-template-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()

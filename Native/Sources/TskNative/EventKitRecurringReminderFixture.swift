@@ -7,6 +7,7 @@ import TskCore
 @MainActor public enum EventKitRecurringReminderFixture {
     public static func prepare(source: EventKitReminderSource, token: String) async throws -> String {
         guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
+        source.recordAccessDiagnostic("reminders.recurring-fixture.prepare.begin")
         try EventKitReminderFixture.clean(source: source, token: token)
         let store = source.store
         guard let local = store.sources.first(where: { $0.sourceType == .local }) else {
