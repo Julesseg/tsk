@@ -4,8 +4,7 @@ import TskCore
 struct TaskAnnotationsSection: View {
     let store: TaskStore
     let task: TaskRecord
-    let onSave: (TaskRecord) -> Void
-    @State private var editor: AnnotationEditorRoute?
+    let edit: (TaskAnnotation?) -> Void
 
     var body: some View {
         Section("Annotations") {
@@ -22,7 +21,7 @@ struct TaskAnnotationsSection: View {
                     Text(annotation.text).textSelection(.enabled)
                         .accessibilityIdentifier("annotation-text-\(annotation.reference.rawValue)")
                     if task.canEdit {
-                        Button("Edit annotation", systemImage: "pencil") { editor = AnnotationEditorRoute(annotation: annotation) }
+                        Button("Edit annotation", systemImage: "pencil") { edit(annotation) }
                             .buttonStyle(.borderless).disabled(store.isSaving)
                             .accessibilityIdentifier("edit-\(annotation.reference.rawValue)")
                     }
@@ -30,19 +29,11 @@ struct TaskAnnotationsSection: View {
                 .padding(.vertical, 4)
             }
             if task.canEdit {
-                Button("Add annotation", systemImage: "plus.bubble") { editor = AnnotationEditorRoute(annotation: nil) }
+                Button("Add annotation", systemImage: "plus.bubble") { edit(nil) }
                     .disabled(store.isSaving).accessibilityIdentifier("add-annotation")
             }
         }
-        .sheet(item: $editor) { route in
-            TaskAnnotationEditor(store: store, task: task, original: route.annotation, onSave: onSave)
-        }
     }
-}
-
-private struct AnnotationEditorRoute: Identifiable {
-    let id = UUID()
-    let annotation: TaskAnnotation?
 }
 
 struct TaskAnnotationEditor: View {
@@ -103,24 +94,27 @@ struct TaskAnnotationEditor: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(store.isSaving) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        isTyping = false
-                        Task {
-                            let saved: TaskRecord?
-                            if let original { saved = await store.editAnnotation(id: task.id, reference: original.reference.rawValue, text: text) }
-                            else { saved = await store.addAnnotation(id: task.id, text: text) }
-                            if let saved { onSave(saved); dismiss() }
-                            else { error = store.error }
-                        }
-                    }
+                    Button("Save", action: save)
                     .disabled(store.isSaving).accessibilityIdentifier("save-annotation")
-                    .keyboardShortcut(.return, modifiers: .command)
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
             .onChange(of: UTF8String(text)) { _, _ in error = nil }
             .onAppear { isTyping = true }
+            .focusedSceneValue(\.taskEditor, store.isSaving ? nil : TaskEditorActions(save: save))
             .modifier(TaskWorkspacePanel(store: store))
         }
     }
+    private func save() {
+        guard !store.isSaving else { return }
+        isTyping = false
+        Task {
+            let saved: TaskRecord?
+            if let original { saved = await store.editAnnotation(id: task.id, reference: original.reference.rawValue, text: text) }
+            else { saved = await store.addAnnotation(id: task.id, text: text) }
+            if let saved { onSave(saved); dismiss() }
+            else { error = store.error }
+        }
+    }
+
 }

@@ -5,7 +5,7 @@ struct TaskDependenciesSection: View {
     let store: TaskStore
     let task: TaskRecord
     let onSave: (TaskRecord) -> Void
-    @State private var isSelecting = false
+    let select: () -> Void
 
     var body: some View {
         Section("Dependencies") {
@@ -43,12 +43,11 @@ struct TaskDependenciesSection: View {
                 }
             }
             if task.canEdit {
-                Button("Add dependency", systemImage: "plus") { isSelecting = true }
+                Button("Add dependency", systemImage: "plus") { select() }
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("add-dependency")
             }
         }
-        .sheet(isPresented: $isSelecting) { TaskDependencySelection(store: store, task: task, onSave: onSave) }
     }
 }
 

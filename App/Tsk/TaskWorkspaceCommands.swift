@@ -11,11 +11,24 @@ struct TaskWorkspaceActions {
     let refresh: () -> Void
 }
 
+struct TaskEditorActions {
+    let save: () -> Void
+}
+
+private struct TaskEditorActionsKey: FocusedValueKey {
+    typealias Value = TaskEditorActions
+}
+
 private struct TaskWorkspaceActionsKey: FocusedValueKey {
     typealias Value = TaskWorkspaceActions
 }
 
 extension FocusedValues {
+    var taskEditor: TaskEditorActions? {
+        get { self[TaskEditorActionsKey.self] }
+        set { self[TaskEditorActionsKey.self] = newValue }
+    }
+
     var taskWorkspace: TaskWorkspaceActions? {
         get { self[TaskWorkspaceActionsKey.self] }
         set { self[TaskWorkspaceActionsKey.self] = newValue }
@@ -24,11 +37,18 @@ extension FocusedValues {
 
 struct TaskWorkspaceCommands: Commands {
     @FocusedValue(\.taskWorkspace) private var actions
+    @FocusedValue(\.taskEditor) private var editor
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Task") { actions?.capture() }
                 .keyboardShortcut("n", modifiers: .command).disabled(actions == nil)
+        }
+        CommandGroup(after: .newItem) {
+            if let editor {
+                Button("Save Changes", action: editor.save)
+                    .keyboardShortcut(.return, modifiers: .command)
+            }
         }
         CommandMenu("Tasks") {
             Button("Previous Task") { actions?.move(.previous) }
