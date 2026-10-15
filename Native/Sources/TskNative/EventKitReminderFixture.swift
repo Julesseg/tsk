@@ -11,17 +11,24 @@ import Foundation
         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-authorization-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
         var output: [String: Any] = ["processID": ProcessInfo.processInfo.processIdentifier, "time": Date().timeIntervalSince1970,
             "stage": "fresh-process-before-cleanup", "authorization": EKEventStore.authorizationStatus(for: .reminder).rawValue,
-            "ownedCalendarCount": lists.count, "fetchStarted": false]
+            "ownedCalendarCount": lists.count, "fetchStarted": false, "timedOut": false, "cancelRequested": false]
         try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
         if !lists.isEmpty {
             let predicate = store.predicateForReminders(in: lists)
             output["fetchStarted"] = true
             try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
-            let result: (Int, Bool) = await withCheckedContinuation { continuation in
-                store.fetchReminders(matching: predicate) { continuation.resume(returning: ($0?.count ?? 0, $0 != nil)) }
+            let outcome = await FixtureReadbackDeadline<(Int, Bool)>.observe(timeoutNanoseconds: 2_000_000_000) { callback in
+                let request = store.fetchReminders(matching: predicate) { callback(($0?.count ?? 0, $0 != nil)) }
+                return { store.cancelFetchRequest(request) }
             }
-            output["ownedReminderCount"] = result.0
-            output["fetchReturnedNonNil"] = result.1
+            switch outcome {
+            case .received(let result):
+                output["ownedReminderCount"] = result.0
+                output["fetchReturnedNonNil"] = result.1
+            case .timedOut:
+                output["timedOut"] = true
+                output["cancelRequested"] = true
+            }
         }
         output["authorizationAfterRead"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
         output["finishedTime"] = Date().timeIntervalSince1970
