@@ -38,7 +38,7 @@ struct TaskExpressionParser {
             switch $0.kind {
             case .identity: true
             case .op(let op): !["and", "or", "xor", "!"].contains(op)
-            case .atom(let atom, let quoted): !quoted && dynamicAttribute(atom) != nil
+            case .atom(let atom, let quoted): !quoted && (dynamicAttribute(atom) != nil || schema.contains(atom))
             default: false
             }
         }
@@ -107,6 +107,10 @@ struct TaskExpressionParser {
                 parser.allowsInitialNumber = true
                 return .binary(dynamic.op, .field(dynamic.name), try parser.expression(0, operand: true))
             }
+            if !quoted, schema.contains(atom) {
+                if atom == "id" { throw TaskFilterError.unsupported("Numeric Taskwarrior IDs are device-local; use uuid instead.") }
+                return .field(atom)
+            }
             if !operand && !hasFollowingOperator {
                 let parser = try FilterParser("", schema: schema)
                 if !quoted, atom.hasPrefix("/"), atom.hasSuffix("/") { return .predicate(try .search(String(atom.dropFirst().dropLast()))) }
@@ -115,10 +119,6 @@ struct TaskExpressionParser {
                 throw syntax("Expected a predicate.")
             }
             if quoted { return .literal(.text(atom)) }
-            if schema.contains(atom) {
-                if atom == "id" { throw TaskFilterError.unsupported("Numeric Taskwarrior IDs are device-local; use uuid instead.") }
-                return .field(atom)
-            }
             if atom.utf8.starts(with: "annotations.".utf8) {
                 let parts = atom.split(separator: ".")
                 let valid = atom == "annotations.count" || ((3...4).contains(parts.count) && Int(parts[1]) != nil && ["description", "entry"].contains(parts[2]) && (parts.count == 3 || parts[2] == "entry" && ["year", "month", "day", "week", "weekday", "julian", "hour", "minute", "second"].contains(parts[3])))

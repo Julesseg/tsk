@@ -24,6 +24,7 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
         ["tag_home": ""], ["tag_home": "", "tag_other": ""], ["tag_a": "", "tag_b": "", "tag_c": ""],
         ["annotation_100": "first"], ["annotation_100": "first", "annotation_200": "second"],
         ["due": String(epoch + 30 * 86400)], ["due": String(epoch - 10 * 86400)],
+        ["due": String(epoch + 7 * 86400)], ["due": String(epoch - 3 * 86400)],
         ["entry": String(epoch - 200 * 86400 - 1000)], ["entry": String(epoch + 2 * 86400 + 1000)],
         ["dep_\(prerequisite.uuidString.lowercased())": "", "project": "Blocked"],
         ["status": "completed", "priority": "H"],
@@ -38,9 +39,10 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
         _ = try await replica.create(id: UUID(), attributes: attributes)
     }
     _ = try await replica.create(id: prerequisite, attributes: ["description": "Prerequisite outside project", "status": "pending", "entry": String(epoch), "project": "Other"])
+    _ = try await replica.create(id: UUID(), attributes: ["description": "Missing entry", "status": "pending", "foreign_é": "composed", "foreign_e\u{301}": "decomposed"])
     let expressions = [
-        "urgency.is:3.9", "urgency.above:3.9", "urgency.below:0", "urgency.by:0", "urgency.is:0", "urgency.above:4", "urgency.above:10", "urgency.above:15", "urgency.has:'^3'",
-        "urgency + 1 > 4.9", "urgency + 1 == 4.9", "urgency + 2 * 3 > 9.9", "urgency / 2 > 1.95", "urgency % 2 > 1.9", "urgency ^ 2 > 15.2", "urgency + -2 > 1.9", "urgency + (-2) > 1.9",
+        "urgency.is:3.9", "urgency.is:5.6", "urgency.above:5.6", "urgency.above:3.9", "urgency.below:0", "urgency.by:0", "urgency.is:0", "urgency.above:4", "urgency.above:10", "urgency.above:15", "urgency.has:'^3'",
+        "urgency + 1 > 4.9", "urgency + 1", "false + 2", "true + 2", "project", "project or +home", "priority", "urgency + 1 == 4.9", "urgency + 2 * 3 > 9.9", "urgency / 2 > 1.95", "urgency % 2 > 1.9", "urgency ^ 2 > 15.2", "urgency + -2 > 1.9", "urgency + (-2) > 1.9",
         "urgency - urgency + 7 / 2 == 3", "urgency - urgency + 7.0 / 2 == 3.5", "urgency - urgency + 2 ^ 3 ^ 2 == 512", "urgency - urgency + -2 ^ 2 == -4", "urgency - urgency + 5.5 % 2 == 1.5", "urgency - urgency + pi > 3.14",
         "urgency.above:3+1", "urgency.above:3-1", "urgency > (urgency - urgency + 3.0 + 1.0)",
         "urgency > 0 and priority:M", "urgency > 0 +next", "urgency + 1 < 10 and /fixture/", "urgency > 0 or status:completed", "urgency > 0 xor +home", "!(urgency > 0) and -home", "urgency > 0 and +ACTIVE",
@@ -102,7 +104,7 @@ func typedExpressionOperationsAgreeWithPinnedConversionAndDOMRules() async throw
 
 private func writeComputedFilterEvidence(_ name: String, epoch: Int, records: [TaskRecord], comparisons: [FilterConformanceSelection]) throws {
     guard let path = ProcessInfo.processInfo.environment["TSK_FILTER_EVIDENCE_DIRECTORY"] else { return }
-    struct Evidence: Codable {
+    struct Evidence: Encodable {
         let version = "3.5.0"
         let contract = "tsk-taskwarrior-3.5-expression-v1"
         let contextEpoch: Int

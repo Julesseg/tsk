@@ -76,3 +76,13 @@ import TskCore
     #expect(try await manager.tasks(filter: "abcdef12 +ACTIVE").map(\.id) == [first])
     #expect(try await manager.tasks(filter: "uuid == abcdef12").isEmpty)
 }
+
+@Test func finalExpressionSelectionPreservesTaskwarriorBooleanResultSlot() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let task = try await manager.create(TaskDraft(description: "project", attributes: ["project": "Work"]))
+    #expect(try await manager.tasks(filter: "urgency + 1").isEmpty)
+    #expect(try await manager.tasks(filter: "false + 2").isEmpty)
+    #expect(try await manager.tasks(filter: "true + 2").map(\.id) == [task.id])
+    #expect(try await manager.tasks(filter: "project").isEmpty)
+    #expect(try await manager.tasks(filter: "project or +home").map(\.id) == [task.id])
+}

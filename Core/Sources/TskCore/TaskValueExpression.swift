@@ -9,31 +9,32 @@ indirect enum TaskValueExpression: Sendable {
     case unary(String, TaskValueExpression)
     case binary(String, TaskValueExpression, TaskValueExpression)
 
-    func value(_ task: TaskRecord, _ context: TaskFilterContext) throws -> TaskExpressionValue {
+    func evaluation(_ task: TaskRecord, _ context: TaskFilterContext) throws -> TaskExpressionEvaluation {
         switch self {
-        case .literal(let value): return value
-        case .identity(let prefixes): return .boolean(prefixes.contains { task.id.uuidString.lowercased().utf8.starts(with: $0.utf8) })
-        case .field(let name): return try TaskExpressionValue.field(name, task: task, context: context)
-        case .date(let expression): return .date(try expression.resolve(context)?.timeIntervalSince1970 ?? 0)
-        case .predicate(let predicate): return .boolean(try predicate.includes(task, context: context))
+        case .literal(let value): return TaskExpressionEvaluation(value)
+        case .identity(let prefixes): return TaskExpressionEvaluation(.boolean(prefixes.contains { task.id.uuidString.lowercased().utf8.starts(with: $0.utf8) }))
+        case .field(let name): return try TaskExpressionEvaluation(TaskExpressionValue.field(name, task: task, context: context))
+        case .date(let expression): return try TaskExpressionEvaluation(.date(expression.resolve(context)?.timeIntervalSince1970 ?? 0))
+        case .predicate(let predicate): return try TaskExpressionEvaluation(.boolean(predicate.includes(task, context: context)))
         case .unary(let op, let child):
-            let value = try child.value(task, context)
-            if op == "!" { return .boolean(!value.boolean) }
-            if op == "+" { return value }
-            return try TaskExpressionValue.integer(0).applying("-", value, context: context)
+            let result = try child.evaluation(task, context)
+            if op == "!" { return TaskExpressionEvaluation(.boolean(!result.value.boolean)) }
+            if op == "+" { return result }
+            return try TaskExpressionEvaluation(TaskExpressionValue.integer(0).applying("-", result.value, context: context))
         case .binary(let op, let left, let right):
-            let lhs = try left.value(task, context)
-            let rhs = try right.value(task, context)
+            let lhs = try left.evaluation(task, context)
+            let rhs = try right.evaluation(task, context)
             if op == "~" || op == "!~", left.sourceName == "description" {
-                let regex = try FilterRegex(TaskExpressionValue.dequoted(rhs.text(context)))
-                var matches = try regex.matches(TaskExpressionValue.dequoted(lhs.text(context)))
+                let regex = try FilterRegex(TaskExpressionValue.dequoted(rhs.value.text(context)))
+                var matches = try regex.matches(TaskExpressionValue.dequoted(lhs.value.text(context)))
                 for (key, note) in task.attributes where !matches && key.utf8.starts(with: "annotation_".utf8) {
                     matches = try regex.matches(note)
                 }
-                return .boolean(matches != (op == "!~"))
+                return TaskExpressionEvaluation(.boolean(matches != (op == "!~")))
             }
-            let name = left.sourceName
-            return try lhs.applying(op, rhs, context: context, field: name)
+            let value = try lhs.value.applying(op, rhs.value, context: context, field: left.sourceName)
+            let selected = ["+", "-", "*", "/", "%", "^"].contains(op) ? lhs.selected : value.boolean
+            return TaskExpressionEvaluation(value, selected: selected)
         }
     }
 
@@ -73,6 +74,16 @@ indirect enum TaskValueExpression: Sendable {
         case .unary(_, let child): child.nextEvaluation(context: context)
         case .binary(_, let left, let right): [left.nextEvaluation(context: context), right.nextEvaluation(context: context)].compactMap { $0 }.min()
         }
+    }
+}
+
+struct TaskExpressionEvaluation {
+    let value: TaskExpressionValue
+    let selected: Bool
+
+    init(_ value: TaskExpressionValue, selected: Bool? = nil) {
+        self.value = value
+        self.selected = selected ?? { if case .boolean(let value) = value { value } else { false } }()
     }
 }
 

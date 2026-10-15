@@ -129,7 +129,7 @@ indirect enum FilterExpression: Sendable {
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
-        case .value(let expression): return try expression.value(task, context).boolean
+        case .value(let expression): return try expression.evaluation(task, context).selected
         case .all: return true
         case .predicate(let predicate): return try predicate.includes(task, context: context)
         case .not(let expression): return try !expression.includes(task, context: context)

@@ -31,7 +31,13 @@ exclusive disjunction. Exponents must be integers. Integer division truncates;
 a real operand preserves real division. Numbers retain the client’s Float-to-Double
 UDA read and Double expression arithmetic. The constants `true`, `false`, and
 `pi` retain the pinned value `3.14159165` when used as expression operands.
-A standalone bare word remains a search, including `true` and `not`.
+An unregistered bare word remains a search, including `true` and `not`.
+A registered bare field resolves through DOM. The pinned evaluator keeps a
+separate Boolean result slot: bare numeric arithmetic selects no rows; a
+Boolean-origin arithmetic result retains that slot (`true + 2` selects rows,
+`false + 2` does not). Comparisons and boolean operators produce their actual
+Boolean result. tsk preserves this behavior rather than inventing truthy-number
+filter semantics.
 
 String addition concatenates. String subtraction inserts a hyphen and retains the
 right literal’s quotes, as pinned Variant.cpp does; comparisons remove surrounding
