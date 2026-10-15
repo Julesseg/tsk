@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		1A0000000000000000000032 /* TskNative in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000031; };
 		1A0000000000000000000012 /* TskCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000000000000000000011 /* TskCore */; };
+		27000000000000000000000D = {isa = PBXBuildFile; fileRef = 270000000000000000000003; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		270000000000000000000010 = {isa = PBXBuildFile; productRef = 27000000000000000000000E; };
+		270000000000000000000011 = {isa = PBXBuildFile; productRef = 27000000000000000000000F; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -19,11 +22,17 @@
 			remoteGlobalIDString = 1A0000000000000000000005;
 			remoteInfo = Tsk;
 		};
+		27000000000000000000000B = {isa = PBXContainerItemProxy; containerPortal = 1A0000000000000000000001; proxyType = 1; remoteGlobalIDString = 270000000000000000000002; remoteInfo = TskWidgets; };
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		27000000000000000000000C = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; files = (27000000000000000000000D, ); name = "Embed Widgets"; runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		1A0000000000000000000006 /* Tsk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tsk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000000000000000000021 /* TskUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		270000000000000000000003 = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TskWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +46,7 @@
 			path = TskUITests;
 			sourceTree = "<group>";
 		};
+		270000000000000000000001 = {isa = PBXFileSystemSynchronizedRootGroup; path = TskWidgets; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +66,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		270000000000000000000005 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (270000000000000000000010, 270000000000000000000011, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -63,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				1A0000000000000000000004 /* Tsk */,
+				270000000000000000000001 /* TskWidgets */,
 				1A0000000000000000000025 /* TskUITests */,
 				1A0000000000000000000003 /* Products */,
 			);
@@ -72,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				1A0000000000000000000006 /* Tsk.app */,
+				270000000000000000000003 /* TskWidgets.appex */,
 				1A0000000000000000000021 /* TskUITests.xctest */,
 			);
 			name = Products;
@@ -87,10 +100,12 @@
 				1A0000000000000000000007 /* Sources */,
 				1A0000000000000000000008 /* Frameworks */,
 				1A0000000000000000000009 /* Resources */,
+				27000000000000000000000C,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				27000000000000000000000A,
 			);
 			fileSystemSynchronizedGroups = (
 				1A0000000000000000000004 /* Tsk */,
@@ -127,6 +142,7 @@
 			productReference = 1A0000000000000000000021 /* TskUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		270000000000000000000002 /* TskWidgets */ = {isa = PBXNativeTarget; buildConfigurationList = 270000000000000000000007; buildPhases = (270000000000000000000004, 270000000000000000000005, 270000000000000000000006, ); buildRules = (); dependencies = (); fileSystemSynchronizedGroups = (270000000000000000000001, ); name = TskWidgets; packageProductDependencies = (27000000000000000000000E, 27000000000000000000000F, ); productName = TskWidgets; productReference = 270000000000000000000003; productType = "com.apple.product-type.app-extension"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -137,6 +153,7 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					270000000000000000000002 = {CreatedOnToolsVersion = 26.0; };
 					1A0000000000000000000005 = {
 						CreatedOnToolsVersion = 26.0;
 					};
@@ -165,6 +182,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				270000000000000000000002,
 				1A0000000000000000000005 /* Tsk */,
 				1A0000000000000000000020 /* TskUITests */,
 			);
@@ -186,6 +204,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		270000000000000000000006 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -203,6 +222,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		270000000000000000000004 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -211,6 +231,7 @@
 			target = 1A0000000000000000000005 /* Tsk */;
 			targetProxy = 1A000000000000000000002A /* PBXContainerItemProxy */;
 		};
+		27000000000000000000000A = {isa = PBXTargetDependency; target = 270000000000000000000002; targetProxy = 27000000000000000000000B; };
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -372,6 +393,7 @@
 				LIBRARY_SEARCH_PATHS = "$(inherited) $(SRCROOT)/../Native/Artifacts/$(PLATFORM_NAME)";
 				OTHER_LDFLAGS = "$(inherited) -ltsk_taskchampion -liconv -lc++ -framework Security -framework SystemConfiguration";
 				CODE_SIGN_STYLE = Automatic;
+				PROVISIONING_PROFILE_SPECIFIER = "$(TSK_APP_PROVISIONING_PROFILE)";
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -429,6 +451,8 @@
 			};
 			name = Release;
 		};
+		270000000000000000000008 = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = TskWidgets/TskWidgets.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = Configuration/TskWidgets-Info.plist; INFOPLIST_KEY_CFBundleDisplayName = "tsk Tasks"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"; LIBRARY_SEARCH_PATHS = "$(inherited) $(SRCROOT)/../Native/Artifacts/$(PLATFORM_NAME)"; OTHER_LDFLAGS = "$(inherited) -ltsk_taskchampion -liconv -lc++ -framework Security -framework SystemConfiguration"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.julesseguin.tsk.widgets; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = "1,2"; }; name = Debug; };
+		270000000000000000000009 = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = TskWidgets/TskWidgets.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = Configuration/TskWidgets-Info.plist; INFOPLIST_KEY_CFBundleDisplayName = "tsk Tasks"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"; LIBRARY_SEARCH_PATHS = "$(inherited) $(SRCROOT)/../Native/Artifacts/$(PLATFORM_NAME)"; OTHER_LDFLAGS = "$(inherited) -ltsk_taskchampion -liconv -lc++ -framework Security -framework SystemConfiguration"; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.julesseguin.tsk.widgets; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = "1,2"; PROVISIONING_PROFILE_SPECIFIER = "$(TSK_WIDGET_PROVISIONING_PROFILE)"; }; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -459,6 +483,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		270000000000000000000007 = {isa = XCConfigurationList; buildConfigurations = (270000000000000000000008, 270000000000000000000009, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -475,6 +500,8 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = TskCore;
 		};
+		27000000000000000000000E = {isa = XCSwiftPackageProductDependency; productName = TskCore; };
+		27000000000000000000000F = {isa = XCSwiftPackageProductDependency; productName = TskNative; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1A0000000000000000000001 /* Project object */;

@@ -53,6 +53,7 @@ extension TaskManager {
             definitions[index] = view
         } else { definitions.append(view) }
         try await viewDefinitions.save(definitions)
+        await publishChange(.views)
         return view
     }
 
@@ -64,5 +65,6 @@ extension TaskManager {
         guard definitions.contains(where: { $0.id == id }) else { throw TaskViewError.missingView(id) }
         definitions.removeAll { $0.id == id }
         try await viewDefinitions.save(definitions)
+        await publishChange(.views)
     }
 }

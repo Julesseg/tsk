@@ -70,7 +70,8 @@ extension TaskManager {
         }
     }
 
-    func localChangeWasCommitted() {
+    func localChangeWasCommitted() async {
+        await publishChange(.tasks)
         synchronizationLocalGeneration += 1
         guard synchronizationConfiguration != nil else { return }
         synchronizationRequested = true
@@ -91,11 +92,14 @@ extension TaskManager {
             let configurationGeneration = synchronizationConfigurationGeneration
             let localGeneration = synchronizationLocalGeneration
             setSynchronizationState(.syncing)
+            let recordsBeforeSync = try? await replica.tasks()
             do {
                 guard let replica = replica as? any TaskSynchronizingReplica else {
                     throw SynchronizationError.unsupportedReplica
                 }
                 try await replica.synchronize(using: configuration)
+                await publishReceivedChanges(since: recordsBeforeSync, origin: .synchronization)
+                await publishChange(.synchronization, origin: .synchronization)
                 guard configurationGeneration == synchronizationConfigurationGeneration else { break }
                 if Task.isCancelled { break }
                 if localGeneration != synchronizationLocalGeneration || synchronizationRequested {
@@ -115,6 +119,7 @@ extension TaskManager {
                     }
                 }
             } catch {
+                await publishReceivedChanges(since: recordsBeforeSync, origin: .partialSynchronization)
                 guard configurationGeneration == synchronizationConfigurationGeneration else { break }
                 if Task.isCancelled { break }
                 if error as? SynchronizationError == .interrupted {

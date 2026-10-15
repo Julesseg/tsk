@@ -11,6 +11,16 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        if arguments.count == 5, arguments[1] == "participant-change" {
+            do {
+                let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
+                let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
+                let view = try await manager.saveView(name: "Other process completed", expression: "status:completed")
+                _ = try await manager.saveAttributeDefinition(name: "processScore", type: .numeric)
+                try write(["saved": saved.id.uuidString, "view": view.id.uuidString], to: arguments[4])
+            } catch { try? write(["error": error.localizedDescription], to: arguments[4]) }
+            return
+        }
         if arguments.count == 9, arguments[1] == "move-reminder" {
             do {
                 let device = UUID(uuidString: arguments[7])!
