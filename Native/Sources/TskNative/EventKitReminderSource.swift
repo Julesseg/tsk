@@ -5,12 +5,14 @@ import TskCore
 
 public enum ReminderAccessError: Error, LocalizedError, Sendable {
     case accessRequired
+    case accessNotReady
     case missingList
     case fetchFailed
     case sourceChanged
     case removalUnconfirmed
     public var errorDescription: String? {
         switch self {
+        case .accessNotReady: "Reminders access has been granted but is not ready yet. Try again."
         case .accessRequired: "Reminders access is unavailable. Allow full Reminders access in Settings, then try again."
         case .missingList: "A selected Reminders list is no longer available. Refresh the lists and select again."
         case .fetchFailed: "EventKit could not fetch reminders. No copy was started. Try again."
@@ -63,6 +65,11 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         #else
         guard try await store.requestFullAccessToReminders() else { throw ReminderAccessError.accessRequired }
         #endif
+        switch try await EventKitAccessPublication.waitForFullAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .reminder)) }) {
+        case .ready: break
+        case .insufficient: throw ReminderAccessError.accessRequired
+        case .notReady: throw ReminderAccessError.accessNotReady
+        }
     }
 
     #if DEBUG && targetEnvironment(simulator)
