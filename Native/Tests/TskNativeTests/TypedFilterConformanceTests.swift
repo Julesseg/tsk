@@ -175,3 +175,19 @@ struct FilterConformanceSelection: Codable {
     let selected: [String]
     let actual: [String]
 }
+
+@MainActor
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
+func acceptedNumericExtremesRemainCompatibleAcrossModifiersDirectAndComputedViews() async throws {
+    let fixture = try TypedFilterFixture()
+    defer { fixture.remove() }
+    let manager = TaskChampionSession.makeManager(directory: fixture.directory)
+    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
+    for value in ["1e100", "-1e100", "1e-100", "16777217", "1.00000001"] {
+        _ = try await manager.create(TaskDraft(description: "Numeric \(value)", attributes: ["score": value]))
+    }
+    let reopened = TaskChampionSession.makeManager(directory: fixture.directory)
+    for expression in ["score.over:0", "score.below:0", "score.is:1e100", "score > 0", "score = score", "score + 1 > 0", "score * 2 > 0", "score / 2 > 0", "score - score = 0", "score.is:'inf'", "score > 1e100", "score.over:16777216", "score.over:16777216.0", "score.over:1", "score > 16777216", "score > 16777216.0", "score > 1", "score + 0 > 16777216.0", "score + 0 > 1", "score.is:16777216.0", "score.is:1"] {
+        try await fixture.compare(expression, manager: reopened)
+    }
+}

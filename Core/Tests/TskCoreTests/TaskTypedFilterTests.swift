@@ -79,3 +79,35 @@ private actor TypedFilterViewStore: TaskViewDefinitionsStore {
     await #expect(throws: TaskFilterError.unknownAttribute("unregistered")) { try await manager.tasks(filter: "unregistered:1") }
     #expect(try await manager.tasks(filter: "description:Retained").count == 4)
 }
+
+@Test func finiteNumericAttributesBeyondFloatRangeRemainFilterable() async throws {
+    let manager = TaskManager(replica: TestReplica(), attributeDefinitions: AttributeDefinitionTestStore())
+    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
+    let positive = try await manager.create(TaskDraft(description: "Huge", attributes: ["score": "1e100"]))
+    let tiny = try await manager.create(TaskDraft(description: "Tiny", attributes: ["score": "1e-100"]))
+    let negative = try await manager.create(TaskDraft(description: "Negative", attributes: ["score": "-1e100"]))
+    #expect(positive.attributes["score"] == "1e+100")
+    for query in ["score.over:0", "score > 0", "score * 2 > 0", "score / 2 > 0", "score > 1e100"] {
+        #expect(try await manager.tasks(filter: query).map(\.id) == [positive.id])
+    }
+    #expect(try await manager.tasks(filter: "score.below:0").map(\.id) == [negative.id])
+    #expect(try await manager.tasks(filter: "score.is:1e100").isEmpty)
+    #expect(Set(try await manager.tasks(filter: "score + 1 > 0").map(\.id)) == [positive.id, tiny.id])
+    #expect(try await manager.tasks(filter: "score - score = 0").map(\.id) == [tiny.id])
+    #expect(Set(try await manager.tasks(filter: "score = score").map(\.id)) == [positive.id, tiny.id, negative.id])
+}
+
+@Test func numericAttributePrecisionMatchesPinnedFloatAndUUIDOperandPrecedence() async throws {
+    let manager = TaskManager(replica: TestReplica(), attributeDefinitions: AttributeDefinitionTestStore())
+    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
+    let integer = try await manager.create(TaskDraft(description: "Integer boundary", attributes: ["score": "16777217"]))
+    let fraction = try await manager.create(TaskDraft(description: "Fraction boundary", attributes: ["score": "1.00000001"]))
+    #expect(try await manager.tasks(filter: "score.over:16777216").isEmpty)
+    #expect(try await manager.tasks(filter: "score.over:16777216.0").isEmpty)
+    #expect(try await manager.tasks(filter: "score.over:1").map(\.id) == [integer.id])
+    #expect(Set(try await manager.tasks(filter: "score > 16777216").map(\.id)) == [integer.id, fraction.id])
+    for query in ["score > 16777216.0", "score + 0 > 16777216.0"] { #expect(try await manager.tasks(filter: query).isEmpty) }
+    #expect(try await manager.tasks(filter: "score.is:16777216.0").map(\.id) == [integer.id])
+    #expect(try await manager.tasks(filter: "score.is:1").map(\.id) == [fraction.id])
+    #expect(try await manager.tasks(filter: "score + 0 > 1").map(\.id) == [integer.id])
+}
