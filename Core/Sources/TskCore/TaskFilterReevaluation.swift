@@ -3,12 +3,14 @@ import Foundation
 extension FilterExpression {
     func nextEvaluation(context: TaskFilterContext) -> Date? {
         switch self {
+        case .value(let expression): return expression.nextEvaluation(context: context)
         case .all: return nil
         case .not(let expression): return expression.nextEvaluation(context: context)
         case .and(let left, let right), .or(let left, let right), .xor(let left, let right):
             return [left.nextEvaluation(context: context), right.nextEvaluation(context: context)].compactMap { $0 }.min()
         case .predicate(let predicate):
             switch predicate {
+            case .typed(let predicate) where predicate.name == "urgency": return context.now.addingTimeInterval(1)
             case .date(let date):
                 return date.operand.nextEvaluation(context: context)
             case .virtualTag(let tag, _): return tag.nextEvaluation(context: context)
