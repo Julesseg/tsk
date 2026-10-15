@@ -59,6 +59,12 @@ struct TaskDetailView: View {
             }
         }
         .accessibilityIdentifier("task-detail-form")
+        .safeAreaInset(edge: .top) {
+            if let error = store.error {
+                Text(error).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
+                    .accessibilityIdentifier("task-action-banner")
+            }
+        }
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -78,6 +78,27 @@ final class TaskActivityUITests: XCTestCase {
         XCTAssertFalse(row.exists)
     }
 
+    func testInvalidOccurrenceStartShowsVisibleFailureAndKeepsSavedTaskUnchanged() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
+        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        let parentIndex = try XCTUnwrap(records.firstIndex { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "mask" } })
+        var attributes = try XCTUnwrap(records[parentIndex]["attributes"] as? [[String: String]])
+        let maskIndex = try XCTUnwrap(attributes.firstIndex { $0["key"] == "mask" })
+        attributes[maskIndex]["value"] = "?WW"; records[parentIndex]["attributes"] = attributes
+        let child = try XCTUnwrap(records.first { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
+        let id = try XCTUnwrap(child["id"] as? String)
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
+        app.launch()
+        XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 20)); app.buttons["task-" + id].tap()
+        XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
+        XCTAssertTrue(app.staticTexts["task-action-banner"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["task-action-banner"].label.contains("No tasks were changed"))
+        XCTAssertFalse(app.buttons["stop-task"].exists)
+        capture("Invalid recurrence state reports a visible genuine start failure", app)
+    }
+
     private func waitForLabel(_ text: String, on element: XCUIElement) {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", text), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
