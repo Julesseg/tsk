@@ -67,6 +67,35 @@ func spotlightMissingCallbackDoesNotBlockDurableTaskAcknowledgement() async thro
     _ = try await settledSpotlight(directory: directory)
 }
 
+#if DEBUG
+@Test @available(macOS 14.0, *)
+func actualStaleFixtureWaitsForProductionAdmissionThenKeepsLatestProjectionAndCallbackOwnership() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let production = ControlledSpotlightIndex(), fixtureIndex = ControlledSpotlightIndex(), contenderIndex = RecordingSpotlightIndex()
+    let effect = SpotlightTaskEffect(directory: directory, index: production, execution: .ownedWorker(SpotlightTaskEffect.containingAppOwner))
+    let manager = TaskChampionSession.makeManager(directory: directory, postCommitEffects: effect)
+    let first = try await manager.create(TaskDraft(description: "Before waiting stale fixture"))
+    await production.waitUntilBlocked()
+    let stale = UUID()
+    let fixture = Task { try await SpotlightStaleResultFixture.install(manager: manager, directory: directory, token: stale, index: fixtureIndex) }
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await fixtureIndex.callCount == 0, "The real fixture must not read/index ahead of the production callback owner")
+    let latest = try await manager.create(TaskDraft(description: "Written while fixture waits for admission"))
+    await production.release()
+    await fixtureIndex.waitUntilBlocked()
+    let contender = Task { try await SpotlightStaleResultFixture.install(manager: manager, directory: directory, token: UUID(), index: contenderIndex) }
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await contenderIndex.callCount == 0, "A second actual fixture cannot submit before the first callback completes")
+    await fixtureIndex.release()
+    try await fixture.value
+    try await contender.value
+    #expect(Set(await fixtureIndex.items.map(\.taskID)) == Set([first.id, latest.id, stale]))
+    #expect(await fixtureIndex.items.first(where: { $0.taskID == stale })?.title == "tsk stale " + stale.uuidString)
+    _ = try await settledSpotlight(directory: directory)
+}
+#endif
+
 private actor SpotlightAcknowledgement {
     var record: TaskRecord?
     func receive(_ value: TaskRecord) { record = value }
