@@ -116,7 +116,9 @@ final class ContinuousReminderImportUITests: XCTestCase {
             XCTAssertTrue(revealTaskElement(app.buttons["continuous-reminders-settings"], in: "workspace-sidebar", app: app))
         } else { app.buttons["workspace-more"].tap() }
         app.buttons["continuous-reminders-settings"].tap()
-        XCTAssertTrue(app.buttons["reminders-access"].waitForExistence(timeout: 10))
+        let form = app.collectionViews["continuous-reminders-form"].firstMatch
+        if !form.exists { XCTAssertTrue(form.waitForExistence(timeout: 10)) }
+        XCTAssertTrue(revealTaskElement(app.buttons["reminders-access"], in: form, app: app, context: "continuous-reminders-form"))
     }
 
     private func allowAndSelect(_ app: XCUIApplication, _ token: String) {
