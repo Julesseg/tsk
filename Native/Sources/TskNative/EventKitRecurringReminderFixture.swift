@@ -1,5 +1,6 @@
 #if DEBUG && canImport(EventKit) && targetEnvironment(simulator)
 import Foundation
+import TskCore
 @preconcurrency import EventKit
 
 @available(iOS 17.0, *)
@@ -88,11 +89,7 @@ import Foundation
     }
     private static func record(_ item: EKReminder) -> [String: Any] {
         let snapshot = EventKitReminderSource.snapshot(item)
-        func date(_ value: DateComponents?) -> [String: Any] {
-            guard let value else { return [:] }
-            return ["calendar": value.calendar.map { String(describing: $0.identifier) } ?? "nil", "timezone": value.timeZone?.identifier ?? "nil", "year": value.year as Any? ?? NSNull(), "month": value.month as Any? ?? NSNull(), "day": value.day as Any? ?? NSNull(), "hour": value.hour as Any? ?? NSNull(), "minute": value.minute as Any? ?? NSNull(), "second": value.second as Any? ?? NSNull()]
-        }
-        return ["title": snapshot.title, "notes": snapshot.notes ?? "", "url": snapshot.url ?? "", "priority": snapshot.priority, "completed": snapshot.isCompleted, "start": date(snapshot.start), "due": date(snapshot.due), "recurrence": snapshot.recurrenceDescription as Any? ?? NSNull(), "sourceType": snapshot.sourceType as Any? ?? NSNull()]
+        return ["title": snapshot.title, "notes": snapshot.notes ?? "", "url": snapshot.url ?? "", "priority": snapshot.priority, "completed": snapshot.isCompleted, "start": ReminderFixtureDiagnostics.components(snapshot.start), "due": ReminderFixtureDiagnostics.components(snapshot.due), "mappingChecks": ReminderRecurrenceMapping.validationChecks(for: snapshot), "startDueStructurallyEqual": snapshot.start == snapshot.due, "recurrence": snapshot.recurrenceDescription as Any? ?? NSNull(), "sourceType": snapshot.sourceType as Any? ?? NSNull()]
     }
     private static func evidenceURL(_ token: String) -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-\(token).json")

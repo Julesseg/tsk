@@ -32,7 +32,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         app.buttons["new-task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
-        description.tap()
+        focusTaskText(description, app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")

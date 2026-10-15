@@ -3,62 +3,113 @@ import XCTest
 extension XCTestCase {
     func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, in containerID: String = "task-editor-form", keyboardDismissIdentifier: String = "dismiss-editor-keyboard", file: StaticString = #filePath, line: UInt = #line) {
         let tutorial = app.buttons["Continue"]
-        if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists {
-            tutorial.tap()
-        }
+        if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
         let keyboardDone = app.buttons[keyboardDismissIdentifier]
         if app.keyboards.firstMatch.exists {
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
-            keyboardDone.tap()
-            let hidden = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.keyboards.firstMatch)
-            XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 5), .completed, "Keyboard still covers task dates", file: file, line: line)
+            tapTaskControl(keyboardDone, app: app, file: file, line: line)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)
         }
         let control = app.switches[identifier].firstMatch
         guard revealTaskElement(control, in: containerID, app: app, file: file, line: line) else { return }
         let expected = enabled ? "1" : "0"
         if control.value as? String != expected {
             let thumb = control.switches.firstMatch
-            if thumb.exists, thumb.isHittable { thumb.tap() }
-            else { control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+            tapTaskControl(thumb.exists ? thumb : control, app: app, file: file, line: line)
         }
-        let state = NSPredicate(format: "value == %@", expected)
-        let changed = expectation(for: state, evaluatedWith: control)
+        let changed = expectation(for: NSPredicate(format: "value == %@", expected), evaluatedWith: control)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
     }
+
+    func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard element.waitForExistence(timeout: 5), element.isEnabled, element.isHittable,
+              element.frame.width > 0, element.frame.height > 0, app.frame.contains(element.frame) else {
+            recordTaskInteraction(app, detail: "Cannot activate \(element)")
+            XCTFail("Control has no valid visible hit area: \(element)", file: file, line: line)
+            return
+        }
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: element.frame.midX - app.frame.minX, dy: element.frame.midY - app.frame.minY)).tap()
+    }
+
+    func focusTaskText(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
+        if element.isHittable { tapTaskControl(element, app: app, file: file, line: line) }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
+    }
+
+    func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        focusTaskText(element, app: app, file: file, line: line)
+        element.press(forDuration: 1.1)
+        let menu = app.menuItems["Select All"]
+        let button = app.buttons["Select All"]
+        if menu.exists { menu.tap() }
+        else if button.exists { button.tap() }
+        else { element.typeKey("a", modifierFlags: .command) }
+        element.typeText(XCUIKeyboardKey.delete.rawValue)
+        let cleared = element.value as? String ?? ""
+        guard cleared.isEmpty || cleared == element.placeholderValue else {
+            recordTaskInteraction(app, detail: "Replacement did not clear \(element)")
+            XCTFail("Text replacement did not clear the previous value: \(cleared)", file: file, line: line)
+            return
+        }
+        if !value.isEmpty { element.typeText(value) }
+        XCTAssertTrue((element.value as? String ?? "") == value || value.isEmpty && (element.value as? String) == element.placeholderValue, "Text replacement value differs", file: file, line: line)
+    }
+
     @discardableResult
     func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let form = app.collectionViews[containerID].firstMatch
         guard form.waitForExistence(timeout: 5) else {
+            recordTaskInteraction(app, detail: "Missing form \(containerID)")
             XCTFail("Missing task form: \(containerID)", file: file, line: line)
             return false
         }
-        let screen = app.frame
-        let navigationBottom = app.navigationBars.allElementsBoundByIndex
-            .filter { $0.exists && $0.isHittable && $0.frame.intersects(form.frame) }
-            .map { $0.frame.maxY }.max() ?? form.frame.minY
-        let viewport = form.frame.intersection(screen)
-        let top = max(viewport.minY, navigationBottom)
-        let bottom = viewport.maxY - 24
         var scrollUp = true
         var missingSteps = 0
         for step in 0...14 {
+            let visible = form.frame.intersection(app.frame)
+            let navigationBottom = app.navigationBars.allElementsBoundByIndex.filter {
+                $0.exists && $0.isHittable && $0.frame.intersection(visible).width > visible.width / 2 && $0.frame.maxY <= visible.minY + 140
+            }.map { $0.frame.maxY }.max() ?? visible.minY
+            let pinnedIDs = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
+            let pinnedBottom = pinnedIDs.compactMap { identifier -> CGFloat? in
+                let item = app.descendants(matching: .any)[identifier].firstMatch
+                return item.exists && item.isHittable && item.frame.intersects(visible) ? item.frame.maxY : nil
+            }.max() ?? visible.minY
+            let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
+            let keyboard = app.keyboards.firstMatch
+            let bottom = min(visible.maxY - 16, keyboard.exists && keyboard.frame.intersects(visible) ? keyboard.frame.minY - 8 : visible.maxY - 16)
+            guard visible.width > 0, bottom - top > 60 else { break }
             if element.exists {
                 let thumb = element.elementType == .switch ? element.switches.firstMatch : element
                 let target = thumb.exists ? thumb : element
                 let frame = target.frame
                 if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
-                    if frame.minY >= top, frame.maxY <= bottom, target.isHittable { return true }
-                    scrollUp = frame.minY >= top
+                    if frame.midY >= top, frame.midY <= bottom, target.isHittable { return true }
+                    scrollUp = frame.midY > bottom
                 }
             } else {
                 missingSteps += 1
                 if missingSteps == 7 { scrollUp.toggle() }
             }
             guard step < 14 else { break }
-            if scrollUp { form.swipeUp() } else { form.swipeDown() }
+            let distance = min(250, (bottom - top) * 0.45)
+            let middle = (top + bottom) / 2
+            let startY = middle + (scrollUp ? distance / 2 : -distance / 2)
+            let endY = middle + (scrollUp ? -distance / 2 : distance / 2)
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: startY - app.frame.minY))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: endY - app.frame.minY)))
         }
+        recordTaskInteraction(app, detail: "Cannot reveal \(element) in \(containerID); form=\(form.frame)")
         XCTFail("Task element could not be revealed in \(containerID): \(element)", file: file, line: line)
         return false
     }
 
+    private func recordTaskInteraction(_ app: XCUIApplication, detail: String) {
+        let tree = XCTAttachment(string: detail + "\n" + app.debugDescription)
+        tree.name = "Scoped native interaction geometry and hierarchy"; tree.lifetime = .keepAlways; add(tree)
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "Scoped native interaction failure"; image.lifetime = .keepAlways; add(image)
+    }
 }

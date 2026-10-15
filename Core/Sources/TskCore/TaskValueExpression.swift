@@ -170,8 +170,8 @@ enum TaskExpressionValue: Sendable {
             catch { throw TaskFilterError.invalidStoredValue(task.id, name, .uuid) }
             return .text(raw)
         case .numeric:
-            guard raw.isEmpty || Float(raw)?.isFinite == true else { throw TaskFilterError.invalidStoredValue(task.id, name, .numeric) }
-            return .real(Double(Float(raw) ?? 0))
+            guard let number = FilterScalar.storedNumber(raw) else { throw TaskFilterError.invalidStoredValue(task.id, name, .numeric) }
+            return .real(number)
         case .duration:
             guard raw.isEmpty || TaskwarriorDuration(raw, allowRawSeconds: false) != nil else { throw TaskFilterError.invalidStoredValue(task.id, name, .duration) }
             return .duration(TaskwarriorDuration(raw, allowRawSeconds: false)?.filterSeconds ?? 0)
@@ -220,13 +220,13 @@ enum TaskExpressionValue: Sendable {
             if case .duration = self { throw invalid(op) }
             let result = pow(left, right)
             if case .integer = self { return try .integer(Self.checkedInteger(result, bits: 32)) }
-            return try Self.checkedReal(result)
+            return try Self.checkedReal(result, allowingNonFinite: !left.isFinite || !right.isFinite)
         }
         let leftDate = if case .date = self { true } else { false }
         let rightDate = if case .date = other { true } else { false }
         let leftDuration = if case .duration = self { true } else { false }
         let rightDuration = if case .duration = other { true } else { false }
-        if op == "-", case .real = self, rightDate || rightDuration { return try Self.checkedReal(left - right) }
+        if op == "-", case .real = self, rightDate || rightDuration { return try Self.checkedReal(left - right, allowingNonFinite: !left.isFinite || !right.isFinite) }
         if leftDate || rightDate {
             guard op == "+" || op == "-", !(op == "+" && leftDate && rightDate), !(op == "-" && leftDuration && rightDate) else { throw invalid(op) }
             if op == "-", leftDate && rightDate { return try .duration(Self.checkedInteger(left - right)) }
@@ -240,7 +240,7 @@ enum TaskExpressionValue: Sendable {
         }
         if leftDuration || rightDuration {
             guard op != "%", !(op == "*" && leftDuration && rightDuration) else { throw invalid(op) }
-            if op == "/", leftDuration && rightDuration { return try Self.checkedReal(left / right) }
+            if op == "/", leftDuration && rightDuration { return try Self.checkedReal(left / right, allowingNonFinite: !left.isFinite || !right.isFinite) }
             let result: Double
             switch op {
             case "+":
@@ -266,11 +266,11 @@ enum TaskExpressionValue: Sendable {
             }
         }
         switch op {
-        case "+": return try Self.checkedReal(left + right)
-        case "-": return try Self.checkedReal(left - right)
-        case "*": return try Self.checkedReal(left * right)
-        case "/": return try Self.checkedReal(left / right)
-        case "%": return try Self.checkedReal(left.truncatingRemainder(dividingBy: right))
+        case "+": return try Self.checkedReal(left + right, allowingNonFinite: !left.isFinite || !right.isFinite)
+        case "-": return try Self.checkedReal(left - right, allowingNonFinite: !left.isFinite || !right.isFinite)
+        case "*": return try Self.checkedReal(left * right, allowingNonFinite: !left.isFinite || !right.isFinite)
+        case "/": return try Self.checkedReal(left / right, allowingNonFinite: !left.isFinite || !right.isFinite)
+        case "%": return try Self.checkedReal(left.truncatingRemainder(dividingBy: right), allowingNonFinite: !left.isFinite || !right.isFinite)
         default: throw invalid(op)
         }
     }
@@ -284,8 +284,8 @@ enum TaskExpressionValue: Sendable {
         Int64(UInt32(bitPattern: Int32(try checkedInteger(value, bits: 32))))
     }
 
-    private static func checkedReal(_ value: Double) throws -> Self {
-        guard value.isFinite else { throw TaskFilterError.evaluation("Arithmetic produced a non-finite value.") }
+    private static func checkedReal(_ value: Double, allowingNonFinite: Bool = false) throws -> Self {
+        guard allowingNonFinite || value.isFinite else { throw TaskFilterError.evaluation("Arithmetic produced a non-finite value.") }
         return .real(value)
     }
 

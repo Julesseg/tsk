@@ -19,11 +19,7 @@ struct ContinuousReminderSettingsView: View {
                 Section("One designated device") {
                     Text("Keep continuous import enabled on only one device. It is disabled by default elsewhere. Sources are removed only after each valid task is saved locally.")
                     Text("An interrupted move, failed removal, or explicit retry can leave a saved task and its source together. Retrying can create duplicates; no per-reminder tracking is retained.").font(.footnote)
-                    Text(controller.status?.active == true ? "Enabled on this device" : "Disabled on this device").accessibilityIdentifier("continuous-reminders-status")
                     if controller.status?.configuredOnAnotherDevice == true { Text("These settings designate another device. Moving is disabled here. Disable the other device before enabling this one.") }
-                    if controller.status?.active == true && controller.status?.paused == true {
-                        Text("Automatic scans are held while another window moves reminders, or after an interrupted or failed move. If no move is running, review the source before explicitly retrying.").accessibilityIdentifier("continuous-reminders-paused")
-                    }
                     ReminderRecurrenceInformation()
                     Button("Allow Reminders access / Refresh lists") { Task { await loadLists() } }.accessibilityIdentifier("reminders-access")
                 }
@@ -40,8 +36,6 @@ struct ContinuousReminderSettingsView: View {
                 }
                 if let result = controller.result {
                     Section("Current attempt") {
-                        Text("Saved \(result.imported.count); removed \(result.removedCount); skipped \(result.skipped.count); failed \(result.failures.count).")
-                            .accessibilityIdentifier("continuous-reminders-result")
                         ForEach(result.imported) { task in
                             VStack(alignment: .leading) {
                                 Text(task.description)
@@ -73,7 +67,15 @@ struct ContinuousReminderSettingsView: View {
             .disabled(loading || controller.isRunning)
             .overlay { if loading || controller.isRunning { ProgressView(controller.isRunning ? "Waiting for other windows or moving reminders…" : "Loading Reminders…").accessibilityIdentifier("continuous-reminders-progress").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
             .safeAreaInset(edge: .top) {
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(controller.status?.active == true ? "Enabled on this device" : "Disabled on this device").accessibilityIdentifier("continuous-reminders-status")
+                    if controller.status?.active == true && controller.status?.paused == true {
+                        Text("Automatic moves are paused. Review the source before explicitly retrying.").font(.footnote).accessibilityIdentifier("continuous-reminders-paused")
+                    }
+                    if let result = controller.result {
+                        Text("Saved \(result.imported.count); removed \(result.removedCount); skipped \(result.skipped.count); failed \(result.failures.count).")
+                            .font(.footnote).accessibilityIdentifier("continuous-reminders-result")
+                    }
                     if controller.isRunning { Button("Stop moving") { controller.cancel() }.padding().background(.bar).disabled(false).accessibilityIdentifier("continuous-reminders-stop") }
                     if let message = error ?? controller.error { Text(message).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial).accessibilityIdentifier("continuous-reminders-error") }
                     #if DEBUG

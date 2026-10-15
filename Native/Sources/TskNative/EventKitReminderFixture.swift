@@ -156,12 +156,7 @@ import Foundation
     }
 
     private static func date(_ components: DateComponents?) -> [String: Any] {
-        guard let components else { return [:] }
-        var result: [String: Any] = ["calendar": components.calendar.map { String(describing: $0.identifier) } ?? "nil", "timezone": components.timeZone?.identifier ?? "nil"]
-        for (name, unit) in [("year", Calendar.Component.year), ("month", .month), ("day", .day), ("hour", .hour), ("minute", .minute), ("second", .second)] {
-            if let value = components.value(for: unit) { result[name] = value }
-        }
-        return result
+        ReminderFixtureDiagnostics.components(components)
     }
 
     private static func write(_ output: [String: Any], token: String) throws -> String {

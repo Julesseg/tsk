@@ -37,8 +37,8 @@ struct FilterTypedPredicate: Sendable {
         else if let stored = task.attributes[name] {
             switch type {
             case .numeric:
-                guard stored.isEmpty || Float(stored)?.isFinite == true else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
-                actual = .number(Double(Float(stored) ?? 0))
+                guard let number = FilterScalar.storedNumber(stored) else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
+                actual = .number(number)
             case .uuid:
                 do { _ = try TaskAttributeValues.normalized(stored, for: TaskAttributeDefinition(name: name, type: .uuid)) }
                 catch { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
@@ -55,6 +55,12 @@ struct FilterTypedPredicate: Sendable {
 
 enum FilterScalar: Sendable {
     case text(String), number(Double), duration(Int64)
+
+    static func storedNumber(_ raw: String) -> Double? {
+        if raw.isEmpty { return 0 }
+        guard let value = Double(raw), value.isFinite, let narrowed = Float(raw) else { return nil }
+        return Double(narrowed)
+    }
 
     static func isUUIDLiteral(_ raw: String) -> Bool {
         let bytes = Array(raw.utf8)
