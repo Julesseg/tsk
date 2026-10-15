@@ -120,7 +120,7 @@ private struct NativeKeyboardRegistrationHistory {
             lastValue = value
             guard !repeated, !envelope.observations.contains(where: { $0.value == value }) else { return nil }
             if envelope.observations.count == 4 {
-                increment(\.omittedBySnapshotCap)
+                guard increment(\.omittedBySnapshotCap) else { return nil }
             } else {
                 var candidate = envelope
                 candidate.observations.append(Snapshot(epoch: epoch, processID: processID, value: value))
@@ -132,7 +132,7 @@ private struct NativeKeyboardRegistrationHistory {
                 if let data = encodedDetails(reserved), data.count <= 4096 {
                     envelope = candidate
                 } else {
-                    increment(\.omittedByPayloadBudget)
+                    guard increment(\.omittedByPayloadBudget) else { return nil }
                 }
             }
         }
@@ -143,9 +143,11 @@ private struct NativeKeyboardRegistrationHistory {
         return details
     }
 
-    private mutating func increment(_ key: WritableKeyPath<Envelope, Int>) {
-        if envelope[keyPath: key] < counterCap { envelope[keyPath: key] += 1 }
-        else { envelope.accountingSaturated = true }
+    private mutating func increment(_ key: WritableKeyPath<Envelope, Int>) -> Bool {
+        if envelope[keyPath: key] < counterCap { envelope[keyPath: key] += 1; return true }
+        guard !envelope.accountingSaturated else { return false }
+        envelope.accountingSaturated = true
+        return true
     }
     private func details(_ value: Envelope) -> [String: String]? {
         guard let data = try? JSONEncoder().encode(value) else { return nil }
@@ -181,9 +183,10 @@ private final class NativeKeyboardControlTextView: UITextView {
                   command.input == "n" || command.input == "\r" else { continue }
             if command.input == "n" { matchingN += 1 } else { matchingReturn += 1 }
             guard rows.count < 8 else { continue }
-            let selector = NSStringFromSelector(command.action)
-            let selectorBytes = Array(selector.utf8)
-            rows.append(NativeKeyboardRegistrationRow(ordinal: ordinal, owned: controlCommands.contains(where: { $0 === command }), input: command.input == "n" ? "n" : "carriageReturn", modifiers: command.modifierFlags.rawValue, selector: String(decoding: selectorBytes.prefix(64), as: UTF8.self), selectorBytes: selectorBytes.count, selectorTruncated: selectorBytes.count > 64, priority: command.wantsPriorityOverSystemBehavior, attributes: command.attributes.rawValue))
+            let action: Selector? = command.action
+            let selector = action.map(NSStringFromSelector)
+            let selectorBytes = selector.map { Array($0.utf8) } ?? []
+            rows.append(NativeKeyboardRegistrationRow(ordinal: ordinal, owned: controlCommands.contains(where: { $0 === command }), input: command.input == "n" ? "n" : "carriageReturn", modifiers: command.modifierFlags.rawValue, selector: selector.map { _ in String(decoding: selectorBytes.prefix(64), as: UTF8.self) }, selectorBytes: selectorBytes.count, selectorTruncated: selectorBytes.count > 64, priority: command.wantsPriorityOverSystemBehavior, attributes: command.attributes.rawValue))
         }
         return .observed(NativeKeyboardRegistrationValue(firstResponder: focused, windowAttached: attached, commandNCount: commandNCount, commandReturnCount: commandReturnCount, totalReturned: returned.count, matchingN: matchingN, matchingReturn: matchingReturn, omittedRows: matchingN + matchingReturn - rows.count, rows: rows))
     }
