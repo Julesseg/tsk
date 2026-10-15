@@ -4,11 +4,25 @@ import TskCore
 struct TaskListView: View {
     let store: TaskStore
     let selection: Binding<UUID?>?
+    let calendar: TodayCalendarController
     let edit: (TaskRecord) -> Void
 
     var body: some View {
         Group {
-            if let error = store.error, store.tasks.isEmpty {
+            if store.customView == nil && store.query == .today {
+                ScrollViewReader { proxy in
+                    List(selection: selection) {
+                        TodayCalendarSection(calendar: calendar)
+                        Section("Tasks · Today") {
+                            if let error = store.error, store.tasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
+                            else if store.tasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
+                            ForEach(store.tasks) { task in TaskListRow(task: task, store: store, edit: edit) }
+                        }
+                    }.accessibilityIdentifier("task-list")
+                        .refreshable { await store.reload(); await calendar.refresh() }
+                        .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
+                }
+            } else if let error = store.error, store.tasks.isEmpty {
                 ContentUnavailableView {
                     Label("Tasks unavailable", systemImage: "exclamationmark.triangle")
                 } description: { Text(error) } actions: {
@@ -22,30 +36,7 @@ struct TaskListView: View {
                 ScrollViewReader { proxy in
                     List(selection: selection) {
                         ForEach(store.tasks) { task in
-                            NavigationLink(value: task.id) {
-                                TaskListLabel(task: task, store: store)
-                            }
-                            .tag(task.id)
-                            .accessibilityIdentifier("task-\(task.id.uuidString)")
-                            .contextMenu {
-                                TaskActivityButton(task: task, store: store)
-                                if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
-                                if task.canComplete {
-                                    Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }.disabled(store.isSaving)
-                                }
-                            }
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                TaskActivityButton(task: task, store: store).tint(.orange)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                if task.canComplete {
-                                    Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }
-                                        .tint(.green).disabled(store.isSaving)
-                                }
-                                if task.canEdit {
-                                    Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
-                                }
-                            }
+                            TaskListRow(task: task, store: store, edit: edit)
                         }
                     }
                     .accessibilityIdentifier("task-list")
@@ -85,5 +76,37 @@ struct TaskListLabel: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+struct TaskListRow: View {
+    let task: TaskRecord
+    let store: TaskStore
+    let edit: (TaskRecord) -> Void
+    var body: some View {
+        NavigationLink(value: task.id) {
+            TaskListLabel(task: task, store: store)
+        }
+        .tag(task.id)
+        .accessibilityIdentifier("task-\(task.id.uuidString)")
+        .contextMenu {
+            TaskActivityButton(task: task, store: store)
+            if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
+            if task.canComplete {
+                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }.disabled(store.isSaving)
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            TaskActivityButton(task: task, store: store).tint(.orange)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if task.canComplete {
+                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }
+                    .tint(.green).disabled(store.isSaving)
+            }
+            if task.canEdit {
+                Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
+            }
+        }
     }
 }
