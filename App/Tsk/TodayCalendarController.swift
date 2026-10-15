@@ -34,6 +34,10 @@ import TskNative
             return
         }
         guard requestingAccess else { await refreshSnapshot(); return }
+        if await refreshAccessPhase() { await refresh() }
+    }
+
+    private func refreshAccessPhase() async -> Bool {
         accessRefreshInProgress = true
         defer {
             accessRefreshInProgress = false
@@ -42,9 +46,7 @@ import TskNative
             waiters.forEach { $0.continuation.resume() }
         }
         await refreshSnapshot(requestingAccess: true)
-        if accessRefreshWaiters.values.contains(where: { !$0.cancellation.isCancelled }), snapshot?.authorization == .fullAccess, snapshot?.readError == nil, !Task.isCancelled {
-            await refreshSnapshot()
-        }
+        return accessRefreshWaiters.values.contains(where: { !$0.cancellation.isCancelled }) && snapshot?.authorization == .fullAccess && snapshot?.readError == nil && !Task.isCancelled
     }
 
     private func waitForAccessRefresh(requestingAccess: Bool) async {
