@@ -17,13 +17,16 @@ final class WidgetUITests: XCTestCase {
         XCTAssertTrue(taskRow(named: today, app: app).waitForExistence(timeout: 30))
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         XCUIDevice.shared.press(.home)
-        let icon = springboard.icons["tsk"].firstMatch
+        let home = springboard.otherElements["Home screen icons"].firstMatch
+        XCTAssertTrue(home.waitForExistence(timeout: 15), springboard.debugDescription)
+        let icon = home.icons["tsk"].firstMatch
         for _ in 0..<3 {
             if icon.exists && icon.isHittable { break }
-            springboard.swipeLeft()
+            home.swipeLeft()
         }
         XCTAssertTrue(icon.waitForExistence(timeout: 15))
         XCTAssertTrue(icon.isHittable)
+        capture("Actual Home screen tsk icon before widget installation", springboard)
         icon.press(forDuration: 1.5)
         tap(springboard, labels: ["Edit Home Screen"])
         tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
@@ -33,7 +36,12 @@ final class WidgetUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap()
         search.typeText("tsk")
-        tap(springboard, labels: ["tsk", "tsk Tasks"])
+        let gallery = springboard.collectionViews["add-sheet-collection-view"].firstMatch
+        let provider = gallery.cells.matching(NSPredicate(format: "label IN %@", ["tsk", "tsk Tasks"])).firstMatch
+        XCTAssertTrue(provider.waitForExistence(timeout: 15), springboard.debugDescription)
+        XCTAssertTrue(provider.isHittable, springboard.debugDescription)
+        capture("Actual tsk provider cell in native widget gallery", springboard)
+        provider.tap()
         tap(springboard, labels: ["Add Widget"])
         tap(springboard, labels: ["Done"])
         let taskText = springboard.staticTexts[today].firstMatch
