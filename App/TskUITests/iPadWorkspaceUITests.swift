@@ -95,6 +95,8 @@ final class iPadWorkspaceUITests: XCTestCase {
     func testNativeSidebarCustomViewAndAccessibilityText() throws {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(revealTaskElement(app.buttons["custom-views"], in: "workspace-sidebar", app: app))
+        XCTAssertEqual(app.buttons["custom-views"].label, "Manage custom views")
+        XCTAssertFalse(app.otherElements["workspace-detail-empty"].exists, "Largest text must not reserve a third column for empty detail")
         app.buttons["custom-views"].tap()
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
@@ -110,6 +112,41 @@ final class iPadWorkspaceUITests: XCTestCase {
         geometry.lifetime = .keepAlways
         add(geometry)
         capture("iPad native custom view sidebar at accessibility text size", app: app)
+        let sidebar = app.collectionViews["workspace-sidebar"]
+        XCTAssertGreaterThan(sidebar.frame.width, app.frame.width * 0.3, "Largest text needs a readable sidebar")
+        XCTAssertLessThanOrEqual(sidebar.frame.width, app.frame.width / 2 + 1, "Task content must retain usable width")
+        XCTAssertTrue(app.descendants(matching: .any)["workspace-accessibility-navigation"].firstMatch.exists)
+        app.buttons["new-task"].tap()
+        let field = description(app)
+        guard revealTaskElement(field, in: "task-editor-form", app: app) else { return }
+        focusTaskText(field, app: app)
+        field.typeText("Accessible task")
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app) }
+        tapTaskControl(app.buttons["save-task"], app: app)
+        let row = taskRow(named: "Accessible task", app: app)
+        guard waitForTaskSave(app, row: row, timeout: 15) else { return }
+        let identity = row.identifier
+        tapTaskControl(row, app: app)
+        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Accessible task")
+        capture("iPad largest text opens the same task in sequential detail", app: app)
+        tapTaskControl(app.buttons["edit-task"], app: app)
+        let editedField = description(app)
+        guard revealTaskElement(editedField, in: "task-editor-form", app: app) else { return }
+        replaceTaskText(editedField, with: "Accessible task revised", app: app)
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app) }
+        tapTaskControl(app.buttons["save-task"], app: app)
+        let saved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.collectionViews["task-editor-form"].exists && app.staticTexts["task-detail-description"].exists && app.staticTexts["task-detail-description"].label == "Accessible task revised"
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 15), .completed)
+        tapTaskControl(app.navigationBars["Task"].buttons.element(boundBy: 0), app: app)
+        let revised = taskRow(named: "Accessible task revised", app: app)
+        let returned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in revised.exists && revised.isHittable && !app.buttons["edit-task"].exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed)
+        XCTAssertEqual(revised.identifier, identity)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch.label, "All local tasks")
+        capture("iPad largest text returns to the same task and custom view", app: app)
     }
 
     private func launch(arguments: [String] = []) -> XCUIApplication {

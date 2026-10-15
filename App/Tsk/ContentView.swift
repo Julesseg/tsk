@@ -6,6 +6,9 @@ import EventKit
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var accessibleSidebarMinimum: CGFloat = 190
+    @ScaledMetric(relativeTo: .body) private var accessibleSidebarWidth: CGFloat = 220
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
@@ -41,16 +44,25 @@ struct ContentView: View {
 
     var body: some View { calendarWorkspace }
 
+    private var presentation: TaskWorkspacePresentation {
+        if sizeClass != .regular { return .compact }
+        return dynamicTypeSize.isAccessibilitySize ? .accessibilityColumns : .columns
+    }
+
     private var navigationWorkspace: some View {
         Group {
-            if sizeClass == .regular { regularWorkspace }
-            else { compactWorkspace }
+            switch presentation {
+            case .columns: regularWorkspace
+            case .accessibilityColumns: accessibleWorkspace
+            case .compact: compactWorkspace
+            }
         }
     }
 
     private var regularWorkspace: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             workspaceSidebar
+                .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
         } content: {
             taskList(selection: $selectedTaskID)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
@@ -59,6 +71,29 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .accessibilityIdentifier("task-workspace")
+    }
+
+    private var accessibleTaskPath: Binding<[UUID]> {
+        Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
+    }
+
+    private var accessibleWorkspace: some View {
+        GeometryReader { geometry in
+            let width = min(accessibleSidebarWidth, geometry.size.width * 0.45)
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                workspaceSidebar
+                    .navigationSplitViewColumnWidth(min: min(accessibleSidebarMinimum, width), ideal: width, max: geometry.size.width / 2)
+            } detail: {
+                NavigationStack(path: accessibleTaskPath) {
+                    taskList(selection: $selectedTaskID)
+                        .navigationDestination(for: UUID.self) { id in taskDestination(id).id(id) }
+                }
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .accessibilityIdentifier("workspace-accessibility-navigation")
+            }
+            .navigationSplitViewStyle(.balanced)
+            .accessibilityIdentifier("task-workspace")
+        }
     }
 
     @ViewBuilder private var selectedTaskDetail: some View {
@@ -73,20 +108,21 @@ struct ContentView: View {
 
     private var workspaceSidebar: some View {
         TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
-            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
     }
 
     private var compactWorkspace: some View {
         NavigationStack(path: $path) {
             taskList(selection: nil)
                 .safeAreaInset(edge: .top) { compactViewPicker }
-                .navigationDestination(for: UUID.self) { id in
-                    if let task = store.allTasks.first(where: { $0.id == id }) {
-                        TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                    } else {
-                        ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
-                    }
-                }
+                .navigationDestination(for: UUID.self) { id in taskDestination(id) }
+        }
+    }
+
+    @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
+        if let task = store.allTasks.first(where: { $0.id == id }) {
+            TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+        } else {
+            ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
         }
     }
 
@@ -150,9 +186,10 @@ struct ContentView: View {
             if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
-        .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
-        .onChange(of: sizeClass) { _, size in
-            path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
+        .onChange(of: path) { _, newPath in if presentation == .compact { selectedTaskID = newPath.last } }
+        .onChange(of: presentation) { previous, current in
+            if previous == .compact { selectedTaskID = path.last ?? selectedTaskID }
+            path = current == .compact ? selectedTaskID.map { [$0] } ?? [] : []
         }
     }
 
@@ -224,7 +261,7 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
-        if sizeClass != .regular {
+        if presentation == .compact {
             ToolbarItemGroup(placement: .topBarLeading) {
                 Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
                 Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
@@ -232,7 +269,7 @@ struct ContentView: View {
                 Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
             }
         }
-        if sizeClass != .regular {
+        if presentation == .compact {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Spotlight") { requestIntegrationPresentation("spotlight", state: $isShowingSpotlight) }.accessibilityIdentifier("spotlight-settings")
@@ -294,7 +331,13 @@ struct ContentView: View {
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.complete(id: task.id) } } : nil },
             move: moveSelection,
-            reveal: selectedTask.map { task in { if sizeClass != .regular { path = [task.id] } } },
+            reveal: selectedTask.map { task in {
+                switch presentation {
+                case .columns: break
+                case .accessibilityColumns: selectedTaskID = task.id
+                case .compact: path = [task.id]
+                }
+            } },
             openView: openView,
             refresh: { Task { await store.reload() } }
         )
@@ -317,7 +360,7 @@ struct ContentView: View {
 
     private func moveSelection(_ movement: TaskSelectionMovement) {
         selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if sizeClass != .regular, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
+        if presentation == .compact, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {
@@ -330,4 +373,8 @@ private struct TaskListSelection: Equatable {
     let query: TaskQuery
     let project: TaskProjectSelection
     let customView: CustomViewSelection?
+}
+
+private enum TaskWorkspacePresentation: Equatable {
+    case columns, accessibilityColumns, compact
 }
