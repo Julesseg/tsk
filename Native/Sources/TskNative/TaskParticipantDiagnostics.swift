@@ -12,6 +12,13 @@ public enum TaskParticipantDiagnostics {
         #endif
     }
 
+    public static func event(_ stage: String, details: [String: String]) {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], !token.isEmpty else { return }
+        TaskParticipantDiagnosticRecorder.shared.record(stage, phase: "event", id: UUID(), token: token, details: details)
+        #endif
+    }
+
     public static func end(_ stage: String, id: UUID?) {
         #if DEBUG && targetEnvironment(simulator)
         guard let id, let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], !token.isEmpty else { return }
@@ -33,12 +40,13 @@ private final class TaskParticipantDiagnosticRecorder: @unchecked Sendable {
         let id: UUID
         let time: TimeInterval
         let processID: Int32
+        let details: [String: String]?
     }
 
-    func record(_ stage: String, phase: String, id: UUID, token: String) {
+    func record(_ stage: String, phase: String, id: UUID, token: String, details: [String: String]? = nil) {
         lock.lock()
         defer { lock.unlock() }
-        let event = Event(stage: stage, phase: phase, id: id, time: Date().timeIntervalSince1970, processID: ProcessInfo.processInfo.processIdentifier)
+        let event = Event(stage: stage, phase: phase, id: id, time: Date().timeIntervalSince1970, processID: ProcessInfo.processInfo.processIdentifier, details: details)
         events.append(event)
         if phase == "begin" { active[id] = event }
         else { active[id] = nil }
