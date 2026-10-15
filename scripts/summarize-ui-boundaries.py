@@ -46,7 +46,7 @@ def boolean(value):
 
 
 def native_class(value):
-    return type(value) is str and len(value) <= 160 and re.fullmatch(r'(?:(?:_?UI|UIKit|SwiftUI)[A-Za-z0-9_]*|TaskKeyboard(?:Controller|Host)|NavigationStackHostingController|PresentationHostingController)(?:<[A-Za-z0-9_<>, .:()\[\]-]+>)?|AppDelegate', value) is not None
+    return type(value) is str and len(value) <= 160 and re.fullmatch(r'(?:(?:_?UI|UIKit|SwiftUI)[A-Za-z0-9_]*|TaskKeyboard(?:Controller|Host)|NavigationStackHostingController|PresentationHostingController|TextEditorTextView|CellHostingView|ListCollectionViewCell|UpdateCoalescingCollectionView|HostingView)(?:<[A-Za-z0-9_<>, .:()\[\]-]+>)?|AppDelegate', value) is not None
 
 
 def fields(source, validators, counts, native_strings=False):
