@@ -50,7 +50,6 @@ extension TaskManager {
             patch["description"] = text
         }
         patch = try await normalizedUserAttributes(patch)
-        for (key, value) in patch where value.matchesBytes(template.attributes[key]) { patch.removeValue(forKey: key) }
         let children = snapshot.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == id }
         var affected: [TaskRecord] = []
         let mask = template.attributes["mask"].map { Array($0.utf8) }

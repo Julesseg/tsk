@@ -75,6 +75,7 @@ struct TaskSeriesMetadataEditor: View {
                     }
                 }
             }
+            .focusedSceneValue(\.taskEditor, editorActions)
             .interactiveDismissDisabled(store.isSaving)
             .task { do { try await store.loadAttributeDefinitions() } catch { self.error = error.localizedDescription } }
             .modifier(TaskWorkspacePanel(store: store))
@@ -165,6 +166,15 @@ struct TaskSeriesMetadataEditor: View {
     private func addTag() {
         do { try draft.addTag(tagInput); tagInput = ""; tagError = nil }
         catch { tagError = error.localizedDescription }
+    }
+
+    private var editorActions: TaskEditorActions? {
+        guard !store.isSaving, !isPreviewing else { return nil }
+        if let preview {
+            guard preview.updates.contains(where: { !$0.changes.isEmpty }) else { return nil }
+            return TaskEditorActions(save: { save(preview) })
+        }
+        return TaskEditorActions(save: buildPreview)
     }
 
     private func endTyping() { field = nil; textField = nil }

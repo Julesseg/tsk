@@ -45,3 +45,27 @@ import Testing
     #expect(await replica.batches == count)
     #expect(try await manager.task(id: parent) == template)
 }
+
+@Test func seriesMetadataUsesLocalTypedValidationWithoutChangingAllowedValueOrder() async throws {
+    let parent = UUID(), child = UUID()
+    let replica = OccurrenceReplica(records: [TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-", "description": "Series", "phase": "late"]), TaskRecord(id: child, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "0", "due": "200", "phase": "late"])])
+    let definitions = AttributeDefinitionTestStore()
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) }, attributeDefinitions: definitions)
+    _ = try await manager.saveAttributeDefinition(name: "phase", type: .string, values: ["late", "early", ""])
+    await #expect(throws: (any Error).self) { try await manager.previewSeriesMetadata(id: parent, changes: ["phase": "unknown"]) }
+    #expect(await replica.batches == 0)
+    let preview = try await manager.previewSeriesMetadata(id: parent, changes: ["phase": "early"])
+    _ = try await manager.applySeriesMetadata(preview)
+    #expect(try await manager.task(id: child).attributes["phase"] == "early")
+    #expect(try await manager.attributeDefinitions().first?.values == ["late", "early", ""])
+}
+
+@Test func explicitSeriesFieldChangesStillReachAnOccurrenceWhenTemplateAlreadyMatches() async throws {
+    let parent = UUID(), child = UUID()
+    let replica = OccurrenceReplica(records: [TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-", "description": "Desired"]), TaskRecord(id: child, attributes: ["status": "pending", "description": "Old occurrence", "parent": parent.uuidString, "imask": "0", "due": "200"])])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+    let preview = try await manager.previewSeriesMetadata(id: parent, changes: ["description": "Desired"])
+    #expect(preview.updates.first?.changes.isEmpty == true)
+    _ = try await manager.applySeriesMetadata(preview)
+    #expect(try await manager.task(id: child).description == "Desired")
+}
