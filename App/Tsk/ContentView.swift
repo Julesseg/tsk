@@ -117,17 +117,22 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
-        .task(id: scenePhase == .active && store.customView == nil && store.query == .today) {
-            calendar.isDisplayingToday = scenePhase == .active && store.customView == nil && store.query == .today
-            guard calendar.isDisplayingToday else { return }
-            while !Task.isCancelled {
+        .task(id: displaysCalendar) {
+            calendar.isDisplayingToday = displaysCalendar
+            if displaysCalendar { await calendar.refresh() }
+        }
+        .task(id: displaysCalendar ? calendar.snapshot?.day?.end : nil) {
+            guard displaysCalendar, let next = calendar.snapshot?.day?.end else { return }
+            do {
+                try await Task.sleep(for: .seconds(max(1, next.timeIntervalSince(store.currentDate))))
+                try Task.checkCancellation()
                 await calendar.refresh()
-                guard let next = calendar.snapshot?.day?.end else { return }
-                do { try await Task.sleep(for: .seconds(max(1, next.timeIntervalSince(store.currentDate)))); try Task.checkCancellation() } catch { return }
                 await store.reload()
-            }
+            } catch {}
         }
     }
+
+    private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
     private func taskList(selection: Binding<UUID?>?) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
