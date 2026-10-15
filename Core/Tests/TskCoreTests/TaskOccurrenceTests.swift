@@ -34,13 +34,17 @@ import Testing
     }
 }
 
-actor OccurrenceReplica: TaskAtomicMutatingReplica {
+actor OccurrenceReplica: TaskAtomicSnapshotMutatingReplica {
     var records: [TaskRecord]
     var batches = 0
     init(records: [TaskRecord]) { self.records = records }
     func tasks() -> [TaskRecord] { records }
     func create(id: UUID, attributes: TaskAttributes) throws -> TaskRecord { throw TaskManagementError.storage("Unexpected create") }
     func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw TaskManagementError.storage("Sequential update forbidden") }
+    func updateAtomically(_ updates: [TaskAtomicUpdate], expecting snapshot: [TaskRecord]) throws -> [TaskRecord] {
+        guard records.sorted(by: { $0.id.uuidString < $1.id.uuidString }) == snapshot.sorted(by: { $0.id.uuidString < $1.id.uuidString }) else { throw TaskSeriesMetadataError.stalePreview }
+        return try updateAtomically(updates)
+    }
     func updateAtomically(_ updates: [TaskAtomicUpdate]) throws -> [TaskRecord] {
         for update in updates { guard records.first(where: { $0.id == update.id })?.attributes == update.expected else { throw TaskManagementError.storage("Conflict") } }
         batches += 1

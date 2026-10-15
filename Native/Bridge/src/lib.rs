@@ -22,6 +22,7 @@ struct Request {
     attributes: Option<Vec<Attribute<String>>>,
     changes: Option<Vec<Attribute<Option<String>>>>,
     updates: Option<Vec<atomic::Update>>,
+    snapshot: Option<Vec<atomic::SnapshotRecord>>,
     configuration: Option<SyncConfiguration>,
     #[serde(rename = "syncGeneration")]
     sync_generation: Option<u64>,
@@ -87,7 +88,10 @@ async fn execute(request: Request) -> Result<Value, String> {
         };
     }
     let storage = SqliteStorage::new(&request.path, AccessMode::ReadWrite, true).await.map_err(|e| e.to_string())?;
-    if request.command == "updateAtomically" { return atomic::update(storage, request.updates.ok_or("Missing atomic updates")?).await; }
+    if request.command == "updateAtomically" || request.command == "updateSnapshotAtomically" {
+        if request.command == "updateSnapshotAtomically" && request.snapshot.is_none() { return Err("Missing preview snapshot".into()); }
+        return atomic::update(storage, request.updates.ok_or("Missing atomic updates")?, request.snapshot).await;
+    }
     let mut replica = Replica::new(storage);
     match request.command.as_str() {
         "tasks" => {
