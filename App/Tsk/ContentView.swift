@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
+    @State private var spotlight: SpotlightController
+    @State private var isShowingSpotlight = false
     @State private var calendar: TodayCalendarController
     @State private var notifications: TaskNotificationController
     @State private var isConfiguringNotifications = false
@@ -28,6 +30,7 @@ struct ContentView: View {
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
+        _spotlight = State(initialValue: SpotlightController(store: store))
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
@@ -39,7 +42,7 @@ struct ContentView: View {
         Group {
             if sizeClass == .regular {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true })
+                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
                         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                 } content: {
                     taskList(selection: $selectedTaskID)
@@ -70,6 +73,7 @@ struct ContentView: View {
             }
         }
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
+        .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight) }
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
@@ -99,6 +103,7 @@ struct ContentView: View {
             opportunities.start()
             await opportunities.foreground()
             await continuousReminders.scan()
+            await spotlight.reconcile()
         }
         .task(id: scenePhase) {
             if scenePhase == .active { await continuousReminders.observeStatus() }
@@ -109,6 +114,7 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await notifications.observe() }
         }
+        .onChange(of: store.allTasks) { _, _ in spotlight.loadStatus() }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -121,6 +127,7 @@ struct ContentView: View {
                     await continuousReminders.scan()
                     await store.reload()
                     await loadSavedViews()
+                    await spotlight.reconcile()
                 }
             } else if phase == .background { opportunities.background() }
         }
@@ -162,6 +169,7 @@ struct ContentView: View {
                 if sizeClass != .regular {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu("More", systemImage: "ellipsis") {
+                            Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
                             Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
                             Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
                             Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
@@ -177,6 +185,9 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
+                    }
+                    if let error = spotlight.status?.error ?? spotlight.error {
+                        Button { isShowingSpotlight = true } label: { Label("Spotlight needs attention: " + error, systemImage: "magnifyingglass") }.font(.footnote).padding().accessibilityIdentifier("spotlight-attention")
                     }
                     SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
@@ -218,7 +229,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isShowingSpotlight, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },

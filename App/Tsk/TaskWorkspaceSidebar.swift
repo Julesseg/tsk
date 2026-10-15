@@ -13,6 +13,7 @@ struct TaskWorkspaceSidebar: View {
     let reminders: () -> Void
     let continuousReminders: () -> Void
     let notifications: () -> Void
+    let spotlight: () -> Void
 
     var body: some View {
         List {
@@ -41,6 +42,7 @@ struct TaskWorkspaceSidebar: View {
                     .accessibilityIdentifier("custom-views")
             }
             Section {
+                Button("Spotlight", systemImage: "magnifyingglass", action: spotlight).accessibilityIdentifier("spotlight-settings")
                 Button("Task notifications", systemImage: "bell", action: notifications).accessibilityIdentifier("notification-settings")
                 Button("Move from Reminders automatically", systemImage: "arrow.down.forward.circle", action: continuousReminders)
                     .accessibilityIdentifier("continuous-reminders-settings")
