@@ -16,3 +16,8 @@ through its own relative symlink. Its controlled clock, samples and action sink
 check one five-second budget, accepted geometry and at-most-once action selection.
 It imports standard CoreGraphics geometry without making UI or provider calls.
 These checks do not establish native input delivery or application response.
+
+A third dependency-free target compiles the actual keyboard registration decision
+through a relative symlink. It checks declaration changes, weak host ownership and
+unchanged-update suppression. UIKit installation and current-scope action dispatch
+remain separate source and canonical iOS checks.
