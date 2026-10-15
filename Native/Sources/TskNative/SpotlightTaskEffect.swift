@@ -25,8 +25,15 @@ public struct SpotlightTaskEffect: Sendable {
     }
 
     public func reconcile(manager: TaskManager) async -> TaskSpotlightIndexStatus {
+        let trace = TaskParticipantDiagnostics.begin("spotlight.reconcile")
+        defer { TaskParticipantDiagnostics.end("spotlight.reconcile", id: trace) }
         do {
-            let lease = try await acquireAdmission()
+            let admission = TaskParticipantDiagnostics.begin("spotlight.admission")
+            let lease: any TaskMutationLease
+            do {
+                defer { TaskParticipantDiagnostics.end("spotlight.admission", id: admission) }
+                lease = try await acquireAdmission()
+            }
             defer { lease.release() }
             do {
                 let count = try await manager.reconcileSpotlight(using: index)

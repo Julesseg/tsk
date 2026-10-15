@@ -60,29 +60,55 @@ final class TaskKeyboardRouter {
     }
 
     static func perform(_ key: UIKeyCommand) {
-        guard let identity = key.propertyList as? [String: String], let id = identity["router"].flatMap(UUID.init(uuidString:)), let router = routers[id]?.value,
-              let command = router.commands.first(where: { $0.id == identity["command"] && $0.input == key.input && $0.modifiers == key.modifierFlags }) else { return }
+        let activeRouters = routers.values.compactMap(\.value)
+        let input = key.input ?? "nil"
+        let metadata = String(describing: key.propertyList)
+        activeRouters.forEach { $0.diagnostic("selector entry input=\(input) modifiers=\(key.modifierFlags.rawValue) propertyList=\(metadata)") }
+        guard let identity = key.propertyList as? [String: String] else {
+            activeRouters.forEach { $0.diagnostic("selector dropped invalid propertyList") }
+            return
+        }
+        guard let id = identity["router"].flatMap(UUID.init(uuidString:)), let router = routers[id]?.value else {
+            activeRouters.forEach { $0.diagnostic("selector dropped unknown router=\(identity["router"] ?? "nil")") }
+            return
+        }
+        guard let command = router.commands.first(where: { $0.id == identity["command"] && $0.input == key.input && $0.modifiers == key.modifierFlags }) else {
+            router.diagnostic("selector dropped inactive command=\(identity["command"] ?? "nil") input=\(input) modifiers=\(key.modifierFlags.rawValue)")
+            return
+        }
         router.diagnostic("execute " + command.id)
         command.action()
     }
 
     func diagnostic(_ event: String) {
-        #if DEBUG
+        #if DEBUG && targetEnvironment(simulator)
         guard ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"] != nil else { return }
         let hosts = controllers.values.compactMap(\.value).map { String(describing: type(of: $0)) }
         let text = event + " scopes=" + commands.map(\.id).joined(separator: ",") + " hosts=" + hosts.joined(separator: ",")
         guard lastDiagnostic != text else { return }
         lastDiagnostic = text
         var chain: [String] = []
-        var responder = controllers.values.compactMap(\.value).first?.view.window?.tskFirstResponder
+        let capture = TaskFirstResponderCapture()
+        let captured = UIApplication.shared.sendAction(#selector(UIResponder.tskCaptureFirstResponder(_:)), to: nil, from: capture, for: nil)
+        var responder = capture.responder
         while let current = responder, chain.count < 30 { chain.append(String(describing: type(of: current))); responder = current.next }
-        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderChain": chain])
+        let declarations = installed.values.compactMap { controller, keys -> [String: Any]? in
+            guard let controller = controller.value else { return nil }
+            var ancestors: [String] = []
+            var parent = controller.parent
+            while let current = parent, ancestors.count < 15 { ancestors.append(String(describing: type(of: current))); parent = current.parent }
+            return ["controller": String(describing: type(of: controller)), "firstResponder": controller.isFirstResponder,
+                    "windowAttached": controller.viewIfLoaded?.window != nil, "parents": ancestors,
+                    "presenting": controller.presentingViewController.map { String(describing: type(of: $0)) } ?? "nil",
+                    "inputs": keys.map { ["input": $0.input ?? "nil", "modifiers": $0.modifierFlags.rawValue, "action": $0.action.map { NSStringFromSelector($0) } ?? "nil"] as [String: Any] }]
+        }
+        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "declarations": declarations])
         diagnostics = Array(diagnostics.suffix(80))
         NSLog("tsk keyboard %@ chain=%@", text, chain.joined(separator: ">"))
         if let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
             do {
                 let data = try JSONSerialization.data(withJSONObject: diagnostics, options: [.prettyPrinted, .sortedKeys])
-                let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("keyboard-fixture-\(token).json")
+                let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("keyboard-fixture-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
                 try data.write(to: file, options: .atomic)
             } catch { NSLog("tsk owned keyboard diagnostic failed: %@", error.localizedDescription) }
         }
@@ -132,6 +158,13 @@ final class TaskKeyboardController: UIHostingController<AnyView> {
             return !router.commands.isEmpty
         }
         return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        for press in presses where press.key?.modifierFlags.contains(.command) == true {
+            router.diagnostic("command press code=\(press.key?.keyCode.rawValue ?? 0)")
+        }
+        super.pressesBegan(presses, with: event)
     }
 }
 
@@ -196,6 +229,16 @@ private struct TaskKeyboardScope: UIViewRepresentable {
 extension View {
     func taskKeyboardCommands(_ commands: [TaskKeyboardCommand]) -> some View {
         background(TaskKeyboardScope(commands: commands).allowsHitTesting(false))
+    }
+}
+
+private final class TaskFirstResponderCapture: NSObject {
+    weak var responder: UIResponder?
+}
+
+private extension UIResponder {
+    @objc func tskCaptureFirstResponder(_ sender: Any?) {
+        (sender as? TaskFirstResponderCapture)?.responder = self
     }
 }
 
