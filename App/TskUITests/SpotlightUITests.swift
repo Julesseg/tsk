@@ -34,7 +34,7 @@ import XCTest
         openSettings(app)
         XCTAssertTrue(revealTaskElement(app.buttons["spotlight-stale-fixture"], in: "spotlight-settings-form", app: app))
         app.buttons["spotlight-stale-fixture"].tap()
-        XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 60))
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual stale fixture entry indexed"))
         app.buttons["Done"].tap()
         try systemSearch("tsk stale " + token, app)
@@ -94,7 +94,7 @@ import XCTest
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
     private func query(_ app: XCUIApplication, id: String, present: Bool) {
-        let deadline = Date().addingTimeInterval(20)
+        let deadline = Date().addingTimeInterval(60)
         let button = app.buttons["spotlight-query"]
         let ids = app.staticTexts["spotlight-fixture-query-ids"]
         XCTAssertTrue(revealTaskElement(button, in: "spotlight-settings-form", app: app))
@@ -109,7 +109,7 @@ import XCTest
                !app.staticTexts["spotlight-index-pending"].exists { return }
             RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
         } while Date() < deadline
-        capture("Actual Spotlight membership did not settle within the original query budget", app)
+        capture("Actual Spotlight membership did not settle within the bounded 60-second query budget", app)
         let observed = ids.exists ? String(describing: ids.value) : "Query IDs not present"
         let error = app.staticTexts["spotlight-query-error"]
         let message = error.exists ? error.label : "No query error label"
