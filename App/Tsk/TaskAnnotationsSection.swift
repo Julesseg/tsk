@@ -1,5 +1,6 @@
 import SwiftUI
 import TskCore
+import TskNative
 
 struct TaskAnnotationsSection: View {
     let store: TaskStore
@@ -105,6 +106,11 @@ struct TaskAnnotationEditor: View {
         }
     }
     private func save() {
+        #if DEBUG && targetEnvironment(simulator)
+        if let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
+            TaskParticipantDiagnostics.event("annotation.save.entry", details: ["isSaving": String(store.isSaving), "isEditing": String(original != nil)])
+        }
+        #endif
         guard !store.isSaving else { return }
         isTyping = false
         Task {
