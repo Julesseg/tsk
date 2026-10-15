@@ -1,0 +1,110 @@
+{
+  "sourceRun": 38794665933,
+  "sourceSHA256": "e33b983720174c7990e81276aa21d6fe07715c036855d2a80842545e48823ffd",
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-1": [
+      {
+        "name": "iPhone 17 Pro",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone Air",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-Air",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 17",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Pro",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Pro Max",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16e",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16e",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Plus",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Plus",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone SE (3rd generation)",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation",
+        "isAvailable": true
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-2": [
+      {
+        "name": "iPhone 17 Pro",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 17 Pro Max",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone Air",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-Air",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 17",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Pro",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Pro Max",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16e",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16e",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone 16 Plus",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Plus",
+        "isAvailable": true
+      },
+      {
+        "name": "iPhone SE (3rd generation)",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation",
+        "isAvailable": true
+      }
+    ]
+  }
+}

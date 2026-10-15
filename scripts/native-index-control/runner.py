@@ -118,7 +118,7 @@ def available_device(document):
     if not candidates:
         raise CommandFailure("no-installed-iPhone-runtime", 70)
     return max(candidates, key=lambda item: (tuple(int(n) for n in item[0].split(".iOS-")[1].split("-")),
-                                              item[1]["name"]))
+                                              "Pro" in item[1]["name"], item[1]["name"]))
 
 
 def read_receipt(path, expected):

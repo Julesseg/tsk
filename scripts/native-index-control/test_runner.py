@@ -40,6 +40,12 @@ class OwnedDevices:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_actual_hosted_device_inventory_prefers_canonical_pro_phone_on_latest_runtime(self):
+        inventory = json.loads(Path(__file__).with_name("available-devices-control-38794665933.json").read_text())
+        runtime, device = runner.available_device(inventory)
+        self.assertEqual(runtime, "com.apple.CoreSimulator.SimRuntime.iOS-26-2")
+        self.assertEqual(device["deviceTypeIdentifier"], "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max")
+
     def test_dispatch_control_is_opt_in_isolated_and_does_not_enter_app_matrix(self):
         workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         source = workflow.read_text()
