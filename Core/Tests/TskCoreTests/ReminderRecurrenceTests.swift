@@ -115,3 +115,26 @@ private struct MalformedRecurringReplica: TaskReplica {
     }
     func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw TaskManagementError.unsupportedTaskKind }
 }
+
+@Test func eventKitExpandedStartComponentsMatchTheSameCanonicalDueWithoutDroppingContradictions() async throws {
+    let original = currentWeeklyReminder()
+    var start = try #require(original.start)
+    start.era = 1; start.nanosecond = 0; start.quarter = 1; start.weekday = 4; start.weekdayOrdinal = 1
+    start.weekOfMonth = 2; start.weekOfYear = 6; start.yearForWeekOfYear = 2030; start.isLeapMonth = false
+    var due = try #require(original.due); due.era = 1; due.isLeapMonth = false
+    #expect(start != due)
+    let source = ImportTestSource(items: [ReminderSnapshot(listID: "work", title: "Expanded owned EventKit representation", start: start, due: due, recurrenceDescription: verifiedWeeklyRule, sourceType: 0)])
+    let manager = TaskManager(replica: TestReplica())
+    let mappings = [ReminderListMapping(listID: "work", project: "")]
+    let result = try await manager.copyReminders(from: source, mappings: mappings)
+    #expect(result.failures.isEmpty && result.skipped.isEmpty)
+    #expect(result.imported.first?.attributes["due"] == "1896598800")
+    #expect(result.imported.first?.attributes["scheduled"] == "1896598800")
+    for component in [Calendar.Component.quarter, .weekday, .weekdayOrdinal, .weekOfMonth, .weekOfYear, .yearForWeekOfYear] {
+        var inconsistent = start
+        inconsistent.setValue((start.value(for: component) ?? 0) + 1, for: component)
+        let unsafe = ImportTestSource(items: [ReminderSnapshot(listID: "work", title: "Contradictory fields", start: inconsistent, due: due, recurrenceDescription: verifiedWeeklyRule, sourceType: 0)])
+        let rejected = try await manager.copyReminders(from: unsafe, mappings: mappings)
+        #expect(rejected.imported.isEmpty && rejected.skipped.count == 1)
+    }
+}
