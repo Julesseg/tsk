@@ -40,6 +40,32 @@ final class TaskStore {
         fixedDate = nil
     }
 
+    func observeParticipantChanges() async {
+        do {
+            var prior: TaskChangeVersion?
+            for try await version in await manager.changeUpdates() {
+                if Task.isCancelled { return }
+                try await loadSavedViews()
+                if let selection = customView, let id = selection.id {
+                    guard let current = savedViews.first(where: { $0.id == id }) else {
+                        tasks = []
+                        error = TaskViewError.missingView(id).localizedDescription
+                        prior = version
+                        continue
+                    }
+                    openView(current)
+                }
+                try await loadAttributeDefinitions()
+                await reload()
+                if let prior, prior.tasks != version.tasks, version.taskOrigin == .local { await manager.requestSynchronization(trigger: .backgroundOpportunity) }
+                prior = version
+            }
+        } catch {
+            await reload()
+            self.error = "Participant refresh failed: " + error.localizedDescription
+        }
+    }
+
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
         task.availability(at: fixedDate ?? date, tasks: allTasks)
     }

@@ -49,7 +49,7 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
     _ = try await seed.create(TaskDraft(description: "Remote version for automatic synchronization fixture"))
     _ = try await seed.synchronize(using: directConfiguration)
     let configuration = try SyncConfiguration(serverURL: proxyURL, clientID: clientID, encryptionSecret: secret)
-    let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("native")))
+    let manager = TaskChampionSession.makeManager(directory: directory.appendingPathComponent("native"))
     let original = try await manager.create(TaskDraft(description: "Before blocked \(method)", attributes: ["opaque": "retain original"]))
     let fixtureReplica = TaskChampionReplica(directory: directory.appendingPathComponent("native"))
     let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": seriesOnly || transitionOnly ? "--" : "-", "opaque": "preserve series", "due": "4000000000", "recur": "weekly"])
@@ -114,7 +114,9 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
         #expect(try await peer.task(id: series.id).attributes["mask"] == "--")
         return
     }
+    let versionBefore = try await manager.changeVersion()
     let created = try await manager.create(TaskDraft(description: "Captured during blocked \(method)", attributes: ["opaque": "retain in-flight"]))
+    #expect(try await manager.changeVersion().tasks != versionBefore.tasks)
     let capturedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(capturedWhileBlocked, "Durable capture must finish before the held server response is released")
     let edited = try await manager.update(id: created.id, changes: ["description": "Edited during blocked \(method)"])

@@ -35,6 +35,7 @@ struct TaskStorageRootView: View {
             }
             try await installRecordedRecurrenceFixture()
             try await runTaskAutomationFixture()
+            try await installWidgetFixture()
             #endif
             store = try TaskStore()
             error = nil

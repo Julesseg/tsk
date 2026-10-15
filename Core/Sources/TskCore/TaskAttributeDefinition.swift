@@ -70,6 +70,7 @@ public extension TaskManager {
         definitions.removeAll { $0.name == definition.name }
         definitions.append(definition)
         try await userAttributeDefinitions.save(definitions)
+        await publishChange(.schema)
         return definition
     }
 
@@ -81,6 +82,7 @@ public extension TaskManager {
         guard definitions.contains(where: { $0.name == UTF8String(name) }) else { throw TaskAttributeError.missingDefinition(name) }
         definitions.removeAll { $0.name == UTF8String(name) }
         try await userAttributeDefinitions.save(definitions)
+        await publishChange(.schema)
     }
 
     func effectiveFilterSchema(base: TaskFilterSchema = .standard) async throws -> TaskFilterSchema {
