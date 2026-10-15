@@ -36,10 +36,11 @@ actor CalendarProofSource: CalendarEventSource {
     var eventReads = 0
     var holdFinalAuthorization = false
     var heldFinalAuthorization = false
+    var finalAuthorizationRead = 1
     var finalAuthorization: CheckedContinuation<Void, Never>?
     var finalAuthorizationObservers: [CheckedContinuation<Void, Never>] = []
     func authorization() async -> CalendarReadAuthorization {
-        if holdFinalAuthorization, eventReads == 1, !heldFinalAuthorization {
+        if holdFinalAuthorization, eventReads == finalAuthorizationRead, !heldFinalAuthorization {
             heldFinalAuthorization = true
             finalAuthorizationObservers.forEach { $0.resume() }; finalAuthorizationObservers.removeAll()
             await withCheckedContinuation { finalAuthorization = $0 }
@@ -58,6 +59,7 @@ actor CalendarProofSource: CalendarEventSource {
         values = [CalendarEventSnapshot(calendarID: "owned", eventID: "event", title: title, calendarTitle: "Owned", start: start, end: start.addingTimeInterval(900))]
         holdFinalAuthorization = holdFinalRead
     }
+    func holdAuthorization(afterRead count: Int) { holdFinalAuthorization = true; finalAuthorizationRead = count }
     func waitForFinalAuthorization() async {
         if heldFinalAuthorization { return }
         await withCheckedContinuation { finalAuthorizationObservers.append($0) }
@@ -102,6 +104,31 @@ actor CalendarProofSource: CalendarEventSource {
         #expect(controller.snapshot?.events.map(\.event.title) == ["new"])
         #expect(await source.eventReads == 2)
         #expect(await source.requestCount == 1)
+    }
+
+    @Test func sourceChangeDuringSuccessfulFollowupMustNotBeDropped() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = TaskChampionSession.makeManager(directory: directory, now: { Date(timeIntervalSince1970: 1792144800) })
+        let source = CalendarProofSource()
+        await source.setEvent("old")
+        await source.holdAuthorization(afterRead: 2)
+        let controller = TodayCalendarController(manager: manager, source: source)
+        let firstSignal = ControllerSignal(); TaskUIBoundaryDiagnostics.signal = firstSignal
+        defer { TaskUIBoundaryDiagnostics.signal = nil }
+        let requesting = Task { await controller.refresh(requestingAccess: true) }
+        await source.waitForRequest()
+        let firstPassive = Task { await CalendarCaller.$passive.withValue(true) { await controller.refresh() } }
+        await firstSignal.wait()
+        await source.release(failing: false)
+        await source.waitForFinalAuthorization()
+        await source.setEvent("new")
+        let secondSignal = ControllerSignal(); TaskUIBoundaryDiagnostics.signal = secondSignal
+        let secondPassive = Task { await CalendarCaller.$passive.withValue(true) { await controller.refresh() } }
+        await secondSignal.wait()
+        await source.releaseFinalAuthorization()
+        await requesting.value; await firstPassive.value; await secondPassive.value
+        #expect(controller.snapshot?.events.map(\.event.title) == ["new"])
     }
 
     @Test func canceledPassiveRefreshDoesNotCancelOwnerOrStartAnotherRead() async throws {
