@@ -92,11 +92,11 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         { reminders in continuation.resume(returning: reminders?.map(\.calendarItemIdentifier)) }
     }
 
-    private static func snapshot(_ item: EKReminder) -> ReminderSnapshot {
+    static func snapshot(_ item: EKReminder) -> ReminderSnapshot {
         ReminderSnapshot(listID: item.calendar.calendarIdentifier, title: item.title ?? "", notes: item.notes,
                          url: item.url?.absoluteString, priority: item.priority, start: item.startDateComponents,
                          due: item.dueDateComponents, isCompleted: item.isCompleted,
-                         recurrenceDescription: recurrenceSignature(item.recurrenceRules))
+                         recurrenceDescription: recurrenceSignature(item.recurrenceRules), sourceType: item.calendar.source.sourceType.rawValue)
     }
 
     private static func recurrenceSignature(_ rules: [EKRecurrenceRule]?) -> String? {

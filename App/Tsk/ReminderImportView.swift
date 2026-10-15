@@ -12,6 +12,7 @@ struct ReminderImportView: View {
     @State private var error: String?
     @State private var busy = false
     @State private var fixtureReport: String?
+    @State private var isShowingTemplates = false
     @FocusState private var editingProject: Bool
     let store: TaskStore
 
@@ -20,6 +21,7 @@ struct ReminderImportView: View {
             Form {
                 Section {
                     Text("Copy incomplete reminders into new tasks. Originals stay in Apple Reminders. Repeating a copy creates additional tasks.")
+                    ReminderRecurrenceInformation()
                     Button("Allow Reminders access / Refresh lists") { Task { await load(requestAccess: true) } }
                         .accessibilityIdentifier("reminders-access")
                 }
@@ -29,6 +31,9 @@ struct ReminderImportView: View {
                             .accessibilityIdentifier("reminders-result")
                         ForEach(result.imported) { task in Label(task.description, systemImage: "checkmark.circle") }
                         issues(result.skipped + result.failures)
+                        if result.imported.contains(where: { $0.status == "recurring" }) {
+                            Button("View recurring templates") { isShowingTemplates = true }.accessibilityIdentifier("reminders-view-templates")
+                        }
                         Button("View copied tasks") {
                             store.customView = nil; store.projectSelection = .all; store.query = .unfinished
                             dismiss()
@@ -46,6 +51,7 @@ struct ReminderImportView: View {
                                 let item = preview[index]
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(item.title).font(.headline)
+                                    if item.recurrence != nil { Text("Recurring template · weekly at 09:00 GMT").accessibilityIdentifier("reminders-preview-template") }
                                     if let draft = item.draft {
                                         Text("Project: \(draft.attributes["project"] ?? "No project")")
                                         if let planned = draft.plannedDate { Text("Planned day: \(planned.formatted(date: .abbreviated, time: .shortened))") }
@@ -87,6 +93,7 @@ struct ReminderImportView: View {
         }
         .task { await load(requestAccess: false) }
         .modifier(TaskWorkspacePanel(store: store))
+        .sheet(isPresented: $isShowingTemplates) { RecurringTemplatesView(store: store) }
     }
 
     private func issues(_ items: [ReminderImportItem]) -> some View {

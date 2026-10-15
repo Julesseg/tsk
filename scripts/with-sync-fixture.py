@@ -31,7 +31,7 @@ with socket.socket() as reservation:
     reservation.bind(('127.0.0.1', 0))
     port = reservation.getsockname()[1]
 client = str(uuid.uuid4())
-generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23]}
+generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23, 34]}
 secret = 'tsk-isolated-ui-' + str(uuid.uuid4())
 url = 'http://127.0.0.1:' + str(port)
 settings = {'TSK_UI_SYNC_SERVER_URL': url, 'TSK_UI_SYNC_CLIENT_ID': client, 'TSK_UI_SYNC_SECRET': secret,
