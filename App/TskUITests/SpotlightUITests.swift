@@ -127,18 +127,32 @@ import XCTest
             education.tap()
             capture("Actual system Search surface after native Continue", springboard)
         }
-        let search = springboard.searchFields.firstMatch.exists ? springboard.searchFields.firstMatch : springboard.textFields.firstMatch
-        guard search.waitForExistence(timeout: 15) else {
+        let spotlight = XCUIApplication(bundleIdentifier: "com.apple.Spotlight")
+        let owners = [("com.apple.springboard", springboard), ("com.apple.Spotlight", spotlight)]
+        func readySearch() -> (owner: XCUIApplication, field: XCUIElement)? {
+            for (_, owner) in owners {
+                let field = owner.searchFields.firstMatch
+                if field.exists && field.isEnabled && field.isHittable { return (owner, field) }
+            }
+            let fallback = springboard.textFields.firstMatch
+            if fallback.exists && fallback.isEnabled && fallback.isHittable { return (springboard, fallback) }
+            return nil
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in readySearch() != nil }, object: nil)
+        guard XCTWaiter.wait(for: [ready], timeout: 15) == .completed, let selected = readySearch() else {
             capture("Actual Search endpoint after missing accessible search field", springboard)
-            let hierarchy = XCTAttachment(string: springboard.debugDescription)
-            hierarchy.name = "Actual Search SpringBoard accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
-            XCTFail("Actual system Spotlight search field must be available; a visible remote surface is not evidence its accessibility owner is SpringBoard")
+            for (bundle, owner) in owners {
+                let raw = owner.debugDescription
+                let hierarchy = XCTAttachment(string: "state=\(owner.state.rawValue); truncated=\(raw.count > 16384)\n" + String(raw.prefix(16384)))
+                hierarchy.name = "Actual Search \(bundle) accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+            }
+            XCTFail("Actual system Spotlight search field must be available, enabled and hittable on an observed native owner")
             return
         }
-        search.tap(); search.typeText(title)
-        let result = springboard.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        selected.field.tap(); selected.field.typeText(title)
+        let result = selected.owner.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 30), "Indexed task must appear in actual system Spotlight, independently of CSSearchQuery proof")
-        let screenshot = XCTAttachment(screenshot: springboard.screenshot()); screenshot.name = "Actual system Spotlight result"; screenshot.lifetime = .keepAlways; add(screenshot)
+        let screenshot = XCTAttachment(screenshot: selected.owner.screenshot()); screenshot.name = "Actual system Spotlight result"; screenshot.lifetime = .keepAlways; add(screenshot)
         result.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 15))
     }
