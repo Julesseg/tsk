@@ -43,18 +43,11 @@ import Testing
 
 @Test @MainActor func fixtureReadbackWithoutRetainedNativeCallbackStillReachesDeadline() async throws {
     let fetch = ControlledFixtureFetch()
-    let observation = Task { @MainActor in
-        let outcome = await FixtureReadbackDeadline<Int>.observe(timeoutNanoseconds: 10_000_000) { _ in
-            return { fetch.cancellations += 1 }
-        }
-        if case .timedOut = outcome { fetch.timeoutObserved = true }
+    let outcome = await FixtureReadbackDeadline<Int>.observe(timeoutNanoseconds: 10_000_000) { _ in
+        return { fetch.cancellations += 1 }
     }
-    let limit = Date().addingTimeInterval(1)
-    while !fetch.timeoutObserved, Date() < limit { try await Task.sleep(nanoseconds: 5_000_000) }
-    #expect(fetch.timeoutObserved, "The deadline must own its lifetime even when native code discards the callback")
+    guard case .timedOut = outcome else { Issue.record("The deadline must own its lifetime even when native code discards the callback"); return }
     #expect(fetch.cancellations == 1)
-    if fetch.timeoutObserved { await observation.value }
-    else { observation.cancel() }
 }
 
 @Test @MainActor func fixtureReadbackDistinguishesNilCallbackFromEmptyCollection() async {
@@ -75,6 +68,5 @@ import Testing
     var callback: (@Sendable (Int) -> Void)?
     var cancellations = 0
     var events: [String] = []
-    var timeoutObserved = false
 }
 #endif
