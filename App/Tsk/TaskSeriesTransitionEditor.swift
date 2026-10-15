@@ -25,14 +25,14 @@ struct TaskSeriesTransitionEditor: View {
 
     init(store: TaskStore, template: TaskRecord, onSave: @escaping (TaskRecord) -> Void) {
         self.store = store; self.template = template; self.onSave = onSave
-        let first = store.allTasks.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == template.id && $0.status == "pending" }.compactMap(\.deadline).filter { $0 >= store.currentDate }.min() ?? store.currentDate.addingTimeInterval(86400)
-        _effective = State(initialValue: store.currentDate)
-        _firstDue = State(initialValue: first)
-        _rule = State(initialValue: template.attributes["recur"] ?? "weekly")
-        _planned = State(initialValue: first.addingTimeInterval((template.plannedDate?.timeIntervalSince1970 ?? first.timeIntervalSince1970) - (template.deadline?.timeIntervalSince1970 ?? first.timeIntervalSince1970)))
-        _wait = State(initialValue: first.addingTimeInterval((template.waitUntil?.timeIntervalSince1970 ?? first.timeIntervalSince1970) - (template.deadline?.timeIntervalSince1970 ?? first.timeIntervalSince1970)))
-        _hasUntil = State(initialValue: template.attributes["until"] != nil)
-        _until = State(initialValue: template.attributes["until"].flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:)) ?? first.addingTimeInterval(31536000))
+        let defaults = TaskSeriesTransitionDefaults(template: template, tasks: store.allTasks, now: store.currentDate)
+        _effective = State(initialValue: defaults.effectiveDate)
+        _firstDue = State(initialValue: defaults.firstDue)
+        _rule = State(initialValue: defaults.recurrence)
+        _planned = State(initialValue: defaults.planned)
+        _wait = State(initialValue: defaults.wait)
+        _hasUntil = State(initialValue: defaults.hasUntil)
+        _until = State(initialValue: defaults.until)
     }
 
     var body: some View {
@@ -135,20 +135,21 @@ struct TaskSeriesTransitionEditor: View {
         return formatter.string(from: value)
     }
     private func optionalDate(_ value: Date?) -> String { value.map { date($0, zone: generatorZone) } ?? "None" }
-    private func offset(_ mode: SeriesOffsetMode, value: Date) -> TaskSeriesOffsetChange {
+    private func offset(_ mode: SeriesOffsetMode, value: Date) throws -> TaskSeriesOffsetChange {
         switch mode {
         case .preserve: .preserve
         case .clear: .clear
-        case .set: .set(Int64((value.timeIntervalSince1970 - firstDue.timeIntervalSince1970).rounded(.towardZero)))
+        case .set: try .setting(date: value, relativeTo: firstDue)
         }
     }
     private func buildPreview() {
         guard !isPreviewing else { return }
         typing = nil; isPreviewing = true
-        let draft = TaskSeriesTransitionDraft(effectiveDate: effective, firstDue: firstDue, recurrence: rule, generatorTimeZone: timeZone, planned: offset(plannedMode, value: planned), wait: offset(waitMode, value: wait), until: hasUntil ? until : nil)
         Task {
             defer { isPreviewing = false }
-            do { preview = try await store.manager.previewSeriesTransition(id: template.id, draft: draft); error = nil }
+            do {
+                let draft = try TaskSeriesTransitionDraft(effectiveDate: effective, firstDue: firstDue, recurrence: rule, generatorTimeZone: timeZone, planned: offset(plannedMode, value: planned), wait: offset(waitMode, value: wait), until: hasUntil ? until : nil)
+                preview = try await store.manager.previewSeriesTransition(id: template.id, draft: draft); error = nil }
             catch { self.error = error.localizedDescription }
         }
     }

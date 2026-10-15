@@ -124,3 +124,31 @@ import Testing
     #expect(try await manager.task(id: done) == history)
     #expect(try await manager.task(id: overdue) == pending)
 }
+
+@Test func transitionDefaultsChooseFutureUnfinishedChildrenAndPreserveTemplateOffsets() throws {
+    let id = UUID()
+    let template = TaskRecord(id: id, attributes: ["status": "recurring", "due": "100", "scheduled": "80", "wait": "95", "recur": "monthly", "until": "900"])
+    let children = [
+        TaskRecord(id: UUID(), attributes: ["parent": id.uuidString, "status": "pending", "due": "199"]),
+        TaskRecord(id: UUID(), attributes: ["parent": id.uuidString, "status": "completed", "due": "201"]),
+        TaskRecord(id: UUID(), attributes: ["parent": UUID().uuidString, "status": "pending", "due": "202"]),
+        TaskRecord(id: UUID(), attributes: ["parent": id.uuidString, "status": "pending", "due": "300"]),
+        TaskRecord(id: UUID(), attributes: ["parent": id.uuidString, "status": "pending", "due": "250"])
+    ]
+    let defaults = TaskSeriesTransitionDefaults(template: template, tasks: children, now: Date(timeIntervalSince1970: 200))
+    #expect(defaults.effectiveDate == Date(timeIntervalSince1970: 200))
+    #expect(defaults.firstDue == Date(timeIntervalSince1970: 250))
+    #expect(defaults.planned == Date(timeIntervalSince1970: 230))
+    #expect(defaults.wait == Date(timeIntervalSince1970: 245))
+    #expect(defaults.until == Date(timeIntervalSince1970: 900))
+    #expect(defaults.hasUntil && defaults.recurrence == "monthly")
+    let empty = TaskSeriesTransitionDefaults(template: TaskRecord(id: id, attributes: [:]), tasks: [], now: Date(timeIntervalSince1970: 200))
+    #expect(empty.firstDue == Date(timeIntervalSince1970: 86600))
+    #expect(empty.planned == empty.firstDue && empty.wait == empty.firstDue)
+    #expect(!empty.hasUntil && empty.recurrence == "weekly")
+    #expect(empty.until == Date(timeIntervalSince1970: 31622600))
+    #expect(try TaskSeriesOffsetChange.setting(date: Date(timeIntervalSince1970: 239.25), relativeTo: defaults.firstDue) == .set(-10))
+    #expect(throws: TaskSeriesTransitionError.invalidDate) {
+        try TaskSeriesOffsetChange.setting(date: Date(timeIntervalSince1970: .infinity), relativeTo: defaults.firstDue)
+    }
+}
