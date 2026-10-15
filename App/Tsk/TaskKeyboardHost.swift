@@ -20,6 +20,7 @@ final class TaskKeyboardRouter {
     private let id = UUID()
     private var controllers: [UUID: WeakKeyboardController] = [:]
     private var installed: [ObjectIdentifier: (WeakKeyboardController, [UIKeyCommand])] = [:]
+    private let registration = TaskKeyboardRegistration()
     private static var routers: [UUID: WeakKeyboardRouter] = [:]
     private var lastDiagnostic: String?
     private var diagnostics: [[String: Any]] = []
@@ -60,9 +61,20 @@ final class TaskKeyboardRouter {
     private func refresh() {
         #if DEBUG && targetEnvironment(simulator)
         refreshCount += 1
-        removalCount += installed.values.reduce(0) { $0 + $1.1.count }
         #endif
-        for (_, (controller, keys)) in installed { keys.forEach { controller.value?.removeKeyCommand($0) } }
+        let declarations = commands.map { TaskKeyboardDeclaration(id: $0.id, input: $0.input, modifiers: $0.modifiers.rawValue, title: $0.title) }
+        registration.reconcile(declarations, hosts: controllers.values.compactMap(\.value)) { applyRegistration() }
+        diagnostic("scope changed")
+    }
+
+    private func applyRegistration() {
+        for (_, (controller, keys)) in installed {
+            guard let controller = controller.value else { continue }
+            keys.forEach(controller.removeKeyCommand)
+            #if DEBUG && targetEnvironment(simulator)
+            removalCount += keys.count
+            #endif
+        }
         installed.removeAll()
         for controller in controllers.values.compactMap(\.value) {
             let identity = ObjectIdentifier(controller)
@@ -83,7 +95,6 @@ final class TaskKeyboardRouter {
         #if DEBUG && targetEnvironment(simulator)
         menuRebuildCount += 1
         #endif
-        diagnostic("scope changed")
     }
 
     static func perform(_ key: UIKeyCommand) {
