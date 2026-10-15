@@ -2,6 +2,7 @@ import XCTest
 
 @MainActor final class ShareCaptureUITests: XCTestCase {
     private let taskActivityTitles = ["Add to tsk", "tsk"]
+    private var capturedSystemShareFailure = false
 
     override func setUpWithError() throws { continueAfterFailure = false }
 
@@ -159,6 +160,50 @@ import XCTest
         capture(stage, app)
         let hierarchy = XCTAttachment(string: stage + "\n" + app.debugDescription)
         hierarchy.name = "Actual installed-share discovery hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        #if targetEnvironment(simulator)
+        guard !capturedSystemShareFailure,
+              ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
+              let token = app.launchEnvironment["TSK_SHARE_FIXTURE_TOKEN"], UUID(uuidString: token) != nil else { return }
+        capturedSystemShareFailure = true
+        let captureTime = Date().timeIntervalSince1970
+        let png = XCUIScreen.main.screenshot().pngRepresentation
+        let screenAttached = png.count <= 4 * 1024 * 1024
+        if screenAttached {
+            let screen = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            screen.name = "Actual system share failure full screen"
+            screen.lifetime = .keepAlways
+            add(screen)
+        }
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let state = springboard.state
+        let running = state != .unknown && state != .notRunning
+        let description = running ? springboard.debugDescription : ""
+        let originalBytes = description.utf8.count
+        let prefix = String(decoding: description.utf8.prefix(12 * 1024), as: UTF8.self)
+        let metadata: [String: Any] = [
+            "stage": String(decoding: stage.utf8.prefix(160), as: UTF8.self),
+            "captureTime": captureTime,
+            "hostState": app.state.rawValue,
+            "springBoardState": state.rawValue,
+            "screenPNGBytes": png.count,
+            "screenAttached": screenAttached,
+            "screenOmission": screenAttached ? "none" : "over-cap",
+            "hierarchyState": state == .unknown ? "unknown" : state == .notRunning ? "notRunning" : originalBytes == 0 ? "empty" : originalBytes > 12 * 1024 ? "truncated" : "captured",
+            "originalHierarchyUTF8Bytes": originalBytes,
+            "retainedHierarchyUTF8Bytes": prefix.utf8.count,
+            "hierarchyTruncated": originalBytes > 12 * 1024
+        ]
+        if let header = try? JSONSerialization.data(withJSONObject: metadata, options: .sortedKeys) {
+            var text = header
+            text.append(Data("\n".utf8))
+            text.append(Data(prefix.utf8))
+            if text.count > 16 * 1024 { text = Data("Supplemental share hierarchy omitted: formatted attachment exceeded 16KiB.".utf8) }
+            let endpoint = XCTAttachment(data: text, uniformTypeIdentifier: "public.plain-text")
+            endpoint.name = "Bounded SpringBoard state at share failure"
+            endpoint.lifetime = .keepAlways
+            add(endpoint)
+        }
+        #endif
     }
 
     private func descriptionField(_ app: XCUIApplication) -> XCUIElement {
