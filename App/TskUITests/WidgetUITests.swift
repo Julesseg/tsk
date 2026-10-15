@@ -28,33 +28,47 @@ final class WidgetUITests: XCTestCase {
         XCTAssertTrue(icon.isHittable)
         capture("Actual Home screen tsk icon before widget installation", springboard)
         icon.press(forDuration: 1.5)
-        let editHome = springboard.buttons["Edit Home Screen"].firstMatch
-        let options = springboard.buttons["Options"].firstMatch
-        if !editHome.exists, options.exists && options.isHittable {
-            capture("Actual Home icon native Options menu before editing route", springboard)
-            options.tap()
-            capture("Actual Home icon Options submenu", springboard)
-            let hierarchy = XCTAttachment(string: springboard.debugDescription)
-            hierarchy.name = "Actual Home icon Options submenu accessibility"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        let nativeMedium = springboard.buttons["Medium-sized widget"].firstMatch
+        if nativeMedium.exists {
+            XCTAssertTrue(nativeMedium.isHittable, springboard.debugDescription)
+            capture("Actual native app icon medium widget control", springboard)
+            nativeMedium.tap()
+            if springboard.buttons["Done"].exists && springboard.buttons["Done"].isHittable { springboard.buttons["Done"].tap() }
+        } else {
+            let editHome = springboard.buttons["Edit Home Screen"].firstMatch
+            let options = springboard.buttons["Options"].firstMatch
+            if !editHome.exists, options.exists && options.isHittable {
+                capture("Actual Home icon native Options menu before editing route", springboard)
+                options.tap()
+                capture("Actual Home icon Options submenu", springboard)
+                let hierarchy = XCTAttachment(string: springboard.debugDescription)
+                hierarchy.name = "Actual Home icon Options submenu accessibility"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+            }
+            tap(springboard, labels: ["Edit Home Screen"])
+            tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
+            if springboard.buttons["Add Widget"].waitForExistence(timeout: 3) { springboard.buttons["Add Widget"].tap() }
+            else if springboard.buttons["Add Widgets"].exists { springboard.buttons["Add Widgets"].tap() }
+            let search = springboard.searchFields.firstMatch
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            search.tap()
+            search.typeText("tsk")
+            let gallery = springboard.collectionViews["add-sheet-collection-view"].firstMatch
+            let provider = gallery.cells.matching(NSPredicate(format: "label IN %@", ["tsk", "tsk Tasks"])).firstMatch
+            XCTAssertTrue(provider.waitForExistence(timeout: 15), springboard.debugDescription)
+            XCTAssertTrue(provider.isHittable, springboard.debugDescription)
+            capture("Actual tsk provider cell in native widget gallery", springboard)
+            provider.tap()
+            tap(springboard, labels: ["Add Widget"])
+            tap(springboard, labels: ["Done"])
         }
-        tap(springboard, labels: ["Edit Home Screen"])
-        tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
-        if springboard.buttons["Add Widget"].waitForExistence(timeout: 3) { springboard.buttons["Add Widget"].tap() }
-        else if springboard.buttons["Add Widgets"].exists { springboard.buttons["Add Widgets"].tap() }
-        let search = springboard.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
-        search.tap()
-        search.typeText("tsk")
-        let gallery = springboard.collectionViews["add-sheet-collection-view"].firstMatch
-        let provider = gallery.cells.matching(NSPredicate(format: "label IN %@", ["tsk", "tsk Tasks"])).firstMatch
-        XCTAssertTrue(provider.waitForExistence(timeout: 15), springboard.debugDescription)
-        XCTAssertTrue(provider.isHittable, springboard.debugDescription)
-        capture("Actual tsk provider cell in native widget gallery", springboard)
-        provider.tap()
-        tap(springboard, labels: ["Add Widget"])
-        tap(springboard, labels: ["Done"])
         let taskText = springboard.staticTexts[today].firstMatch
-        XCTAssertTrue(taskText.waitForExistence(timeout: 30), springboard.debugDescription)
+        let rendered = taskText.waitForExistence(timeout: 30)
+        if !rendered {
+            capture("Actual native widget installation endpoint without Today task", springboard)
+            let hierarchy = XCTAttachment(string: springboard.debugDescription)
+            hierarchy.name = "Actual widget installation failure accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        }
+        XCTAssertTrue(rendered, springboard.debugDescription)
         capture("Installed Today widget reads shared tasks", springboard)
         let complete = springboard.buttons["Complete " + today].firstMatch
         XCTAssertTrue(complete.waitForExistence(timeout: 10))
