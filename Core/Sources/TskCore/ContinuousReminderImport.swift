@@ -52,11 +52,11 @@ public extension TaskManager {
         var result = ReminderMoveResult()
         for candidate in candidates {
             guard let item = reminderImportItems([candidate.snapshot], mappings: mappings).first else { continue }
-            guard let draft = item.draft else { result.skipped.append(item); continue }
+            guard item.draft != nil else { result.skipped.append(item); continue }
             do {
                 try Task.checkCancellation()
                 try await verifyReminderConfiguration(configuration)
-                result.imported.append(try await create(draft))
+                result.imported.append(try await saveReminderImportItem(item))
             } catch {
                 result.failures.append(ReminderImportItem(title: item.title, draft: nil, reason: "Task was not saved; source was not removed. \(error.localizedDescription)"))
                 break
