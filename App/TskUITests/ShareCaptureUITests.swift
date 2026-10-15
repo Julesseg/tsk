@@ -1,6 +1,8 @@
 import XCTest
 
 @MainActor final class ShareCaptureUITests: XCTestCase {
+    private let taskActivityTitles = ["Add to tsk", "tsk"]
+
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback() throws {
@@ -84,10 +86,10 @@ import XCTest
             return
         }
         capture("Real system activity sheet before installed extension discovery", app)
-        let direct = activityEntry("Add to tsk", in: sheet)
+        let direct = activityEntry(taskActivityTitles, in: sheet)
         if direct.exists && direct.isHittable { tapTaskControl(direct, app: app) }
         else {
-            var more = activityEntry("More", in: sheet)
+            var more = activityEntry(["More"], in: sheet)
             if !more.waitForExistence(timeout: 3) || !more.isHittable {
                 let row = sheet.scrollViews.containing(.cell, identifier: "shareCell").firstMatch
                 for _ in 0..<3 {
@@ -97,7 +99,7 @@ import XCTest
                     let origin = app.coordinate(withNormalizedOffset: .zero)
                     origin.withOffset(CGVector(dx: frame.maxX - 20 - app.frame.minX, dy: frame.midY - app.frame.minY))
                         .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: frame.minX + 20 - app.frame.minX, dy: frame.midY - app.frame.minY)))
-                    more = activityEntry("More", in: sheet)
+                    more = activityEntry(["More"], in: sheet)
                     if more.exists && more.isHittable { break }
                 }
             }
@@ -108,11 +110,13 @@ import XCTest
             }
             tapTaskControl(more, app: app)
             capture("Real system More apps list before installed extension selection", app)
-            let matches = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Add to tsk"))
+            let apps = app.otherElements["ShareSheet.EditAppsView"].firstMatch
+            let titles = NSPredicate(format: "elementType == %lu AND identifier == %@ AND label IN %@", XCUIElement.ElementType.staticText.rawValue, "activityTitleLabel", taskActivityTitles)
+            let matches = apps.tables.cells.containing(titles)
             if !matches.firstMatch.exists, app.buttons["Edit"].exists {
                 tapTaskControl(app.buttons["Edit"], app: app)
                 capture("Real system Edit apps list before installed extension activation", app)
-                let row = app.tables.cells.containing(.staticText, identifier: "Add to tsk").firstMatch
+                let row = matches.firstMatch
                 guard row.waitForExistence(timeout: 10) else {
                     shareDiscoveryEvidence("Installed extension absent from real Edit apps list", app: app)
                     XCTFail("Installed tsk share extension was absent from the system Edit apps list")
@@ -124,7 +128,7 @@ import XCTest
                     let enabled = expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: toggle)
                     XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
                 }
-                tapTaskControl(app.buttons["Done"].firstMatch, app: app)
+                tapTaskControl(apps.navigationBars.buttons["Done"].firstMatch, app: app)
                 capture("Real system apps list after installed extension activation", app)
             }
             guard matches.firstMatch.waitForExistence(timeout: 10), let entry = matches.allElementsBoundByIndex.first(where: { $0.isHittable }) else {
@@ -141,11 +145,12 @@ import XCTest
         }
     }
 
-    private func activityEntry(_ title: String, in sheet: XCUIElement) -> XCUIElement {
-        let cell = sheet.cells.matching(NSPredicate(format: "identifier == %@ AND label == %@", "shareCell", title)).firstMatch
+    private func activityEntry(_ titles: [String], in sheet: XCUIElement) -> XCUIElement {
+        let cell = sheet.cells.matching(NSPredicate(format: "identifier == %@ AND label IN %@", "shareCell", titles)).firstMatch
         if cell.exists { return cell }
-        let button = sheet.buttons[title].firstMatch
-        return button.exists ? button : sheet.staticTexts[title].firstMatch
+        let matchingTitle = NSPredicate(format: "label IN %@", titles)
+        let button = sheet.buttons.matching(matchingTitle).firstMatch
+        return button.exists ? button : sheet.staticTexts.matching(matchingTitle).firstMatch
     }
 
     private func shareDiscoveryEvidence(_ stage: String, app: XCUIApplication) {
