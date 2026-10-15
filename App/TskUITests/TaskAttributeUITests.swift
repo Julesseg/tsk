@@ -33,7 +33,7 @@ final class TaskAttributeUITests: XCTestCase {
             nameField.typeText(name)
             if app.buttons["dismiss-definition-keyboard"].exists { app.buttons["dismiss-definition-keyboard"].tap() }
             app.buttons["attribute-definition-type"].tap()
-            app.buttons[type].tap()
+            tapTaskControl(app.buttons[type], app: app)
             if name == "reference" { capture("Native UUID definition editor", app: app) }
             tapTaskControl(app.buttons["save-attribute-definition"], app: app)
             XCTAssertTrue(nameField.waitForNonExistence(timeout: 10))
