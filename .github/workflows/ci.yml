@@ -98,6 +98,9 @@ jobs:
           scripts/build-native.sh host
           swift build --package-path Native --product tsk-native-probe
 
+      - name: Validate target-specific release profile rules
+        run: python3 scripts/test-provisioning-profiles.py
+
       - name: Toolchain versions
         run: xcodebuild -version
 

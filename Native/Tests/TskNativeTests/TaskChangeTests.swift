@@ -32,7 +32,7 @@ import TskNative
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_NATIVE_PROBE_BINARY"] != nil))
-@MainActor func aSeparateProcessPublishesTaskAndDefinitionVersionsToAnAlreadyOpenParticipant() async throws {
+func aSeparateProcessPublishesTaskAndDefinitionVersionsToAnAlreadyOpenParticipant() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let manager = TaskChampionSession.makeManager(directory: root)
@@ -45,9 +45,13 @@ import TskNative
     let process = Process()
     process.executableURL = URL(fileURLWithPath: binary)
     process.arguments = ["participant-change", root.path, saved.id.uuidString, output.path]
-    try process.run()
+    try await MainActor.run { try process.run() }
+    defer { if process.isRunning { process.terminate() } }
     let deadline = Date().addingTimeInterval(10)
-    while process.isRunning && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.02)) }
+    while process.isRunning && Date() < deadline {
+        await pumpWidgetProbeRunLoop()
+        try await Task.sleep(for: .milliseconds(20))
+    }
     if process.isRunning { process.terminate() }
     #expect(!process.isRunning)
     let result = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: output)) as? [String: String])
@@ -67,7 +71,7 @@ import TskNative
 }
 
 #if canImport(AppIntents)
-@Test @MainActor func theWidgetCompletionIntentUsesTheSelectedRegisteredViewAndPublishesSharedChanges() async throws {
+@Test func theWidgetCompletionIntentUsesTheSelectedRegisteredViewAndPublishesSharedChanges() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let app = TaskChampionSession.makeManager(directory: root)
@@ -102,3 +106,5 @@ import TskNative
     await #expect(throws: (any Error).self) { try await participant.changeVersion() }
     #expect(try await participant.tasks().count == 1)
 }
+
+@MainActor private func pumpWidgetProbeRunLoop() { RunLoop.current.run(until: Date().addingTimeInterval(0.02)) }
