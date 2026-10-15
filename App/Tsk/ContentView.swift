@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var isChoosingCustomView = false
     @State private var isShowingShortcuts = false
     @State private var isDefiningAttributes = false
+    @State private var isImportingReminders = false
     @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
@@ -28,7 +29,7 @@ struct ContentView: View {
         Group {
             if sizeClass == .regular {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, attributeDefinitions: { isDefiningAttributes = true })
+                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true })
                         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                 } content: {
                     taskList(selection: $selectedTaskID)
@@ -59,6 +60,7 @@ struct ContentView: View {
             }
         }
         .focusedSceneValue(\.taskWorkspace, workspaceActions)
+        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
         .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
         .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
@@ -115,6 +117,7 @@ struct ContentView: View {
                 if sizeClass != .regular {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu("More", systemImage: "ellipsis") {
+                            Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                             Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
                         }.accessibilityIdentifier("workspace-more")
                     }
@@ -165,7 +168,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isDefiningAttributes, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isDefiningAttributes, !isImportingReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
