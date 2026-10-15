@@ -30,7 +30,7 @@ final class CustomViewsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["filter-error"].waitForExistence(timeout: 5))
         XCTAssertEqual(expression.value as? String, "unknown:Work")
         capture("Raw filter schema error", app: app)
-        replaceLine(expression, with: "project.is:Work")
+        replaceLine(expression, app: app, with: "project.is:Work")
         app.buttons["save-custom-view"].tap()
         XCTAssertTrue(app.buttons["active-custom-view"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Filter task"].exists)
@@ -47,7 +47,7 @@ final class CustomViewsUITests: XCTestCase {
         app.buttons["Edit"].tap()
         XCTAssertTrue(expression.waitForExistence(timeout: 5))
         XCTAssertEqual(expression.value as? String, "project.is:Work")
-        replaceLine(expression, with: "project.is:Work and status:pending")
+        replaceLine(expression, app: app, with: "project.is:Work and status:pending")
         app.buttons["save-custom-view"].tap()
         XCTAssertTrue(app.buttons["active-custom-view"].waitForExistence(timeout: 10))
         app.staticTexts["Filter task"].tap()
@@ -70,9 +70,8 @@ final class CustomViewsUITests: XCTestCase {
         XCTAssertFalse(saved.exists)
     }
 
-    private func replaceLine(_ field: XCUIElement, with text: String) {
-        field.tap(withNumberOfTaps: 3, numberOfTouches: 1)
-        field.typeText(text)
+    private func replaceLine(_ field: XCUIElement, app: XCUIApplication, with text: String) {
+        replaceTaskText(field, with: text, app: app)
         XCTAssertEqual(field.value as? String, text)
     }
 

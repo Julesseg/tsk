@@ -57,6 +57,7 @@ final class RecurringTemplateUITests: XCTestCase {
             return attributes.contains { $0["key"] == "parent" }
         })
         let id = try XCTUnwrap(child["id"] as? String)
+        let parentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
@@ -80,7 +81,8 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         XCTAssertEqual(app.buttons["complete-task"].label, "Complete occurrence")
         app.buttons["complete-task"].tap()
-        XCTAssertTrue(app.staticTexts["Completed"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
         XCTAssertFalse(app.buttons["edit-task"].exists)
         capture("Occurrence completes while preserving series history", app)
         XCTAssertTrue(revealTaskElement(app.buttons["occurrence-template"], in: "task-detail-form", app: app))
@@ -92,7 +94,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launch()
         XCTAssertFalse(row.waitForExistence(timeout: 2))
         openTemplates(app)
-        app.staticTexts["Generated weekly"].tap()
+        app.collectionViews["recurring-template-list"].buttons["recurring-template-" + parentID].tap()
         XCTAssertTrue(revealTaskElement(app.otherElements["raw-attribute-mask"], in: "task-detail-form", app: app) || revealTaskElement(app.staticTexts["raw-attribute-mask"], in: "task-detail-form", app: app))
         let mask = app.descendants(matching: .any)["raw-attribute-mask"].firstMatch
         XCTAssertEqual(mask.value as? String, "WW+")
@@ -109,6 +111,7 @@ final class RecurringTemplateUITests: XCTestCase {
         records[parentIndex]["attributes"] = attributes
         let child = try XCTUnwrap(records.first { record in (record["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
         let id = try XCTUnwrap(child["id"] as? String)
+        let parentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)

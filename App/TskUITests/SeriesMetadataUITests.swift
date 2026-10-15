@@ -35,8 +35,7 @@ final class SeriesMetadataUITests: XCTestCase {
         app.buttons["edit-series-metadata"].tap()
         let emptyDescription = app.textFields["series-description"].exists ? app.textFields["series-description"] : app.textViews["series-description"]
         XCTAssertTrue(emptyDescription.waitForExistence(timeout: 10))
-        emptyDescription.tap()
-        emptyDescription.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 50))
+        replaceTaskText(emptyDescription, with: "", app: app)
         hideKeyboard(app)
         app.buttons["preview-series-metadata"].tap()
         XCTAssertTrue(app.staticTexts["series-metadata-error"].waitForExistence(timeout: 10))
@@ -95,8 +94,7 @@ final class SeriesMetadataUITests: XCTestCase {
     private func changeDescription(_ app: XCUIApplication) {
         let field = app.textFields["series-description"].exists ? app.textFields["series-description"] : app.textViews["series-description"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 50) + "Revised series metadata")
+        replaceTaskText(field, with: "Revised series metadata", app: app)
         hideKeyboard(app)
     }
 

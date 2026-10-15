@@ -35,6 +35,7 @@ final class ContinuousReminderController {
     func load() async {
         do { status = try await store.manager.continuousReminderStatus() }
         catch { self.error = error.localizedDescription }
+        recordFixtureState()
     }
 
     func enable(mappings: [ReminderListMapping]) async throws {
@@ -92,6 +93,19 @@ final class ContinuousReminderController {
         debounce?.cancel()
         #if DEBUG
         fixtureContinuation?.resume(throwing: CancellationError()); fixtureContinuation = nil; fixtureWaiting = false
+        #endif
+    }
+
+    private func recordFixtureState() {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", let token = environment["TSK_TEST_REMINDERS_VERIFY_TOKEN"], UUID(uuidString: token) != nil else { return }
+        let record: [String: Any] = ["readAt": Date().timeIntervalSince1970, "active": status?.active as Any? ?? NSNull(), "paused": status?.paused as Any? ?? NSNull(), "configuredOnAnotherDevice": status?.configuredOnAnotherDevice as Any? ?? NSNull(), "enabled": status?.configuration?.enabled as Any? ?? NSNull(), "isRunning": isRunning, "fixtureWaiting": fixtureWaiting, "error": error as Any? ?? NSNull(), "imported": result?.imported.map { $0.id.uuidString } as Any? ?? NSNull(), "removedCount": result?.removedCount as Any? ?? NSNull(), "skippedCount": result?.skipped.count as Any? ?? NSNull(), "failedCount": result?.failures.count as Any? ?? NSNull()]
+        do {
+            let data = try JSONSerialization.data(withJSONObject: record, options: [.prettyPrinted, .sortedKeys])
+            let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-status-\(token).json")
+            try data.write(to: file, options: .atomic)
+        } catch { NSLog("tsk owned import diagnostic failed: %@", error.localizedDescription) }
         #endif
     }
 

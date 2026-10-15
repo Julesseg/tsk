@@ -29,12 +29,13 @@ final class TaskAttributeUITests: XCTestCase {
             app.buttons["new-attribute-definition"].tap()
             let nameField = app.textFields["attribute-definition-name"]
             XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+            focusTaskText(nameField, app: app)
             nameField.typeText(name)
             if app.buttons["dismiss-definition-keyboard"].exists { app.buttons["dismiss-definition-keyboard"].tap() }
             app.buttons["attribute-definition-type"].tap()
             app.buttons[type].tap()
             if name == "reference" { capture("Native UUID definition editor", app: app) }
-            app.buttons["save-attribute-definition"].tap()
+            tapTaskControl(app.buttons["save-attribute-definition"], app: app)
             XCTAssertTrue(nameField.waitForNonExistence(timeout: 10))
         }
         capture("All five local attribute types", app: app)
