@@ -58,7 +58,8 @@ final class RecurringTemplateUITests: XCTestCase {
             return attributes.contains { $0["key"] == "parent" }
         })
         let id = try XCTUnwrap(child["id"] as? String)
-        let parentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
+        let rawParentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
+        let parentID = try XCTUnwrap(UUID(uuidString: rawParentID), "The recorded occurrence must reference a valid template UUID").uuidString
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
