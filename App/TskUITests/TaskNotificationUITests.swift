@@ -13,14 +13,14 @@ final class TaskNotificationUITests: XCTestCase {
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=true hour=9 minute=0", timeout: 15))
         let toggle = app.switches["notification-midnight-enabled"]
-        reveal(toggle, in: app); toggle.tap()
+        reveal(toggle, in: app, towardsTop: true); tapNotificationSwitch(toggle, app: app)
         let save = app.buttons["notification-save-preferences"]
-        reveal(save, in: app); save.tap()
+        reveal(save, in: app, towardsTop: true); tapTaskControl(save, app: app)
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=false", timeout: 15))
         capture("Disabled midnight replacement updates actual registration without changing task dates", app)
-        reveal(toggle, in: app); toggle.tap()
-        reveal(save, in: app); save.tap()
+        reveal(toggle, in: app, towardsTop: true); tapNotificationSwitch(toggle, app: app)
+        reveal(save, in: app, towardsTop: true); tapTaskControl(save, app: app)
         let register = app.buttons["notification-fixture-register"]
         reveal(register, in: app)
         register.tap()
@@ -68,14 +68,9 @@ final class TaskNotificationUITests: XCTestCase {
         reveal(link, in: app); link.tap()
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
-        let toggle = settings.switches["Allow Notifications"].firstMatch
-        if !toggle.waitForExistence(timeout: 5) {
-            let notifications = settings.cells.containing(.staticText, identifier: "Notifications").firstMatch
-            XCTAssertTrue(notifications.waitForExistence(timeout: 5), settings.debugDescription)
-            notifications.tap()
-        }
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), settings.debugDescription)
-        if toggle.value as? String == "1" { toggle.tap() }
+        let toggle = notificationPermissionSwitch(in: settings)
+        if toggle.value as? String == "1" { tapTaskControl(toggle, app: settings) }
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "0"), evaluatedWith: toggle)], timeout: 5), .completed)
         app.activate()
         let denied = app.buttons["notification-fixture-denied"]
         reveal(denied, in: app); denied.tap()
@@ -83,10 +78,40 @@ final class TaskNotificationUITests: XCTestCase {
         capture("Actual revoked permission preserves durable task creation", app)
         reveal(link, in: app); link.tap()
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
-        if !toggle.waitForExistence(timeout: 5) { settings.cells.containing(.staticText, identifier: "Notifications").firstMatch.tap() }
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
-        if toggle.value as? String == "0" { toggle.tap() }
+        let restoredToggle = notificationPermissionSwitch(in: settings)
+        if restoredToggle.value as? String == "0" { tapTaskControl(restoredToggle, app: settings) }
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: restoredToggle)], timeout: 5), .completed)
         app.activate()
+    }
+
+    private func notificationPermissionSwitch(in settings: XCUIApplication) -> XCUIElement {
+        let toggle = settings.switches["Allow Notifications"].firstMatch
+        if toggle.waitForExistence(timeout: 5) { return toggle }
+        capture("Actual public notification Settings link destination", settings)
+        var notifications = settings.cells.containing(.staticText, identifier: "Notifications").firstMatch
+        if !notifications.exists {
+            let apps = settings.buttons["com.apple.settings.apps"].firstMatch
+            let sidebar = settings.collectionViews.matching(NSPredicate(format: "label == %@", "Sidebar")).firstMatch
+            let root = sidebar.exists ? sidebar : settings.collectionViews.firstMatch
+            guard revealTaskElement(apps, in: root, app: settings, maximumSteps: 12) else { return toggle }
+            tapTaskControl(apps, app: settings)
+            capture("Actual system Apps settings before selecting tsk", settings)
+            let taskApp = settings.cells.containing(.staticText, identifier: "tsk").firstMatch
+            let collection = settings.collectionViews.matching(NSPredicate(format: "label != %@", "Sidebar")).firstMatch
+            let list = collection.waitForExistence(timeout: 5) ? collection : settings.tables.firstMatch
+            if let search = settings.searchFields.allElementsBoundByIndex.first(where: { $0.isHittable && list.frame.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }) {
+                tapTaskControl(search, app: settings)
+                search.typeText("tsk")
+            }
+            guard revealTaskElement(taskApp, in: list, app: settings, maximumSteps: 12) else { return toggle }
+            tapTaskControl(taskApp, app: settings)
+            capture("Actual tsk app settings before notification permissions", settings)
+            notifications = settings.cells.containing(.staticText, identifier: "Notifications").firstMatch
+        }
+        XCTAssertTrue(notifications.waitForExistence(timeout: 5), settings.debugDescription)
+        tapTaskControl(notifications, app: settings)
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), settings.debugDescription)
+        return toggle
     }
 
     private func application() -> XCUIApplication {
@@ -118,13 +143,12 @@ final class TaskNotificationUITests: XCTestCase {
         }
         XCTAssertTrue(wait(app.staticTexts["notification-permission"], prefix: "Notifications allowed", timeout: 15), app.debugDescription)
     }
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<12 {
-            if element.exists && element.isHittable && app.frame.contains(element.frame) { return }
-            if element.exists && element.frame.midY < app.frame.midY { app.swipeDown() }
-            else { app.swipeUp() }
-        }
-        XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, towardsTop: Bool = false) {
+        revealTaskElement(element, in: "notification-settings-form", app: app, initialScrollUp: !towardsTop, maximumSteps: 12)
+    }
+    private func tapNotificationSwitch(_ element: XCUIElement, app: XCUIApplication) {
+        let thumb = element.switches.firstMatch
+        tapTaskControl(thumb.exists ? thumb : element, app: app)
     }
     private func wait(_ element: XCUIElement, prefix: String, timeout: TimeInterval) -> Bool {
         XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in element.exists && element.label.hasPrefix(prefix) }, object: nil)], timeout: timeout) == .completed

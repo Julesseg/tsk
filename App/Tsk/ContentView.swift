@@ -1,5 +1,6 @@
 import SwiftUI
 import TskCore
+import TskNative
 import EventKit
 
 struct ContentView: View {
@@ -225,7 +226,7 @@ struct ContentView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
-                    Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
+                    Button("Task notifications") { TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "workspace-menu"]); isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
                     Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
                     Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                     Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
