@@ -42,6 +42,12 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
     }
     try await waitForFile(directory.appendingPathComponent("url"))
     let proxyURL = try String(contentsOf: directory.appendingPathComponent("url"), encoding: .utf8)
+    try await exerciseBlockedReplica(directory: directory, proxyURL: proxyURL, backend: backend, secret: secret, method: method, seriesOnly: seriesOnly, transitionOnly: transitionOnly)
+}
+
+private func exerciseBlockedReplica(directory: URL, proxyURL: String, backend: String, secret: String, method: String, seriesOnly: Bool, transitionOnly: Bool) async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let gate = directory.appendingPathComponent("released")
     let rawClientID = try #require(environment["TSK_SYNC_TEST_CLIENT_ID"])
     let clientID = try #require(UUID(uuidString: rawClientID))
     let directConfiguration = try SyncConfiguration(serverURL: backend, clientID: clientID, encryptionSecret: secret)
@@ -58,6 +64,11 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
         _ = try await fixtureReplica.updateAtomically([TaskAtomicUpdate(id: occurrence.id, expected: occurrence.attributes, changes: ["due": "4000000000"])])
         _ = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "1", "due": "4000000001", "opaque": "preserve future"])
     }
+    let phaseStart = Date()
+    let mode = seriesOnly ? "series metadata" : transitionOnly ? "series transition" : "local mutations"
+    func recordPhase(_ phase: String) {
+        print("Held response \(method) \(mode) \(phase): \(Date().timeIntervalSince(phaseStart))s; released=\(FileManager.default.fileExists(atPath: gate.path))")
+    }
     let attempt = Task { try await manager.synchronize(using: configuration) }
     let deadline = Task.detached {
         try await Task.sleep(for: .seconds(5))
@@ -65,6 +76,7 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
     }
     defer { deadline.cancel() }
     try await waitForFile(directory.appendingPathComponent("blocked.json"))
+    recordPhase("barrier observed")
     let blocked = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("blocked.json"))) as? [String: Any])
     #expect(blocked["method"] as? String == method)
     if method == "POST" { #expect(blocked["status"] as? Int == 200) }
@@ -117,12 +129,15 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
     let versionBefore = try await manager.changeVersion()
     let created = try await manager.create(TaskDraft(description: "Captured during blocked \(method)", attributes: ["opaque": "retain in-flight"]))
     #expect(try await manager.changeVersion().tasks != versionBefore.tasks)
+    recordPhase("capture published")
     let capturedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(capturedWhileBlocked, "Durable capture must finish before the held server response is released")
     let edited = try await manager.update(id: created.id, changes: ["description": "Edited during blocked \(method)"])
+    recordPhase("edit published")
     let editedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(editedWhileBlocked, "Durable edit must finish before the held server response is released")
     let completed = try await manager.complete(id: created.id)
+    recordPhase("completion published")
     let completedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(completedWhileBlocked, "Durable completion must finish before the held server response is released")
     #expect(edited.attributes["opaque"] == "retain in-flight")
@@ -130,11 +145,13 @@ func durableSeriesTransitionFinishesWhileRealServerResponsesRemainBlocked() asyn
     #expect(completed.attributes["opaque"] == "retain in-flight")
     let completedOccurrence = try await manager.complete(id: occurrence.id)
     #expect(!FileManager.default.fileExists(atPath: gate.path), "Atomic occurrence completion must finish while the real HTTP response remains held")
+    recordPhase("occurrence published")
     #expect(completedOccurrence.status == "completed")
     #expect(try await manager.task(id: series.id).attributes["mask"] == "+")
     let samePath = directory.appendingPathComponent("native").resolvingSymlinksInPath()
     let anotherManager = TaskManager(replica: TaskChampionReplica(directory: samePath))
     let otherLocal = try await anotherManager.create(TaskDraft(description: "Another actor during blocked \(method)", attributes: ["opaque": "retain other actor"]))
+    recordPhase("other actor saved")
     let otherActorSavedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(otherActorSavedWhileBlocked)
     try Data().write(to: gate)

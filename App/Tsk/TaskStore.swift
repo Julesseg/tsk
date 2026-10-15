@@ -80,7 +80,10 @@ final class TaskStore {
         defer { if generation == reloadGeneration { isLoading = false } }
         do {
             let snapshot: TaskViewSnapshot
-            if let requestedCustom { snapshot = try await manager.viewSnapshot(filter: requestedCustom.expression) }
+            if let requestedCustom {
+                if let id = requestedCustom.id { snapshot = try await manager.viewSnapshot(reference: .custom(id)) }
+                else { snapshot = try await manager.viewSnapshot(filter: requestedCustom.expression) }
+            }
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
             tasks = snapshot.tasks

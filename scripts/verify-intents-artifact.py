@@ -5,7 +5,8 @@ import struct
 import sys
 
 app = pathlib.Path(sys.argv[1])
-info = plistlib.loads((app / 'Info.plist').read_bytes())
+
+
 def verify_group(bundle):
     bundle_info = plistlib.loads((bundle / 'Info.plist').read_bytes())
     binary = (bundle / bundle_info['CFBundleExecutable']).read_bytes()

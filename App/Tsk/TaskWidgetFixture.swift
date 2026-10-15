@@ -5,9 +5,10 @@ import TskNative
 import WidgetKit
 
 func installWidgetFixture() async throws {
+    #if targetEnvironment(simulator)
     let environment = ProcessInfo.processInfo.environment
     guard let token = environment["TSK_TEST_WIDGET_FIXTURE"] else { return }
-    guard environment["TSK_TEST_REPLICA_NAME"] == nil, UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
+    guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", environment["TSK_TEST_REPLICA_NAME"] == nil, UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
     let directory = try TaskChampionSession.directory()
     let manager = try await TaskChampionSession.open(directory: directory)
     let todayName = "Widget Today " + token
@@ -29,6 +30,15 @@ func installWidgetFixture() async throws {
     let proof = records.filter { $0.description == todayName || $0.description == customName }
     let output = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("widgets-fixture-\(token).json")
     try JSONEncoder().encode(proof).write(to: output, options: .atomic)
+    let configurations: [WidgetInfo] = try await withCheckedThrowingContinuation { continuation in
+        WidgetCenter.shared.getCurrentConfigurations { continuation.resume(with: $0) }
+    }
+    let installed = configurations.filter { $0.kind == "tsk.tasks" }.map { info in
+        ["kind": info.kind, "family": String(info.family.rawValue), "view": info.widgetConfigurationIntent(of: TaskWidgetConfiguration.self)?.view?.id ?? "unconfigured"]
+    }
+    let installedOutput = output.deletingLastPathComponent().appendingPathComponent("widgets-installed-\(token).json")
+    try JSONSerialization.data(withJSONObject: installed).write(to: installedOutput, options: .atomic)
     WidgetCenter.shared.reloadTimelines(ofKind: "tsk.tasks")
+    #endif
 }
 #endif

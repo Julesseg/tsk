@@ -5,18 +5,25 @@ final class WidgetUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError() throws {
+        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", "Widget system fixtures require the canonical disposable simulator lane")
         let token = UUID().uuidString
         let today = "Widget Today " + token
         let custom = "Widget Custom " + token
         let view = "Widget saved " + token
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_WIDGET_FIXTURE"] = token
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launch()
         XCTAssertTrue(taskRow(named: today, app: app).waitForExistence(timeout: 30))
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         XCUIDevice.shared.press(.home)
         let icon = springboard.icons["tsk"].firstMatch
+        for _ in 0..<3 {
+            if icon.exists && icon.isHittable { break }
+            springboard.swipeLeft()
+        }
         XCTAssertTrue(icon.waitForExistence(timeout: 15))
+        XCTAssertTrue(icon.isHittable)
         icon.press(forDuration: 1.5)
         tap(springboard, labels: ["Edit Home Screen"])
         tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
