@@ -9,14 +9,24 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     public init(center: UNUserNotificationCenter = .current()) { self.center = center }
 
     public func authorization() async throws -> TaskNotificationAuthorization {
-        let settings = await withCheckedContinuation { continuation in center.getNotificationSettings { continuation.resume(returning: $0) } }
-        switch settings.authorizationStatus {
-        case .notDetermined: return .notDetermined
-        case .denied: return .denied
-        case .authorized: return .authorized
-        case .provisional: return .provisional
-        case .ephemeral: return .ephemeral
-        @unknown default: return .unavailable
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                let authorization: TaskNotificationAuthorization
+                #if os(iOS)
+                if #available(iOS 14, *), settings.authorizationStatus == .ephemeral {
+                    continuation.resume(returning: .ephemeral)
+                    return
+                }
+                #endif
+                switch settings.authorizationStatus {
+                case .notDetermined: authorization = .notDetermined
+                case .denied: authorization = .denied
+                case .authorized: authorization = .authorized
+                case .provisional: authorization = .provisional
+                @unknown default: authorization = .unavailable
+                }
+                continuation.resume(returning: authorization)
+            }
         }
     }
 
@@ -30,10 +40,14 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     }
 
     public func pending() async throws -> [PendingTaskNotification] {
-        let requests = await withCheckedContinuation { continuation in center.getPendingNotificationRequests { continuation.resume(returning: $0) } }
-        return requests.map { request in
-            let payload = (request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
-            return PendingTaskNotification(identifier: request.identifier, request: payload, nextTriggerDate: (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate())
+        await withCheckedContinuation { continuation in
+            center.getPendingNotificationRequests { requests in
+                let values = requests.map { request in
+                    let payload = (request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
+                    return PendingTaskNotification(identifier: request.identifier, request: payload, nextTriggerDate: (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate())
+                }
+                continuation.resume(returning: values)
+            }
         }
     }
 

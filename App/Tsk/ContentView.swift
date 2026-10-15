@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
     @State private var calendar: TodayCalendarController
+    @State private var notifications: TaskNotificationController
+    @State private var isConfiguringNotifications = false
     @State private var continuousReminders: ContinuousReminderController
     @State private var isConfiguringContinuousReminders = false
     @State private var isCapturing = false
@@ -29,6 +31,7 @@ struct ContentView: View {
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
+        _notifications = State(initialValue: TaskNotificationController(store: store))
         _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
@@ -36,7 +39,7 @@ struct ContentView: View {
         Group {
             if sizeClass == .regular {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true })
+                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true })
                         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                 } content: {
                     taskList(selection: $selectedTaskID)
@@ -67,6 +70,7 @@ struct ContentView: View {
             }
         }
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
+        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
         .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
@@ -102,6 +106,9 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await store.observeParticipantChanges() }
         }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await notifications.observe() }
+        }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -118,8 +125,8 @@ struct ContentView: View {
             } else if phase == .background { opportunities.background() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged(); Task { await notifications.refresh() } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged(); await notifications.refresh() } }
         .task(id: displaysCalendar) {
             calendar.isDisplayingToday = displaysCalendar
             if displaysCalendar { await calendar.refresh() }
@@ -140,6 +147,9 @@ struct ContentView: View {
     private func taskList(selection: Binding<UUID?>?) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
             .navigationTitle(store.customView?.name ?? "Tasks")
+            .safeAreaInset(edge: .bottom) {
+                if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
+            }
             .toolbar {
                 if sizeClass != .regular {
                     ToolbarItemGroup(placement: .topBarLeading) {
@@ -152,6 +162,7 @@ struct ContentView: View {
                 if sizeClass != .regular {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu("More", systemImage: "ellipsis") {
+                            Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
                             Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
                             Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                             Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
