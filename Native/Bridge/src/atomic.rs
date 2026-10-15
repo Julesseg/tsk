@@ -13,6 +13,12 @@ pub struct Update {
 }
 
 #[derive(Deserialize)]
+pub struct Create {
+    id: Uuid,
+    attributes: Vec<Attribute<String>>,
+}
+
+#[derive(Deserialize)]
 pub struct SnapshotRecord {
     id: Uuid,
     attributes: Vec<Attribute<String>>,
@@ -41,10 +47,12 @@ impl Storage for GuardedStorage {
     }
 }
 
-pub async fn update(storage: SqliteStorage, updates: Vec<Update>, snapshot: Option<Vec<SnapshotRecord>>) -> Result<Value, String> {
-    if updates.is_empty() { return Err("Missing atomic updates".into()); }
+pub async fn update(storage: SqliteStorage, updates: Vec<Update>, snapshot: Option<Vec<SnapshotRecord>>, creates: Vec<Create>) -> Result<Value, String> {
+    if updates.is_empty() && creates.is_empty() { return Err("Missing atomic mutations".into()); }
     let mut identities = std::collections::HashSet::new();
     if updates.iter().any(|update| !identities.insert(update.id)) { return Err("Duplicate atomic task identity".into()); }
+    if creates.iter().any(|create| !identities.insert(create.id)) { return Err("Duplicate atomic task identity".into()); }
+    if !creates.is_empty() && snapshot.is_none() { return Err("Atomic creation requires a complete snapshot".into()); }
     let expected = updates.iter().map(|update| (update.id, update.expected.iter().map(|attribute| (attribute.key.clone(), attribute.value.clone())).collect())).collect();
     let with_snapshot = snapshot.is_some();
     let snapshot = snapshot.map(|records| records.into_iter().map(|record| (record.id, record.attributes.into_iter().map(|attribute| (attribute.key, attribute.value)).collect())).collect());
@@ -52,6 +60,12 @@ pub async fn update(storage: SqliteStorage, updates: Vec<Update>, snapshot: Opti
     let mut tasks = if with_snapshot { Some(replica.all_task_data().await.map_err(|e| e.to_string())?) } else { None };
     let mut operations = vec![taskchampion::Operation::UndoPoint];
     let mut saved = Vec::new();
+    for create in creates {
+        if tasks.as_ref().map(|tasks| tasks.contains_key(&create.id)).unwrap_or(true) { return Err("Task identity already exists".into()); }
+        let mut task = taskchampion::TaskData::create(create.id, &mut operations);
+        for Attribute { key, value } in create.attributes { task.update(key, Some(value), &mut operations); }
+        saved.push(record(task));
+    }
     for update in updates {
         let mut task = match tasks.as_mut() {
             Some(tasks) => tasks.remove(&update.id),
