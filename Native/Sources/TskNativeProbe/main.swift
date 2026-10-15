@@ -11,6 +11,17 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        if arguments.count == 9, arguments[1] == "move-reminder" {
+            do {
+                let device = UUID(uuidString: arguments[7])!
+                let manager = TaskChampionSession.makeManager(directory: URL(fileURLWithPath: arguments[2]), reminderDeviceIdentifier: { device })
+                let source = ProcessReminderSource(source: URL(fileURLWithPath: arguments[3]), ready: URL(fileURLWithPath: arguments[4]), release: URL(fileURLWithPath: arguments[5]), failRemoval: arguments[8] == "fail")
+                try Data().write(to: URL(fileURLWithPath: arguments[4] + ".started"))
+                let result = try await manager.runContinuousReminderImport(from: source)
+                try write(["saved": String(result?.imported.count ?? 0), "removed": String(result?.removedCount ?? 0), "paused": String(try await manager.continuousReminderStatus().paused)], to: arguments[6])
+            } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
+            return
+        }
         if arguments.count == 7, arguments[1] == "complete-occurrence" {
             do {
                 try Data().write(to: URL(fileURLWithPath: arguments[4]))
@@ -157,4 +168,32 @@ private actor AttributeBarrierStore: TaskAttributeDefinitionsStore {
     }
 
     func save(_ definitions: [TaskAttributeDefinition]) async throws { try await native.save(definitions) }
+}
+
+private actor ProcessReminderSource: ReminderMoveSource {
+    let source: URL
+    let ready: URL
+    let release: URL
+    let failRemoval: Bool
+    init(source: URL, ready: URL, release: URL, failRemoval: Bool) {
+        self.source = source; self.ready = ready; self.release = release; self.failRemoval = failRemoval
+    }
+    func lists() -> [ReminderList] { [ReminderList(id: "work", title: "Owned process fixture")] }
+    func incompleteReminders(in listIDs: [String]) -> [ReminderSnapshot] {
+        FileManager.default.fileExists(atPath: source.path) ? [ReminderSnapshot(listID: "work", title: "Owned cross-process source")] : []
+    }
+    func moveCandidates(in listIDs: [String]) async throws -> [ReminderMoveCandidate] {
+        let snapshots = incompleteReminders(in: listIDs)
+        try Data().write(to: ready)
+        let deadline = Date().addingTimeInterval(10)
+        while !FileManager.default.fileExists(atPath: release.path) {
+            guard Date() < deadline else { throw TaskManagementError.storage("Owned reminder process fixture timed out") }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return snapshots.map { ReminderMoveCandidate(snapshot: $0, removeSource: { try await self.remove() }) }
+    }
+    private func remove() throws {
+        if failRemoval { throw TaskManagementError.storage("Owned process fixture removal failure") }
+        try FileManager.default.removeItem(at: source)
+    }
 }

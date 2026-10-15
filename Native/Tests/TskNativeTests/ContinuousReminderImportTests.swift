@@ -38,10 +38,9 @@ import TskNative
     try Data("regular file blocks directory creation".utf8).write(to: directory)
     let manager = TaskChampionSession.makeManager(directory: directory)
     let source = DurableMoveSource(directory: directory)
-    let result = try await manager.moveReminders(from: source, mappings: [ReminderListMapping(listID: "selected", project: "")])
-    #expect(result.imported.isEmpty)
-    #expect(result.removedCount == 0)
-    #expect(result.failures.count == 1)
+    await #expect(throws: (any Error).self) {
+        try await manager.moveReminders(from: source, mappings: [ReminderListMapping(listID: "selected", project: "")])
+    }
     #expect(await source.present)
     #expect(await source.sawDurableTask == false)
 }
