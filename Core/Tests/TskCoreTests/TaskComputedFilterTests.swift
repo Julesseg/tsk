@@ -86,3 +86,17 @@ import TskCore
     #expect(try await manager.tasks(filter: "project").isEmpty)
     #expect(try await manager.tasks(filter: "project or +home").map(\.id) == [task.id])
 }
+
+@Test func dueUrgencyCrossesDecimalBoundaryAfterExactlyOneClockSecond() async throws {
+    let replica = TestReplica()
+    let epoch = 1792144800
+    let id = UUID()
+    _ = try await replica.create(id: id, attributes: ["description": "Exact due interpolation", "status": "pending", "entry": String(epoch), "due": String(epoch + 7 * 86400)])
+    let atBoundary = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: Double(epoch)) })
+    let oneSecondLater = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: Double(epoch + 1)) })
+    #expect(try await atBoundary.tasks(filter: "urgency.above:5.6").isEmpty)
+    #expect(try await atBoundary.tasks(filter: "urgency.below:5.6").map(\.id) == [id])
+    #expect(try await oneSecondLater.tasks(filter: "urgency.above:5.6").map(\.id) == [id])
+    #expect(try await oneSecondLater.tasks(filter: "urgency.below:5.6").isEmpty)
+    #expect(try await atBoundary.viewSnapshot(filter: "urgency.above:5.6").nextEvaluation == Date(timeIntervalSince1970: Double(epoch + 1)))
+}
