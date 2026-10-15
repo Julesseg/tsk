@@ -58,7 +58,7 @@ final class WidgetUITests: XCTestCase {
             XCTAssertTrue(provider.isHittable, springboard.debugDescription)
             capture("Actual tsk provider cell in native widget gallery", springboard)
             provider.tap()
-            tap(springboard, labels: ["Add Widget"])
+            tap(springboard, labels: ["Add Widget", " Add Widget"])
             tap(springboard, labels: ["Done"])
         }
         let taskText = springboard.staticTexts[today].firstMatch
