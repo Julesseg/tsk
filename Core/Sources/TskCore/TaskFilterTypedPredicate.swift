@@ -14,7 +14,7 @@ struct FilterTypedPredicate: Sendable {
         self.name = name
         self.type = type
         let operand: FilterScalar
-        if quoted || raw.isEmpty { operand = .text(raw) }
+        if quoted || raw.isEmpty || FilterScalar.isUUIDLiteral(raw) { operand = .text(raw) }
         else if let number = FilterScalar.numericOperand(raw) { operand = .number(number) }
         else if type == .duration, let duration = TaskwarriorDuration(raw, allowRawSeconds: false) { operand = .duration(duration.seconds) }
         else if case .regex = operation {
@@ -54,6 +54,15 @@ struct FilterTypedPredicate: Sendable {
 
 enum FilterScalar: Sendable {
     case text(String), number(Double), duration(Int64)
+
+    static func isUUIDLiteral(_ raw: String) -> Bool {
+        let bytes = Array(raw.utf8)
+        let pattern = Array("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx".utf8)
+        guard (8...36).contains(bytes.count) else { return false }
+        return bytes.enumerated().allSatisfy { index, byte in
+            pattern[index] == 45 ? byte == 45 : (48...57).contains(byte) || (65...70).contains(byte) || (97...102).contains(byte)
+        }
+    }
 
     static func numericOperand(_ raw: String) -> Double? {
         let pattern = #"^[+-]?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][+-]?(?:[0-9]+(?:\.[0-9]*)?)?)?$"#

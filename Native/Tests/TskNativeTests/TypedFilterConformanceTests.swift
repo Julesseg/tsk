@@ -16,7 +16,7 @@ func typedNumericFiltersAgreeWithPinnedTaskwarriorAndReopenedSavedViews() async 
         if let value { attributes["score"] = value }
         _ = try await replica.create(id: UUID(), attributes: attributes)
     }
-    let expressions = ["score:0", "score:'1'", "score:'0'", "score.is:0", "score.isnt:0", "score.not:0", "score.below:0", "score.above:0", "score.by:0", "score.none:", "score.any:", "score.below:", "score.above:", "score.by:", "score.is:0.1", "score.is:'0.1'", "score.above:0.1", "score.below:2", "score.by:2", "score.is:1e2", "score.is:+2", "score.has:'^0'", "score.has:1e", "score.has:'1e'", "score.hasnt:'^0'", "score.left:1", "score.right:0"]
+    let expressions = ["score:0", "score.is:10000000", "score:'1'", "score:'0'", "score.is:0", "score.isnt:0", "score.not:0", "score.below:0", "score.above:0", "score.by:0", "score.none:", "score.any:", "score.below:", "score.above:", "score.by:", "score.is:0.1", "score.is:'0.1'", "score.above:0.1", "score.below:2", "score.by:2", "score.is:1e2", "score.is:+2", "score.has:'^0'", "score.has:1e", "score.has:'1e'", "score.hasnt:'^0'", "score.left:1", "score.right:0"]
     for expression in expressions { try await fixture.compare(expression, manager: manager) }
     let saved = try await manager.saveView(name: "Typed scores", expression: "score.above:2")
     let reopened = TaskChampionSession.makeManager(directory: fixture.directory)
@@ -121,13 +121,13 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     }
     let expressions = [
         "note:Café", "note:Cafe\u{301}", "note.left:Prefix", "note.right:text", "note.has:'é'", "note.none:",
-        "reference:abcdef12", "reference.below:0", "reference.above:0", "reference.by:0", "reference.is:ABCDEF12", "reference.isnt:abcdef12", "reference.not:abcdef12", "reference.none:", "reference.any:", "reference.below:abcdef12", "reference.above:abcdef12", "reference.by:abcdef12", "reference.left:'12'", "reference.right:'12'", "reference.has:'AB'",
+        "reference:abcdef12", "reference.is:12345678", "reference.below:0", "reference.above:0", "reference.by:0", "reference.is:ABCDEF12", "reference.isnt:abcdef12", "reference.not:abcdef12", "reference.none:", "reference.any:", "reference.below:abcdef12", "reference.above:abcdef12", "reference.by:abcdef12", "reference.left:'12'", "reference.right:'12'", "reference.has:'AB'",
         "review:2026-10-16", "review.is:2026-10-16T10:00:00Z", "review.is:'1970-01-01T00:00:01Z'", "review.before:2026-10-17", "review.after:2026-10-16", "review.by:2026-10-16T10:00:00Z", "review.none:", "review.any:", "review.has:'T10'", "review.has:1e", "review.has:PT1H", "review.has:2026-10-16T10:00:00Z", "review.left:'T10'", "review.right:'T10'", "review.not:2026-10-16",
         "priority.above:M", "priority.below:M", "priority.by:M", "priority.above:", "priority.below:", "priority.by:", "priority.is:H", "priority.none:",
         "rating.above:mid", "rating.below:mid", "rating.by:mid", "rating.above:", "rating.by:", "rating.is:high", "rating:none", "spelling.above:é", "spelling.below:é", "spelling.is:e\u{301}"
     ]
     for expression in expressions { try await fixture.compare(expression, manager: manager) }
-    for expression in ["review.is:'1'", "review.below:'1'", "review.by:'1'"] {
+    for expression in ["review.is:'1'", "review.below:'1'", "review.by:'1'", "review.is:20261016"] {
         _ = try fixture.task([expression, "_uuids"], expectedFailure: true)
         await #expect(throws: TaskFilterError.self) { try await manager.validateFilter(expression) }
     }

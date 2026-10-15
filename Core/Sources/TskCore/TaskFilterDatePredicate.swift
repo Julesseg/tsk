@@ -25,11 +25,12 @@ struct FilterDatePredicate: Sendable {
                 if !quoted, raw.utf8.contains(where: { [43, 45, 42, 47, 94, 37].contains($0) }) {
                     throw TaskFilterError.unsupported("Quote typed regex patterns containing expression operators.")
                 }
-                let pattern = !quoted ? FilterScalar.numericOperand(raw).map { FilterScalar.number($0).text } ?? raw : raw
+                let pattern = !quoted && !FilterScalar.isUUIDLiteral(raw) ? FilterScalar.numericOperand(raw).map { FilterScalar.number($0).text } ?? raw : raw
                 self.operation = .regex(try FilterRegex(pattern), inverted: inverted)
             }
         } else {
             evaluatesPattern = false
+            if FilterScalar.isUUIDLiteral(raw) { throw FilterDateExpression.invalid(raw) }
             let expression = try FilterDateExpression(raw)
             if quoted, expression.numericVariant != nil { throw FilterDateExpression.invalid(raw) }
             operand = expression
