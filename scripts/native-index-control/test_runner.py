@@ -56,7 +56,7 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("github.event_name != 'workflow_dispatch' || !inputs.native_index_control", app)
         control = source.split("  native-index-control:", 1)[1].split("  app-ui-tests:", 1)[0]
         self.assertIn("needs: dispatch-inputs", control)
-        self.assertIn("runs-on: macos-15", control)
+        self.assertIn("runs-on: macos-26", control)
         for forbidden in ("rust", "sync-fixture", "run-ui-tests", "Native/", "App/"):
             self.assertNotIn(forbidden, control)
 

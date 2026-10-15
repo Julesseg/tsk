@@ -84,7 +84,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_index_control }}
     needs: dispatch-inputs
     name: Core Spotlight · Independent native control
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 25
     permissions:
       contents: read
@@ -93,7 +93,7 @@ jobs:
       - name: Select latest stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '26.6'
       - name: Validate control ownership and workflow contracts
         run: python3 scripts/native-index-control/test_runner.py
       - name: Run four sequential owned native controls
