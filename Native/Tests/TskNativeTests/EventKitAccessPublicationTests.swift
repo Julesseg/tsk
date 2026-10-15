@@ -38,6 +38,21 @@ import Testing
         #expect(instant == 6_000_000_000)
     }
 
+    @Test func readinessPublishedAfterDeadlineIsNotAcceptedAfterOversleptWait() async throws {
+        var current = EventKitAccessPublication.Authorization.notDetermined
+        var instant: UInt64 = 0
+        var samples = 0
+        let outcome = try await EventKitAccessPublication.waitForFullAccess(authorization: {
+            samples += 1
+            return current
+        }, now: { instant }, sleep: { _ in
+            instant = 6_000_000_000
+            current = .fullAccess
+        })
+        #expect(outcome == .notReady)
+        #expect(samples == 1)
+    }
+
     @Test func everyCallSamplesCurrentAuthorizationWithoutCachingReadiness() async throws {
         var current = EventKitAccessPublication.Authorization.fullAccess
         #expect(try await EventKitAccessPublication.waitForFullAccess(authorization: { current }) == .ready)

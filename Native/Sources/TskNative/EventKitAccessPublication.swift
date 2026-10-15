@@ -22,6 +22,8 @@ enum EventKitAccessPublication {
                 let elapsed = now() &- started
                 guard elapsed < 5_000_000_000 else { return .notReady }
                 try await sleep(min(100_000_000, 5_000_000_000 - elapsed))
+                try Task.checkCancellation()
+                guard now() &- started < 5_000_000_000 else { return .notReady }
             case .denied, .restricted, .writeOnly, .unavailable: return .insufficient
             }
         }
