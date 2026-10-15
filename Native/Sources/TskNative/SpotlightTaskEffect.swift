@@ -21,8 +21,8 @@ public struct SpotlightTaskEffect: Sendable {
 
     public static func namespace(directory: URL) -> String {
         let parent = directory.deletingLastPathComponent()
-        if parent.deletingLastPathComponent().lastPathComponent == "UITests" { return "com.julesseguin.tsk.tasks.test." + parent.lastPathComponent }
-        return "com.julesseguin.tsk.tasks"
+        if parent.deletingLastPathComponent().lastPathComponent == "UITests" { return "com-julesseguin-tsk-tasks-test-" + parent.lastPathComponent }
+        return "com-julesseguin-tsk-tasks-v1"
     }
 
     public func reconcile(manager: TaskManager) async -> TaskSpotlightIndexStatus {

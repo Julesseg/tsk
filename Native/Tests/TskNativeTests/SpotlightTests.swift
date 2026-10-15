@@ -103,24 +103,51 @@ private actor FailingNativeSpotlightIndex: TaskSpotlightIndex {
 #endif
 
 #if canImport(CoreSpotlight)
-@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil)) @available(macOS 14.0, *)
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil && ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil)) @available(macOS 14.0, *)
 func receivedEncryptedSyncCompletionAndDeletionReconcileSpotlightThroughCommonEffects() async throws {
     let environment = ProcessInfo.processInfo.environment
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let configuration = try SyncConfiguration(serverURL: #require(environment["TSK_SYNC_TEST_URL"]), clientID: #require(UUID(uuidString: #require(environment["TSK_SYNC_TEST_CLIENT_ID"]))), encryptionSecret: #require(environment["TSK_SYNC_TEST_SECRET"]))
+    let rawClient = try #require(environment["TSK_SYNC_TEST_CLIENT_ID"])
+    let client = try #require(UUID(uuidString: rawClient))
+    let configuration = try SyncConfiguration(serverURL: #require(environment["TSK_SYNC_TEST_URL"]), clientID: client, encryptionSecret: #require(environment["TSK_SYNC_TEST_SECRET"]))
     let directory = root.appendingPathComponent("phone"), index = RecordingSpotlightIndex()
     let phone = TaskManager(replica: TaskChampionReplica(directory: directory), postCommitEffects: SpotlightTaskEffect(directory: directory, index: index))
     let completed = try await phone.create(TaskDraft(description: "Received completed task"))
     let deleted = try await phone.create(TaskDraft(description: "Received deleted task", attributes: ["opaque": "keep"]))
     _ = try await phone.synchronize(using: configuration)
     #expect(Set(await index.items.map(\.taskID)).isSuperset(of: [completed.id, deleted.id]))
-    let peerReplica = TaskChampionReplica(directory: root.appendingPathComponent("peer"))
-    let peer = TaskManager(replica: peerReplica)
-    _ = try await peer.synchronize(using: configuration)
-    _ = try await peer.complete(id: completed.id)
-    _ = try await peerReplica.update(id: deleted.id, changes: ["status": "deleted"])
-    _ = try await peer.synchronize(using: configuration)
+    let taskrc = root.appendingPathComponent("taskrc"), desktop = root.appendingPathComponent("desktop")
+    try """
+    data.location=\(desktop.path)
+    confirmation=no
+    news.version=3.5.0
+    journal.time=0
+    uda.opaque.type=string
+    sync.server.url=\(configuration.serverURL)
+    sync.server.client_id=\(configuration.clientID.uuidString.lowercased())
+    sync.encryption_secret=\(configuration.encryptionSecret)
+
+    """.write(to: taskrc, atomically: true, encoding: .utf8)
+    var proof: [[String: Any]] = []
+    func task(_ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: try #require(environment["TSK_TASKWARRIOR_BINARY"]))
+        process.arguments = ["rc:\(taskrc.path)", "rc.recurrence=off"] + arguments
+        var isolated = environment; isolated["TASKRC"] = taskrc.path; isolated["TASKDATA"] = desktop.path
+        process.environment = isolated
+        let output = Pipe(), errors = Pipe(); process.standardOutput = output; process.standardError = errors
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile(), diagnostic = errors.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        proof.append(["arguments": arguments, "exit": process.terminationStatus, "stdout": String(decoding: data, as: UTF8.self), "stderr": String(decoding: diagnostic, as: UTF8.self)])
+        guard process.terminationStatus == 0 else { throw TaskManagementError.storage(String(decoding: diagnostic, as: UTF8.self)) }
+    }
+    defer { if let path = environment["TSK_SPOTLIGHT_TW_PROOF"], let data = try? JSONSerialization.data(withJSONObject: proof, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: path)) } }
+    try task(["sync"])
+    try task([completed.id.uuidString.lowercased(), "done"])
+    try task([deleted.id.uuidString.lowercased(), "delete"])
+    try task(["sync"])
     _ = try await phone.synchronize(using: configuration)
     #expect(!(await index.items.map(\.taskID)).contains(completed.id))
     #expect(!(await index.items.map(\.taskID)).contains(deleted.id))

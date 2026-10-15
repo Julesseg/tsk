@@ -26,7 +26,11 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
 
     public init(namespace: String, indexName: String = "tsk.tasks.v1") {
         self.namespace = namespace
+        #if os(iOS)
+        index = CSSearchableIndex(name: indexName, protectionClass: .completeUntilFirstUserAuthentication)
+        #else
         index = CSSearchableIndex(name: indexName)
+        #endif
     }
 
     public func replace(_ items: [TaskSpotlightItem]) async throws {
@@ -35,6 +39,7 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
         try await index.deleteSearchableItems(withDomainIdentifiers: [namespace])
         let values = items.map { item in
             let attributes = CSSearchableItemAttributeSet(itemContentType: "public.text")
+            attributes.domainIdentifier = namespace
             attributes.title = item.title; attributes.displayName = item.title; attributes.contentDescription = item.summary
             let value = CSSearchableItem(uniqueIdentifier: item.identifier, domainIdentifier: namespace, attributeSet: attributes)
             value.expirationDate = .distantFuture

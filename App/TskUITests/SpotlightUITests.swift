@@ -11,7 +11,7 @@ import XCTest
         let id = create(title, app)
         openSettings(app)
         query(app)
-        XCTAssertTrue(app.staticTexts["spotlight-fixture-query-ids"].label.lowercased().contains(id.lowercased()))
+        XCTAssertTrue((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
         app.buttons["Done"].tap()
         try systemSearch(title, app)
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 20))
@@ -23,7 +23,7 @@ import XCTest
         app.buttons["complete-task"].tap()
         app.buttons["Done"].tap()
         openSettings(app); query(app)
-        XCTAssertFalse(app.staticTexts["spotlight-fixture-query-ids"].label.lowercased().contains(id.lowercased()))
+        XCTAssertFalse((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
         capture("Awaited local completion removes actual indexed UUID", app)
     }
 
@@ -40,7 +40,7 @@ import XCTest
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual stale fixture entry indexed"))
         app.buttons["Done"].tap()
         try systemSearch("tsk stale " + token, app)
-        XCTAssertTrue(app.otherElements["spotlight-task-unavailable"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "spotlight-task-unavailable").firstMatch.waitForExistence(timeout: 20))
         XCTAssertFalse(app.staticTexts["task-detail-description"].exists)
         capture("Real stale system result resolves unavailable without a replacement task", app)
     }
@@ -55,13 +55,13 @@ import XCTest
         app.launch()
         let id = create("tsk remote " + token, app)
         openSettings(app); query(app)
-        XCTAssertTrue(app.staticTexts["spotlight-fixture-query-ids"].label.lowercased().contains(id.lowercased()))
+        XCTAssertTrue((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
         XCTAssertTrue(revealTaskElement(app.buttons["spotlight-sync-fixture"], in: "spotlight-settings-form", app: app))
         app.buttons["spotlight-sync-fixture"].tap()
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 45))
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual encrypted peer completion received"), app.staticTexts["spotlight-query-error"].label)
         query(app)
-        XCTAssertFalse(app.staticTexts["spotlight-fixture-query-ids"].label.lowercased().contains(id.lowercased()))
+        XCTAssertFalse((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
         capture("Actual received encrypted sync completion reconciles scoped Spotlight index", app)
     }
 
@@ -102,6 +102,7 @@ import XCTest
         app.buttons["spotlight-query"].tap()
         XCTAssertTrue(app.staticTexts["spotlight-query-result"].waitForExistence(timeout: 20), app.staticTexts["spotlight-query-error"].label)
         XCTAssertTrue(revealTaskElement(app.staticTexts["spotlight-fixture-query-ids"], in: "spotlight-settings-form", app: app))
+        XCTAssertNotNil(app.staticTexts["spotlight-fixture-query-ids"].value as? String)
     }
     private func systemSearch(_ title: String, _ app: XCUIApplication) throws {
         XCUIDevice.shared.press(.home)

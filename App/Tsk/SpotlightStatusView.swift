@@ -23,7 +23,7 @@ struct SpotlightStatusView: View {
                 #if DEBUG && targetEnvironment(simulator)
                 if ProcessInfo.processInfo.environment["TSK_TEST_SPOTLIGHT_FIXTURE"] != nil, ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" {
                     Section("Isolated fixture") {
-                        if controller.queryResult != nil { Text(controller.queryItems.isEmpty ? "No indexed UUIDs" : controller.queryItems.map(\.identifier).joined(separator: "\n")).accessibilityIdentifier("spotlight-fixture-query-ids") }
+                        if controller.queryResult != nil { Text("Queried task UUIDs").accessibilityValue(controller.queryItems.isEmpty ? "No indexed UUIDs" : controller.queryItems.map(\.identifier).joined(separator: "\n")).accessibilityIdentifier("spotlight-fixture-query-ids") }
                         if let result = controller.fixtureResult { Text(result).accessibilityIdentifier("spotlight-fixture-result") }
                         Button("Index unavailable fixture result") { Task { await controller.fixture(stale: true) } }.accessibilityIdentifier("spotlight-stale-fixture")
                         Button("Write received fixture state") { Task { await controller.fixture(stale: false) } }.accessibilityIdentifier("spotlight-sync-fixture")

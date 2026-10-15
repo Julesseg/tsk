@@ -42,7 +42,7 @@ struct ContentView: View {
         Group {
             if sizeClass == .regular {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, spotlight: { isShowingSpotlight = true }, notifications: { isConfiguringNotifications = true })
+                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
                         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                 } content: {
                     taskList(selection: $selectedTaskID)
@@ -74,9 +74,47 @@ struct ContentView: View {
         }
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
         .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight) }
+        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
+        .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
+        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
+        .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
+        .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
+        .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
+        .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
+        .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
+        .sheet(isPresented: $isShowingShortcuts) { NavigationStack { TaskShortcutsView().toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { isShowingShortcuts = false } } } } }
+        .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
+        .task(id: TaskListSelection(query: store.query, project: store.projectSelection, customView: store.customView)) {
+            selectedTaskID = nil
+            path = []
+            await store.reload()
+        }
+        .task(id: scenePhase == .active ? store.filterRefreshGeneration : nil) {
+            guard scenePhase == .active, let next = store.nextFilterEvaluation else { return }
+            do {
+                try await Task.sleep(for: .seconds(max(0.05, next.timeIntervalSinceNow)))
+                await store.reload()
+            } catch {}
+        }
+        .task {
+            synchronization.startObserving(tasks: store)
+            await synchronization.loadConfiguration()
+            await loadSavedViews()
+            opportunities.start()
+            await opportunities.foreground()
+            await continuousReminders.scan()
+            await spotlight.reconcile()
+        }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await continuousReminders.observeStatus() }
+        }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await store.observeParticipantChanges() }
+        }
         .task(id: scenePhase) {
             if scenePhase == .active { await notifications.observe() }
         }
+        .onChange(of: store.allTasks) { _, _ in spotlight.loadStatus() }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -131,12 +169,8 @@ struct ContentView: View {
                 if sizeClass != .regular {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu("More", systemImage: "ellipsis") {
-<<<<<<< HEAD
                             Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
-||||||| merged common ancestors
-=======
                             Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
->>>>>>> 049b483
                             Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
                             Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                             Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
