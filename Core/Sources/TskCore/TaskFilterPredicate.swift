@@ -40,6 +40,7 @@ enum FilterPredicate: Sendable {
     case tag(String, present: Bool)
     case virtualTag(FilterVirtualTag, present: Bool)
     case date(FilterDatePredicate)
+    case typed(FilterTypedPredicate)
     case comparison(name: String, operation: FilterComparison, value: String)
 
     static func search(_ pattern: String) throws -> Self {
@@ -66,9 +67,6 @@ enum FilterPredicate: Sendable {
         case "word", "noword": throw TaskFilterError.unsupported(".\(modifier) differs between Taskwarrior hosts; use an explicit ECMAScript pattern instead.")
         default: throw TaskFilterError.syntax("Unrecognized attribute modifier ‘\(modifier)’.", byteOffset: 0)
         }
-        if name == "priority", ["before", "under", "below", "after", "over", "above", "by"].contains(modifier) {
-            throw TaskFilterError.unsupported("Priority ordering requires its typed ordering support; use .is or .isnt for now.")
-        }
         return .comparison(name: name, operation: operation, value: operand)
     }
 
@@ -81,6 +79,7 @@ enum FilterPredicate: Sendable {
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
         switch self {
+        case .typed(let predicate): return try predicate.includes(task, context: context)
         case .date(let predicate): return try predicate.includes(task, context: context)
         case .virtualTag(let tag, let present): return try tag.includes(task, context: context) == present
         case .tag(let tag, let present): return (task.attributes["tag_\(tag)"] != nil) == present
@@ -90,6 +89,17 @@ enum FilterPredicate: Sendable {
             else if name == "status", FilterVirtualTag.isWaiting(task, at: context.now) { actual = "waiting" }
             else if name == "tags" { actual = task.tags.joined(separator: ",") }
             else { actual = task.attributes[name] ?? "" }
+            if let values = context.schema.orderedValues(for: name) {
+                let ordered = values.reversed().map { UTF8String($0) }
+                let left = ordered.firstIndex(of: UTF8String(actual)) ?? ordered.endIndex
+                let right = ordered.firstIndex(of: UTF8String(value)) ?? ordered.endIndex
+                switch operation {
+                case .less: return !actual.matchesBytes(value) && left < right
+                case .greater: return !actual.matchesBytes(value) && left > right
+                case .by: return actual.matchesBytes(value) || left <= right
+                default: break
+                }
+            }
             switch operation {
             case .partial, .notPartial:
                 let matches: Bool

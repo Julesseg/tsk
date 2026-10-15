@@ -40,7 +40,7 @@ struct RawFilterEditorView: View {
                         .frame(minHeight: 120)
                         .accessibilityLabel("Taskwarrior filter expression")
                         .accessibilityIdentifier("raw-filter-expression")
-                    Text("Example: due:today and +READY\nA blank expression shows all tasks, including completed tasks.")
+                    Text("Example: due:today and +READY\nFor a numeric field: score.above:2\nA blank expression shows all tasks, including completed tasks.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Check results") { focusedField = nil; Task { await preview() } }
                         .disabled(isWorking).accessibilityIdentifier("check-filter")

@@ -6,16 +6,18 @@ public struct TaskAttributeDefinition: Identifiable, Codable, Equatable, Sendabl
     public let name: UTF8String
     public let label: String
     public let type: TaskAttributeType
+    public let values: [String]?
     public var id: UTF8String { name }
 
-    public init(name: String, label: String = "", type: TaskAttributeType) {
+    public init(name: String, label: String = "", type: TaskAttributeType, values: [String]? = nil) {
         self.name = UTF8String(name)
         self.label = label
         self.type = type
+        self.values = values
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.name == rhs.name && lhs.label.matchesBytes(rhs.label) && lhs.type == rhs.type
+        lhs.name == rhs.name && lhs.label.matchesBytes(rhs.label) && lhs.type == rhs.type && lhs.values?.map { UTF8String($0) } == rhs.values?.map { UTF8String($0) }
     }
 }
 
@@ -48,17 +50,23 @@ public extension TaskManager {
         return try await userAttributeDefinitions.load().sorted { $0.name < $1.name }
     }
 
-    func saveAttributeDefinition(name: String, label: String = "", type: TaskAttributeType) async throws -> TaskAttributeDefinition {
+    func saveAttributeDefinition(name: String, label: String = "", type: TaskAttributeType, values: [String]? = nil) async throws -> TaskAttributeDefinition {
         let letters = CharacterSet.letters.union(.nonBaseCharacters)
         let first = name.unicodeScalars.first
         guard let first, first == "_" || CharacterSet.letters.contains(first),
               name.unicodeScalars.allSatisfy({ letters.contains($0) || CharacterSet.decimalDigits.contains($0) || $0 == "_" || $0 == "-" }) else { throw TaskAttributeError.invalidName(name) }
         guard !TaskFilterSchema.standard.contains(name), !["annotations", "modification"].contains(where: { $0.matchesBytes(name) }) else { throw TaskAttributeError.reservedName(name) }
         guard let userAttributeDefinitions else { throw TaskAttributeError.storageNotConfigured }
+        if let values {
+            guard type == .string, !values.isEmpty, Set(values.map { UTF8String($0) }).count == values.count,
+                  values.allSatisfy({ !$0.contains(",") && !$0.contains("\n") && !$0.contains("\r") }) else {
+                throw TaskAttributeError.invalidValue(name, type, "Allowed values need a string definition and distinct values without commas or newlines.")
+            }
+        }
         let lease = try await beginMutation()
         defer { endMutation(lease) }
         var definitions = try await userAttributeDefinitions.load()
-        let definition = TaskAttributeDefinition(name: name, label: label, type: type)
+        let definition = TaskAttributeDefinition(name: name, label: label, type: type, values: values)
         definitions.removeAll { $0.name == definition.name }
         definitions.append(definition)
         try await userAttributeDefinitions.save(definitions)

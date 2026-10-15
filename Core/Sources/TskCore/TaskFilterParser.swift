@@ -156,7 +156,9 @@ struct FilterParser {
             let name = parts.count > 1 ? parts.dropLast().joined(separator: ".") : attribute
             let modifier = parts.count > 1 ? String(parts.last!) : ""
             guard let type = schema.attributes[UTF8String(name)] else { throw TaskFilterError.unknownAttribute(name) }
-            if type == .date { return .date(try FilterDatePredicate(name: name, modifier: modifier, value: value)) }
+            if type == .date { return .date(try FilterDatePredicate(name: name, modifier: modifier, value: value, quoted: quoted)) }
+            if (type == .numeric && schema.isUserDefined(name)) || type == .duration { return .typed(try FilterTypedPredicate(name: name, type: type, modifier: modifier, value: value, quoted: quoted)) }
+            if type == .uuid { return .typed(try FilterTypedPredicate(name: name, type: type, modifier: modifier, value: value, quoted: quoted)) }
             guard type == .string else { throw TaskFilterError.unsupported("\(name) uses \(type.rawValue) semantics; this schema type requires its typed filter support.") }
             return try .attribute(name, modifier: modifier, value: value)
         }

@@ -5,12 +5,14 @@ public enum TaskFilterError: Error, Equatable, LocalizedError, Sendable {
     case unknownAttribute(String)
     case unsupported(String)
     case invalidRegex(String, String)
+    case invalidStoredValue(UUID, String, TaskFilterAttributeType)
 
     public var errorDescription: String? {
         switch self {
         case .syntax(let message, let offset): "Filter at byte \(offset + 1): \(message)"
         case .unknownAttribute(let name): "Unknown filter attribute ‘\(name)’. Define its local schema before filtering it."
         case .unsupported(let message): "Unsupported filter: \(message)"
+        case .invalidStoredValue(let id, let name, let type): "Task \(id.uuidString) has an invalid \(type.rawValue) value for ‘\(name)’. Edit or clear that field before filtering it."
         case .invalidRegex(let pattern, let message): "Invalid ECMAScript pattern ‘\(pattern)’: \(message)"
         }
     }
@@ -22,11 +24,15 @@ public enum TaskFilterAttributeType: String, CaseIterable, Codable, Sendable {
 
 public struct TaskFilterSchema: Sendable {
     var attributes: [UTF8String: TaskFilterAttributeType]
+    private var valueOrders: [UTF8String: [String]]
     private static let builtinNames = Set(["description", "project", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "recur", "entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "id", "urgency", "last", "template"].map { UTF8String($0) })
 
-    public init(attributes: [(String, TaskFilterAttributeType)] = []) {
+    public init(attributes: [(String, TaskFilterAttributeType)] = [], orderedValues: [(String, [String])] = []) {
+        valueOrders = Dictionary(orderedValues.map { (UTF8String($0.0), $0.1) }, uniquingKeysWith: { _, new in new })
         self.attributes = Dictionary(attributes.map { (UTF8String($0.0), $0.1) }, uniquingKeysWith: { _, new in new })
     }
+
+    public func orderedValues(for name: String) -> [String]? { valueOrders[UTF8String(name)] }
 
     public func contains(_ name: String) -> Bool {
         attributes[UTF8String(name)] != nil || Self.builtinNames.contains(UTF8String(name)) || ["annotation_", "tag_", "dep_"].contains { name.utf8.starts(with: $0.utf8) }
@@ -42,6 +48,7 @@ public struct TaskFilterSchema: Sendable {
         var result = self
         for definition in definitions where !Self.standard.contains(definition.name.rawValue) {
             result.attributes[definition.name] = definition.type
+            if let values = definition.values { result.valueOrders[definition.name] = values }
         }
         return result
     }
@@ -49,7 +56,7 @@ public struct TaskFilterSchema: Sendable {
     public static let standard = TaskFilterSchema(attributes:
         ["description", "project", "priority", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "template"].map { ($0, .string) }
         + [("recur", .duration), ("id", .numeric), ("urgency", .numeric)]
-        + ["entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "last"].map { ($0, .date) })
+        + ["entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "last"].map { ($0, .date) }, orderedValues: [("priority", ["H", "M", "L", ""])])
 }
 
 struct TaskFilterContext: Sendable {
