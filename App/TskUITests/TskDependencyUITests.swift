@@ -36,7 +36,7 @@ final class TskDependencyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["dependency-selection-error"].waitForExistence(timeout: 10))
         screenshot("Cycle rejected without saving another link", app: app)
         app.buttons["Cancel"].tap()
-        tap(app.buttons["complete-task"], in: app, direction: .down)
+        tap(app.buttons["complete-task"], in: app)
         XCTAssertFalse(app.buttons["complete-task"].waitForExistence(timeout: 2))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.swipeDown()
@@ -52,7 +52,8 @@ final class TskDependencyUITests: XCTestCase {
         XCTAssertEqual(blockedReasons(app).count, 0)
         app.staticTexts["Planned dependent"].tap()
         tap(app.buttons["dependency-task-\(targetIdentity)"], in: app)
-        XCTAssertTrue(app.staticTexts["Completed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let remove = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "remove-dependency-")).firstMatch
         tap(remove, in: app)
@@ -81,13 +82,8 @@ final class TskDependencyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[description].waitForExistence(timeout: 10))
     }
 
-    private enum ScrollDirection { case up, down }
-
-    private func tap(_ element: XCUIElement, in app: XCUIApplication, direction: ScrollDirection = .up) {
-        for _ in 0..<6 where !element.isHittable {
-            if direction == .up { app.swipeUp() } else { app.swipeDown() }
-        }
-        XCTAssertTrue(element.waitForExistence(timeout: 5))
+    private func tap(_ element: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(revealTaskElement(element, in: "task-detail-form", app: app))
         element.tap()
     }
 

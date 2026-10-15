@@ -72,30 +72,31 @@ struct TaskEditorView: View {
                     Button("Cancel") { dismiss() }.disabled(store.isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        focusedField = nil
-                        Task {
-                            if !tagInput.isEmpty, !addTag() { return }
-                            let didSave: Bool
-                            if let original {
-                                if let saved = await store.update(id: original.id, changes: changes) {
-                                    onSave?(saved)
-                                    didSave = true
-                                } else { didSave = false }
-                            } else {
-                                didSave = await store.save(draft)
-                            }
-                            if didSave { dismiss() } else { error = store.error }
-                        }
-                    }
+                    Button("Save", action: save)
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("save-task")
-                    .keyboardShortcut(.return, modifiers: .command)
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
             .onAppear { focusedField = .description }
+            .focusedSceneValue(\.taskEditor, store.isSaving ? nil : TaskEditorActions(save: save))
             .modifier(TaskWorkspacePanel(store: store))
+        }
+    }
+
+    private func save() {
+        guard !store.isSaving else { return }
+        focusedField = nil
+        Task {
+            if !tagInput.isEmpty, !addTag() { return }
+            let didSave: Bool
+            if let original {
+                if let saved = await store.update(id: original.id, changes: changes) {
+                    onSave?(saved)
+                    didSave = true
+                } else { didSave = false }
+            } else { didSave = await store.save(draft) }
+            if didSave { dismiss() } else { error = store.error }
         }
     }
 

@@ -4,8 +4,7 @@ import TskCore
 struct TaskAdvancedAttributesSection: View {
     let store: TaskStore
     let task: TaskRecord
-    let onSave: (TaskRecord) -> Void
-    @State private var isEditing = false
+    let edit: () -> Void
     @State private var error: String?
 
     var body: some View {
@@ -16,10 +15,9 @@ struct TaskAdvancedAttributesSection: View {
                 }
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            Button("Advanced editor", systemImage: "slider.horizontal.3") { isEditing = true }
+            Button("Advanced editor", systemImage: "slider.horizontal.3") { edit() }
                 .accessibilityIdentifier("advanced-attributes")
         }
-        .sheet(isPresented: $isEditing) { TaskAdvancedAttributesEditor(store: store, task: task, onSave: onSave) }
         .task {
             do { try await store.loadAttributeDefinitions(); error = nil }
             catch { self.error = error.localizedDescription }

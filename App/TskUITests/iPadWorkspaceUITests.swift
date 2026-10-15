@@ -23,7 +23,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         field.typeText("Keyboard task")
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
         XCTAssertTrue(field.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Keyboard task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Keyboard task", app: app).waitForExistence(timeout: 10))
         app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: .command)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad selected task with simultaneous sidebar list and detail", app: app)
@@ -34,18 +34,18 @@ final class iPadWorkspaceUITests: XCTestCase {
         let editedField = description(app)
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
         XCTAssertTrue(editedField.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Keyboard task revised"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         app.typeKey(XCUIKeyboardKey.return, modifierFlags: [.command, .shift])
         XCTAssertTrue(app.buttons["complete-task"].waitForNonExistence(timeout: 10))
         app.typeKey("4", modifierFlags: .command)
-        XCTAssertTrue(app.staticTexts["Keyboard task revised"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         capture("iPad completed view from injected command", app: app)
         app.terminate()
         app.launch()
         XCTAssertTrue(app.buttons["sidebar-view-completed"].waitForExistence(timeout: 10))
         app.buttons["sidebar-view-completed"].tap()
-        XCTAssertTrue(app.staticTexts["Keyboard task revised"].firstMatch.waitForExistence(timeout: 10))
-        app.staticTexts["Keyboard task revised"].firstMatch.tap()
+        XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
+        taskRow(named: "Keyboard task revised", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["complete-task"].exists)
         capture("iPad completed task after persistent reopen", app: app)
@@ -69,8 +69,8 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["sidebar-project-Workspace"].waitForExistence(timeout: 10))
         app.buttons["sidebar-project-Workspace"].tap()
         app.buttons["sidebar-view-today"].tap()
-        XCTAssertTrue(app.staticTexts["Adaptive planned task"].firstMatch.waitForExistence(timeout: 10))
-        app.staticTexts["Adaptive planned task"].firstMatch.tap()
+        XCTAssertTrue(taskRow(named: "Adaptive planned task", app: app).waitForExistence(timeout: 10))
+        taskRow(named: "Adaptive planned task", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad project Today waiting task and detail", app: app)
         XCUIDevice.shared.orientation = .portrait
@@ -105,6 +105,10 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch, in: "workspace-sidebar", app: app))
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
+        let geometry = XCTAttachment(string: "Workspace: \(app.frame)\nSidebar: \(app.collectionViews["workspace-sidebar"].frame)\n" + app.debugDescription)
+        geometry.name = "Largest text workspace geometry and accessibility tree"
+        geometry.lifetime = .keepAlways
+        add(geometry)
         capture("iPad native custom view sidebar at accessibility text size", app: app)
     }
 
@@ -122,7 +126,7 @@ final class iPadWorkspaceUITests: XCTestCase {
     }
 
     private func capture(_ name: String, app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
