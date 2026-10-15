@@ -30,7 +30,9 @@ struct FilterDatePredicate: Sendable {
             }
         } else {
             evaluatesPattern = false
-            operand = try FilterDateExpression(raw)
+            let expression = try FilterDateExpression(raw)
+            if quoted, expression.numericVariant != nil { throw FilterDateExpression.invalid(raw) }
+            operand = expression
             self.operation = operation
         }
     }

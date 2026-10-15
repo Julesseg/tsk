@@ -48,7 +48,7 @@ private final class TypedFilterFixture {
         #expect(actual == expected, "\(expression)")
     }
 
-    func task(_ arguments: [String]) throws -> Data {
+    func task(_ arguments: [String], expectedFailure: Bool = false) throws -> Data {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         process.arguments = ["-c", "import json,subprocess,sys; r=subprocess.run(json.load(sys.stdin),stdout=subprocess.PIPE,stderr=subprocess.PIPE);sys.stdout.buffer.write(r.stdout);sys.stderr.buffer.write(r.stderr if r.returncode else b'');sys.exit(r.returncode)"]
@@ -67,7 +67,8 @@ private final class TypedFilterFixture {
         let data = output.fileHandleForReading.readDataToEndOfFile()
         while process.isRunning { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
         process.waitUntilExit()
-        #expect(process.terminationStatus == 0, "CLI rejected \(arguments)")
+        if expectedFailure { #expect(process.terminationStatus != 0, "CLI unexpectedly accepted \(arguments)") }
+        else { #expect(process.terminationStatus == 0, "CLI rejected \(arguments)") }
         return data
     }
 }
@@ -108,7 +109,8 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
         ["Café", "ABCDEF12", "1792108800", "H", "low", "é"],
         ["Cafe\u{301}", "abcdef12", "1792144800", "M", "mid", "e\u{301}"],
         ["Prefix text", "abcdef12-1234-1234-1234-123456789012", "1792195199", "L", "high", nil],
-        ["Other", "12345678", "0", "?", "foreign", nil]
+        ["Other", "12345678", "0", "?", "foreign", nil],
+        ["Old date", "87654321", "1", nil, nil, nil]
     ]
     for (index, row) in values.enumerated() {
         var attributes: TaskAttributes = ["description": "Typed fixture \(index)", "status": "pending", "entry": "1792144800", "foreign": "keep"]
@@ -120,11 +122,15 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     let expressions = [
         "note:Café", "note:Cafe\u{301}", "note.left:Prefix", "note.right:text", "note.has:'é'", "note.none:",
         "reference:abcdef12", "reference.below:0", "reference.above:0", "reference.by:0", "reference.is:ABCDEF12", "reference.isnt:abcdef12", "reference.not:abcdef12", "reference.none:", "reference.any:", "reference.below:abcdef12", "reference.above:abcdef12", "reference.by:abcdef12", "reference.left:'12'", "reference.right:'12'", "reference.has:'AB'",
-        "review:2026-10-16", "review.is:2026-10-16T10:00:00Z", "review.before:2026-10-17", "review.after:2026-10-16", "review.by:2026-10-16T10:00:00Z", "review.none:", "review.any:", "review.has:'T10'", "review.has:1e", "review.has:PT1H", "review.has:2026-10-16T10:00:00Z", "review.left:'T10'", "review.right:'T10'", "review.not:2026-10-16",
+        "review:2026-10-16", "review.is:2026-10-16T10:00:00Z", "review.is:'1970-01-01T00:00:01Z'", "review.before:2026-10-17", "review.after:2026-10-16", "review.by:2026-10-16T10:00:00Z", "review.none:", "review.any:", "review.has:'T10'", "review.has:1e", "review.has:PT1H", "review.has:2026-10-16T10:00:00Z", "review.left:'T10'", "review.right:'T10'", "review.not:2026-10-16",
         "priority.above:M", "priority.below:M", "priority.by:M", "priority.above:", "priority.below:", "priority.by:", "priority.is:H", "priority.none:",
         "rating.above:mid", "rating.below:mid", "rating.by:mid", "rating.above:", "rating.by:", "rating.is:high", "rating:none", "spelling.above:é", "spelling.below:é", "spelling.is:e\u{301}"
     ]
     for expression in expressions { try await fixture.compare(expression, manager: manager) }
+    for expression in ["review.is:'1'", "review.below:'1'", "review.by:'1'"] {
+        _ = try fixture.task([expression, "_uuids"], expectedFailure: true)
+        await #expect(throws: TaskFilterError.self) { try await manager.validateFilter(expression) }
+    }
 }
 
 @Test func nativeTypedSavedMembershipChangesDurablyAndInvalidImportsRemainRecoverable() async throws {
