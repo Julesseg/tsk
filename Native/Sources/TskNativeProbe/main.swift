@@ -277,6 +277,10 @@ private actor ProcessSpotlightIndex: TaskSpotlightIndex {
         try JSONEncoder().encode(calls).write(to: control.appendingPathComponent("calls.json"), options: .atomic)
         try Data().write(to: control.appendingPathComponent("entered"))
         while !FileManager.default.fileExists(atPath: control.appendingPathComponent("release").path) { try await Task.sleep(nanoseconds: 10_000_000) }
+        if FileManager.default.fileExists(atPath: control.appendingPathComponent("fail").path) {
+            try Data().write(to: control.appendingPathComponent("failed"))
+            throw TaskManagementError.storage("Owned process index failure")
+        }
         let projected = items.map { ["id": $0.taskID.uuidString.lowercased(), "title": $0.title, "summary": $0.summary] }
         try JSONSerialization.data(withJSONObject: projected).write(to: control.appendingPathComponent("projection.json"), options: .atomic)
     }

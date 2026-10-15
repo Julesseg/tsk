@@ -88,6 +88,32 @@ try:
                     child.terminate()
                     child.wait(timeout=5)
             processes.clear()
+        case = root / 'failure-publication'
+        case.mkdir()
+        replica = case / 'replica'
+        failing, first, a = start(case, replica, 'create')
+        wait_until((first / 'entered').exists, 'Failing index operation never entered', failing)
+        with (replica / '.tsk-spotlight-state').open('r+') as state_gate:
+            fcntl.flock(state_gate, fcntl.LOCK_EX)
+            (first / 'fail').touch()
+            (first / 'release').touch()
+            wait_until((first / 'failed').exists, 'Controlled failure never returned', failing)
+            time.sleep(0.1)
+            with (replica / '.tsk-spotlight-index').open('r+') as operation_gate:
+                try:
+                    fcntl.flock(operation_gate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    pass
+                else:
+                    raise AssertionError('Failed worker released ownership before publishing its delayed error')
+            fcntl.flock(state_gate, fcntl.LOCK_UN)
+        wait_until(lambda: read(replica / 'spotlight-status.json').get('error') is not None, 'Genuine index failure was not published', failing)
+        recovering, recovery, ack = start(case, replica, 'recover', released=True)
+        wait_until(lambda: settled(replica), 'New worker did not replace the failed attempt with a clean receipt', recovering)
+        confirmation = read(replica / 'spotlight-status.json')
+        time.sleep(0.1)
+        assert read(replica / 'spotlight-status.json') == confirmation, 'Older failed worker overwrote a newer confirmation'
+        proof.append(dict(case='failure-publication', first=a, recovery=ack, status=confirmation))
         print(json.dumps(proof, indent=2))
 finally:
     for child in processes:

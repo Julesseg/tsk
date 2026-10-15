@@ -74,7 +74,7 @@ extension SpotlightTaskEffect: TaskPostCommitEffect {
     public func apply(to manager: TaskManager, origin: TaskChangeOrigin) async { _ = await enqueue(manager: manager, force: false) }
 }
 
-private struct SpotlightAttempt: Codable, Sendable {
+private struct SpotlightAttempt: Codable, Equatable, Sendable {
     let id: UUID
     let owner: String
     let revision: UUID
@@ -82,7 +82,7 @@ private struct SpotlightAttempt: Codable, Sendable {
     let started: Date
 }
 
-private struct SpotlightWorkState: Codable, Sendable {
+private struct SpotlightWorkState: Codable, Equatable, Sendable {
     var requestedRevision: UUID?
     var requestedRepair: UUID?
     var confirmedRevision: UUID?
@@ -216,16 +216,24 @@ private actor SpotlightWorker {
         let store = SpotlightWorkStore(directory: directory)
         var observedGeneration = generation
         var attemptID: UUID?
+        var operationLease: (any TaskMutationLease)?
+        var admissionState: SpotlightWorkState?
+        defer { operationLease?.release() }
         let trace = TaskParticipantDiagnostics.begin("spotlight.reconcile")
         defer { TaskParticipantDiagnostics.end("spotlight.reconcile", id: trace) }
         do {
+            let initial = try await store.acquire()
+            do {
+                defer { initial.release() }
+                admissionState = try store.load()
+            }
             let admission = TaskParticipantDiagnostics.begin("spotlight.admission")
             let lease: any TaskMutationLease
             do {
                 defer { TaskParticipantDiagnostics.end("spotlight.admission", id: admission) }
                 lease = try await NativeMutationLease.acquire(path: directory.appendingPathComponent(".tsk-spotlight-index").path)
             }
-            defer { lease.release() }
+            operationLease = lease
             while let manager {
                 observedGeneration = generation
                 let stateLease = try await store.acquire()
@@ -269,10 +277,20 @@ private actor SpotlightWorker {
                 let lease = try await store.acquire()
                 defer { lease.release() }
                 var state = try store.load()
-                if state.attempt?.id == attemptID { state.attempt = nil }
-                state.error = error.localizedDescription
-                try store.save(state)
-            } catch { await store.recordWarning(error.localizedDescription) }
+                if let attemptID {
+                    if state.attempt?.id == attemptID {
+                        state.attempt = nil
+                        state.error = error.localizedDescription
+                        try store.save(state)
+                    }
+                } else if operationLease != nil || state == admissionState {
+                    state.error = error.localizedDescription
+                    try store.save(state)
+                }
+            } catch {
+                if operationLease != nil { await store.recordWarning(error.localizedDescription) }
+                else { NSLog("tsk Spotlight admission failed: %@", error.localizedDescription) }
+            }
         }
         running = nil
         if generation != observedGeneration { running = Task { await drain() } }
