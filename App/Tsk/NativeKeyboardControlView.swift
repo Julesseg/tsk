@@ -73,7 +73,7 @@ private struct NativeKeyboardRegistrationRow: Codable, Equatable {
     let ordinal: Int
     let owned: Bool
     let input: String
-    let modifiers: UInt
+    let modifiers: Int
     let selector: String?
     let selectorBytes: Int
     let selectorTruncated: Bool
