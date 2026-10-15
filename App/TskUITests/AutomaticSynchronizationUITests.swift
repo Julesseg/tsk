@@ -5,7 +5,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
 
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
         addUIInterruptionMonitor(withDescription: "Optional system password storage") { alert in
-            guard alert.label == "Save Password?", alert.buttons["Not Now"].exists else { return false }
+            guard alert.elementType == .alert, alert.label == "Save Password?", alert.buttons["Not Now"].exists else { return false }
             alert.buttons["Not Now"].tap()
             return true
         }
@@ -32,6 +32,19 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         app.buttons["new-task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
+        let passwordSheet = app.sheets["Save Password?"]
+        if passwordSheet.waitForExistence(timeout: 5) {
+            let notNow = passwordSheet.buttons["Not Now"]
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                !passwordSheet.exists || (notNow.exists && notNow.isEnabled && notNow.isHittable)
+            }, object: nil)
+            guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+                XCTFail("The observed Save Password? sheet must expose an actionable Not Now button")
+                return
+            }
+            if passwordSheet.exists { notNow.tap() }
+            XCTAssertTrue(passwordSheet.waitForNonExistence(timeout: 5))
+        }
         focusTaskText(description, app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
