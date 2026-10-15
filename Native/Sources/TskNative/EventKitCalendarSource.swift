@@ -4,9 +4,10 @@ import Foundation
 import TskCore
 
 public enum CalendarReadError: Error, LocalizedError, Equatable, Sendable {
-    case accessRequired, invalidWindow, invalidEvent
+    case accessRequired, accessNotReady, invalidWindow, invalidEvent
     public var errorDescription: String? {
         switch self {
+        case .accessNotReady: "Calendar access has been granted but is not ready yet. Try again."
         case .accessRequired: "Calendar read access is unavailable. Your tasks are still available."
         case .invalidWindow: "Today's Calendar date window is invalid."
         case .invalidEvent: "EventKit returned an event without its calendar, identity, or dates. Try refreshing Calendar."
@@ -49,6 +50,11 @@ public actor EventKitCalendarSource: CalendarEventSource {
         #else
         guard try await store.requestFullAccessToEvents() else { throw CalendarReadError.accessRequired }
         #endif
+        switch try await EventKitAccessPublication.waitForFullAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }) {
+        case .ready: break
+        case .insufficient: throw CalendarReadError.accessRequired
+        case .notReady: throw CalendarReadError.accessNotReady
+        }
         store.reset()
     }
 
