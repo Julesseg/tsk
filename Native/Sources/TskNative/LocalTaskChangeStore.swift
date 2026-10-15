@@ -34,7 +34,7 @@ public actor LocalTaskChangeStore: TaskChangeTracking {
         #endif
     }
 
-    private static func read(_ directory: URL) throws -> TaskChangeVersion {
+    static func read(_ directory: URL) throws -> TaskChangeVersion {
         let file = directory.appendingPathComponent("participant-changes.json")
         do { return try JSONDecoder().decode(TaskChangeVersion.self, from: Data(contentsOf: file)) }
         catch let error as CocoaError where error.code == .fileReadNoSuchFile { return .initial }

@@ -16,9 +16,17 @@ import TskNative
         do { status = try SpotlightTaskEffect.status(directory: store.directory); error = nil }
         catch { self.error = "Spotlight status could not be read: " + error.localizedDescription }
     }
-    func reconcile() async {
+    func observe() async {
+        do {
+            while !Task.isCancelled {
+                loadStatus()
+                try await Task.sleep(for: .milliseconds(500))
+            }
+        } catch {}
+    }
+    func reconcile(force: Bool = true) async {
         isRefreshing = true
-        status = await SpotlightTaskEffect(directory: store.directory).reconcile(manager: store.manager)
+        status = await SpotlightTaskEffect(directory: store.directory).reconcile(manager: store.manager, force: force)
         isRefreshing = false
         error = nil
     }

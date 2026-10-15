@@ -60,7 +60,9 @@ import XCTest
         capture("Native share extension reviews organization and independent planned/deadline dates", host)
         host.buttons["save-shared-task"].tap()
         let dismissed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: host.buttons["save-shared-task"])
-        XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 15), .completed)
+        let completion = XCTWaiter.wait(for: [dismissed], timeout: 15)
+        if completion != .completed { shareDiscoveryEvidence("Actual extension editor after Save did not dismiss", app: host) }
+        XCTAssertEqual(completion, .completed)
         app.launch()
         XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 15))
         capture("Extension-created task is visible in the main app after process reopen", app)

@@ -10,8 +10,7 @@ import XCTest
         app.launch()
         let id = create(title, app)
         openSettings(app)
-        query(app)
-        XCTAssertTrue((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
+        query(app, id: id, present: true)
         app.buttons["Done"].tap()
         try systemSearch(title, app)
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 20))
@@ -22,9 +21,8 @@ import XCTest
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         app.buttons["complete-task"].tap()
         app.buttons["Done"].tap()
-        openSettings(app); query(app)
-        XCTAssertFalse((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
-        capture("Awaited local completion removes actual indexed UUID", app)
+        openSettings(app); query(app, id: id, present: false)
+        capture("Confirmed local completion removes actual indexed UUID", app)
     }
 
     func testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask() throws {
@@ -54,14 +52,12 @@ import XCTest
         defer { clean(app) }
         app.launch()
         let id = create("tsk remote " + token, app)
-        openSettings(app); query(app)
-        XCTAssertTrue((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
+        openSettings(app); query(app, id: id, present: true)
         XCTAssertTrue(revealTaskElement(app.buttons["spotlight-sync-fixture"], in: "spotlight-settings-form", app: app))
         app.buttons["spotlight-sync-fixture"].tap()
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 45))
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual encrypted peer completion received"), app.staticTexts["spotlight-query-error"].label)
-        query(app)
-        XCTAssertFalse((app.staticTexts["spotlight-fixture-query-ids"].value as? String ?? "").lowercased().contains(id.lowercased()))
+        query(app, id: id, present: false)
         capture("Actual received encrypted sync completion reconciles scoped Spotlight index", app)
     }
 
@@ -97,19 +93,43 @@ import XCTest
         app.buttons["spotlight-settings"].tap()
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
-    private func query(_ app: XCUIApplication) {
-        XCTAssertTrue(revealTaskElement(app.buttons["spotlight-query"], in: "spotlight-settings-form", app: app))
-        app.buttons["spotlight-query"].tap()
-        XCTAssertTrue(app.staticTexts["spotlight-query-result"].waitForExistence(timeout: 20), app.staticTexts["spotlight-query-error"].label)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["spotlight-fixture-query-ids"], in: "spotlight-settings-form", app: app))
-        XCTAssertNotNil(app.staticTexts["spotlight-fixture-query-ids"].value as? String)
+    private func query(_ app: XCUIApplication, id: String, present: Bool) {
+        let deadline = Date().addingTimeInterval(20)
+        let button = app.buttons["spotlight-query"]
+        let ids = app.staticTexts["spotlight-fixture-query-ids"]
+        XCTAssertTrue(revealTaskElement(button, in: "spotlight-settings-form", app: app))
+        repeat {
+            if button.isEnabled { button.tap() }
+            let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                button.isEnabled && app.staticTexts["spotlight-query-result"].exists
+            }, object: nil)
+            guard XCTWaiter.wait(for: [finished], timeout: max(0, deadline.timeIntervalSinceNow)) == .completed else { break }
+            if ids.exists, let values = ids.value as? String,
+               values.lowercased().contains(id.lowercased()) == present,
+               !app.staticTexts["spotlight-index-pending"].exists { return }
+            RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
+        } while Date() < deadline
+        capture("Actual Spotlight membership did not settle within the original query budget", app)
+        XCTFail("Actual indexed UUID membership must become \(present ? "present" : "absent"): \(id). Observed \(String(describing: ids.value)); \(app.staticTexts["spotlight-query-error"].label)")
     }
     private func systemSearch(_ title: String, _ app: XCUIApplication) throws {
         XCUIDevice.shared.press(.home)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         springboard.swipeDown()
+        capture("Actual system Search surface before first-run handling", springboard)
+        let education = springboard.buttons["Continue"].firstMatch
+        if education.exists && education.isHittable {
+            education.tap()
+            capture("Actual system Search surface after native Continue", springboard)
+        }
         let search = springboard.searchFields.firstMatch.exists ? springboard.searchFields.firstMatch : springboard.textFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 15), "Actual system Spotlight search field must be available")
+        guard search.waitForExistence(timeout: 15) else {
+            capture("Actual Search endpoint after missing accessible search field", springboard)
+            let hierarchy = XCTAttachment(string: springboard.debugDescription)
+            hierarchy.name = "Actual Search SpringBoard accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+            XCTFail("Actual system Spotlight search field must be available; a visible remote surface is not evidence its accessibility owner is SpringBoard")
+            return
+        }
         search.tap(); search.typeText(title)
         let result = springboard.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 30), "Indexed task must appear in actual system Spotlight, independently of CSSearchQuery proof")

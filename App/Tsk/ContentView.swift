@@ -1,5 +1,6 @@
 import SwiftUI
 import TskCore
+import TskNative
 import EventKit
 
 struct ContentView: View {
@@ -145,7 +146,10 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await notifications.observe() }
         }
-        .onChange(of: store.allTasks) { _, _ in spotlight.loadStatus() }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await spotlight.observe() }
+        }
+        .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -205,6 +209,9 @@ struct ContentView: View {
                     if let error = spotlight.status?.error ?? spotlight.error {
                         Button { isShowingSpotlight = true } label: { Label("Spotlight needs attention: " + error, systemImage: "magnifyingglass") }.font(.footnote).padding().accessibilityIdentifier("spotlight-attention")
                     }
+                    if spotlight.status?.pending == true {
+                        Button("Spotlight update pending. Tasks are saved.") { isShowingSpotlight = true }.font(.footnote).padding().accessibilityIdentifier("spotlight-pending")
+                    }
                     SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
@@ -225,7 +232,7 @@ struct ContentView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
-                    Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
+                    Button("Task notifications") { TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "workspace-menu"]); isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
                     Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
                     Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
                     Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")

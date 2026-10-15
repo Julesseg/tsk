@@ -28,6 +28,15 @@ final class WidgetUITests: XCTestCase {
         XCTAssertTrue(icon.isHittable)
         capture("Actual Home screen tsk icon before widget installation", springboard)
         icon.press(forDuration: 1.5)
+        let editHome = springboard.buttons["Edit Home Screen"].firstMatch
+        let options = springboard.buttons["Options"].firstMatch
+        if !editHome.exists, options.exists && options.isHittable {
+            capture("Actual Home icon native Options menu before editing route", springboard)
+            options.tap()
+            capture("Actual Home icon Options submenu", springboard)
+            let hierarchy = XCTAttachment(string: springboard.debugDescription)
+            hierarchy.name = "Actual Home icon Options submenu accessibility"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        }
         tap(springboard, labels: ["Edit Home Screen"])
         tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
         if springboard.buttons["Add Widget"].waitForExistence(timeout: 3) { springboard.buttons["Add Widget"].tap() }

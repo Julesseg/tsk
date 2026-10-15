@@ -1,5 +1,6 @@
 import SwiftUI
 import TskCore
+import TskNative
 
 struct TaskNotificationSettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -53,6 +54,9 @@ struct TaskNotificationSettingsView: View {
                 MissedNotificationFixtureControls(controller: controller)
                 #endif
             }
+            .accessibilityIdentifier("notification-settings-form")
+            .onAppear { TaskParticipantDiagnostics.event("notifications.presentation.appeared", details: [:]) }
+            .onDisappear { TaskParticipantDiagnostics.event("notifications.presentation.disappeared", details: [:]) }
             .navigationTitle("Task notifications")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task {

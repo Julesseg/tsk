@@ -78,16 +78,20 @@ extension XCTestCase {
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        let form = app.collectionViews[containerID].firstMatch
+    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, file: file, line: line)
+    }
+
+    @discardableResult
+    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", file: StaticString = #filePath, line: UInt = #line) -> Bool {
         guard form.waitForExistence(timeout: 5) else {
-            recordTaskInteraction(app, detail: "Missing form \(containerID)")
-            XCTFail("Missing task form: \(containerID)", file: file, line: line)
+            recordTaskInteraction(app, detail: "Missing form \(context)")
+            XCTFail("Missing task form: \(context)", file: file, line: line)
             return false
         }
-        var scrollUp = true
+        var scrollUp = initialScrollUp
         var missingSteps = 0
-        for step in 0...14 {
+        for step in 0...maximumSteps {
             let visible = form.frame.intersection(app.frame)
             let navigationBottom = app.navigationBars.allElementsBoundByIndex.filter {
                 $0.exists && $0.isHittable && $0.frame.intersection(visible).width > visible.width / 2 && $0.frame.maxY <= visible.minY + 140
@@ -110,9 +114,9 @@ extension XCTestCase {
                 }
             } else {
                 missingSteps += 1
-                if missingSteps == 7 { scrollUp.toggle() }
+                if missingSteps == maximumSteps / 2 { scrollUp.toggle() }
             }
-            guard step < 14 else { break }
+            guard step < maximumSteps else { break }
             let distance = min(250, (bottom - top) * 0.45)
             let middle = (top + bottom) / 2
             let startY = middle + (scrollUp ? distance / 2 : -distance / 2)
@@ -121,8 +125,8 @@ extension XCTestCase {
             origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: startY - app.frame.minY))
                 .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: endY - app.frame.minY)))
         }
-        recordTaskInteraction(app, detail: "Cannot reveal \(element) in \(containerID); form=\(form.frame)")
-        XCTFail("Task element could not be revealed in \(containerID): \(element)", file: file, line: line)
+        recordTaskInteraction(app, detail: "Cannot reveal \(element) in \(context); form=\(form.frame)")
+        XCTFail("Task element could not be revealed in \(context): \(element)", file: file, line: line)
         return false
     }
 
