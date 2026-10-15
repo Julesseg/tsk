@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TskNative",
-    platforms: [.iOS(.v13), .macOS(.v10_15)],
+    platforms: [.iOS(.v13), .macOS("10.15.4")],
     products: [.library(name: "TskNative", targets: ["TskNative"]), .executable(name: "tsk-native-probe", targets: ["TskNativeProbe"])],
     dependencies: [.package(path: "../Core")],
     targets: [
