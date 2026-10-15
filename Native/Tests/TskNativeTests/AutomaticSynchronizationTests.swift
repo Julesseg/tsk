@@ -10,7 +10,12 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     }
 }
 
-@MainActor private func exerciseBlockedServerResponse(method: String) async throws {
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil))
+func durableSeriesMetadataFinishesWhileRealServerResponsesRemainBlocked() async throws {
+    for method in ["GET", "POST"] { try await exerciseBlockedServerResponse(method: method, seriesOnly: true) }
+}
+
+@MainActor private func exerciseBlockedServerResponse(method: String, seriesOnly: Bool = false) async throws {
     let environment = ProcessInfo.processInfo.environment
     let backend = try #require(environment["TSK_SYNC_TEST_URL"])
     let secret = try #require(environment["TSK_SYNC_TEST_SECRET"])
@@ -42,8 +47,12 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("native")))
     let original = try await manager.create(TaskDraft(description: "Before blocked \(method)", attributes: ["opaque": "retain original"]))
     let fixtureReplica = TaskChampionReplica(directory: directory.appendingPathComponent("native"))
-    let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-", "opaque": "preserve series"])
+    let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": seriesOnly ? "--" : "-", "opaque": "preserve series"])
     let occurrence = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "0", "opaque": "preserve occurrence"])
+    if seriesOnly {
+        _ = try await fixtureReplica.updateAtomically([TaskAtomicUpdate(id: occurrence.id, expected: occurrence.attributes, changes: ["due": "4000000000"])])
+        _ = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "1", "due": "4000000001", "opaque": "preserve future"])
+    }
     let attempt = Task { try await manager.synchronize(using: configuration) }
     let deadline = Task.detached {
         try await Task.sleep(for: .seconds(5))
@@ -54,6 +63,28 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     let blocked = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("blocked.json"))) as? [String: Any])
     #expect(blocked["method"] as? String == method)
     if method == "POST" { #expect(blocked["status"] as? Int == 200) }
+    if seriesOnly {
+        var applied = false
+        for _ in 0..<5 {
+            let preview = try await manager.previewSeriesMetadata(id: series.id, changes: ["description": "Metadata during blocked \(method)", "project": "Series.Work"])
+            #expect(preview.affected.count == 2)
+            do { _ = try await manager.applySeriesMetadata(preview); applied = true; break }
+            catch TaskSeriesMetadataError.stalePreview { #expect(try await manager.task(id: series.id).attributes["description"] == nil) }
+        }
+        guard applied else { throw TaskSeriesMetadataError.stalePreview }
+        #expect(!FileManager.default.fileExists(atPath: gate.path), "Atomic series save must finish while the actual HTTP response remains held")
+        let local = try await manager.tasks().filter { UUID(uuidString: $0.attributes["parent"] ?? "") == series.id }
+        #expect(local.allSatisfy { $0.description == "Metadata during blocked \(method)" && $0.project == "Series.Work" })
+        try Data().write(to: gate)
+        _ = try await attempt.value
+        _ = try await manager.synchronize(using: configuration)
+        let peer = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("series-peer")))
+        let records = try await peer.synchronize(using: directConfiguration)
+        #expect(records.contains(original))
+        #expect(local.allSatisfy { records.contains($0) })
+        #expect(try await peer.task(id: series.id).attributes["mask"] == "--")
+        return
+    }
     let created = try await manager.create(TaskDraft(description: "Captured during blocked \(method)", attributes: ["opaque": "retain in-flight"]))
     let capturedWhileBlocked = !FileManager.default.fileExists(atPath: gate.path)
     #expect(capturedWhileBlocked, "Durable capture must finish before the held server response is released")
