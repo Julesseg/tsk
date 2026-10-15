@@ -50,24 +50,9 @@ extension TaskManager {
             patch["description"] = text
         }
         patch = try await normalizedUserAttributes(patch)
-        let children = snapshot.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == id }
-        var affected: [TaskRecord] = []
-        let mask = template.attributes["mask"].map { Array($0.utf8) }
-        if let mask, !mask.allSatisfy({ [45, 87, 43, 88].contains($0) }) { throw TaskSeriesMetadataError.invalidSeries }
-        var positions = Set<Int>()
-        for child in children {
-            guard let raw = child.attributes["imask"], !raw.isEmpty, raw.utf8.allSatisfy({ (48...57).contains($0) }), let index = Int(raw),
-                  let mask, index < mask.count, positions.insert(index).inserted else { throw TaskSeriesMetadataError.invalidSeries }
-            switch child.status {
-            case "pending":
-                guard [45, 87].contains(mask[index]), let due = child.deadline else { throw TaskSeriesMetadataError.invalidSeries }
-                if due >= cutoff { affected.append(child) }
-            case "completed": guard mask[index] == 43 else { throw TaskSeriesMetadataError.invalidSeries }
-            case "deleted": guard mask[index] == 88 else { throw TaskSeriesMetadataError.invalidSeries }
-            default: throw TaskSeriesMetadataError.invalidSeries
-            }
-        }
-        affected.sort { ($0.deadline ?? .distantFuture, $0.id.uuidString) < ($1.deadline ?? .distantFuture, $1.id.uuidString) }
+        let series = try TaskSeriesRecords(records: snapshot, id: id, cutoff: cutoff)
+        let children = series.children
+        let affected = series.affected
         if !addingAnnotation.isEmpty {
             guard !addingAnnotation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TaskManagementError.emptyAnnotation }
             guard let initial = Int64(exactly: cutoff.timeIntervalSince1970.rounded(.towardZero)) else { throw TaskManagementError.invalidAnnotationTimestamp }
