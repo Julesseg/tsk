@@ -57,6 +57,20 @@ import Testing
     else { observation.cancel() }
 }
 
+@Test @MainActor func fixtureReadbackDistinguishesNilCallbackFromEmptyCollection() async {
+    for reminders: [Int]? in [nil, []] {
+        let outcome = await FixtureReadbackDeadline<(Int?, Bool)>.observe(timeoutNanoseconds: 30_000_000) { callback in
+            callback((reminders?.count, reminders != nil))
+            return {}
+        }
+        guard case .received(let result) = outcome else { Issue.record("Both nil and empty callbacks must finish before cleanup"); return }
+        #expect(result.0 == reminders?.count)
+        #expect(result.1 == (reminders != nil))
+        if reminders == nil { #expect(result.0 == nil && !result.1) }
+        else { #expect(result.0 == 0 && result.1) }
+    }
+}
+
 @MainActor private final class ControlledFixtureFetch {
     var callback: (@Sendable (Int) -> Void)?
     var cancellations = 0

@@ -11,6 +11,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
         prepareAndSelect(token, in: "reminders-import-form", app: app)
         let preview = app.buttons["reminders-preview"]
         XCTAssertTrue(revealTaskElement(preview, in: "reminders-import-form", app: app)); preview.tap()
+        XCTAssertTrue(revealTaskElement(app.staticTexts["reminders-preview-count"], in: "reminders-import-form", app: app))
         XCTAssertTrue(app.staticTexts["reminders-preview-count"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["reminders-preview-count"].label, "1 eligible reminder(s)")
         XCTAssertTrue(revealTaskElement(app.staticTexts["reminders-preview-template"], in: "reminders-import-form", app: app))

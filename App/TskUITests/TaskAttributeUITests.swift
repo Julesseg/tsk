@@ -16,6 +16,7 @@ final class TaskAttributeUITests: XCTestCase {
         app.buttons["new-task"].tap()
         let description = field("task-description", app: app)
         XCTAssertTrue(description.waitForExistence(timeout: 5))
+        focusTaskText(description, app: app)
         description.typeText("Task with local typed values")
         app.buttons["save-task"].tap()
         XCTAssertTrue(description.waitForNonExistence(timeout: 10))

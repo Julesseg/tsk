@@ -35,6 +35,9 @@ cleanup() {
         if [[ -n "$group" && -d "$group/UITestDiagnostics" ]]; then
             find "$group/UITestDiagnostics" -maxdepth 1 -name 'participant-fixture-share-*.json' -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
         fi
+        if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
+            python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-ui-boundaries.py" "$TSK_EVENTKIT_EVIDENCE_DIR" || true
+        fi
     fi
     if [[ "$was_booted" == no ]]; then
         xcrun simctl shutdown "$simulator_id" || true

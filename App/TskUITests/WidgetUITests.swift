@@ -83,7 +83,13 @@ final class WidgetUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 15))
         title.press(forDuration: 1.5)
         tap(springboard, labels: ["Edit Widget", "Edit “Task view”"])
-        tap(springboard, labels: ["Today", "View"])
+        let configuredView = springboard.buttons["Today"].firstMatch
+        let configuredViewReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in configuredView.exists && configuredView.isEnabled && configuredView.isHittable }, object: nil)
+        guard XCTWaiter.wait(for: [configuredViewReady], timeout: 15) == .completed else {
+            XCTFail("Native widget View value must be an enabled hittable Today button\n" + springboard.debugDescription)
+            return
+        }
+        configuredView.tap()
         let filterSearch = springboard.searchFields.firstMatch
         if filterSearch.waitForExistence(timeout: 3) { filterSearch.tap(); filterSearch.typeText(view) }
         tap(springboard, labels: [view])
