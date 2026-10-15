@@ -10,7 +10,7 @@ struct ShareCaptureRoot: View {
     var body: some View {
         Group {
             if let draft {
-                ShareTaskEditor(initial: draft, cancel: cancel, complete: { context.completeRequest(returningItems: nil) })
+                ShareTaskEditor(initial: draft, cancel: cancel, complete: finish)
             } else {
                 NavigationStack {
                     Group {
@@ -33,9 +33,18 @@ struct ShareCaptureRoot: View {
             if content.isEmpty {
                 content = items.compactMap { $0.attributedContentText?.string }.map(SharedTaskItem.text)
             }
+            #if DEBUG && targetEnvironment(simulator)
+            for case .url(let url) in content where url.scheme == "https" && url.host == "example.com" && url.path == "/tsk-share" {
+                if let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "fixture" })?.value, let token = UUID(uuidString: raw) { TaskParticipantDiagnostics.enableShareFixture(token) }
+            }
+            #endif
             draft = try TaskManager.sharedDraft(from: content)
             error = nil
         } catch { self.error = error.localizedDescription }
+    }
+    private func finish() {
+        let trace = TaskParticipantDiagnostics.begin("share.complete-request")
+        context.completeRequest(returningItems: nil) { _ in TaskParticipantDiagnostics.end("share.complete-request", id: trace) }
     }
     private func cancel() { context.cancelRequest(withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)) }
 }
@@ -95,7 +104,8 @@ private struct ShareTaskEditor: View {
     private func open() async {
         guard !opening else { return }
         opening = true
-        defer { opening = false }
+        let trace = TaskParticipantDiagnostics.begin("share.storage-open")
+        defer { opening = false; TaskParticipantDiagnostics.end("share.storage-open", id: trace) }
         do { manager = try await TaskChampionSession.open(directory: TaskChampionSession.participantDirectory()); error = nil }
         catch { manager = nil; self.error = error.localizedDescription }
     }
@@ -109,9 +119,17 @@ private struct ShareTaskEditor: View {
         if !tagInput.isEmpty, !addTag() { return }
         saving = true
         Task {
-            defer { saving = false }
-            do { _ = try await manager.captureSharedTask(draft); complete() }
-            catch { self.error = error.localizedDescription }
+            let trace = TaskParticipantDiagnostics.begin("share.capture")
+            defer { saving = false; TaskParticipantDiagnostics.end("share.capture", id: trace) }
+            do {
+                let saved = try await manager.captureSharedTask(draft)
+                TaskParticipantDiagnostics.event("share.capture.durable-result", details: ["id": saved.id.uuidString])
+                complete()
+            } catch {
+                let native = error as NSError
+                TaskParticipantDiagnostics.event("share.capture.error", details: ["domain": native.domain, "code": String(native.code)])
+                self.error = error.localizedDescription
+            }
         }
     }
 }
