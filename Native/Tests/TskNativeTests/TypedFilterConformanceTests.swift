@@ -119,8 +119,8 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     }
     let expressions = [
         "note:Café", "note:Cafe\u{301}", "note.left:Prefix", "note.right:text", "note.has:'é'", "note.none:",
-        "reference:abcdef12", "reference.is:ABCDEF12", "reference.isnt:abcdef12", "reference.not:abcdef12", "reference.none:", "reference.any:", "reference.below:abcdef12", "reference.above:abcdef12", "reference.by:abcdef12", "reference.left:'12'", "reference.right:'12'", "reference.has:'AB'",
-        "review:2026-10-16", "review.is:2026-10-16T10:00:00Z", "review.before:2026-10-17", "review.after:2026-10-16", "review.by:2026-10-16T10:00:00Z", "review.none:", "review.any:", "review.has:'T10'", "review.left:'T10'", "review.right:'T10'", "review.not:2026-10-16",
+        "reference:abcdef12", "reference.below:0", "reference.above:0", "reference.by:0", "reference.is:ABCDEF12", "reference.isnt:abcdef12", "reference.not:abcdef12", "reference.none:", "reference.any:", "reference.below:abcdef12", "reference.above:abcdef12", "reference.by:abcdef12", "reference.left:'12'", "reference.right:'12'", "reference.has:'AB'",
+        "review:2026-10-16", "review.is:2026-10-16T10:00:00Z", "review.before:2026-10-17", "review.after:2026-10-16", "review.by:2026-10-16T10:00:00Z", "review.none:", "review.any:", "review.has:'T10'", "review.has:1e", "review.has:PT1H", "review.has:2026-10-16T10:00:00Z", "review.left:'T10'", "review.right:'T10'", "review.not:2026-10-16",
         "priority.above:M", "priority.below:M", "priority.by:M", "priority.above:", "priority.below:", "priority.by:", "priority.is:H", "priority.none:",
         "rating.above:mid", "rating.below:mid", "rating.by:mid", "rating.above:", "rating.by:", "rating.is:high", "rating:none", "spelling.above:é", "spelling.below:é", "spelling.is:e\u{301}"
     ]

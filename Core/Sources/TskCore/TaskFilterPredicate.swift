@@ -89,10 +89,6 @@ enum FilterPredicate: Sendable {
             else if name == "status", FilterVirtualTag.isWaiting(task, at: context.now) { actual = "waiting" }
             else if name == "tags" { actual = task.tags.joined(separator: ",") }
             else { actual = task.attributes[name] ?? "" }
-            if context.schema.type(for: name) == .uuid, !actual.isEmpty {
-                do { _ = try TaskAttributeValues.normalized(actual, for: TaskAttributeDefinition(name: name, type: .uuid)) }
-                catch { throw TaskFilterError.invalidStoredValue(task.id, name, .uuid) }
-            }
             if let values = context.schema.orderedValues(for: name) {
                 let ordered = values.reversed().map { UTF8String($0) }
                 let left = ordered.firstIndex(of: UTF8String(actual)) ?? ordered.endIndex

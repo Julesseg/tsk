@@ -23,6 +23,7 @@ struct FilterTypedPredicate: Sendable {
             }
             operand = .text(raw)
         }
+        else if type == .uuid { operand = .text(raw) }
         else { throw TaskFilterError.syntax("‘\(name)’ requires a valid \(type.rawValue) operand.", byteOffset: 0) }
         self.operand = operand
         if case .regex(_, let inverted) = operation {
@@ -37,6 +38,10 @@ struct FilterTypedPredicate: Sendable {
             case .numeric:
                 guard stored.isEmpty || Float(stored)?.isFinite == true else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
                 actual = .number(Double(Float(stored) ?? 0))
+            case .uuid:
+                do { _ = try TaskAttributeValues.normalized(stored, for: TaskAttributeDefinition(name: name, type: .uuid)) }
+                catch { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
+                actual = .text(stored)
             case .duration:
                 guard stored.isEmpty || TaskwarriorDuration(stored, allowRawSeconds: false) != nil else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
                 actual = .duration(TaskwarriorDuration(stored, allowRawSeconds: false)?.seconds ?? 0)
@@ -103,7 +108,8 @@ enum FilterScalar: Sendable {
                 less = !trivial && !operand.trivial && UTF8String(text) < UTF8String(operand.text)
                 greater = !trivial && !operand.trivial && UTF8String(operand.text) < UTF8String(text)
             } else {
-                partial = equal
+                if case .text = self { partial = text.isEmpty == operand.text.isEmpty && text.utf8.starts(with: operand.text.utf8) }
+                else { partial = equal }
                 less = UTF8String(text) < UTF8String(operand.text)
                 greater = UTF8String(operand.text) < UTF8String(text)
             }
