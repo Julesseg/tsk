@@ -50,16 +50,19 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
         defer { activeQueries[id] = nil }
         return try await withCheckedThrowingContinuation { continuation in
             query.foundItemsHandler = Self.foundHandler(collector)
-            query.completionHandler = { error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: collector.values()) }
-            }
+            query.completionHandler = Self.completionHandler(collector, continuation)
             query.start()
         }
     }
 
     nonisolated private static func foundHandler(_ collector: SpotlightQueryCollector) -> @Sendable ([CSSearchableItem]) -> Void {
         { items in collector.append(items.map { SpotlightIndexedItem(identifier: $0.uniqueIdentifier, title: $0.attributeSet.title ?? "") }) }
+    }
+    nonisolated private static func completionHandler(_ collector: SpotlightQueryCollector, _ continuation: CheckedContinuation<[SpotlightIndexedItem], any Error>) -> @Sendable ((any Error)?) -> Void {
+        { error in
+            if let error { continuation.resume(throwing: error) }
+            else { continuation.resume(returning: collector.values()) }
+        }
     }
     nonisolated private static func escaped(_ raw: String) -> String { raw.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
 }

@@ -101,3 +101,35 @@ private actor FailingNativeSpotlightIndex: TaskSpotlightIndex {
     func replace(_ items: [TaskSpotlightItem]) throws { if failing { throw CocoaError(.fileWriteUnknown) } }
 }
 #endif
+
+#if canImport(CoreSpotlight)
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil)) @available(macOS 14.0, *)
+func receivedEncryptedSyncCompletionAndDeletionReconcileSpotlightThroughCommonEffects() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = try SyncConfiguration(serverURL: #require(environment["TSK_SYNC_TEST_URL"]), clientID: #require(UUID(uuidString: #require(environment["TSK_SYNC_TEST_CLIENT_ID"]))), encryptionSecret: #require(environment["TSK_SYNC_TEST_SECRET"]))
+    let directory = root.appendingPathComponent("phone"), index = RecordingSpotlightIndex()
+    let phone = TaskManager(replica: TaskChampionReplica(directory: directory), postCommitEffects: SpotlightTaskEffect(directory: directory, index: index))
+    let completed = try await phone.create(TaskDraft(description: "Received completed task"))
+    let deleted = try await phone.create(TaskDraft(description: "Received deleted task", attributes: ["opaque": "keep"]))
+    _ = try await phone.synchronize(using: configuration)
+    #expect(Set(await index.items.map(\.taskID)).isSuperset(of: [completed.id, deleted.id]))
+    let peerReplica = TaskChampionReplica(directory: root.appendingPathComponent("peer"))
+    let peer = TaskManager(replica: peerReplica)
+    _ = try await peer.synchronize(using: configuration)
+    _ = try await peer.complete(id: completed.id)
+    _ = try await peerReplica.update(id: deleted.id, changes: ["status": "deleted"])
+    _ = try await peer.synchronize(using: configuration)
+    _ = try await phone.synchronize(using: configuration)
+    #expect(!(await index.items.map(\.taskID)).contains(completed.id))
+    #expect(!(await index.items.map(\.taskID)).contains(deleted.id))
+    #expect(try await phone.task(id: completed.id).status == "completed")
+    #expect(try await phone.task(id: deleted.id).attributes["opaque"] == "keep")
+}
+private actor RecordingSpotlightIndex: TaskSpotlightIndex {
+    nonisolated let namespace = "owned.fixture.sync"
+    var items: [TaskSpotlightItem] = []
+    func replace(_ items: [TaskSpotlightItem]) { self.items = items }
+}
+#endif
