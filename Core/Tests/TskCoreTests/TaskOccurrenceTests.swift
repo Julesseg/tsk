@@ -34,13 +34,20 @@ import Testing
     }
 }
 
-actor OccurrenceReplica: TaskAtomicSnapshotMutatingReplica {
+actor OccurrenceReplica: TaskAtomicTransitionReplica {
     var records: [TaskRecord]
     var batches = 0
     init(records: [TaskRecord]) { self.records = records }
     func tasks() -> [TaskRecord] { records }
     func create(id: UUID, attributes: TaskAttributes) throws -> TaskRecord { throw TaskManagementError.storage("Unexpected create") }
     func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw TaskManagementError.storage("Sequential update forbidden") }
+    func commitAtomically(creating: [TaskAtomicCreate], updating updates: [TaskAtomicUpdate], expecting snapshot: [TaskRecord]) throws -> [TaskRecord] {
+        guard records.sorted(by: { $0.id.uuidString < $1.id.uuidString }) == snapshot.sorted(by: { $0.id.uuidString < $1.id.uuidString }), creating.allSatisfy({ new in !records.contains { $0.id == new.id } }) else { throw TaskSeriesMetadataError.stalePreview }
+        let saved = try updateAtomically(updates)
+        let created = creating.map { TaskRecord(id: $0.id, attributes: $0.attributes) }
+        records += created
+        return created + saved
+    }
     func updateAtomically(_ updates: [TaskAtomicUpdate], expecting snapshot: [TaskRecord]) throws -> [TaskRecord] {
         guard records.sorted(by: { $0.id.uuidString < $1.id.uuidString }) == snapshot.sorted(by: { $0.id.uuidString < $1.id.uuidString }) else { throw TaskSeriesMetadataError.stalePreview }
         return try updateAtomically(updates)

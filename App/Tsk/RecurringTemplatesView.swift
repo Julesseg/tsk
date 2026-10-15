@@ -15,10 +15,10 @@ struct RecurringTemplatesView: View {
                     Text("If the generator is offline, existing occurrences remain available but new ones will not arrive.").font(.footnote)
                 }
                 Section("Templates") {
-                    if store.recurringTemplates.isEmpty {
+                    if !store.recurringTemplates.contains(where: { !$0.isRetiredRecurringTemplate }) {
                         Text("No recurring templates").foregroundStyle(.secondary)
                     }
-                    ForEach(store.recurringTemplates) { template in
+                    ForEach(store.recurringTemplates.filter { !$0.isRetiredRecurringTemplate }) { template in
                         NavigationLink(value: template.id) {
                             VStack(alignment: .leading) {
                                 Text(template.description)
@@ -28,7 +28,15 @@ struct RecurringTemplatesView: View {
                         .accessibilityIdentifier("recurring-template-\(template.id.uuidString)")
                     }
                 }
+                if store.recurringTemplates.contains(where: \.isRetiredRecurringTemplate) {
+                    Section("Retired templates") {
+                        ForEach(store.recurringTemplates.filter(\.isRetiredRecurringTemplate)) { template in
+                            NavigationLink(value: template.id) { VStack(alignment: .leading) { Text(template.description); Text("Retired · view retained history").font(.caption).foregroundStyle(.secondary) } }.accessibilityIdentifier("recurring-template-\(template.id.uuidString)")
+                        }
+                    }
+                }
             }
+            .accessibilityIdentifier("recurring-template-list")
             .navigationTitle("Recurring templates")
             .navigationDestination(for: UUID.self) { id in
                 if let task = store.allTasks.first(where: { $0.id == id }) { TaskDetailView(store: store, task: task) }

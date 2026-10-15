@@ -7,6 +7,7 @@ struct TaskDetailView: View {
     @State private var task: TaskRecord
     @State private var isEditing = false
     @State private var panel: TaskDetailPanel?
+    @State private var createdSuccessor: TaskRecord?
 
     init(store: TaskStore, task: TaskRecord, edit: ((TaskRecord) -> Void)? = nil) {
         self.store = store
@@ -18,7 +19,10 @@ struct TaskDetailView: View {
         Form {
             Section("Description") { Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description") }
             TaskOrganizationSummary(task: task)
-            TaskRecurrenceSection(task: task, store: store)
+            TaskRecurrenceSection(task: task, store: store, transition: { panel = .transition })
+            if let createdSuccessor {
+                Section("Separate successor created") { NavigationLink("View new recurring template") { TaskDetailView(store: store, task: createdSuccessor) }.accessibilityIdentifier("view-transition-successor") }
+            }
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
                     .accessibilityIdentifier("task-detail-status")
@@ -83,6 +87,10 @@ struct TaskDetailView: View {
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
         .sheet(item: $panel) { panel in
             switch panel {
+            case .transition: TaskSeriesTransitionEditor(store: store, template: task, onSave: { saved in
+                createdSuccessor = saved
+                if let retired = store.allTasks.first(where: { $0.id == task.id }) { task = retired }
+            })
             case .series: TaskSeriesMetadataEditor(store: store, template: task, onSave: { task = $0 })
             case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
             case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
@@ -104,10 +112,11 @@ struct TaskDetailView: View {
 }
 
 private enum TaskDetailPanel: Identifiable {
-    case dependency, annotation(TaskAnnotation?), attributes, series
+    case dependency, annotation(TaskAnnotation?), attributes, series, transition
 
     var id: String {
         switch self {
+        case .transition: "transition"
         case .series: "series"
         case .dependency: "dependency"
         case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
