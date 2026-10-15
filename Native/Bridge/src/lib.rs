@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
 use taskchampion::{storage::{AccessMode, sqlite::SqliteStorage}, Replica, ServerConfig, TaskData};
 use uuid::Uuid;
 mod admission;
+mod atomic;
 mod migration;
 use admission::{LocalAccess, SyncAccess, interrupt_sync, sync_generation};
 
@@ -21,6 +21,7 @@ struct Request {
     id: Option<Uuid>,
     attributes: Option<Vec<Attribute<String>>>,
     changes: Option<Vec<Attribute<Option<String>>>>,
+    updates: Option<Vec<atomic::Update>>,
     configuration: Option<SyncConfiguration>,
     #[serde(rename = "syncGeneration")]
     sync_generation: Option<u64>,
@@ -86,6 +87,7 @@ async fn execute(request: Request) -> Result<Value, String> {
         };
     }
     let storage = SqliteStorage::new(&request.path, AccessMode::ReadWrite, true).await.map_err(|e| e.to_string())?;
+    if request.command == "updateAtomically" { return atomic::update(storage, request.updates.ok_or("Missing atomic updates")?).await; }
     let mut replica = Replica::new(storage);
     match request.command.as_str() {
         "tasks" => {

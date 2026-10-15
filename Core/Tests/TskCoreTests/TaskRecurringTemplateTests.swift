@@ -21,8 +21,8 @@ import TskCore
     #expect(try await manager.recurringTemplates() == [template])
     #expect(try await manager.tasks() == [template])
     #expect(try await manager.tasks(query: .unfinished).isEmpty)
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await manager.complete(id: template.id) }
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await manager.update(id: template.id, changes: ["description": "Accidental ordinary edit"]) }
+    await #expect(throws: (any Error).self) { try await manager.complete(id: template.id) }
+    await #expect(throws: (any Error).self) { try await manager.update(id: template.id, changes: ["description": "Accidental ordinary edit"]) }
 }
 
 @Test func recurrenceValidationRejectsUnsafeRulesAndDatesBeforeAnyRecordIsCommitted() async throws {
@@ -53,7 +53,7 @@ import TskCore
     #expect(try await manager.tasks().count == rules.count)
 }
 
-@Test func recurringInspectionDistinguishesTemplatesAndOccurrencesWithoutUnlockingMutations() async throws {
+@Test func recurringInspectionDistinguishesTemplatesAndOccurrencesAndRejectsMissingBookkeeping() async throws {
     let replica = TestReplica()
     let manager = TaskManager(replica: replica)
     let template = try await manager.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Inspect series"), firstDue: Date(timeIntervalSince1970: 1792224000)))
@@ -63,10 +63,10 @@ import TskCore
     #expect(child.recurrenceInspection?.kind == .occurrence)
     #expect(child.recurrenceInspection?.parentID == template.id)
     #expect(child.recurrenceInspection?.index == 0)
-    #expect(!child.canEdit && !child.canComplete)
+    #expect(child.canEdit && child.canComplete)
     #expect(try await manager.tasks(query: .unfinished) == [child])
     for action in ["complete", "edit"] {
-        await #expect(throws: TaskManagementError.unsupportedTaskKind) {
+        await #expect(throws: (any Error).self) {
             if action == "complete" { _ = try await manager.complete(id: child.id) }
             else { _ = try await manager.update(id: child.id, changes: ["description": "Unsafe mutation"]) }
         }

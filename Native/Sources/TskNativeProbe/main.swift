@@ -11,6 +11,16 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        if arguments.count == 7, arguments[1] == "complete-occurrence" {
+            do {
+                try Data().write(to: URL(fileURLWithPath: arguments[4]))
+                while !FileManager.default.fileExists(atPath: arguments[5]) { try await Task.sleep(nanoseconds: 10_000_000) }
+                let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
+                let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
+                try write(["saved": saved.id.uuidString], to: arguments[6])
+            } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
+            return
+        }
         if arguments.count == 7, arguments[1] == "save-attribute" {
             do {
                 let directory = URL(fileURLWithPath: arguments[2])
