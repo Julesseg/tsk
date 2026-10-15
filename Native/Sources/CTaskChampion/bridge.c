@@ -78,6 +78,15 @@ int tsk_bridge_acquire_mutation(const char *path) {
     return descriptor;
 }
 
+int tsk_bridge_try_acquire_mutation(const char *path) {
+    int descriptor = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (descriptor < 0) return -errno;
+    if (flock(descriptor, LOCK_EX | LOCK_NB) == 0) return descriptor;
+    int error = errno;
+    close(descriptor);
+    return -error;
+}
+
 void tsk_bridge_release_mutation(int descriptor) {
     flock(descriptor, LOCK_UN);
     close(descriptor);
