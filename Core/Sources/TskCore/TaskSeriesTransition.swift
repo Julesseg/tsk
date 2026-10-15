@@ -100,7 +100,7 @@ extension TaskManager {
         guard let atomic = replica as? any TaskAtomicTransitionReplica else { throw TaskManagementError.storage("This adapter cannot create and update a series in one transaction.") }
         let result = try await atomic.commitAtomically(creating: [TaskAtomicCreate(id: preview.successor.id, attributes: preview.successor.attributes)], updating: preview.updates, expecting: preview.snapshot)
         guard let successor = result.first(where: { $0.id == preview.successor.id }) else { throw TaskManagementError.storage("The atomic transition returned no successor template.") }
-        localChangeWasCommitted()
+        await localChangeWasCommitted()
         return successor
     }
 

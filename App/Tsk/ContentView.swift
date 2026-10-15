@@ -99,6 +99,9 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await continuousReminders.observeStatus() }
         }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await store.observeParticipantChanges() }
+        }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
