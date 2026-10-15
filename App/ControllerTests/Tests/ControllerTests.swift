@@ -6,7 +6,12 @@ import TskNative
 enum CalendarCaller { @TaskLocal static var passive = false }
 @MainActor enum TaskUIBoundaryDiagnostics {
     static var signal: ControllerSignal?
+    static var ownerPublished: (() -> Void)?
     static func event(_ stage: String, details: [String: String]) {
+        if !CalendarCaller.passive, stage == "calendar.refresh.published", let callback = ownerPublished {
+            ownerPublished = nil
+            callback()
+        }
         if CalendarCaller.passive && ["calendar.refresh.published", "calendar.refresh.coalesced"].contains(stage) { signal?.signal() }
     }
 }
@@ -120,6 +125,25 @@ actor CalendarProofSource: CalendarEventSource {
         #expect(controller.snapshot?.authorization == .fullAccess)
         #expect(await source.eventReads == 1)
         #expect(await source.requestCount == 1)
+    }
+
+    @Test func passiveCancellationDuringOwnerPublicationPreventsFollowupBeforeQueuedCleanup() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = CalendarProofSource()
+        let controller = TodayCalendarController(manager: TaskChampionSession.makeManager(directory: directory), source: source)
+        let signal = ControllerSignal(); TaskUIBoundaryDiagnostics.signal = signal
+        defer { TaskUIBoundaryDiagnostics.signal = nil; TaskUIBoundaryDiagnostics.ownerPublished = nil }
+        let requesting = Task { await controller.refresh(requestingAccess: true) }
+        await source.waitForRequest()
+        let foreground = Task { await CalendarCaller.$passive.withValue(true) { await controller.refresh() } }
+        await signal.wait()
+        TaskUIBoundaryDiagnostics.ownerPublished = { foreground.cancel() }
+        await source.release(failing: false)
+        await requesting.value; await foreground.value
+        #expect(!requesting.isCancelled)
+        #expect(controller.snapshot?.authorization == .fullAccess)
+        #expect(await source.eventReads == 1)
     }
 
     private func scenario(failing: Bool) async throws {

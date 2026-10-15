@@ -15,7 +15,7 @@ import TskNative
     private var refreshTask: Task<Void, Never>?
     private var preparedFixture = false
     private var accessRefreshInProgress = false
-    private var accessRefreshWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
+    private var accessRefreshWaiters: [UUID: (cancellation: CalendarRefreshCancellation, continuation: CheckedContinuation<Void, Never>)] = [:]
 
     init(manager: TaskManager, source: any CalendarEventSource = EventKitCalendarSource()) {
         self.manager = manager
@@ -39,24 +39,26 @@ import TskNative
             accessRefreshInProgress = false
             let waiters = Array(accessRefreshWaiters.values)
             accessRefreshWaiters.removeAll()
-            waiters.forEach { $0.resume() }
+            waiters.forEach { $0.continuation.resume() }
         }
         await refreshSnapshot(requestingAccess: true)
-        if !accessRefreshWaiters.isEmpty, snapshot?.authorization == .fullAccess, snapshot?.readError == nil, !Task.isCancelled {
+        if accessRefreshWaiters.values.contains(where: { !$0.cancellation.isCancelled }), snapshot?.authorization == .fullAccess, snapshot?.readError == nil, !Task.isCancelled {
             await refreshSnapshot()
         }
     }
 
     private func waitForAccessRefresh(requestingAccess: Bool) async {
         let id = UUID()
+        let cancellation = CalendarRefreshCancellation()
         await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard !Task.isCancelled else { continuation.resume(); return }
-                accessRefreshWaiters[id] = continuation
+                guard !Task.isCancelled, !cancellation.isCancelled else { continuation.resume(); return }
+                accessRefreshWaiters[id] = (cancellation, continuation)
                 TaskUIBoundaryDiagnostics.event("calendar.refresh.coalesced", details: ["generation": generation.uuidString, "requestingAccess": String(requestingAccess)])
             }
         } onCancel: {
-            Task { @MainActor [weak self] in self?.accessRefreshWaiters.removeValue(forKey: id)?.resume() }
+            cancellation.cancel()
+            Task { @MainActor [weak self] in self?.accessRefreshWaiters.removeValue(forKey: id)?.continuation.resume() }
         }
     }
 
@@ -108,3 +110,16 @@ private struct CalendarFixtureReadFailure: LocalizedError {
     var errorDescription: String? { "Injected Calendar adapter read failure. Tasks remain available." }
 }
 #endif
+
+private final class CalendarRefreshCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+    var isCancelled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return cancelled
+    }
+    func cancel() {
+        lock.lock(); defer { lock.unlock() }
+        cancelled = true
+    }
+}
