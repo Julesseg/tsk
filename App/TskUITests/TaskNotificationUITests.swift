@@ -30,6 +30,10 @@ final class TaskNotificationUITests: XCTestCase {
         XCTAssertGreaterThan(epoch - Date().timeIntervalSince1970, 10, "The app must terminate before the actual trigger")
         capture("Actual combined pending registration before termination", app)
         app.terminate()
+        let terminatedAt = Date().timeIntervalSince1970
+        XCTAssertLessThan(terminatedAt, epoch, "The app was actually terminated before the registered trigger")
+        let timing = XCTAttachment(string: "registeredTriggerEpoch=\(epoch)\nterminatedEpoch=\(terminatedAt)")
+        timing.name = "Closed-app actual termination timing"; timing.lifetime = .keepAlways; add(timing)
         let remaining = max(0, epoch + 5 - Date().timeIntervalSince1970)
         let elapsed = expectation(description: "Fresh notification trigger passes while app is terminated")
         DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { elapsed.fulfill() }
