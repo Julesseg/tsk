@@ -64,7 +64,7 @@ struct ContentView: View {
                 }
             }
         }
-        .focusedSceneValue(\.taskWorkspace, workspaceActions)
+        .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
         .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }

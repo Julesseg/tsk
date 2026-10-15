@@ -79,7 +79,7 @@ struct TaskEditorView: View {
             }
             .interactiveDismissDisabled(store.isSaving)
             .onAppear { focusedField = .description }
-            .focusedSceneValue(\.taskEditor, store.isSaving ? nil : TaskEditorActions(save: save))
+            .taskKeyboardCommands(store.isSaving ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
             .modifier(TaskWorkspacePanel(store: store))
         }
     }
