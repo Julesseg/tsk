@@ -11,6 +11,11 @@ on:
         type: boolean
         required: false
         default: false
+      native_index_control:
+        description: Run only the independent disposable Core Spotlight control
+        type: boolean
+        required: false
+        default: false
 
 # The one project-specific value in this workflow. Must match the name of the
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
@@ -19,12 +24,26 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.native_index_control && format('ci-native-index-control-{0}', github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
+  dispatch-inputs:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject conflicting diagnostic modes
+        env:
+          DIAGNOSTIC_ONLY: ${{ inputs.diagnostic_only }}
+          NATIVE_INDEX_CONTROL: ${{ inputs.native_index_control }}
+        run: |
+          if [[ "$DIAGNOSTIC_ONLY" == "true" && "$NATIVE_INDEX_CONTROL" == "true" ]]; then
+            echo 'Choose diagnostic_only OR native_index_control, not both.' >&2
+            exit 64
+          fi
+
   core-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && !inputs.native_index_control) }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -37,7 +56,7 @@ jobs:
         run: swift test
 
   native-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && !inputs.native_index_control) }}
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -61,7 +80,36 @@ jobs:
           TSK_NATIVE_PROBE_BINARY="$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
             TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
 
+  native-index-control:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_index_control }}
+    needs: dispatch-inputs
+    name: Core Spotlight · Independent native control
+    runs-on: macos-15
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Validate control ownership and workflow contracts
+        run: python3 scripts/native-index-control/test_runner.py
+      - name: Run four sequential owned native controls
+        run: python3 scripts/native-index-control/runner.py --output .build/native-index-control
+      - name: Upload bounded control receipts and command logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-index-control
+          path: |
+            .build/native-index-control/**/*.json
+            .build/native-index-control/*.log
+          if-no-files-found: ignore
+
   app-ui-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.native_index_control }}
     name: ${{ matrix.job-name }}
     runs-on: macos-15
     strategy:
