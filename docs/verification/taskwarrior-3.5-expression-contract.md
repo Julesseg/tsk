@@ -118,7 +118,13 @@ separate pinned Taskwarrior process for computed urgency and the integrated type
 operator matrix, preserves foreign UTF-8 fields, reopens a saved definition,
 changes a prerequisite durably, and verifies genuine CLI errors. Setting
 `TSK_FILTER_EVIDENCE_DIRECTORY` records the input records, version/profile,
-clock bounds, CLI selections and Core selections as JSON. argv crosses Python
+clock bounds, CLI selections and Core selections as JSON. Live moving-urgency
+comparisons enforce a measured300-second clock budget and place interpolation
+fixtures six hours away from a decimal threshold. The exact seven-day boundary
+and its one-second crossing remain literal public Core checks with a controlled
+clock; a frozen Core clock must not be compared to an advancing CLI clock at that
+boundary. No tolerance, rounded value, query or assertion is removed.
+argv crosses Python
 JSON stdin to avoid Darwin Foundation’s Unicode normalization.
 
 `TypedFilterUITests.testComputedArithmeticViewErrorsEditsReopenAndCompletion`

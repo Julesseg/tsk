@@ -24,7 +24,7 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
         ["tag_home": ""], ["tag_home": "", "tag_other": ""], ["tag_a": "", "tag_b": "", "tag_c": ""],
         ["annotation_100": "first"], ["annotation_100": "first", "annotation_200": "second"],
         ["due": String(epoch + 30 * 86400)], ["due": String(epoch - 10 * 86400)],
-        ["due": String(epoch + 7 * 86400)], ["due": String(epoch - 3 * 86400)],
+        ["due": String(liveComputedUrgencyDue(epoch))], ["due": String(epoch - 3 * 86400)],
         ["entry": String(epoch - 200 * 86400 - 1000)], ["entry": String(epoch + 2 * 86400 + 1000)],
         ["dep_\(prerequisite.uuidString.lowercased())": "", "project": "Blocked"],
         ["status": "completed", "priority": "H"],
@@ -55,8 +55,12 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
     ]
     let records = try await manager.tasks()
     var comparisons: [FilterConformanceSelection] = []
-    for expression in expressions { comparisons.append(try await fixture.compare(expression, manager: manager)) }
-    try writeComputedFilterEvidence("computed-urgency", epoch: epoch, records: records, comparisons: comparisons)
+    for expression in expressions {
+        comparisons.append(try await fixture.compare(expression, manager: manager))
+        let elapsed = Int(Date().timeIntervalSince1970) - epoch
+        #expect((0...300).contains(elapsed), "Live urgency conformance exceeded its bounded clock window: \(elapsed)s")
+    }
+    try writeComputedFilterEvidence("computed-urgency", epoch: epoch, records: records, comparisons: comparisons, clockBudgetSeconds: 300)
     let saved = try await manager.saveView(name: "Computed default urgency", expression: "project:Blocked and urgency < 0")
     let reopened = TaskChampionSession.makeManager(directory: fixture.directory)
     #expect(try await reopened.savedViews() == [saved])
@@ -102,13 +106,15 @@ func typedExpressionOperationsAgreeWithPinnedConversionAndDOMRules() async throw
     try writeComputedFilterEvidence("typed-expression-operations", epoch: Int(Date().timeIntervalSince1970), records: records, comparisons: comparisons)
 }
 
-private func writeComputedFilterEvidence(_ name: String, epoch: Int, records: [TaskRecord], comparisons: [FilterConformanceSelection]) throws {
+private func writeComputedFilterEvidence(_ name: String, epoch: Int, records: [TaskRecord], comparisons: [FilterConformanceSelection], clockBudgetSeconds: Int? = nil) throws {
     guard let path = ProcessInfo.processInfo.environment["TSK_FILTER_EVIDENCE_DIRECTORY"] else { return }
     struct Evidence: Encodable {
         let version = "3.5.0"
         let contract = "tsk-taskwarrior-3.5-expression-v1"
         let contextEpoch: Int
         let recordedAtEpoch: Int
+        let measuredElapsedSeconds: Int
+        let clockBudgetSeconds: Int?
         let records: [TaskRecord]
         let cases: [FilterConformanceSelection]
     }
@@ -116,5 +122,24 @@ private func writeComputedFilterEvidence(_ name: String, epoch: Int, records: [T
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    try encoder.encode(Evidence(contextEpoch: epoch, recordedAtEpoch: Int(Date().timeIntervalSince1970), records: records, cases: comparisons)).write(to: directory.appendingPathComponent(name + ".json"), options: .atomic)
+    let recordedAt = Int(Date().timeIntervalSince1970)
+    try encoder.encode(Evidence(contextEpoch: epoch, recordedAtEpoch: recordedAt, measuredElapsedSeconds: recordedAt - epoch, clockBudgetSeconds: clockBudgetSeconds, records: records, cases: comparisons)).write(to: directory.appendingPathComponent(name + ".json"), options: .atomic)
+}
+
+private func liveComputedUrgencyDue(_ epoch: Int) -> Int { epoch + 7 * 86400 + 6 * 3600 }
+
+@MainActor
+@Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
+func liveComputedUrgencyFixtureRemainsComparableAfterClockAdvances() async throws {
+    let fixture = try TypedFilterFixture()
+    defer { fixture.remove() }
+    let frozenEpoch = Int(Date().timeIntervalSince1970) - 5
+    let manager = TaskChampionSession.makeManager(directory: fixture.directory, now: { Date(timeIntervalSince1970: Double(frozenEpoch)) })
+    let id = UUID()
+    _ = try await TaskChampionReplica(directory: fixture.directory).create(id: id, attributes: ["description": "Isolated due interpolation row", "status": "pending", "entry": String(frozenEpoch), "due": String(liveComputedUrgencyDue(frozenEpoch))])
+    let above = try await fixture.compare("urgency.above:5.6", manager: manager)
+    let below = try await fixture.compare("urgency.below:5.6", manager: manager)
+    try writeComputedFilterEvidence("clock-offset-regression", epoch: frozenEpoch, records: await manager.tasks(), comparisons: [above, below], clockBudgetSeconds: 300)
+    #expect(try await manager.tasks(filter: "urgency.below:5.6").map(\.id) == [id])
+    #expect((5...300).contains(Int(Date().timeIntervalSince1970) - frozenEpoch))
 }
