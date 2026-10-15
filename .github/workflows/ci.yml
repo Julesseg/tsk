@@ -37,7 +37,7 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           apt-get update
-          apt-get install -y curl gcc g++
+          apt-get install -y curl gcc g++ sqlite3
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: Swatinem/rust-cache@v2
@@ -126,7 +126,7 @@ jobs:
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests)
+            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests)
           fi
           peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
@@ -156,6 +156,7 @@ jobs:
           name: ${{ matrix.artifact }}
           path: |
             App/TestResults.xcresult
+            App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
           if-no-files-found: ignore

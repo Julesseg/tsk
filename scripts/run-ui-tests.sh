@@ -38,4 +38,34 @@ if [[ "$was_booted" == no ]]; then
     xcrun simctl boot "$simulator_id"
 fi
 xcrun simctl bootstatus "$simulator_id" -b
-xcodebuild test -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "$@"
+build_arguments=()
+share_arguments=()
+derived_data=""
+result_path=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -derivedDataPath)
+            derived_data=$2
+            build_arguments+=("$1" "$2")
+            share_arguments+=("$1" "$2")
+            shift 2 ;;
+        -resultBundlePath)
+            result_path=$2
+            shift 2 ;;
+        -only-testing:*|-skip-testing:*)
+            build_arguments+=("$1")
+            shift ;;
+        *)
+            build_arguments+=("$1")
+            share_arguments+=("$1")
+            shift ;;
+    esac
+done
+if [[ -z "$derived_data" || -z "$result_path" ]]; then
+    echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed share fixture.' >&2
+    exit 1
+fi
+xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
+xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
+xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult"
+xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path"
