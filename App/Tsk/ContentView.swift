@@ -38,52 +38,79 @@ struct ContentView: View {
         _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
-    var body: some View {
+    var body: some View { calendarWorkspace }
+
+    private var navigationWorkspace: some View {
         Group {
-            if sizeClass == .regular {
-                NavigationSplitView(columnVisibility: $columnVisibility) {
-                    TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
-                        .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-                } content: {
-                    taskList(selection: $selectedTaskID)
-                        .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
-                } detail: {
-                    if let task = selectedTask {
+            if sizeClass == .regular { regularWorkspace }
+            else { compactWorkspace }
+        }
+    }
+
+    private var regularWorkspace: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            workspaceSidebar
+        } content: {
+            taskList(selection: $selectedTaskID)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
+        } detail: {
+            selectedTaskDetail
+        }
+        .navigationSplitViewStyle(.balanced)
+        .accessibilityIdentifier("task-workspace")
+    }
+
+    @ViewBuilder private var selectedTaskDetail: some View {
+        if let task = selectedTask {
+            TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+                .id(task.id)
+        } else {
+            ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
+                .accessibilityIdentifier("workspace-detail-empty")
+        }
+    }
+
+    private var workspaceSidebar: some View {
+        TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
+            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
+    }
+
+    private var compactWorkspace: some View {
+        NavigationStack(path: $path) {
+            taskList(selection: nil)
+                .safeAreaInset(edge: .top) { compactViewPicker }
+                .navigationDestination(for: UUID.self) { id in
+                    if let task = store.allTasks.first(where: { $0.id == id }) {
                         TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                            .id(task.id)
                     } else {
-                        ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
-                            .accessibilityIdentifier("workspace-detail-empty")
+                        ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
                     }
                 }
-                .navigationSplitViewStyle(.balanced)
-                .accessibilityIdentifier("task-workspace")
-            } else {
-                NavigationStack(path: $path) {
-                    taskList(selection: nil)
-                        .safeAreaInset(edge: .top) { compactViewPicker }
-                        .navigationDestination(for: UUID.self) { id in
-                            if let task = store.allTasks.first(where: { $0.id == id }) {
-                                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                            } else {
-                                ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
-                            }
-                        }
-                }
-            }
         }
+    }
+
+    private var integrationSheets: some View {
+        navigationWorkspace
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
         .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight) }
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
         .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
+    }
+
+    private var editorSheets: some View {
+        integrationSheets
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
         .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
         .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
         .sheet(isPresented: $isShowingShortcuts) { NavigationStack { TaskShortcutsView().toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { isShowingShortcuts = false } } } } }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
+    }
+
+    private var taskLifecycle: some View {
+        editorSheets
         .task(id: TaskListSelection(query: store.query, project: store.projectSelection, customView: store.customView)) {
             selectedTaskID = nil
             path = []
@@ -105,6 +132,10 @@ struct ContentView: View {
             await continuousReminders.scan()
             await spotlight.reconcile()
         }
+    }
+
+    private var participantLifecycle: some View {
+        taskLifecycle
         .task(id: scenePhase) {
             if scenePhase == .active { await continuousReminders.observeStatus() }
         }
@@ -119,6 +150,10 @@ struct ContentView: View {
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
         }
+    }
+
+    private var applicationLifecycle: some View {
+        participantLifecycle
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task {
@@ -134,6 +169,10 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged(); Task { await notifications.refresh() } }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged(); await notifications.refresh() } }
+    }
+
+    private var calendarWorkspace: some View {
+        applicationLifecycle
         .task(id: displaysCalendar) {
             calendar.isDisplayingToday = displaysCalendar
             if displaysCalendar { await calendar.refresh() }
@@ -157,30 +196,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar {
-                if sizeClass != .regular {
-                    ToolbarItemGroup(placement: .topBarLeading) {
-                        Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
-                        Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
-                        Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }.accessibilityIdentifier("synchronization-settings")
-                        Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
-                    }
-                }
-                if sizeClass != .regular {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu("More", systemImage: "ellipsis") {
-                            Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
-                            Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
-                            Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
-                            Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
-                            Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
-                        }.accessibilityIdentifier("workspace-more")
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("New task", systemImage: "plus", action: capture).accessibilityIdentifier("new-task")
-                }
-            }
+            .toolbar { workspaceToolbar }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
@@ -194,6 +210,32 @@ struct ContentView: View {
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
+    }
+
+    @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
+        if sizeClass != .regular {
+            ToolbarItemGroup(placement: .topBarLeading) {
+                Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
+                Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
+                Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }.accessibilityIdentifier("synchronization-settings")
+                Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
+            }
+        }
+        if sizeClass != .regular {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("More", systemImage: "ellipsis") {
+                    Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
+                    Button("Task notifications") { isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
+                    Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
+                    Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
+                    Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
+                }.accessibilityIdentifier("workspace-more")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button("New task", systemImage: "plus", action: capture).accessibilityIdentifier("new-task")
+        }
+
     }
 
     private var compactViewPicker: some View {
