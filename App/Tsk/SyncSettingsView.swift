@@ -35,7 +35,7 @@ struct SyncSettingsView: View {
                         .focused($focusedField, equals: .client)
                         .accessibilityIdentifier("sync-client-id")
                     SecureField("Encryption secret", text: $secret)
-                        .textContentType(.password)
+                        .textContentType(nil)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .secret)

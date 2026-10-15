@@ -1,5 +1,6 @@
 import SwiftUI
 import TskCore
+import UIKit
 
 struct TaskWorkspaceActions {
     let capture: () -> Void
@@ -9,66 +10,28 @@ struct TaskWorkspaceActions {
     let reveal: (() -> Void)?
     let openView: (TaskQuery) -> Void
     let refresh: () -> Void
+
+    var keyboardCommands: [TaskKeyboardCommand] {
+        var commands = [
+            TaskKeyboardCommand(id: "capture", input: "n", modifiers: .command, title: "New Task", action: capture),
+            TaskKeyboardCommand(id: "previous", input: UIKeyCommand.inputUpArrow, modifiers: .command, title: "Previous Task", action: { move(.previous) }),
+            TaskKeyboardCommand(id: "next", input: UIKeyCommand.inputDownArrow, modifiers: .command, title: "Next Task", action: { move(.next) }),
+            TaskKeyboardCommand(id: "today", input: "1", modifiers: .command, title: "Today", action: { openView(.today) }),
+            TaskKeyboardCommand(id: "upcoming", input: "2", modifiers: .command, title: "Upcoming", action: { openView(.upcoming) }),
+            TaskKeyboardCommand(id: "unfinished", input: "3", modifiers: .command, title: "Unfinished", action: { openView(.unfinished) }),
+            TaskKeyboardCommand(id: "completed", input: "4", modifiers: .command, title: "Completed", action: { openView(.completed) }),
+            TaskKeyboardCommand(id: "refresh", input: "r", modifiers: .command, title: "Refresh Tasks", action: refresh)
+        ]
+        if let edit { commands.append(TaskKeyboardCommand(id: "edit", input: "e", modifiers: .command, title: "Edit Task", action: edit)) }
+        if let complete { commands.append(TaskKeyboardCommand(id: "complete", input: "\r", modifiers: [.command, .shift], title: "Complete Task", action: complete)) }
+        if let reveal { commands.append(TaskKeyboardCommand(id: "reveal", input: "o", modifiers: .command, title: "Reveal Task Details", action: reveal)) }
+        return commands
+    }
 }
 
 struct TaskEditorActions {
     let save: () -> Void
-}
-
-private struct TaskEditorActionsKey: FocusedValueKey {
-    typealias Value = TaskEditorActions
-}
-
-private struct TaskWorkspaceActionsKey: FocusedValueKey {
-    typealias Value = TaskWorkspaceActions
-}
-
-extension FocusedValues {
-    var taskEditor: TaskEditorActions? {
-        get { self[TaskEditorActionsKey.self] }
-        set { self[TaskEditorActionsKey.self] = newValue }
-    }
-
-    var taskWorkspace: TaskWorkspaceActions? {
-        get { self[TaskWorkspaceActionsKey.self] }
-        set { self[TaskWorkspaceActionsKey.self] = newValue }
-    }
-}
-
-struct TaskWorkspaceCommands: Commands {
-    @FocusedValue(\.taskWorkspace) private var actions
-    @FocusedValue(\.taskEditor) private var editor
-
-    var body: some Commands {
-        CommandGroup(replacing: .newItem) {
-            Button("New Task") { actions?.capture() }
-                .keyboardShortcut("n", modifiers: .command).disabled(actions == nil)
-        }
-        CommandGroup(after: .newItem) {
-            if let editor {
-                Button("Save Changes", action: editor.save)
-                    .keyboardShortcut(.return, modifiers: .command)
-            }
-        }
-        CommandMenu("Tasks") {
-            Button("Previous Task") { actions?.move(.previous) }
-                .keyboardShortcut(.upArrow, modifiers: .command).disabled(actions == nil)
-            Button("Next Task") { actions?.move(.next) }
-                .keyboardShortcut(.downArrow, modifiers: .command).disabled(actions == nil)
-            Button("Reveal Task Details") { actions?.reveal?() }
-                .keyboardShortcut("o", modifiers: .command).disabled(actions?.reveal == nil)
-            Button("Edit Task") { actions?.edit?() }
-                .keyboardShortcut("e", modifiers: .command).disabled(actions?.edit == nil)
-            Button("Complete Task") { actions?.complete?() }
-                .keyboardShortcut(.return, modifiers: [.command, .shift]).disabled(actions?.complete == nil)
-            Divider()
-            Button("Today") { actions?.openView(.today) }.keyboardShortcut("1", modifiers: .command).disabled(actions == nil)
-            Button("Upcoming") { actions?.openView(.upcoming) }.keyboardShortcut("2", modifiers: .command).disabled(actions == nil)
-            Button("Unfinished") { actions?.openView(.unfinished) }.keyboardShortcut("3", modifiers: .command).disabled(actions == nil)
-            Button("Completed") { actions?.openView(.completed) }.keyboardShortcut("4", modifiers: .command).disabled(actions == nil)
-            Divider()
-            Button("Refresh Tasks") { actions?.refresh() }
-                .keyboardShortcut("r", modifiers: .command).disabled(actions == nil)
-        }
+    var keyboardCommands: [TaskKeyboardCommand] {
+        TaskKeyboardCommand.suspended + [TaskKeyboardCommand(id: "save", input: "\r", modifiers: .command, title: "Save Changes", action: save)]
     }
 }
