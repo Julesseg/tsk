@@ -93,7 +93,10 @@ struct TaskAttributeDefinitionEditor: View {
                         .disabled(original != nil || isSaving).accessibilityIdentifier("attribute-definition-name")
                     TextField("Label", text: $label).focused($field, equals: .label)
                         .disabled(isSaving).accessibilityIdentifier("attribute-definition-label")
-                    Picker("Type", selection: $type) {
+                    Picker("Type", selection: Binding(get: { type }, set: { value in
+                        TaskUIBoundaryDiagnostics.event("attribute-definition.type.setter", details: ["previous": type.rawValue, "selected": value.rawValue])
+                        type = value
+                    })) {
                         ForEach(TaskAttributeType.allCases, id: \.self) { type in Text(type.title).tag(type) }
                     }
                     .pickerStyle(.menu).disabled(isSaving).accessibilityIdentifier("attribute-definition-type")

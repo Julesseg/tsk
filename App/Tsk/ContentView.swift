@@ -93,11 +93,11 @@ struct ContentView: View {
     private var integrationSheets: some View {
         navigationWorkspace
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
-        .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight) }
+        .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "spotlight"]) } }
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
-        .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders) }
-        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store) }
-        .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store) }
+        .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
+        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
+        .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "attribute-definitions"]) } }
     }
 
     private var editorSheets: some View {
@@ -159,6 +159,7 @@ struct ContentView: View {
     private var applicationLifecycle: some View {
         participantLifecycle
         .onChange(of: scenePhase) { _, phase in
+            TaskUIBoundaryDiagnostics.event("calendar.scene", details: ["phase": String(describing: phase)])
             #if DEBUG && targetEnvironment(simulator)
             continuousReminders.source.recordAccessDiagnostic("reminders.scene", details: ["phase": String(describing: phase)])
             #endif
@@ -234,11 +235,11 @@ struct ContentView: View {
         if sizeClass != .regular {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
-                    Button("Spotlight") { isShowingSpotlight = true }.accessibilityIdentifier("spotlight-settings")
+                    Button("Spotlight") { requestIntegrationPresentation("spotlight", state: $isShowingSpotlight) }.accessibilityIdentifier("spotlight-settings")
                     Button("Task notifications") { TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "workspace-menu"]); isConfiguringNotifications = true }.accessibilityIdentifier("notification-settings")
-                    Button("Move from Reminders automatically") { isConfiguringContinuousReminders = true }.accessibilityIdentifier("continuous-reminders-settings")
-                    Button("Copy from Reminders") { isImportingReminders = true }.accessibilityIdentifier("reminders-import")
-                    Button("Attribute definitions") { isDefiningAttributes = true }.accessibilityIdentifier("attribute-definitions")
+                    Button("Move from Reminders automatically") { requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders) }.accessibilityIdentifier("continuous-reminders-settings")
+                    Button("Copy from Reminders") { requestIntegrationPresentation("reminders-import", state: $isImportingReminders) }.accessibilityIdentifier("reminders-import")
+                    Button("Attribute definitions") { requestIntegrationPresentation("attribute-definitions", state: $isDefiningAttributes) }.accessibilityIdentifier("attribute-definitions")
                 }.accessibilityIdentifier("workspace-more")
             }
         }
@@ -246,6 +247,12 @@ struct ContentView: View {
             Button("New task", systemImage: "plus", action: capture).accessibilityIdentifier("new-task")
         }
 
+    }
+
+    private func requestIntegrationPresentation(_ destination: String, state: Binding<Bool>) {
+        TaskUIBoundaryDiagnostics.event("workspace.menu.action-entry", details: ["destination": destination, "presented": String(state.wrappedValue)])
+        state.wrappedValue = true
+        TaskUIBoundaryDiagnostics.event("workspace.menu.state-assigned", details: ["destination": destination, "presented": String(state.wrappedValue)])
     }
 
     private var compactViewPicker: some View {

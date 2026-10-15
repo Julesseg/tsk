@@ -36,10 +36,24 @@ extension XCTestCase {
         let expected = enabled ? "1" : "0"
         if control.value as? String != expected {
             let thumb = control.switches.firstMatch
-            tapTaskControl(thumb.exists ? thumb : control, app: app, file: file, line: line)
+            let selected = thumb.exists ? thumb : control
+            recordTaskSwitchInteraction(row: control, selected: selected, phase: "before", app: app)
+            tapTaskControl(selected, app: app, file: file, line: line)
         }
         let changed = expectation(for: NSPredicate(format: "value == %@", expected), evaluatedWith: control)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
+        let result = XCTWaiter.wait(for: [changed], timeout: 5)
+        recordTaskSwitchInteraction(row: control, selected: control.switches.firstMatch.exists ? control.switches.firstMatch : control, phase: "after", app: app)
+        XCTAssertEqual(result, .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
+    }
+
+    func recordTaskSwitchInteraction(row: XCUIElement, selected: XCUIElement, phase: String, app: XCUIApplication) {
+        guard ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { return }
+        let frame = selected.frame
+        let metadata = "phase=\(phase)\nrowIdentifier=\(row.identifier)\nrowValue=\(String(describing: row.value))\nselectedIdentifier=\(selected.identifier)\nselectedValue=\(String(describing: selected.value))\nenabled=\(selected.isEnabled)\nhittable=\(selected.isHittable)\nframe=\(frame)\nappFrame=\(app.frame)\nrequestedTap=\(frame.midX),\(frame.midY)\nrowHierarchy=\(row.debugDescription)"
+        let attachment = XCTAttachment(string: metadata)
+        attachment.name = "Actual selected switch \(phase) metadata and hierarchy"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
