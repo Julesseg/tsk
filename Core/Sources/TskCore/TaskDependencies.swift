@@ -60,8 +60,7 @@ public extension TaskManager {
         if source.attributes[key] != nil { return source }
         guard !TaskDependencies.hasPath(from: prerequisiteID, to: id, tasks: records) else { throw TaskManagementError.dependencyCycle }
         let references = (source.dependencyReferences + [reference]).sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
-        let saved = try await replica.update(id: id, changes: [key: "x", "depends": references.joined(separator: ","), "modified": String(Int(now().timeIntervalSince1970))])
-        localChangeWasCommitted()
+        let saved = try await saveTaskMutation(source, changes: [key: "x", "depends": references.joined(separator: ","), "modified": String(Int(now().timeIntervalSince1970))])
         return saved
     }
 }
@@ -93,8 +92,7 @@ public extension TaskManager {
         var patch: TaskAttributePatch = ["modified": String(Int(now().timeIntervalSince1970))]
         patch.updateValue(nil, forKey: key)
         patch.updateValue(remaining.isEmpty ? nil : remaining.joined(separator: ","), forKey: "depends")
-        let saved = try await replica.update(id: id, changes: patch)
-        localChangeWasCommitted()
+        let saved = try await saveTaskMutation(source, changes: patch)
         return saved
     }
 }

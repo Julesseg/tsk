@@ -21,7 +21,7 @@ struct TaskDetailView: View {
             Section {
                 LabeledContent("Status", value: task.status.capitalized)
                 if task.canComplete {
-                    Button("Complete task", systemImage: "checkmark.circle") {
+                    Button(task.isOccurrence ? "Complete occurrence" : "Complete task", systemImage: "checkmark.circle") {
                         Task { if let completed = await store.complete(id: task.id) { task = completed } }
                     }
                     .disabled(store.isSaving)
@@ -55,7 +55,7 @@ struct TaskDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if task.canEdit {
-                Button("Edit") {
+                Button(task.isOccurrence ? "Edit occurrence" : "Edit") {
                     if let edit { edit(task) } else { isEditing = true }
                 }
                     .disabled(store.isSaving)

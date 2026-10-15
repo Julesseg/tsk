@@ -11,7 +11,8 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
 
     public var description: String { attributes["description"] ?? "Untitled task" }
     public var status: String { attributes["status"] ?? "unknown" }
-    public var canEdit: Bool { !isRecurring && (status == "pending" || status == "completed") }
+    public var isOccurrence: Bool { attributes["parent"] != nil }
+    public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && Int(attributes["imask"] ?? "").map { $0 >= 0 } == true && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
     public var canComplete: Bool { canEdit && status == "pending" }
     public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }
@@ -184,6 +185,7 @@ public actor TaskManager {
         }
         patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
         patch["modified"] = String(Int(now().timeIntervalSince1970))
+        if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)
         localChangeWasCommitted()
         return saved
@@ -193,6 +195,10 @@ public actor TaskManager {
         let lease = try await beginMutation()
         defer { endMutation(lease) }
         let task = try await self.task(id: id)
+        if task.isOccurrence {
+            let timestamp = String(Int(now().timeIntervalSince1970))
+            return try await saveOccurrence(task, changes: ["status": "completed", "end": task.attributes["end"] ?? timestamp, "modified": timestamp, "start": nil], completing: true)
+        }
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }
         let timestamp = String(Int(now().timeIntervalSince1970))
