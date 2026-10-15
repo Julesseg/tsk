@@ -31,12 +31,12 @@ import Foundation
             calendar.timeZone = TimeZone(secondsFromGMT: 0)!
             let start = DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2030, month: 1, day: 2, hour: 9, minute: 0, second: 0)
             let due = DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2030, month: 1, day: 3, hour: 10, minute: 30, second: 0)
-            func reminder(_ title: String, in list: EKCalendar, priority: Int = 0, completed: Bool = false, recurring: Bool = false) throws {
+            func reminder(_ title: String, in list: EKCalendar, priority: Int = 0, completed: Bool = false, recurring: Bool = false, recurrenceInterval: Int = 1) throws {
                 let item = EKReminder(eventStore: store)
                 item.calendar = list; item.title = title; item.priority = priority
                 item.notes = "  Fixture notes\nsecond line  "; item.url = URL(string: "https://example.com/reminder")
                 item.startDateComponents = start; item.dueDateComponents = recurring ? start : due
-                if recurring { item.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: .weekly, interval: 1, end: nil)) }
+                if recurring { item.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: .weekly, interval: recurrenceInterval, end: nil)) }
                 item.isCompleted = completed
                 try store.save(item, commit: true)
             }
@@ -44,7 +44,7 @@ import Foundation
             try reminder("Copy fixture none", in: selected)
             try reminder("Exclude completed", in: selected, completed: true)
             try reminder("Exclude unselected", in: unselected)
-            try reminder("Skip recurring", in: selected, recurring: true)
+            try reminder("Skip recurring", in: selected, recurring: true, recurrenceInterval: 2)
             try reminder("Weekly UTC sequence", in: sequenceList, recurring: true)
             output["selectedBeforeCopy"] = await fetch(store, selected, incomplete: false).map(summary)
             var sequence: [[String: Any]] = []

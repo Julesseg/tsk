@@ -8,6 +8,7 @@ struct ContinuousReminderSettingsView: View {
     @State private var projects: [String: String] = [:]
     @State private var error: String?
     @State private var fixtureReport: String?
+    @State private var isShowingTemplates = false
     @State private var loading = false
     @State private var fixtureChanged = false
     @FocusState private var editingProject: Bool
@@ -23,6 +24,7 @@ struct ContinuousReminderSettingsView: View {
                     if controller.status?.active == true && controller.status?.paused == true {
                         Text("Automatic scans are held while another window moves reminders, or after an interrupted or failed move. If no move is running, review the source before explicitly retrying.").accessibilityIdentifier("continuous-reminders-paused")
                     }
+                    ReminderRecurrenceInformation()
                     Button("Allow Reminders access / Refresh lists") { Task { await loadLists() } }.accessibilityIdentifier("reminders-access")
                 }
                 ReminderListMappingSection(lists: lists, projects: $projects, focused: $editingProject)
@@ -40,7 +42,15 @@ struct ContinuousReminderSettingsView: View {
                     Section("Current attempt") {
                         Text("Saved \(result.imported.count); removed \(result.removedCount); skipped \(result.skipped.count); failed \(result.failures.count).")
                             .accessibilityIdentifier("continuous-reminders-result")
-                        ForEach(result.imported) { Text($0.description) }
+                        ForEach(result.imported) { task in
+                            VStack(alignment: .leading) {
+                                Text(task.description)
+                                if task.status == "recurring" { Text("Recurring template").font(.caption) }
+                            }
+                        }
+                        if result.imported.contains(where: { $0.status == "recurring" }) {
+                            Button("View recurring templates") { isShowingTemplates = true }.accessibilityIdentifier("continuous-reminders-view-templates")
+                        }
                         ForEach((result.skipped + result.failures).indices, id: \.self) { index in
                             let item = (result.skipped + result.failures)[index]
                             VStack(alignment: .leading) { Text(item.title).font(.headline); Text(item.reason ?? "Not moved").font(.footnote) }
@@ -87,6 +97,7 @@ struct ContinuousReminderSettingsView: View {
             do { lists = try await controller.source.lists() } catch { self.error = error.localizedDescription }
         }
         .modifier(TaskWorkspacePanel(store: controller.store))
+        .sheet(isPresented: $isShowingTemplates) { RecurringTemplatesView(store: controller.store) }
     }
 
     private func loadLists() async {
