@@ -17,13 +17,13 @@ import Foundation
             let predicate = store.predicateForReminders(in: lists)
             output["fetchStarted"] = true
             try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
-            let outcome = await FixtureReadbackDeadline<(Int, Bool)>.observe(timeoutNanoseconds: 2_000_000_000) { callback in
-                let request = store.fetchReminders(matching: predicate) { callback(($0?.count ?? 0, $0 != nil)) }
+            let outcome = await FixtureReadbackDeadline<(Int?, Bool)>.observe(timeoutNanoseconds: 2_000_000_000) { callback in
+                let request = store.fetchReminders(matching: predicate) { callback(($0?.count, $0 != nil)) }
                 return { store.cancelFetchRequest(request) }
             }
             switch outcome {
             case .received(let result):
-                output["ownedReminderCount"] = result.0
+                if let count = result.0 { output["ownedReminderCount"] = count }
                 output["fetchReturnedNonNil"] = result.1
             case .timedOut:
                 output["timedOut"] = true
