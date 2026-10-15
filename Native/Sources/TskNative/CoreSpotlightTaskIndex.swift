@@ -34,12 +34,19 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
     }
 
     public func replace(_ items: [TaskSpotlightItem]) async throws {
-        guard CSSearchableIndex.isIndexingAvailable() else { throw SpotlightIndexError.unavailable }
+        let available = CSSearchableIndex.isIndexingAvailable()
+        TaskParticipantDiagnostics.event("spotlight.availability", details: ["available": String(available)])
+        guard available else { throw SpotlightIndexError.unavailable }
         for item in items { guard (try? TaskSpotlightItem.taskID(from: item.identifier, namespace: namespace)) == item.taskID else { throw SpotlightIndexError.foreignItem } }
         let deletion = TaskParticipantDiagnostics.begin("spotlight.delete")
         do {
             defer { TaskParticipantDiagnostics.end("spotlight.delete", id: deletion) }
-            try await index.deleteSearchableItems(withDomainIdentifiers: [namespace])
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let submission = TaskParticipantDiagnostics.begin("spotlight.delete.submit")
+                defer { TaskParticipantDiagnostics.end("spotlight.delete.submit", id: submission) }
+                TaskParticipantDiagnostics.event("spotlight.delete.submission", details: ["mainThread": String(Thread.isMainThread)])
+                index.deleteSearchableItems(withDomainIdentifiers: [namespace], completionHandler: Self.indexCompletion(stage: "spotlight.delete.callback", continuation: continuation))
+            }
         }
         let values = items.map { item in
             let attributes = CSSearchableItemAttributeSet(itemContentType: "public.text")
@@ -51,7 +58,27 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
         }
         let indexing = TaskParticipantDiagnostics.begin("spotlight.index")
         defer { TaskParticipantDiagnostics.end("spotlight.index", id: indexing) }
-        try await index.indexSearchableItems(values)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            let submission = TaskParticipantDiagnostics.begin("spotlight.index.submit")
+            defer { TaskParticipantDiagnostics.end("spotlight.index.submit", id: submission) }
+            TaskParticipantDiagnostics.event("spotlight.index.submission", details: ["mainThread": String(Thread.isMainThread), "count": String(values.count)])
+            index.indexSearchableItems(values, completionHandler: Self.indexCompletion(stage: "spotlight.index.callback", continuation: continuation))
+        }
+    }
+
+    nonisolated private static func indexCompletion(stage: String, continuation: CheckedContinuation<Void, any Error>) -> @Sendable ((any Error)?) -> Void {
+        { error in
+            var details = ["mainThread": String(Thread.isMainThread), "succeeded": String(error == nil)]
+            if let error {
+                let native = error as NSError
+                details["errorDomain"] = native.domain
+                details["errorCode"] = String(native.code)
+                details["error"] = native.localizedDescription
+            }
+            TaskParticipantDiagnostics.event(stage, details: details)
+            if let error { continuation.resume(throwing: error) }
+            else { continuation.resume() }
+        }
     }
 
     public func query() async throws -> [SpotlightIndexedItem] {
