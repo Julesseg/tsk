@@ -30,6 +30,12 @@ struct TaskDetailView: View {
                     .accessibilityIdentifier("complete-task")
                 }
             }
+            Section("Activity") {
+                if !task.isActive { Text("Not active").accessibilityIdentifier("task-activity-inactive") }
+                TaskActivityCaption(task: task)
+                TaskActivityButton(task: task, store: store, isDetail: true, onSave: { task = $0 })
+                if !task.canChangeActivity { Text("Start and stop are available for unfinished tasks with valid task state.").font(.footnote) }
+            }
             TaskAvailabilityView(task: task, store: store, isDetail: true)
             TaskDependenciesSection(store: store, task: task, onSave: { task = $0 }, select: { panel = .dependency })
             Section("Planning") { TaskPlanningSummary(task: task) }

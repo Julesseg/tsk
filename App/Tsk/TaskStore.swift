@@ -106,6 +106,10 @@ final class TaskStore {
         await perform { try await $0.editAnnotation(id: id, reference: reference, text: text) }
     }
 
+    func start(id: UUID) async -> TaskRecord? { await perform { try await $0.start(id: id) } }
+
+    func stop(id: UUID) async -> TaskRecord? { await perform { try await $0.stop(id: id) } }
+
     func complete(id: UUID) async -> TaskRecord? {
         await perform { try await $0.complete(id: id) }
     }

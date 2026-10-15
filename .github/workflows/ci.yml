@@ -126,7 +126,7 @@ jobs:
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests)
+            coverage=(-only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests)
           fi
           peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
