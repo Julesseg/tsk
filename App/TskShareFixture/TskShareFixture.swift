@@ -33,7 +33,7 @@ private struct ShareFixtureSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-@MainActor private final class ShareFixtureURL: NSObject, UIActivityItemSource {
+private final class ShareFixtureURL: NSObject, UIActivityItemSource {
     let url: URL
     init(url: URL) { self.url = url }
 
