@@ -75,7 +75,7 @@ import Foundation
         let selected = try source.store.calendars(for: .reminder).first { $0.title == "tsk fixture \(token) selected" }.unwrapFixture()
         let items = await fetch(source.store, selected, incomplete: false)
         let evidenceURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-\(token).json")
-        let evidence = try JSONSerialization.jsonObject(with: Data(contentsOf: evidenceURL)) as? [String: Any]
+        var evidence = try JSONSerialization.jsonObject(with: Data(contentsOf: evidenceURL)) as? [String: Any]
         guard let before = evidence?["selectedBeforeCopy"] as? [[String: Any]] else { throw CocoaError(.fileReadCorruptFile) }
         let after = items.map(summary)
         func sorted(_ values: [[String: Any]]) throws -> Data {
@@ -84,6 +84,9 @@ import Foundation
         guard items.count == 4, items.filter(\.isCompleted).count == 1, try sorted(before) == sorted(after) else {
             throw NSError(domain: "tsk.EventKitFixture", code: 4, userInfo: [NSLocalizedDescriptionKey: "One-time copy changed the real source reminders."])
         }
+        evidence?["selectedAfterCopy"] = after
+        evidence?["copyPreservedSources"] = true
+        if let evidence { _ = try write(evidence, token: token) }
         return "Verified four source reminders unchanged, including completed and recurring reminders."
     }
 

@@ -114,7 +114,8 @@ private extension TaskManager {
         guard components.year != nil, components.month != nil, components.day != nil else { throw ReminderImportError.invalidDate }
         var calendar = components.calendar ?? self.calendar
         calendar.timeZone = components.timeZone ?? components.calendar?.timeZone ?? self.calendar.timeZone
-        guard let date = calendar.date(from: components) else { throw ReminderImportError.invalidDate }
+        guard let date = calendar.date(from: components), date.timeIntervalSince1970.isFinite,
+              abs(date.timeIntervalSince1970) <= 253402300799 else { throw ReminderImportError.invalidDate }
         let units: [Calendar.Component] = [.year, .month, .day, .hour, .minute, .second]
         let actual = calendar.dateComponents(Set(units), from: date)
         guard units.allSatisfy({ unit in components.value(for: unit).map { $0 == actual.value(for: unit) } ?? true }) else { throw ReminderImportError.invalidDate }

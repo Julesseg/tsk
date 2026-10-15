@@ -60,8 +60,8 @@ struct ReminderImportView: View {
                                     Text(item.title).font(.headline)
                                     if let draft = item.draft {
                                         Text("Project: \(draft.attributes["project"] ?? "No project")")
-                                        if draft.attributes["scheduled"] != nil { Text("Planned day retained") }
-                                        if draft.attributes["due"] != nil { Text("Deadline retained") }
+                                        if let planned = draft.plannedDate { Text("Planned day: \(planned.formatted(date: .abbreviated, time: .shortened))") }
+                                        if let deadline = draft.deadline { Text("Deadline: \(deadline.formatted(date: .abbreviated, time: .shortened))") }
                                         if let priority = draft.attributes["priority"] { Text("Priority: \(priority)") }
                                         ForEach(TaskRecord(id: UUID(), attributes: draft.attributes).annotations) { note in Text(note.text).font(.footnote) }
                                     }
