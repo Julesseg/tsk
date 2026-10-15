@@ -39,10 +39,20 @@ if not {'TaskWidgetConfiguration', 'CompleteTaskIntent'}.issubset(widget_metadat
 if 'WidgetTaskViewEntity' not in widget_metadata['entities']:
     raise SystemExit('Widget metadata is missing its registered-view entity')
 
+share = app / "PlugIns" / "TskShare.appex"
+verify_group(share)
+share_info = plistlib.loads((share / "Info.plist").read_bytes())
+extension = share_info["NSExtension"]
+if share_info["CFBundleIdentifier"] != "com.julesseguin.tsk.share" or extension["NSExtensionPointIdentifier"] != "com.apple.share-services":
+    raise SystemExit("The embedded share extension has incorrect identity or extension point")
+activation = extension["NSExtensionAttributes"]["NSExtensionActivationRule"]
+if activation.get("NSExtensionActivationSupportsText") is not True or activation.get("NSExtensionActivationSupportsWebURLWithMaxCount", 0) < 1:
+    raise SystemExit("The embedded share extension does not activate for text and web URLs")
+
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
 if not {'CreateTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(metadata['actions']):
     raise SystemExit('The app metadata is missing its create/find/complete/reschedule actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
 if 'IntentTaskEntity' not in metadata['entities'] or not {'CreateTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and four App Shortcuts')
+print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and four App Shortcuts')

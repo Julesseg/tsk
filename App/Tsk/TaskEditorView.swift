@@ -1,10 +1,6 @@
 import SwiftUI
 import TskCore
 
-enum TaskEditorField: Hashable {
-    case description, project, tag
-}
-
 struct TaskEditorView: View {
     let store: TaskStore
     let original: TaskRecord?
