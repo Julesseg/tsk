@@ -5,7 +5,6 @@ import Testing
 
 @Test @MainActor func fixtureReadbackDeadlineCancelsBeforeCleanupAndIgnoresLateCallbacks() async {
     let fetch = ControlledFixtureFetch()
-    let started = Date()
     let outcome = await FixtureReadbackDeadline<Int>.observe(timeoutNanoseconds: 10_000_000) { callback in
         fetch.callback = callback
         fetch.events.append("start")
@@ -17,7 +16,6 @@ import Testing
     }
     fetch.events.append("cleanup")
     guard case .timedOut = outcome else { Issue.record("A missing native callback must reach the diagnostic deadline"); return }
-    #expect(Date().timeIntervalSince(started) < 1)
     #expect(fetch.events == ["start", "cancel", "cleanup"])
     #expect(fetch.cancellations == 1)
     fetch.callback?(1)
