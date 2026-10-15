@@ -55,13 +55,18 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         }
         guard !calendars.isEmpty else { throw ReminderImportError.noLists }
         let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: calendars)
-        let result: [ReminderTransferValue]? = await withCheckedContinuation { continuation in
-            store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: reminders?.map { ReminderTransferValue(reference: $0.calendarItemIdentifier, snapshot: Self.snapshot($0)) })
-            }
+        let identifiers: [String]? = await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate, completion: Self.identifierCallback(continuation))
         }
         try requireAccess()
-        guard let result else { throw ReminderAccessError.fetchFailed }
+        guard let identifiers else { throw ReminderAccessError.fetchFailed }
+        store.reset()
+        let result: [ReminderTransferValue] = try identifiers.compactMap { reference in
+            guard let item = store.calendarItem(withIdentifier: reference) as? EKReminder,
+                  listIDs.contains(item.calendar.calendarIdentifier) else { throw ReminderAccessError.sourceChanged }
+            guard !item.isCompleted else { return nil }
+            return ReminderTransferValue(reference: reference, snapshot: Self.snapshot(item))
+        }
         return result.sorted { lhs, rhs in
             if !lhs.snapshot.title.matchesBytes(rhs.snapshot.title) { return UTF8String(lhs.snapshot.title) < UTF8String(rhs.snapshot.title) }
             return lhs.reference < rhs.reference
@@ -83,14 +88,18 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         guard store.calendarItem(withIdentifier: reference) == nil else { throw ReminderAccessError.removalUnconfirmed }
     }
 
-    nonisolated private static func snapshot(_ item: EKReminder) -> ReminderSnapshot {
+    nonisolated static func identifierCallback(_ continuation: CheckedContinuation<[String]?, Never>) -> @Sendable ([EKReminder]?) -> Void {
+        { reminders in continuation.resume(returning: reminders?.map(\.calendarItemIdentifier)) }
+    }
+
+    private static func snapshot(_ item: EKReminder) -> ReminderSnapshot {
         ReminderSnapshot(listID: item.calendar.calendarIdentifier, title: item.title ?? "", notes: item.notes,
                          url: item.url?.absoluteString, priority: item.priority, start: item.startDateComponents,
                          due: item.dueDateComponents, isCompleted: item.isCompleted,
                          recurrenceDescription: recurrenceSignature(item.recurrenceRules))
     }
 
-    nonisolated private static func recurrenceSignature(_ rules: [EKRecurrenceRule]?) -> String? {
+    private static func recurrenceSignature(_ rules: [EKRecurrenceRule]?) -> String? {
         guard let rules, !rules.isEmpty else { return nil }
         let values = rules.map { rule in
             ["frequency": rule.frequency.rawValue, "interval": rule.interval, "calendar": rule.calendarIdentifier,

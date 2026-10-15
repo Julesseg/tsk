@@ -69,6 +69,84 @@ final class TypedFilterUITests: XCTestCase {
         capture("Typed definitions and saved filter after relaunch", app: app)
     }
 
+    func testComputedArithmeticViewErrorsEditsReopenAndCompletion() throws {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        if isPad { XCUIDevice.shared.orientation = .landscapeLeft }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        app.buttons["new-task"].tap()
+        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        description.tap()
+        description.typeText("Computed urgency task")
+        app.buttons["dismiss-editor-keyboard"].tap()
+        XCTAssertTrue(revealTaskElement(app.buttons["task-priority"], in: "task-editor-form", app: app))
+        app.buttons["task-priority"].tap()
+        app.buttons["Medium"].tap()
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.staticTexts["Computed urgency task"].firstMatch.waitForExistence(timeout: 10))
+        openViews(app, isPad: isPad)
+        app.buttons["new-custom-view"].tap()
+        let name = app.textFields["custom-view-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Default urgency arithmetic")
+        app.buttons["dismiss-filter-keyboard"].tap()
+        replaceExpression("urgency / 0 > 0", app: app)
+        XCTAssertTrue(revealTaskElement(app.buttons["check-filter"], in: "raw-filter-form", app: app))
+        app.buttons["check-filter"].tap()
+        XCTAssertTrue(app.staticTexts["filter-error"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["filter-error"].label.contains("zero"))
+        capture("Computed expression error retains editable draft", app: app)
+        replaceExpression("urgency + 1 > 4.9 and +PENDING", app: app)
+        app.buttons["save-custom-view"].tap()
+        XCTAssertTrue(app.staticTexts["Computed urgency task"].firstMatch.waitForExistence(timeout: 10))
+        capture("Default Float urgency arithmetic selects Medium priority", app: app)
+        app.staticTexts["Computed urgency task"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
+        app.buttons["edit-task"].tap()
+        XCTAssertTrue(revealTaskElement(app.buttons["task-priority"], in: "task-editor-form", app: app))
+        app.buttons["task-priority"].tap()
+        app.buttons["Low"].tap()
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(app.buttons["save-task"].waitForNonExistence(timeout: 10))
+        if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
+        app.terminate()
+        app.launch()
+        openViews(app, isPad: isPad)
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        saved.swipeLeft()
+        app.buttons["Edit"].firstMatch.tap()
+        XCTAssertTrue(app.textViews["raw-filter-expression"].waitForExistence(timeout: 5))
+        replaceExpression("(urgency + 1 > 2.7) and +PENDING", app: app)
+        app.buttons["save-custom-view"].tap()
+        XCTAssertTrue(app.staticTexts["Computed urgency task"].firstMatch.waitForExistence(timeout: 10))
+        capture("Edited arithmetic definition survives relaunch and updates membership", app: app)
+        app.staticTexts["Computed urgency task"].firstMatch.tap()
+        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
+        app.buttons["complete-task"].tap()
+        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
+        if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
+        capture("Completion refreshes the same explicit pending arithmetic filter", app: app)
+    }
+
+    private func replaceExpression(_ value: String, app: XCUIApplication) {
+        let expression = app.textViews["raw-filter-expression"]
+        XCTAssertTrue(revealTaskElement(expression, in: "raw-filter-form", app: app))
+        expression.tap()
+        expression.typeKey("a", modifierFlags: .command)
+        expression.typeText(value)
+        app.buttons["dismiss-filter-keyboard"].tap()
+    }
+
     private func addDefinition(_ name: String, type: String, app: XCUIApplication, orderedValues: String? = nil) {
         app.buttons["new-attribute-definition"].tap()
         let nameField = app.textFields["attribute-definition-name"]

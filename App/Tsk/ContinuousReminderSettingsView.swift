@@ -21,7 +21,7 @@ struct ContinuousReminderSettingsView: View {
                     Text(controller.status?.active == true ? "Enabled on this device" : "Disabled on this device").accessibilityIdentifier("continuous-reminders-status")
                     if controller.status?.configuredOnAnotherDevice == true { Text("These settings designate another device. Moving is disabled here. Disable the other device before enabling this one.") }
                     if controller.status?.active == true && controller.status?.paused == true {
-                        Text("Automatic moves are paused. Review the failure and source before explicitly retrying.").accessibilityIdentifier("continuous-reminders-paused")
+                        Text("Automatic scans are held while another window moves reminders, or after an interrupted or failed move. If no move is running, review the source before explicitly retrying.").accessibilityIdentifier("continuous-reminders-paused")
                     }
                     Button("Allow Reminders access / Refresh lists") { Task { await loadLists() } }.accessibilityIdentifier("reminders-access")
                 }
@@ -33,7 +33,7 @@ struct ContinuousReminderSettingsView: View {
                         .accessibilityIdentifier("continuous-reminders-disable")
                     Button("Scan / Retry moving now") { Task { editingProject = false; await controller.scan(retry: true) } }
                         .disabled(controller.status?.active != true).accessibilityIdentifier("continuous-reminders-retry")
-                    Text("Selected-list changes and app opening can trigger scans. iOS background opportunities are best effort; reminders may wait until you reopen tsk.").font(.footnote)
+                    Text("Windows share one import attempt. Pauses survive reopening the app; Scan / Retry or re-enabling explicitly resumes moving. Selected-list changes and app opening can trigger scans. iOS background opportunities are best effort; reminders may wait until you reopen tsk.").font(.footnote)
                     if let schedulingError = SynchronizationAppDelegate.schedulingError { Text(schedulingError).font(.footnote) }
                 }
                 if let result = controller.result {
@@ -61,7 +61,7 @@ struct ContinuousReminderSettingsView: View {
             }
             .accessibilityIdentifier("continuous-reminders-form")
             .disabled(loading || controller.isRunning)
-            .overlay { if loading || controller.isRunning { ProgressView("Moving eligible reminders…").accessibilityIdentifier("continuous-reminders-progress").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+            .overlay { if loading || controller.isRunning { ProgressView(controller.isRunning ? "Waiting for other windows or moving reminders…" : "Loading Reminders…").accessibilityIdentifier("continuous-reminders-progress").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
             .safeAreaInset(edge: .top) {
                 VStack(spacing: 0) {
                     if controller.isRunning { Button("Stop moving") { controller.cancel() }.padding().background(.bar).disabled(false).accessibilityIdentifier("continuous-reminders-stop") }

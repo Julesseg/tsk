@@ -63,12 +63,23 @@ final class ContinuousReminderController {
                 error = nil
                 if !next.imported.isEmpty { await store.reload() }
             }
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.localizedDescription
+            await store.reload()
+        }
         await load()
     }
 
+    func observeStatus() async {
+        while !Task.isCancelled {
+            await load()
+            do { try await Task.sleep(nanoseconds: 1_000_000_000) }
+            catch { return }
+        }
+    }
+
     func sourceChanged() {
-        guard !isRunning, status?.active == true, status?.paused != true else { return }
+        guard !isRunning else { return }
         debounce?.cancel()
         debounce = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(400)); await self?.scan() }

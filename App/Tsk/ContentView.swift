@@ -94,6 +94,9 @@ struct ContentView: View {
             await opportunities.foreground()
             await continuousReminders.scan()
         }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await continuousReminders.observeStatus() }
+        }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -141,7 +144,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
-                        Button("Reminders import needs attention") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
+                        Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
                     SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }

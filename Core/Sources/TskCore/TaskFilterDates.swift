@@ -39,7 +39,7 @@ indirect enum FilterDateExpression: Sendable {
             let suffix = String(decoding: bytes[(index + 1)...], as: UTF8.self)
             let prefix = String(decoding: bytes[..<index], as: UTF8.self)
             if let duration = TaskwarriorDuration(suffix), let base = try? Self(prefix) {
-                self = .offset(base, TimeInterval(duration.seconds) * (bytes[index] == 43 ? 1 : -1))
+                self = .offset(base, TimeInterval(duration.filterSeconds) * (bytes[index] == 43 ? 1 : -1))
                 return
             }
         }
@@ -115,7 +115,7 @@ indirect enum FilterDateExpression: Sendable {
 
     static func duration(_ raw: String) throws -> TimeInterval {
         guard let duration = TaskwarriorDuration(raw) else { throw invalid(raw) }
-        return TimeInterval(duration.seconds)
+        return TimeInterval(duration.filterSeconds)
     }
 
     static let periodNames = Set(["sopd", "sod", "sond", "eopd", "eod", "eond", "sopw", "sow", "sonw", "eopw", "eow", "eonw", "sopww", "soww", "sonww", "eopww", "eoww", "eonww", "sopm", "som", "sonm", "eopm", "eom", "eonm", "sopq", "soq", "sonq", "eopq", "eoq", "eonq", "sopy", "soy", "sony", "eopy", "eoy", "eony"])
