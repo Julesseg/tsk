@@ -99,7 +99,7 @@ final class TaskStore {
         await perform { try await $0.complete(id: id) }
     }
 
-    private func perform(_ action: @Sendable (TaskManager) async throws -> TaskRecord) async -> TaskRecord? {
+    func perform(_ action: @Sendable (TaskManager) async throws -> TaskRecord) async -> TaskRecord? {
         guard !isSaving else { return nil }
         isSaving = true
         defer { isSaving = false }

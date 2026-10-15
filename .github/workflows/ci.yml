@@ -126,7 +126,7 @@ jobs:
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/ReminderImportUITests)
+            coverage=(-only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/ReminderImportUITests)
           fi
           peer=()
           if [[ "${{ matrix.family }}" == "iPhone" ]]; then
