@@ -1,4 +1,3 @@
-import CTaskChampion
 import Foundation
 import TskCore
 #if canImport(UIKit)
@@ -34,20 +33,7 @@ public actor LocalContinuousReminderStore: ContinuousReminderConfigurationStore,
 
     public func acquireImportLease() async throws -> any TaskMutationLease {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let path = directory.appendingPathComponent(".tsk-reminder-import").path
-        while true {
-            try Task.checkCancellation()
-            let descriptor = tsk_bridge_try_acquire_mutation(path)
-            if descriptor >= 0 {
-                let lease = NativeMutationLease(descriptor: descriptor)
-                do { try Task.checkCancellation(); return lease }
-                catch { lease.release(); throw error }
-            }
-            guard descriptor == -POSIXErrorCode.EWOULDBLOCK.rawValue || descriptor == -POSIXErrorCode.EINTR.rawValue else {
-                throw TaskManagementError.storage(NSError(domain: NSPOSIXErrorDomain, code: Int(-descriptor)).localizedDescription)
-            }
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
+        return try await NativeMutationLease.acquire(path: directory.appendingPathComponent(".tsk-reminder-import").path)
     }
 
     public func importPaused() throws -> Bool {

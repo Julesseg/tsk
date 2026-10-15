@@ -1,4 +1,3 @@
-import CTaskChampion
 import Foundation
 import TskCore
 
@@ -8,19 +7,7 @@ public actor LocalTaskNotificationStore: TaskNotificationStateStore {
     public init(directory: URL) { self.directory = directory }
     public func acquireLease() async throws -> any TaskMutationLease {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        while true {
-            try Task.checkCancellation()
-            let descriptor = tsk_bridge_try_acquire_mutation(directory.appendingPathComponent(".tsk-notifications").path)
-            if descriptor >= 0 {
-                let lease = NativeMutationLease(descriptor: descriptor)
-                do { try Task.checkCancellation(); return lease }
-                catch { lease.release(); throw error }
-            }
-            guard descriptor == -POSIXErrorCode.EWOULDBLOCK.rawValue || descriptor == -POSIXErrorCode.EINTR.rawValue else {
-                throw TaskManagementError.storage(NSError(domain: NSPOSIXErrorDomain, code: Int(-descriptor)).localizedDescription)
-            }
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
+        return try await NativeMutationLease.acquire(path: directory.appendingPathComponent(".tsk-notifications").path)
     }
     public func load() throws -> TaskNotificationState {
         do { return try JSONDecoder().decode(TaskNotificationState.self, from: Data(contentsOf: file)) }
