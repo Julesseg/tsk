@@ -19,7 +19,7 @@ import XCTest
         host.buttons["cancel-shared-task"].tap()
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.staticTexts["Shared article " + token].exists)
+        XCTAssertFalse(taskRow(named: "Shared article " + token, app: app).exists)
         app.terminate()
         host.terminate()
         host.launch()
@@ -29,7 +29,7 @@ import XCTest
         host.buttons["cancel-shared-task"].tap()
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.staticTexts["Cancelled share " + token].exists)
+        XCTAssertFalse(taskRow(named: "Cancelled share " + token, app: app).exists)
         app.terminate()
         host.terminate()
         host.launch()
@@ -60,9 +60,9 @@ import XCTest
         let dismissed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: host.buttons["save-shared-task"])
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 15), .completed)
         app.launch()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 15))
+        XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 15))
         capture("Extension-created task is visible in the main app after process reopen", app)
-        app.staticTexts[title].tap()
+        taskRow(named: title, app: app).tap()
         XCTAssertTrue(revealTaskElement(app.staticTexts["Shared.Reading"], in: "task-detail-form", app: app))
         XCTAssertTrue(app.staticTexts["reference"].exists)
         let note = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Full shared text café e\u{301}")).firstMatch
@@ -77,32 +77,74 @@ import XCTest
     private func openExtension(_ app: XCUIApplication) {
         XCTAssertTrue(app.buttons["share-fixture-present"].waitForExistence(timeout: 10))
         app.buttons["share-fixture-present"].tap()
-        let entry = app.buttons["Add to tsk"].firstMatch
-        if !entry.waitForExistence(timeout: 5) || !entry.isHittable {
-            let more = app.buttons["More"].firstMatch
+        let sheet = app.collectionViews["activityCollectionView"]
+        guard sheet.waitForExistence(timeout: 5) else {
+            shareDiscoveryEvidence("System activity sheet missing", app: app)
+            XCTFail("The host did not present its system activity sheet")
+            return
+        }
+        capture("Real system activity sheet before installed extension discovery", app)
+        let direct = activityEntry("Add to tsk", in: sheet)
+        if direct.exists && direct.isHittable { tapTaskControl(direct, app: app) }
+        else {
+            var more = activityEntry("More", in: sheet)
             if !more.waitForExistence(timeout: 3) || !more.isHittable {
-                let row = app.collectionViews.firstMatch
-                if row.exists { row.swipeLeft() }
+                let row = sheet.scrollViews.containing(.cell, identifier: "shareCell").firstMatch
+                for _ in 0..<3 {
+                    guard row.exists else { break }
+                    let frame = row.frame.intersection(app.frame)
+                    guard frame.width > 60, frame.height > 20 else { break }
+                    let origin = app.coordinate(withNormalizedOffset: .zero)
+                    origin.withOffset(CGVector(dx: frame.maxX - 20 - app.frame.minX, dy: frame.midY - app.frame.minY))
+                        .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: frame.minX + 20 - app.frame.minX, dy: frame.midY - app.frame.minY)))
+                    more = activityEntry("More", in: sheet)
+                    if more.exists && more.isHittable { break }
+                }
             }
-            XCTAssertTrue(more.waitForExistence(timeout: 10), "System share-sheet More entry is missing")
-            more.tap()
-            let name = app.staticTexts["Add to tsk"].firstMatch
-            XCTAssertTrue(name.waitForExistence(timeout: 10), "Installed tsk share extension was not discovered")
-            name.tap()
-        } else { entry.tap() }
-        XCTAssertTrue(app.buttons["cancel-shared-task"].waitForExistence(timeout: 15))
+            guard more.waitForExistence(timeout: 10), more.isHittable else {
+                shareDiscoveryEvidence("System activity-row More entry missing", app: app)
+                XCTFail("System share-sheet More entry is missing")
+                return
+            }
+            tapTaskControl(more, app: app)
+            capture("Real system More apps list before installed extension selection", app)
+            let matches = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Add to tsk"))
+            guard matches.firstMatch.waitForExistence(timeout: 10), let entry = matches.allElementsBoundByIndex.first(where: { $0.isHittable }) else {
+                shareDiscoveryEvidence("Installed extension absent from real More apps list", app: app)
+                XCTFail("Installed tsk share extension was not discovered")
+                return
+            }
+            tapTaskControl(entry, app: app)
+        }
+        guard app.buttons["cancel-shared-task"].waitForExistence(timeout: 15) else {
+            shareDiscoveryEvidence("Selected system activity did not expose the extension editor", app: app)
+            XCTFail("Installed tsk share extension editor did not open")
+            return
+        }
     }
+
+    private func activityEntry(_ title: String, in sheet: XCUIElement) -> XCUIElement {
+        let cell = sheet.cells.matching(NSPredicate(format: "identifier == %@ AND label == %@", "shareCell", title)).firstMatch
+        if cell.exists { return cell }
+        let button = sheet.buttons[title].firstMatch
+        return button.exists ? button : sheet.staticTexts[title].firstMatch
+    }
+
+    private func shareDiscoveryEvidence(_ stage: String, app: XCUIApplication) {
+        capture(stage, app)
+        let hierarchy = XCTAttachment(string: stage + "\n" + app.debugDescription)
+        hierarchy.name = "Actual installed-share discovery hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+    }
+
     private func descriptionField(_ app: XCUIApplication) -> XCUIElement {
         let field = app.textFields["share-task-description"]
         return field.exists ? field : app.textViews["share-task-description"]
     }
     private func replace(_ field: XCUIElement, with value: String) {
-        field.tap()
         let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
         let tutorial = host.buttons["Continue"]
         if tutorial.exists, host.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText(value)
+        replaceTaskText(field, with: value, app: host)
     }
     private func capture(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
