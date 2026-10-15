@@ -16,7 +16,8 @@ final class CustomViewsUITests: XCTestCase {
         app.textFields["task-project"].tap()
         app.textFields["task-project"].typeText("Work")
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["Filter task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Filter task", app: app), timeout: 10))
+        XCTAssertTrue(app.staticTexts["Filter task"].exists)
         app.buttons["custom-views"].tap()
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]

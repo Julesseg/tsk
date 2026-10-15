@@ -87,7 +87,7 @@ import XCTest
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
         app.buttons["save-task"].tap()
         let row = taskRow(named: title, app: app)
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitForTaskSave(app, row: row, timeout: 20))
         return String(row.identifier.dropFirst("task-".count))
     }
     private func openSettings(_ app: XCUIApplication) {

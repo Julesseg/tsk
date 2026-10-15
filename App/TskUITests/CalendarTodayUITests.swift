@@ -98,6 +98,7 @@ import XCTest
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
         app.buttons["save-task"].tap()
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: title, app: app), timeout: 15))
     }
     private func permission(allow: Bool) {
         let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch

@@ -33,7 +33,8 @@ final class RecurringTemplateUITests: XCTestCase {
         rule.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "weekly")
         hideKeyboard(app)
         app.buttons["save-recurring-template"].tap()
-        XCTAssertTrue(app.staticTexts["Review recurring work"].waitForExistence(timeout: 15))
+        XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 15, editorID: "recurring-editor-form"))
+        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Review recurring work")
         XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
         XCTAssertFalse(app.buttons["complete-task"].exists)
         XCTAssertFalse(app.buttons["edit-task"].exists)
@@ -76,7 +77,7 @@ final class RecurringTemplateUITests: XCTestCase {
         description.typeText(" occurrence edit")
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 10))
         XCTAssertTrue(app.staticTexts["task-detail-description"].label.contains("occurrence edit"))
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         XCTAssertEqual(app.buttons["complete-task"].label, "Complete occurrence")
