@@ -90,6 +90,44 @@ import Foundation
         return "Verified four source reminders unchanged, including completed and recurring reminders."
     }
 
+    public static func addCapture(source: EventKitReminderSource, token: String, title: String) throws {
+        guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
+        let list = try source.store.calendars(for: .reminder).first { $0.title == "tsk fixture \(token) selected" }.unwrapFixture()
+        let reminder = EKReminder(eventStore: source.store)
+        reminder.calendar = list; reminder.title = title; reminder.notes = "Actual observed source change"
+        try source.store.save(reminder, commit: true)
+    }
+
+    public static func editPendingIntoRecurring(source: EventKitReminderSource, token: String) async throws {
+        guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
+        let list = try source.store.calendars(for: .reminder).first { $0.title == "tsk fixture \(token) selected" }.unwrapFixture()
+        let item = try await fetch(source.store, list, incomplete: true).first { $0.title == "Copy fixture H" }.unwrapFixture()
+        item.notes = "Externally edited before removal"
+        item.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: .daily, interval: 2, end: nil))
+        try source.store.save(item, commit: true)
+    }
+
+    public static func verifyMove(source: EventKitReminderSource, token: String, changed: Bool) async throws -> String {
+        guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
+        let selected = try source.store.calendars(for: .reminder).first { $0.title == "tsk fixture \(token) selected" }.unwrapFixture()
+        let unselected = try source.store.calendars(for: .reminder).first { $0.title == "tsk fixture \(token) unselected" }.unwrapFixture()
+        let items = await fetch(source.store, selected, incomplete: false)
+        let excluded = await fetch(source.store, unselected, incomplete: false)
+        if changed {
+            guard items.count == 4, items.contains(where: { $0.title == "Copy fixture H" && $0.notes == "Externally edited before removal" && !($0.recurrenceRules ?? []).isEmpty }),
+                  items.contains(where: { $0.title == "Copy fixture none" && !$0.isCompleted }) else { throw CocoaError(.fileReadCorruptFile) }
+        } else {
+            guard items.count == 2, items.contains(where: { $0.title == "Exclude completed" && $0.isCompleted }),
+                  items.contains(where: { $0.title == "Skip recurring" && !($0.recurrenceRules ?? []).isEmpty }) else { throw CocoaError(.fileReadCorruptFile) }
+        }
+        guard excluded.count == 1, excluded[0].title == "Exclude unselected", !excluded[0].isCompleted else { throw CocoaError(.fileReadCorruptFile) }
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-\(token).json")
+        var output = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] ?? [:]
+        output["selectedAfterMove"] = items.map(summary); output["unselectedAfterMove"] = excluded.map(summary)
+        output["moveScopeVerified"] = changed ? "Changed source and newly recurring rule preserved after durable destination save" : "Only two eligible sources removed; completed, unselected and recurring sources preserved"
+        return try write(output, token: token)
+    }
+
     private static func nextIncomplete(_ store: EKEventStore, _ list: EKCalendar) async throws -> EKReminder? {
         for _ in 0..<25 {
             if let item = await fetch(store, list, incomplete: true).first { return item }

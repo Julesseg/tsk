@@ -30,4 +30,32 @@ import TskNative
     return nil
     #endif
 }
+
+@MainActor func verifyContinuousReminderFixture(source: EventKitReminderSource) async throws -> String? {
+    #if targetEnvironment(simulator)
+    let environment = ProcessInfo.processInfo.environment
+    guard let token = environment["TSK_TEST_REMINDERS_VERIFY_TOKEN"] ?? environment["TSK_TEST_REMINDERS_FIXTURE"], environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { return nil }
+    if environment["TSK_TEST_REMINDERS_EXPECT_PRESERVED"] == "1" { return try await EventKitReminderFixture.verifySourcesUnchanged(source: source, token: token) }
+    return try await EventKitReminderFixture.verifyMove(source: source, token: token, changed: environment["TSK_TEST_REMINDERS_EXPECT_CHANGED"] == "1")
+    #else
+    return nil
+    #endif
+}
+
+@MainActor func changeContinuousReminderFixture(source: EventKitReminderSource, edit: Bool) async throws {
+    #if targetEnvironment(simulator)
+    let environment = ProcessInfo.processInfo.environment
+    guard let token = environment["TSK_TEST_REMINDERS_VERIFY_TOKEN"], environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { throw CocoaError(.userCancelled) }
+    if edit { try await EventKitReminderFixture.editPendingIntoRecurring(source: source, token: token) }
+    else { try EventKitReminderFixture.addCapture(source: source, token: token, title: "Observed fixture capture") }
+    #endif
+}
+
+@MainActor func addForegroundReminderFixtureIfRequested() throws {
+    #if targetEnvironment(simulator)
+    let environment = ProcessInfo.processInfo.environment
+    guard let token = environment["TSK_TEST_REMINDERS_ADD_ON_OPEN"], environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { return }
+    try EventKitReminderFixture.addCapture(source: EventKitReminderSource(), token: token, title: "Foreground fixture capture")
+    #endif
+}
 #endif

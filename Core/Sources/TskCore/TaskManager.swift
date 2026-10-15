@@ -88,6 +88,7 @@ public actor TaskManager {
     let replica: any TaskReplica
     let viewDefinitions: (any TaskViewDefinitionsStore)?
     let userAttributeDefinitions: (any TaskAttributeDefinitionsStore)?
+    let reminderImportConfiguration: (any ContinuousReminderConfigurationStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
     var synchronizationState: SynchronizationState = .localOnly
@@ -97,14 +98,17 @@ public actor TaskManager {
     var synchronizationTask: Task<Void, Never>?
     var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
+    var reminderMoveInProgress = false
+    var reminderImportPaused = false
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.userAttributeDefinitions = attributeDefinitions
+        self.reminderImportConfiguration = reminderImportConfiguration
         self.now = now
         self.calendar = calendar
     }

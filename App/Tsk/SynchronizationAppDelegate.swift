@@ -42,12 +42,19 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
                 task.setTaskCompleted(success: false)
                 return
             }
+            let continuous: ContinuousReminderController
+            if let current = ContinuousReminderController.current, current.store.directory == directory { continuous = current }
+            else { continuous = ContinuousReminderController(store: TaskStore(manager: manager, directory: directory)) }
+            execution.continuousReminders = continuous
+            await continuous.scan()
+            guard !execution.expired else { task.setTaskCompleted(success: false); return }
+            let importSucceeded = continuous.status?.active != true || (!continuous.isRunning && continuous.error == nil && continuous.result?.stopped != true)
             if await manager.synchronizationStatus() == .localOnly {
-                task.setTaskCompleted(success: true)
+                task.setTaskCompleted(success: importSucceeded)
                 return
             }
             _ = try await manager.synchronize(trigger: .backgroundOpportunity)
-            task.setTaskCompleted(success: true)
+            task.setTaskCompleted(success: importSucceeded)
         } catch { task.setTaskCompleted(success: false) }
     }
 }
@@ -56,9 +63,12 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
 private final class BackgroundSynchronizationExecution {
     var manager: TaskManager?
     var expired = false
+    var continuousReminders: ContinuousReminderController?
 
     func expire() async {
         expired = true
+        continuousReminders?.cancel()
+        await continuousReminders?.store.manager.suspendSynchronization()
         await manager?.suspendSynchronization()
     }
 }

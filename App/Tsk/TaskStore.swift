@@ -34,6 +34,12 @@ final class TaskStore {
         manager = TaskChampionSession.makeManager(directory: directory, now: { fixed ?? Date() })
     }
 
+    init(manager: TaskManager, directory: URL) {
+        self.manager = manager
+        self.directory = directory
+        fixedDate = nil
+    }
+
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
         task.availability(at: fixedDate ?? date, tasks: allTasks)
     }

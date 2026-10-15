@@ -6,13 +6,14 @@ public struct ReminderList: Identifiable, Equatable, Sendable {
     public init(id: String, title: String) { self.id = id; self.title = title }
 }
 
-public struct ReminderListMapping: Sendable {
+public struct ReminderListMapping: Codable, Equatable, Sendable {
     public let listID: String
     public let project: String
     public init(listID: String, project: String) { self.listID = listID; self.project = project }
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.listID.matchesBytes(rhs.listID) && lhs.project.matchesBytes(rhs.project) }
 }
 
-public struct ReminderSnapshot: Sendable {
+public struct ReminderSnapshot: Equatable, Sendable {
     public let listID: String
     public let title: String
     public let notes: String?
@@ -28,6 +29,15 @@ public struct ReminderSnapshot: Sendable {
         self.listID = listID; self.title = title; self.notes = notes; self.url = url; self.priority = priority
         self.start = start; self.due = due; self.isCompleted = isCompleted; self.recurrenceDescription = recurrenceDescription
     }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.listID.matchesBytes(rhs.listID) && lhs.title.matchesBytes(rhs.title)
+            && lhs.notes.map { UTF8String($0) } == rhs.notes.map { UTF8String($0) }
+            && lhs.url.map { UTF8String($0) } == rhs.url.map { UTF8String($0) }
+            && lhs.priority == rhs.priority && lhs.start == rhs.start && lhs.due == rhs.due
+            && lhs.isCompleted == rhs.isCompleted
+            && lhs.recurrenceDescription.map { UTF8String($0) } == rhs.recurrenceDescription.map { UTF8String($0) }
+    }
+
 }
 
 public protocol ReminderSource: Sendable {
@@ -67,6 +77,10 @@ public extension TaskManager {
         guard !mappings.isEmpty else { throw ReminderImportError.noLists }
         guard Set(mappings.map(\.listID)).count == mappings.count else { throw ReminderImportError.duplicateList }
         let reminders = try await source.incompleteReminders(in: mappings.map(\.listID))
+        return reminderImportItems(reminders, mappings: mappings)
+    }
+
+    internal func reminderImportItems(_ reminders: [ReminderSnapshot], mappings: [ReminderListMapping]) -> [ReminderImportItem] {
         return reminders.compactMap { reminder in
             guard !reminder.isCompleted, let mapping = mappings.first(where: { $0.listID == reminder.listID }) else { return nil }
             if let recurrence = reminder.recurrenceDescription {
