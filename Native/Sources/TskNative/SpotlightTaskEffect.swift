@@ -76,3 +76,10 @@ public struct SpotlightTaskEffect: Sendable {
     }
 }
 #endif
+
+#if canImport(CoreSpotlight)
+@available(iOS 17.0, macOS 14.0, *)
+extension SpotlightTaskEffect: TaskPostCommitEffect {
+    public func apply(to manager: TaskManager, origin: TaskChangeOrigin) async { _ = await reconcile(manager: manager) }
+}
+#endif

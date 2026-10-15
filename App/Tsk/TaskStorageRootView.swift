@@ -1,9 +1,11 @@
 import SwiftUI
 import TskNative
+import CoreSpotlight
 
 struct TaskStorageRootView: View {
     @State private var store: TaskStore?
     @State private var error: String?
+    @State private var spotlightRequest: SpotlightRequest?
 
     var body: some View {
         Group {
@@ -23,6 +25,13 @@ struct TaskStorageRootView: View {
             }
         }
         .task { await open() }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
+        }
+        .sheet(item: $spotlightRequest) { request in
+            if let store { SpotlightTaskDestination(store: store, identifier: request.identifier) }
+            else { ContentUnavailableView("Task storage unavailable", systemImage: "exclamationmark.triangle", description: Text(error ?? "Saved tasks could not be opened.")) }
+        }
     }
 
     private func open() async {
