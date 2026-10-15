@@ -55,16 +55,16 @@ final class ReminderImportUITests: XCTestCase {
         capture("Copy result and real source preservation", app)
         XCTAssertTrue(revealTaskElement(app.buttons["reminders-view-tasks"], in: "reminders-import-form", app: app))
         app.buttons["reminders-view-tasks"].tap()
-        XCTAssertTrue(app.staticTexts["Copy fixture H"].firstMatch.waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["Copy fixture none"].firstMatch.exists)
-        XCTAssertFalse(app.staticTexts["Exclude completed"].exists)
-        XCTAssertFalse(app.staticTexts["Exclude unselected"].exists)
-        XCTAssertFalse(app.staticTexts["Skip recurring"].exists)
+        XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 15))
+        XCTAssertTrue(taskRow(named: "Copy fixture none", app: app).exists)
+        XCTAssertFalse(taskRow(named: "Exclude completed", app: app).exists)
+        XCTAssertFalse(taskRow(named: "Exclude unselected", app: app).exists)
+        XCTAssertFalse(taskRow(named: "Skip recurring", app: app).exists)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
         app.launch()
-        XCTAssertTrue(app.staticTexts["Copy fixture H"].firstMatch.waitForExistence(timeout: 15))
-        app.staticTexts["Copy fixture H"].firstMatch.tap()
+        XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 15))
+        taskRow(named: "Copy fixture H", app: app).tap()
         let notes = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Fixture notes")).firstMatch
         XCTAssertTrue(revealTaskElement(notes, in: "task-detail-form", app: app))
         capture("Reopened durable task with copied notes and independent dates", app)
@@ -88,7 +88,7 @@ final class ReminderImportUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task after denied Reminders access")
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["Task after denied Reminders access"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Task after denied Reminders access", app: app).waitForExistence(timeout: 10))
     }
 
     private func openImport(_ app: XCUIApplication) {

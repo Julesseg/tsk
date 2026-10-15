@@ -75,7 +75,7 @@ struct TaskSeriesMetadataEditor: View {
                     }
                 }
             }
-            .focusedSceneValue(\.taskEditor, editorActions)
+            .taskKeyboardCommands(editorActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
             .interactiveDismissDisabled(store.isSaving)
             .task { do { try await store.loadAttributeDefinitions() } catch { self.error = error.localizedDescription } }
             .modifier(TaskWorkspacePanel(store: store))

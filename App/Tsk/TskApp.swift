@@ -8,8 +8,7 @@ struct TskApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TaskStorageRootView()
+            TaskKeyboardHost { TaskStorageRootView() }.ignoresSafeArea()
         }
-        .commands { TaskWorkspaceCommands() }
     }
 }
