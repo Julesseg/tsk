@@ -191,7 +191,8 @@ def cleanup_device(commands, identifier, name):
             commands.run(["xcrun", "simctl", operation, identifier], name + "." + operation, timeout=30)
             results.append({"stage": operation, "exit": 0})
         except (CommandFailure, Interrupted, OSError) as error:
-            results.append({"stage": operation, "exit": getattr(error, "code", 70)})
+            results.append({"stage": operation, "exit": getattr(error, "code", 70),
+                            "interrupted": isinstance(error, Interrupted)})
     try:
         remaining = json.loads(commands.run(["xcrun", "simctl", "list", "devices", "booted", "--json"],
                                             name + ".remaining-booted", timeout=20))
@@ -199,7 +200,8 @@ def cleanup_device(commands, identifier, name):
             commands.run(["osascript", "-e", 'quit app "Simulator"'], name + ".quit-simulator", timeout=20)
         results.append({"stage": "remaining-booted", "exit": 0})
     except (CommandFailure, Interrupted, ValueError, KeyError, OSError) as error:
-        results.append({"stage": "remaining-booted", "exit": getattr(error, "code", 70)})
+        results.append({"stage": "remaining-booted", "exit": getattr(error, "code", 70),
+                        "interrupted": isinstance(error, Interrupted)})
     return results
 
 
@@ -230,6 +232,7 @@ def run_cells(commands, output, app, observe=observe):
             destination = output / name
             destination.mkdir()
             identifier = None
+            interruption = None
             token = str(uuid.uuid4()).upper()
             owned_name = "tsk native index " + token
             cell["ownedName"] = owned_name
@@ -265,19 +268,32 @@ def run_cells(commands, output, app, observe=observe):
             except (CommandFailure, Interrupted, ValueError, KeyError, OSError) as error:
                 cell["outcome"] = "interrupted" if isinstance(error, Interrupted) else "setup-failed"
                 cell["failedStage"] = getattr(error, "stage", type(error).__name__)
+                if isinstance(error, Interrupted):
+                    interruption = error
                 raise
             finally:
+                cleanup_interruption = None
                 if identifier is None:
                     try:
                         identifier = recover_created_device(commands, runtime, owned_name, name)
                         cell["recoveredOwnedDevice"] = identifier
                     except (CommandFailure, Interrupted, OSError, ValueError, KeyError) as error:
                         cell["cleanupRecoveryExit"] = getattr(error, "code", 70)
+                        if isinstance(error, Interrupted):
+                            cleanup_interruption = error
                 if identifier:
                     cell["cleanup"] = cleanup_device(commands, identifier, name)
                     if any(stage["exit"] for stage in cell["cleanup"]):
                         code = 70
+                    if cleanup_interruption is None:
+                        first = next((stage for stage in cell["cleanup"] if stage.get("interrupted")), None)
+                        if first:
+                            cleanup_interruption = Interrupted(first["exit"] - 128)
+                if cleanup_interruption is not None:
+                    cell["outcome"] = "interrupted"
                 write_json(output / "result.json", result)
+                if interruption is None and cleanup_interruption is not None:
+                    raise cleanup_interruption
             if code == 70:
                 raise CommandFailure(name + ".cleanup", 70)
         result["outcome"] = "completed" if code == 0 else "native-incomplete"

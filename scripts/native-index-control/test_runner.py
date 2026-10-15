@@ -10,6 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+sys.dont_write_bytecode = True
 
 SPEC = importlib.util.spec_from_file_location("control_runner", Path(__file__).with_name("runner.py"))
 runner = importlib.util.module_from_spec(SPEC)
@@ -282,6 +283,26 @@ except runner.Interrupted as error:
             self.assertEqual(commands.next_id, 1)
             self.assertEqual([item["stage"] for item in result["cells"][0]["cleanup"]],
                              ["shutdown", "delete", "remaining-booted"])
+
+    def test_parent_signal_during_normal_cleanup_is_preserved_after_all_stages(self):
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            commands = OwnedDevices()
+            original = commands.run
+
+            def run(args, stage, **kwargs):
+                if stage.endswith(".shutdown"):
+                    raise runner.Interrupted(signum)
+                return original(args, stage, **kwargs)
+
+            commands.run = run
+            with tempfile.TemporaryDirectory() as directory:
+                code = runner.run_cells(commands, Path(directory), Path(directory) / "Control.app",
+                                        observe=lambda *args: {"outcome": "completed"})
+                result = json.loads((Path(directory) / "result.json").read_text())
+            self.assertEqual(code, 128 + signum)
+            self.assertEqual(result["outcome"], "interrupted")
+            self.assertEqual(commands.next_id, 1)
+            self.assertIn("protected-delete-first.delete", [stage for stage, _ in commands.calls])
 
     def test_no_installed_runtime_fails_without_creating_any_simulator(self):
         commands = OwnedDevices()
