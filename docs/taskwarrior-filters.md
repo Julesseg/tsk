@@ -35,10 +35,37 @@ becoming text searches. Invalid modifiers, parentheses, quotes and regexes
 produce errors before querying or saving. A failed saved-view edit retains
 its previous definition and the editor draft.
 
-Numeric/duration/UUID UDA comparison, local value ordering and computed or
-arithmetic operands are extended by the following filter slices. These remain
-explicit unsupported errors, including priority ordering, numeric working-set
-IDs, `+LATEST` and regex flags. `.word`/`.noword` are also rejected because
+Typed local fields support string, numeric, date, duration and UUID predicates.
+Numbers compare the stored Float value promoted to Double, matching the pinned
+client rather than a rounded display. Durations compare fixed seconds; dates
+reuse the relative/local-calendar rules below; UUID values retain exact case
+and prefix spelling. Missing values retain Taskwarrior’s empty-string Variant
+semantics, which differ by type and operator: a missing numeric field is below
+zero, while a present numeric zero is not missing. Duration ordering against a
+zero operand intentionally differs from duration equality.
+
+Local string definitions may declare allowed values, highest first, using one
+value per line in the native definition editor. An empty line explicitly places
+unset values in that order. Definitions and value identity preserve UTF-8
+bytes. The default priority order is H, M, L, empty. Filtering existing values
+outside a declared list follows the pinned client’s end-iterator ordering;
+changing a constrained value requires an allowed value or explicit removal.
+Changing a definition keeps task data intact and refreshes the current view.
+
+A referenced invalid stored typed value reports the task UUID, field and type.
+Unrelated fields remain readable/editable and the invalid raw string is retained
+until explicitly repaired or cleared. Removing a definition makes dependent
+filters report the missing schema without deleting its raw task attributes.
+
+Typed regex operands use the evaluated value’s representation (six significant
+digits for numeric values and ISO text for durations). Quote regex patterns
+containing expression operators. In pinned Taskwarrior, typed `.left`/`.right`
+reuse the original evaluated operand without the string-only anchors; ordinary
+string `.left`/`.right` retain their prefix/suffix behavior.
+
+Computed or arithmetic operands are extended by the following expression slice.
+These remain explicit unsupported errors, including numeric working-set IDs,
+`+LATEST` and regex flags. `.word`/`.noword` are also rejected because
 pinned Taskwarrior implements different boundaries on Darwin and Linux; an
 explicit supported ECMAScript pattern is available. Unsupported input is never
 reinterpreted as a narrower builder query.

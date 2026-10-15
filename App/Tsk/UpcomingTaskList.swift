@@ -27,7 +27,7 @@ struct UpcomingTaskList: View {
                                     .font(.caption).foregroundStyle(.secondary)
                                     TaskAvailabilityView(task: entry.task, store: store)
                                     if entry.task.isRecurring {
-                                        Text("Recurring task · read only").font(.caption).foregroundStyle(.secondary)
+                                        Text(entry.task.isOccurrence ? "Generated occurrence" : "Recurring template").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
                             }
@@ -35,13 +35,13 @@ struct UpcomingTaskList: View {
                             .accessibilityIdentifier("upcoming-\(entry.role.rawValue)-\(Int(entry.date.timeIntervalSince1970))-\(entry.task.id.uuidString)")
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 if entry.task.canComplete {
-                                    Button("Complete", systemImage: "checkmark") {
+                                    Button(entry.task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") {
                                         Task { _ = await store.complete(id: entry.task.id) }
                                     }
                                     .tint(.green).disabled(store.isSaving)
                                 }
                                 if entry.task.canEdit {
-                                    Button("Edit", systemImage: "pencil") { edit(entry.task) }
+                                    Button(entry.task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(entry.task) }
                                         .disabled(store.isSaving)
                                 }
                             }

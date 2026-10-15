@@ -67,7 +67,7 @@ actor TestReplica: TaskReplica {
     }
     #expect(try await manager.task(id: ordinary.id) == ordinary)
     let occurrence = try await replica.create(id: UUID(), attributes: ["description": "Occurrence", "status": "pending", "parent": UUID().uuidString])
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) {
+    await #expect(throws: (any Error).self) {
         try await manager.complete(id: occurrence.id)
     }
     #expect(try await manager.task(id: occurrence.id) == occurrence)

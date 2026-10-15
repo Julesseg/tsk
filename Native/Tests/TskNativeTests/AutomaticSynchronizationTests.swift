@@ -41,6 +41,9 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     let configuration = try SyncConfiguration(serverURL: proxyURL, clientID: clientID, encryptionSecret: secret)
     let manager = TaskManager(replica: TaskChampionReplica(directory: directory.appendingPathComponent("native")))
     let original = try await manager.create(TaskDraft(description: "Before blocked \(method)", attributes: ["opaque": "retain original"]))
+    let fixtureReplica = TaskChampionReplica(directory: directory.appendingPathComponent("native"))
+    let series = try await fixtureReplica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-", "opaque": "preserve series"])
+    let occurrence = try await fixtureReplica.create(id: UUID(), attributes: ["status": "pending", "parent": series.id.uuidString, "imask": "0", "opaque": "preserve occurrence"])
     let attempt = Task { try await manager.synchronize(using: configuration) }
     let deadline = Task.detached {
         try await Task.sleep(for: .seconds(5))
@@ -63,6 +66,10 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     #expect(edited.attributes["opaque"] == "retain in-flight")
     #expect(completed.status == "completed")
     #expect(completed.attributes["opaque"] == "retain in-flight")
+    let completedOccurrence = try await manager.complete(id: occurrence.id)
+    #expect(!FileManager.default.fileExists(atPath: gate.path), "Atomic occurrence completion must finish while the real HTTP response remains held")
+    #expect(completedOccurrence.status == "completed")
+    #expect(try await manager.task(id: series.id).attributes["mask"] == "+")
     let samePath = directory.appendingPathComponent("native").resolvingSymlinksInPath()
     let anotherManager = TaskManager(replica: TaskChampionReplica(directory: samePath))
     let otherLocal = try await anotherManager.create(TaskDraft(description: "Another actor during blocked \(method)", attributes: ["opaque": "retain other actor"]))
@@ -80,6 +87,8 @@ func durableNativeMutationsFinishWhileRealServerResponsesRemainBlocked() async t
     #expect(try await received.task(id: created.id) == completed)
     #expect(try await received.task(id: otherLocal.id) == otherLocal)
     #expect(final.filter { $0.id == otherLocal.id }.count == 1)
+    #expect(try await received.task(id: occurrence.id) == completedOccurrence)
+    #expect(try await received.task(id: series.id).attributes["mask"] == "+")
 }
 
 private func waitForFile(_ file: URL) async throws {

@@ -114,3 +114,22 @@ import TskNative
     }
 }
 #endif
+
+#if canImport(AppIntents)
+@available(macOS 13, iOS 16, *)
+@Test func nativeOccurrenceIntentsUseTheAtomicSharedCorePathAndPersistentAppDataset() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let replica = TaskChampionReplica(directory: directory)
+    let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-", "opaque": "parent"])
+    let child = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Intent occurrence", "due": "2000000000", "parent": parent.id.uuidString, "imask": "0", "opaque": "child"])
+    let entity = IntentTaskEntity(child)
+    _ = try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(timeIntervalSince1970: 2000010000), directory: directory).perform()
+    _ = try await CompleteTaskIntent(task: entity, directory: directory).perform()
+    let app = try await TaskChampionSession.open(directory: directory)
+    #expect(try await app.task(id: child.id).attributes["due"] == "2000010000")
+    #expect(try await app.task(id: child.id).status == "completed")
+    #expect(try await app.task(id: child.id).attributes["opaque"] == "child")
+    #expect(try await app.task(id: parent.id).attributes["mask"] == "+")
+}
+#endif

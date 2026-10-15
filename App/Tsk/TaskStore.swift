@@ -87,7 +87,12 @@ final class TaskStore {
         await perform { try await $0.removeDependency(id: id, reference: reference) }
     }
 
-    func loadAttributeDefinitions() async throws { attributeDefinitions = try await manager.attributeDefinitions() }
+    func loadAttributeDefinitions() async throws {
+        let definitions = try await manager.attributeDefinitions()
+        let changed = definitions != attributeDefinitions
+        attributeDefinitions = definitions
+        if changed, customView != nil { await reload() }
+    }
 
     func updateUserAttributes(id: UUID, changes: TaskAttributePatch) async -> TaskRecord? {
         await perform { try await $0.updateUserAttributes(id: id, changes: changes) }
