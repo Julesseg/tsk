@@ -67,10 +67,16 @@ final class TaskAnnotationUITests: XCTestCase {
         } else {
             let original = try XCTUnwrap(editor.value as? String)
             XCTAssertEqual(original, "First supporting note\nAnother line")
-            editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.count))
-            XCTAssertEqual(editor.value as? String, "")
+            editor.press(forDuration: 1.1)
+            let menu = app.menuItems["Select All"]
+            let button = app.buttons["Select All"]
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in menu.exists || button.exists }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+            let selectAll = menu.exists ? menu : button
+            selectAll.tap()
         }
         editor.typeText("First supporting note\nAnother line revised")
+        if !keyboardShortcuts { XCTAssertEqual(editor.value as? String, "First supporting note\nAnother line revised") }
         capture("Edit annotation keeps its original timestamp", app: app)
         save(app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
