@@ -48,7 +48,7 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
             execution.continuousReminders = continuous
             await continuous.scan()
             guard !execution.expired else { task.setTaskCompleted(success: false); return }
-            let importSucceeded = continuous.status?.active != true || (!continuous.isRunning && continuous.error == nil && continuous.result?.stopped != true)
+            let importSucceeded = continuous.error == nil && !continuous.isRunning && (continuous.status?.active != true || continuous.result?.stopped != true)
             if await manager.synchronizationStatus() == .localOnly {
                 task.setTaskCompleted(success: importSucceeded)
                 return

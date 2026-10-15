@@ -7,7 +7,7 @@ import TskNative
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let device = UUID()
-    let manager = TaskChampionSession.makeManager(directory: directory, reminderDeviceIdentifier: { device })
+    let manager = TaskChampionSession.makeManager(directory: directory, now: { Date(timeIntervalSince1970: 1792144800) }, reminderDeviceIdentifier: { device })
     let original = try await manager.create(TaskDraft(description: "Keep existing", attributes: ["opaque": "retained"]))
     try await manager.configureContinuousReminders(enabled: true, mappings: [ReminderListMapping(listID: "selected", project: "Moved")])
     let source = DurableMoveSource(directory: directory)
@@ -21,7 +21,7 @@ import TskNative
     #expect(try await reopened.task(id: original.id) == original)
     let moved = try #require(result.imported.first)
     #expect(try await reopened.task(id: moved.id) == moved)
-    #expect(moved.attributes.keys.sorted() == ["annotation_\(moved.attributes["entry"]!)", "description", "entry", "modified", "project", "status"])
+    #expect(moved.attributes.keys.sorted() == ["annotation_1792144800", "description", "entry", "modified", "project", "status"])
     let otherDevice = UUID()
     let other = TaskChampionSession.makeManager(directory: directory, reminderDeviceIdentifier: { otherDevice })
     #expect(try await other.continuousReminderStatus().configuredOnAnotherDevice)

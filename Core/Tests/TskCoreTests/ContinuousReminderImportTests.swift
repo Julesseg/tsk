@@ -98,3 +98,27 @@ private struct MoveUnwritableReplica: TaskReplica {
     #expect(try await manager.tasks().count == 2)
     #expect(await source.remainingTitles() == ["First", "Second"])
 }
+
+@Test func cancellationAfterDurableSaveNeverRemovesSourceAndReturnsInterruptedMove() async throws {
+    let manager = TaskManager(replica: CancelAfterCreateReplica())
+    let source = MoveTestSource(manager: manager)
+    let attempt = Task { try await manager.moveReminders(from: source, mappings: [ReminderListMapping(listID: "work", project: "")]) }
+    let result = try await attempt.value
+    #expect(result.imported.count == 1)
+    #expect(result.removedCount == 0)
+    #expect(result.failures.count == 1)
+    #expect(await source.remainingTitles() == ["First", "Second"])
+    #expect(await source.removalSawDurableTask == false)
+    #expect(try await manager.tasks().count == 1)
+}
+
+private actor CancelAfterCreateReplica: TaskReplica {
+    var records: [TaskRecord] = []
+    func tasks() -> [TaskRecord] { records }
+    func create(id: UUID, attributes: TaskAttributes) -> TaskRecord {
+        let record = TaskRecord(id: id, attributes: attributes); records.append(record)
+        withUnsafeCurrentTask { $0?.cancel() }
+        return record
+    }
+    func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw CocoaError(.userCancelled) }
+}
