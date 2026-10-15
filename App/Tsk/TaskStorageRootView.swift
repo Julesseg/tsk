@@ -28,6 +28,7 @@ struct TaskStorageRootView: View {
     private func open() async {
         do {
             #if DEBUG
+            try cleanReminderFixtureIfRequested()
             if let description = ProcessInfo.processInfo.environment["TSK_TEST_INTENT_DESCRIPTION"] {
                 _ = try await CreateTaskIntent(description: description).perform()
             }
