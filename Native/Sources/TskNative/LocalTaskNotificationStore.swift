@@ -6,6 +6,8 @@ public actor LocalTaskNotificationStore: TaskNotificationStateStore {
     private var file: URL { directory.appendingPathComponent("task-notifications.json") }
     public init(directory: URL) { self.directory = directory }
     public func acquireLease() async throws -> any TaskMutationLease {
+        let trace = TaskParticipantDiagnostics.begin("notifications.admission")
+        defer { TaskParticipantDiagnostics.end("notifications.admission", id: trace) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return try await NativeMutationLease.acquire(path: directory.appendingPathComponent(".tsk-notifications").path)
     }

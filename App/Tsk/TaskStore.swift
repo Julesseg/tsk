@@ -147,8 +147,17 @@ final class TaskStore {
         guard !isSaving else { return nil }
         isSaving = true
         defer { isSaving = false }
+        let actionTrace = TaskParticipantDiagnostics.begin("taskstore.mutation")
+        defer { TaskParticipantDiagnostics.end("taskstore.mutation", id: actionTrace) }
         do {
-            let saved = try await action(manager)
+            let managerTrace = TaskParticipantDiagnostics.begin("taskstore.manager-action")
+            let saved: TaskRecord
+            do {
+                defer { TaskParticipantDiagnostics.end("taskstore.manager-action", id: managerTrace) }
+                saved = try await action(manager)
+            }
+            let refreshTrace = TaskParticipantDiagnostics.begin("taskstore.refresh-after-mutation")
+            defer { TaskParticipantDiagnostics.end("taskstore.refresh-after-mutation", id: refreshTrace) }
             allTasks.removeAll { $0.id == saved.id }
             allTasks.append(saved)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
@@ -159,7 +168,9 @@ final class TaskStore {
                 availableProjects.sort { UTF8String($0) < UTF8String($1) }
             }
             error = nil
+            let reloadTrace = TaskParticipantDiagnostics.begin("taskstore.reload-after-mutation")
             await reload()
+            TaskParticipantDiagnostics.end("taskstore.reload-after-mutation", id: reloadTrace)
             return saved
         } catch {
             self.error = error.localizedDescription

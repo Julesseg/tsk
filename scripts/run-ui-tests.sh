@@ -16,7 +16,7 @@ cleanup() {
         mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
         container=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk data 2>/dev/null || true)
         if [[ -n "$container" && -d "$container/Documents" ]]; then
-            find "$container/Documents" -maxdepth 1 \( -name 'keyboard-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'widgets-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
+            find "$container/Documents" -maxdepth 1 \( -name 'keyboard-fixture-*.json' -o -name 'participant-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'widgets-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
         fi
     fi
     if [[ "$was_booted" == no ]]; then
@@ -66,6 +66,8 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
     exit 1
 fi
 xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
+xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
+xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
 share_status=0
 xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?

@@ -36,7 +36,11 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
     public func replace(_ items: [TaskSpotlightItem]) async throws {
         guard CSSearchableIndex.isIndexingAvailable() else { throw SpotlightIndexError.unavailable }
         for item in items { guard (try? TaskSpotlightItem.taskID(from: item.identifier, namespace: namespace)) == item.taskID else { throw SpotlightIndexError.foreignItem } }
-        try await index.deleteSearchableItems(withDomainIdentifiers: [namespace])
+        let deletion = TaskParticipantDiagnostics.begin("spotlight.delete")
+        do {
+            defer { TaskParticipantDiagnostics.end("spotlight.delete", id: deletion) }
+            try await index.deleteSearchableItems(withDomainIdentifiers: [namespace])
+        }
         let values = items.map { item in
             let attributes = CSSearchableItemAttributeSet(itemContentType: "public.text")
             attributes.domainIdentifier = namespace
@@ -45,6 +49,8 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
             value.expirationDate = .distantFuture
             return value
         }
+        let indexing = TaskParticipantDiagnostics.begin("spotlight.index")
+        defer { TaskParticipantDiagnostics.end("spotlight.index", id: indexing) }
         try await index.indexSearchableItems(values)
     }
 

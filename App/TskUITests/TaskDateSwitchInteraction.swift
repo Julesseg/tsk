@@ -1,6 +1,27 @@
 import XCTest
 
 extension XCTestCase {
+    func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let editor = app.collectionViews[editorID]
+        let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !editor.exists && row.exists }, object: nil)
+        guard XCTWaiter.wait(for: [finished], timeout: timeout) == .completed else {
+            recordTaskInteraction(app, detail: "Task save did not dismiss its editor and reveal the saved row")
+            XCTFail("Task save is not complete; the workspace may still be covered", file: file, line: line)
+            return false
+        }
+        return true
+    }
+
+    func waitForEnabledTaskControl(_ element: XCUIElement, app: XCUIApplication, timeout: TimeInterval, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in element.exists && element.isEnabled }, object: nil)
+        guard XCTWaiter.wait(for: [ready], timeout: timeout) == .completed else {
+            recordTaskInteraction(app, detail: "Control did not become enabled: \(element)")
+            XCTFail("The previous task action has not completed", file: file, line: line)
+            return false
+        }
+        return true
+    }
+
     func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, in containerID: String = "task-editor-form", keyboardDismissIdentifier: String = "dismiss-editor-keyboard", file: StaticString = #filePath, line: UInt = #line) {
         let tutorial = app.buttons["Continue"]
         if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
@@ -72,8 +93,7 @@ extension XCTestCase {
                 $0.exists && $0.isHittable && $0.frame.intersection(visible).width > visible.width / 2 && $0.frame.maxY <= visible.minY + 140
             }.map { $0.frame.maxY }.max() ?? visible.minY
             let pinnedIDs = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
-            let pinnedBottom = pinnedIDs.compactMap { identifier -> CGFloat? in
-                let item = app.descendants(matching: .any)[identifier].firstMatch
+            let pinnedBottom = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", pinnedIDs)).allElementsBoundByIndex.compactMap { item -> CGFloat? in
                 return item.exists && item.isHittable && item.frame.intersects(visible) ? item.frame.maxY : nil
             }.max() ?? visible.minY
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8

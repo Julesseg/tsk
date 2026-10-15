@@ -14,7 +14,7 @@ final class SynchronizationUITests: XCTestCase {
         draft.tap()
         draft.typeText("Offline work survives server failure")
         app.buttons["save-task"].tap()
-        XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Offline work survives server failure", app: app), timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
         let server = app.textFields["sync-server-url"]
@@ -77,7 +77,7 @@ final class SynchronizationUITests: XCTestCase {
         draft.typeText("Hosted task " + token)
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
         app.buttons["save-task"].tap()
-        XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Hosted task " + token, app: app), timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
         let server = app.textFields["sync-server-url"]

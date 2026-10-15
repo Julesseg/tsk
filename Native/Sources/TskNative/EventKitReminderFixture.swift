@@ -15,6 +15,8 @@ import Foundation
         guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
         let store = source.store
         var output: [String: Any] = ["sources": store.sources.map { ["title": $0.title, "type": $0.sourceType.rawValue] }]
+        output["authorizationAtPreparation"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
+        var stage = "create disposable lists and reminders"
         do {
             try clean(source: source, token: token)
             guard let local = store.sources.first(where: { $0.sourceType == .local }) else {
@@ -48,16 +50,26 @@ import Foundation
             try reminder("Weekly UTC sequence", in: sequenceList, recurring: true)
             output["selectedBeforeCopy"] = await fetch(store, selected, incomplete: false).map(summary)
             var sequence: [[String: Any]] = []
-            for _ in 0..<5 {
+            for index in 0..<5 {
+                stage = "complete disposable weekly occurrence \(index + 1)"
                 guard let current = try await nextIncomplete(store, sequenceList) else { break }
                 sequence.append(summary(current))
+                output["completionSequence"] = sequence
                 current.isCompleted = true
                 try store.save(current, commit: true)
                 try await Task.sleep(for: .milliseconds(300))
             }
             output["completionSequence"] = sequence
             output["beforeRemoval"] = await fetch(store, sequenceList, incomplete: false).map(summary)
-            if let current = await fetch(store, sequenceList, incomplete: true).first { try store.remove(current, commit: true) }
+            stage = "remove disposable incomplete weekly occurrence"
+            output["authorizationBeforeRemoval"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
+            if let current = await fetch(store, sequenceList, incomplete: true).first {
+                output["removalCandidate"] = summary(current)
+                output["removalCandidateIdentifier"] = current.calendarItemIdentifier
+                output["removalCalendarWritable"] = current.calendar.allowsContentModifications
+                try store.remove(current, commit: true)
+            }
+            stage = "read disposable weekly history after removal"
             try await Task.sleep(for: .milliseconds(300))
             output["afterRemoval"] = await fetch(store, sequenceList, incomplete: false).map(summary)
             output["incompleteAfterRemoval"] = await fetch(store, sequenceList, incomplete: true).map(summary)
@@ -65,8 +77,12 @@ import Foundation
             output["fixtureStatus"] = "Real EventKit source, storage, five completions and removal observed"
         } catch {
             output["error"] = error.localizedDescription
-            let evidence = try write(output, token: token)
-            throw NSError(domain: "tsk.EventKitFixture", code: 3, userInfo: [NSLocalizedDescriptionKey: evidence])
+            output["failedStage"] = stage
+            output["errorDomain"] = (error as NSError).domain
+            output["errorCode"] = (error as NSError).code
+            output["authorizationAfterFailure"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
+            _ = try write(output, token: token)
+            throw NSError(domain: "tsk.EventKitFixture", code: 3, userInfo: [NSLocalizedDescriptionKey: "The isolated Reminders fixture could not \(stage): \(error.localizedDescription). Full evidence was saved for this test."])
         }
         return try write(output, token: token)
     }

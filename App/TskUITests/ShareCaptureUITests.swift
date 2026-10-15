@@ -109,6 +109,24 @@ import XCTest
             tapTaskControl(more, app: app)
             capture("Real system More apps list before installed extension selection", app)
             let matches = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Add to tsk"))
+            if !matches.firstMatch.exists, app.buttons["Edit"].exists {
+                tapTaskControl(app.buttons["Edit"], app: app)
+                capture("Real system Edit apps list before installed extension activation", app)
+                let row = app.tables.cells.containing(.staticText, identifier: "Add to tsk").firstMatch
+                guard row.waitForExistence(timeout: 10) else {
+                    shareDiscoveryEvidence("Installed extension absent from real Edit apps list", app: app)
+                    XCTFail("Installed tsk share extension was absent from the system Edit apps list")
+                    return
+                }
+                let toggle = row.switches.firstMatch
+                if toggle.exists, toggle.value as? String == "0" {
+                    tapTaskControl(toggle, app: app)
+                    let enabled = expectation(for: NSPredicate(format: "value == %@", "1"), evaluatedWith: toggle)
+                    XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed)
+                }
+                tapTaskControl(app.buttons["Done"].firstMatch, app: app)
+                capture("Real system apps list after installed extension activation", app)
+            }
             guard matches.firstMatch.waitForExistence(timeout: 10), let entry = matches.allElementsBoundByIndex.first(where: { $0.isHittable }) else {
                 shareDiscoveryEvidence("Installed extension absent from real More apps list", app: app)
                 XCTFail("Installed tsk share extension was not discovered")

@@ -15,7 +15,9 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     public init(center: UNUserNotificationCenter = .current()) { self.center = center }
 
     public func authorization() async throws -> TaskNotificationAuthorization {
-        await withCheckedContinuation { continuation in
+        let trace = TaskParticipantDiagnostics.begin("notifications.authorization")
+        defer { TaskParticipantDiagnostics.end("notifications.authorization", id: trace) }
+        return await withCheckedContinuation { continuation in
             center.getNotificationSettings { settings in
                 let authorization: TaskNotificationAuthorization
                 #if os(iOS)
@@ -46,7 +48,9 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     }
 
     public func pending() async throws -> [PendingTaskNotification] {
-        await withCheckedContinuation { continuation in
+        let trace = TaskParticipantDiagnostics.begin("notifications.pending")
+        defer { TaskParticipantDiagnostics.end("notifications.pending", id: trace) }
+        return await withCheckedContinuation { continuation in
             center.getPendingNotificationRequests { requests in
                 let values = requests.map { request in
                     let payload = (request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
@@ -89,7 +93,9 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     }
 
     public func deliveredNotifications() async -> [DeliveredTaskNotification] {
-        await withCheckedContinuation { continuation in
+        let trace = TaskParticipantDiagnostics.begin("notifications.delivered")
+        defer { TaskParticipantDiagnostics.end("notifications.delivered", id: trace) }
+        return await withCheckedContinuation { continuation in
             center.getDeliveredNotifications { notifications in
                 let values = notifications.map { notification in
                     let request = (notification.request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
@@ -105,10 +111,14 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     }
 
     public func deliveredIdentifiers() async -> [String] {
-        await withCheckedContinuation { continuation in center.getDeliveredNotifications { continuation.resume(returning: $0.map(\.request.identifier)) } }
+        let trace = TaskParticipantDiagnostics.begin("notifications.delivered-identifiers")
+        defer { TaskParticipantDiagnostics.end("notifications.delivered-identifiers", id: trace) }
+        return await withCheckedContinuation { continuation in center.getDeliveredNotifications { continuation.resume(returning: $0.map(\.request.identifier)) } }
     }
 
     private func addNative(_ request: UNNotificationRequest) async throws {
+        let trace = TaskParticipantDiagnostics.begin("notifications.add")
+        defer { TaskParticipantDiagnostics.end("notifications.add", id: trace) }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             center.add(request) { error in
                 if let error { continuation.resume(throwing: error) } else { continuation.resume() }

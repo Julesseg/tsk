@@ -7,6 +7,8 @@ public struct TaskNotificationEffect: TaskPostCommitEffect {
     public init(directory: URL) { self.directory = directory }
     public func apply(to manager: TaskManager, origin: TaskChangeOrigin) async { await apply(to: manager, origin: origin, locallyWritten: []) }
     public func apply(to manager: TaskManager, origin: TaskChangeOrigin, locallyWritten: [TaskRecord]) async {
+        let trace = TaskParticipantDiagnostics.begin("postcommit.notifications")
+        defer { TaskParticipantDiagnostics.end("postcommit.notifications", id: trace) }
         do {
             _ = try await Self.reconcile(manager: manager, directory: directory, locallyWritten: locallyWritten)
         } catch {
