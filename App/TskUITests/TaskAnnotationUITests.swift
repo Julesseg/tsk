@@ -6,6 +6,14 @@ final class TaskAnnotationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAddValidateEditAndReopenTimestampedAnnotations() throws {
+        try exerciseAnnotationRoundTrip { $0.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
+    }
+
+    func testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations() throws {
+        try exerciseAnnotationRoundTrip { $0.buttons["save-annotation"].tap() }
+    }
+
+    private func exerciseAnnotationRoundTrip(save: (XCUIApplication) -> Void) throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
@@ -46,7 +54,7 @@ final class TaskAnnotationUITests: XCTestCase {
         app.typeKey("n", modifierFlags: .command)
         XCTAssertFalse(app.textFields["task-description"].exists)
         XCTAssertTrue(editor.exists)
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        save(app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
@@ -55,7 +63,7 @@ final class TaskAnnotationUITests: XCTestCase {
         editor.typeKey("a", modifierFlags: .command)
         editor.typeText("First supporting note\nAnother line revised")
         capture("Edit annotation keeps its original timestamp", app: app)
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        save(app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
         app.launch()
