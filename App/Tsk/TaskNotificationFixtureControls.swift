@@ -2,6 +2,7 @@
 import SwiftUI
 import TskCore
 import TskNative
+import AppIntents
 
 private struct NotificationFixtureEvidence: Codable {
     var task: TaskRecord?
@@ -12,6 +13,8 @@ private struct NotificationFixtureEvidence: Codable {
     var capacityRetained: [String] = []
     var mutationVerified = false
     var deniedTask: TaskRecord?
+    var midnightTask: TaskRecord?
+    var midnightRegisteredDate: Date?
     var errors: [String] = []
 }
 
@@ -32,6 +35,7 @@ struct TaskNotificationFixtureControls: View {
         if let token {
             Section("Disposable notification verification") {
                 Text(result).accessibilityIdentifier("notification-fixture-result")
+                Button("Verify midnight preference registration") { run(token: token) { try await midnight(token) } }.accessibilityIdentifier("notification-fixture-midnight")
                 Button("Register fresh closed-app alert") { run(token: token) { try await register(token) } }.accessibilityIdentifier("notification-fixture-register")
                 Button("Read delivered alerts without reseeding") { run(token: token) { try await delivered(token) } }.accessibilityIdentifier("notification-fixture-delivered")
                 Button("Probe actual registration capacity") { run(token: token) { try await capacity(token) } }.accessibilityIdentifier("notification-fixture-capacity")
@@ -60,6 +64,26 @@ struct TaskNotificationFixtureControls: View {
             busy = false
             await controller.refresh()
         }
+    }
+    private func midnight(_ token: String) async throws -> String {
+        var evidence = try load(token)
+        let manager = controller.store.manager
+        let task: TaskRecord
+        if let saved = evidence.midnightTask { task = saved }
+        else {
+            let calendar = Calendar.autoupdatingCurrent
+            let date = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 2, to: Date())!)
+            task = try await manager.create(TaskDraft(description: "Midnight notification " + token, attributes: ["due": String(Int64(date.timeIntervalSince1970)), "foreign_alert": "midnight unchanged"]))
+            evidence.midnightTask = task
+        }
+        guard try await manager.task(id: task.id) == task else { throw TaskManagementError.storage("Alert preferences changed stored task attributes.") }
+        let state = try await manager.notificationState(using: LocalTaskNotificationStore(directory: controller.store.directory))
+        let expected = try await manager.notificationPlan(preferences: state.preferences).future.first { $0.taskID == task.id }
+        let actual = try await UNTaskNotificationCenter().pending().first { $0.request?.taskID == task.id }
+        guard let expected, actual?.request == expected, actual?.nextTriggerDate == expected.fireDate else { throw TaskManagementError.storage("Actual midnight registration does not match saved preferences.") }
+        evidence.midnightRegisteredDate = expected.fireDate
+        try save(evidence, token)
+        return "MIDNIGHT enabled=\(state.preferences.midnightReplacement) hour=\(state.preferences.hour) minute=\(state.preferences.minute)"
     }
     private func register(_ token: String) async throws -> String {
         var evidence = try load(token)
@@ -105,11 +129,12 @@ struct TaskNotificationFixtureControls: View {
         var evidence = try load(token)
         let base = Int64(Date().timeIntervalSince1970) + 7200
         let task = try await controller.store.manager.create(TaskDraft(description: "Notification mutation " + token, attributes: ["due": String(base), "foreign_alert": "preserve"]))
-        let changed = try await controller.store.manager.update(id: task.id, changes: ["due": String(base + 3600)])
+        _ = try await RescheduleTaskIntent(task: IntentTaskEntity(task), role: .deadline, date: Date(timeIntervalSince1970: Double(base + 3600)), directory: controller.store.directory).perform()
+        let changed = try await controller.store.manager.task(id: task.id)
         let center = UNTaskNotificationCenter()
         let pending = try await center.pending().filter { $0.request?.taskID == task.id }
         guard pending.count == 1, pending[0].nextTriggerDate == Date(timeIntervalSince1970: Double(base + 3600)), changed.attributes["foreign_alert"] == "preserve" else { throw TaskManagementError.storage("A saved date change was not reflected in actual pending notifications.") }
-        _ = try await controller.store.manager.complete(id: task.id)
+        _ = try await CompleteTaskIntent(task: IntentTaskEntity(changed), directory: controller.store.directory).perform()
         guard try await center.pending().allSatisfy({ $0.request?.taskID != task.id }), try await controller.store.manager.task(id: task.id).status == "completed" else { throw TaskManagementError.storage("Completion did not cancel the actual pending notification.") }
         evidence.mutationVerified = true
         try save(evidence, token)
