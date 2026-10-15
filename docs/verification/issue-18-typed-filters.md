@@ -31,7 +31,7 @@ choices, updated raw-filter guidance, and automatic saved-view refresh after
 value/schema edits. TypedFilterUITests exercises real capture, local definitions,
 configured ordering, raw expression save, invalid value correction, membership
 change and relaunch. The iPad CI selection includes this class alongside all
-existing workspace, annotations, automation, recurrence, attributes and Reminders
+existing synchronization, workspace, annotations, automation, recurrence, attributes and Reminders
 classes. Screenshot attachments are produced when canonical UI tests run.
 
 Local simulator execution/screenshots were not captured because of disk
