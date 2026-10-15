@@ -10,6 +10,7 @@ struct TaskNotificationSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if controller.isWorking { ProgressView("Checking system notifications…") }
                 Section("System permission") {
                     Text(permissionText).accessibilityIdentifier("notification-permission")
                     if controller.report?.authorization == .notDetermined {
@@ -46,7 +47,6 @@ struct TaskNotificationSettingsView: View {
             }
             .navigationTitle("Task notifications")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .disabled(controller.isWorking)
             .task {
                 await controller.refresh()
                 guard !loaded else { return }

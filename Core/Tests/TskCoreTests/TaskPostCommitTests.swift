@@ -28,3 +28,39 @@ private actor InspectingCommitEffect: TaskPostCommitEffect {
     _ = try await manager.complete(id: second.id)
     #expect(await effect.count() == 3)
 }
+
+private actor HeldSecondPublication: TaskChangeTracking {
+    var version = TaskChangeVersion.initial
+    var writes = 0
+    var continuation: CheckedContinuation<Void, Never>?
+    func current() -> TaskChangeVersion { version }
+    func record(_ domain: TaskChangeDomain, origin: TaskChangeOrigin) async {
+        writes += 1
+        if writes == 2 { await withCheckedContinuation { continuation = $0 } }
+        version.advance(domain, origin: origin)
+    }
+    func count() -> Int { writes }
+    func resume() { continuation?.resume(); continuation = nil }
+}
+
+@Test func anEarlierPostCommitReturnCannotReleaseALaterMutationsOwnedScope() async throws {
+    let effect = InspectingCommitEffect()
+    let tracking = HeldSecondPublication()
+    let manager = TaskManager(replica: TestReplica(), changeTracking: tracking, postCommitEffects: effect)
+    let first = Task { try await manager.create(TaskDraft(description: "First")) }
+    for _ in 0..<100 where await effect.count() == 0 { try await Task.sleep(nanoseconds: 1_000_000) }
+    #expect(await effect.count() == 1)
+    let second = Task { try await manager.create(TaskDraft(description: "Second")) }
+    for _ in 0..<100 where await tracking.count() < 2 { try await Task.sleep(nanoseconds: 1_000_000) }
+    #expect(await tracking.count() == 2)
+    await effect.resume()
+    _ = try await first.value
+    let third = Task { try await manager.create(TaskDraft(description: "Third")) }
+    try await Task.sleep(nanoseconds: 20_000_000)
+    #expect(try await manager.tasks().count == 2)
+    #expect(await tracking.count() == 2)
+    await tracking.resume()
+    _ = try await second.value
+    _ = try await third.value
+    #expect(try await manager.tasks().count == 3)
+}

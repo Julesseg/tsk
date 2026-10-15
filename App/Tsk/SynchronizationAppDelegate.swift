@@ -1,14 +1,16 @@
 @preconcurrency import BackgroundTasks
 import UIKit
+@preconcurrency import UserNotifications
 import TskCore
 import TskNative
 
 @MainActor
-final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
+final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     static var schedulingError: String?
     static var refreshIdentifier: String { (Bundle.main.bundleIdentifier ?? "com.julesseguin.tsk") + ".refresh" }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshIdentifier, using: .main) { task in
             Task { @MainActor in
                 await Self.refresh(task)
@@ -16,6 +18,10 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
         }
         if !registered { Self.schedulingError = "iOS did not register background synchronization. Foreground synchronization remains available." }
         return true
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
     }
 
     static func scheduleRefresh() {

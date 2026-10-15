@@ -229,7 +229,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingSpotlight, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isConfiguringNotifications, !isShowingSpotlight, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },

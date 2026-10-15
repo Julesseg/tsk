@@ -55,7 +55,8 @@ private actor NotificationPolicyCenter: TaskNotificationCenter {
     var permission = TaskNotificationAuthorization.authorized
     var requests: [String: TaskNotificationRequest] = [:]
     let capacity: Int
-    init(capacity: Int) { self.capacity = capacity }
+    let revokeAfterAdd: Bool
+    init(capacity: Int, revokeAfterAdd: Bool = false) { self.capacity = capacity; self.revokeAfterAdd = revokeAfterAdd }
     func authorization() -> TaskNotificationAuthorization { permission }
     func requestAuthorization() -> TaskNotificationAuthorization { permission }
     func pending() -> [PendingTaskNotification] { requests.values.map { PendingTaskNotification(identifier: $0.identifier, request: $0, nextTriggerDate: $0.fireDate) } }
@@ -63,6 +64,7 @@ private actor NotificationPolicyCenter: TaskNotificationCenter {
         guard permission.permitsAlerts else { throw TaskManagementError.storage("Permission revoked") }
         guard requests.count < capacity || requests[request.identifier] != nil else { throw TaskManagementError.storage("Registration capacity reached") }
         requests[request.identifier] = request
+        if revokeAfterAdd { permission = .denied }
     }
     func remove(identifiers: [String]) { for id in identifiers { requests[id] = nil } }
     func deny() { permission = .denied }
@@ -117,4 +119,16 @@ private final class NotificationTestClock: @unchecked Sendable {
     #expect(changed.registered.isEmpty)
     #expect(changed.unscheduled.isEmpty)
     #expect(try await manager.notificationState(using: state).accepted.count == 2)
+}
+
+@Test func permissionRevokedDuringRegistrationIsReadBackAndCancelsTheAcceptedPendingAlert() async throws {
+    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792100000) })
+    _ = try await manager.create(TaskDraft(description: "Revoked during IPC", attributes: ["due": "1792141200"]))
+    let center = NotificationPolicyCenter(capacity: 10, revokeAfterAdd: true)
+    let state = NotificationTestState()
+    let report = try await manager.reconcileNotifications(center: center, store: state)
+    #expect(report.authorization == .denied)
+    #expect(report.registered.isEmpty)
+    #expect(await center.pending().isEmpty)
+    #expect(try await manager.notificationState(using: state).accepted.isEmpty)
 }

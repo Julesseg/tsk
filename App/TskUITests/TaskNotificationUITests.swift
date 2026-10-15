@@ -9,6 +9,18 @@ final class TaskNotificationUITests: XCTestCase {
         app.launch()
         openNotifications(app)
         allowNotifications(app)
+        let midnight = app.buttons["notification-fixture-midnight"]
+        reveal(midnight, in: app); midnight.tap()
+        XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=true hour=9 minute=0", timeout: 15))
+        let toggle = app.switches["notification-midnight-enabled"]
+        reveal(toggle, in: app); toggle.tap()
+        let save = app.buttons["notification-save-preferences"]
+        reveal(save, in: app); save.tap()
+        reveal(midnight, in: app); midnight.tap()
+        XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=false", timeout: 15))
+        capture("Disabled midnight replacement updates actual registration without changing task dates", app)
+        reveal(toggle, in: app); toggle.tap()
+        reveal(save, in: app); save.tap()
         let register = app.buttons["notification-fixture-register"]
         reveal(register, in: app)
         register.tap()
@@ -18,6 +30,10 @@ final class TaskNotificationUITests: XCTestCase {
         XCTAssertGreaterThan(epoch - Date().timeIntervalSince1970, 10, "The app must terminate before the actual trigger")
         capture("Actual combined pending registration before termination", app)
         app.terminate()
+        let terminatedAt = Date().timeIntervalSince1970
+        XCTAssertLessThan(terminatedAt, epoch, "The app was actually terminated before the registered trigger")
+        let timing = XCTAttachment(string: "registeredTriggerEpoch=\(epoch)\nterminatedEpoch=\(terminatedAt)")
+        timing.name = "Closed-app actual termination timing"; timing.lifetime = .keepAlways; add(timing)
         let remaining = max(0, epoch + 5 - Date().timeIntervalSince1970)
         let elapsed = expectation(description: "Fresh notification trigger passes while app is terminated")
         DispatchQueue.main.asyncAfter(deadline: .now() + remaining) { elapsed.fulfill() }
@@ -105,7 +121,8 @@ final class TaskNotificationUITests: XCTestCase {
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 {
             if element.exists && element.isHittable && app.frame.contains(element.frame) { return }
-            app.swipeUp()
+            if element.exists && element.frame.midY < app.frame.midY { app.swipeDown() }
+            else { app.swipeUp() }
         }
         XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
     }
