@@ -110,7 +110,12 @@ import XCTest
             RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
         } while Date() < deadline
         capture("Actual Spotlight membership did not settle within the original query budget", app)
-        XCTFail("Actual indexed UUID membership must become \(present ? "present" : "absent"): \(id). Observed \(String(describing: ids.value)); \(app.staticTexts["spotlight-query-error"].label)")
+        let observed = ids.exists ? String(describing: ids.value) : "Query IDs not present"
+        let error = app.staticTexts["spotlight-query-error"]
+        let message = error.exists ? error.label : "No query error label"
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Actual Spotlight membership failure accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        XCTFail("Actual indexed UUID membership must become \(present ? "present" : "absent"): \(id). Observed \(observed); \(message); pending=\(app.staticTexts["spotlight-index-pending"].exists)")
     }
     private func systemSearch(_ title: String, _ app: XCUIApplication) throws {
         XCUIDevice.shared.press(.home)

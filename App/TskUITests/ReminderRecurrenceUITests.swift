@@ -65,7 +65,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         let token = UUID().uuidString, app = XCUIApplication()
-        app.resetAuthorizationStatus(for: .reminders)
+        resetOwnedReminderAuthorization(app, token: token, stage: "recurring-before-launch")
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
@@ -76,7 +76,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
             app.launchEnvironment["TSK_TEST_REMINDERS_CLEANUP"] = token
             app.launch()
             XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-            app.terminate(); app.resetAuthorizationStatus(for: .reminders)
+            app.terminate(); self.resetOwnedReminderAuthorization(app, token: token, stage: "recurring-after-cleanup")
             XCUIDevice.shared.orientation = .portrait
         }
         app.launch()

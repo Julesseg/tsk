@@ -11,7 +11,7 @@ import time
 from xml.parsers.expat import ExpatError
 
 
-TERMS = ['spotlight', 'search', 'springboard', 'widget']
+TERMS = ['spotlight', 'search', 'indexagent', 'springboard', 'widget']
 
 
 def utc():
@@ -63,6 +63,8 @@ def capture(device, observed_pids, run=subprocess.run):
                 else:
                     entry['processes'] = [line for line in completed.stdout.decode(errors='replace').splitlines()
                                           if any(term in line.lower() for term in TERMS) or (line.split() and line.split()[0] in observed_pids)]
+                    entry['registrations'] = [{'label': parts[2], 'runningPID': int(parts[0]) if parts[0].isdigit() and int(parts[0]) > 0 else None,
+                                               'lastExitStatus': parts[1]} for line in entry['processes'] if len(parts := line.split(maxsplit=2)) == 3]
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             entry['error'] = type(error).__name__ + ': ' + str(error)
         entry['finishedUTC'] = utc()

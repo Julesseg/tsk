@@ -115,7 +115,7 @@ final class TypedFilterUITests: XCTestCase {
         app.buttons["edit-task"].tap()
         XCTAssertTrue(revealTaskElement(app.buttons["task-priority"], in: "task-editor-form", app: app))
         app.buttons["task-priority"].tap()
-        app.buttons["Low"].tap()
+        tapTaskControl(app.buttons["Low"], app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["save-task"].waitForNonExistence(timeout: 10))
         if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
@@ -158,7 +158,7 @@ final class TypedFilterUITests: XCTestCase {
         nameField.typeText(name)
         app.buttons["dismiss-definition-keyboard"].tap()
         app.buttons["attribute-definition-type"].tap()
-        app.buttons[type].tap()
+        tapTaskControl(app.buttons[type], app: app)
         if let orderedValues {
             setDateSwitch("attribute-values-enabled", to: true, app: app, in: "attribute-definition-form", keyboardDismissIdentifier: "dismiss-definition-keyboard")
             let values = app.textViews["attribute-ordered-values"]

@@ -26,6 +26,8 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     #if DEBUG && targetEnvironment(simulator)
     public var fixtureBeforeRemoval: (@MainActor @Sendable () async throws -> Void)?
     private let diagnosticStoreID = UUID().uuidString
+    private var authorizationSamples: Task<Void, Never>?
+    private var authorizationSampleRequests = 0
     #endif
     public init() { store = EKEventStore() }
 
@@ -41,6 +43,17 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
                 store.requestFullAccessToReminders(completion: Self.accessCallback(continuation, context: context, requestID: requestID))
             }
             recordAccessDiagnostic("reminders.access.returned", details: ["request": requestID, "granted": String(granted)])
+            if granted, context != nil, authorizationSampleRequests < 3 {
+                authorizationSampleRequests += 1
+                authorizationSamples?.cancel()
+                authorizationSamples = Task { @MainActor [weak self] in
+                    for interval in [100, 400, 1500, 3000] {
+                        do { try await Task.sleep(for: .milliseconds(interval)) } catch { return }
+                        guard let self else { return }
+                        self.recordAccessDiagnostic("reminders.access.publication-sample", details: ["request": requestID])
+                    }
+                }
+            }
             guard granted else { throw ReminderAccessError.accessRequired }
         } catch {
             let native = error as NSError

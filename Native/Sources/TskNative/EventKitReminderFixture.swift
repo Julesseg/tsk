@@ -4,6 +4,37 @@ import Foundation
 
 @available(iOS 17.0, *)
 @MainActor public enum EventKitReminderFixture {
+    public static func observeAuthorizationBeforeCleanup(source: EventKitReminderSource, token: String) async throws {
+        guard UUID(uuidString: token) != nil, ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { throw CocoaError(.coderInvalidValue) }
+        let store = source.store
+        let lists = store.calendars(for: .reminder).filter { $0.title.hasPrefix("tsk fixture \(token) ") }
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("reminders-fixture-authorization-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
+        var output: [String: Any] = ["processID": ProcessInfo.processInfo.processIdentifier, "time": Date().timeIntervalSince1970,
+            "stage": "fresh-process-before-cleanup", "authorization": EKEventStore.authorizationStatus(for: .reminder).rawValue,
+            "ownedCalendarCount": lists.count, "fetchStarted": false, "timedOut": false, "cancelRequested": false]
+        try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
+        if !lists.isEmpty {
+            let predicate = store.predicateForReminders(in: lists)
+            output["fetchStarted"] = true
+            try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
+            let outcome = await FixtureReadbackDeadline<(Int, Bool)>.observe(timeoutNanoseconds: 2_000_000_000) { callback in
+                let request = store.fetchReminders(matching: predicate) { callback(($0?.count ?? 0, $0 != nil)) }
+                return { store.cancelFetchRequest(request) }
+            }
+            switch outcome {
+            case .received(let result):
+                output["ownedReminderCount"] = result.0
+                output["fetchReturnedNonNil"] = result.1
+            case .timedOut:
+                output["timedOut"] = true
+                output["cancelRequested"] = true
+            }
+        }
+        output["authorizationAfterRead"] = EKEventStore.authorizationStatus(for: .reminder).rawValue
+        output["finishedTime"] = Date().timeIntervalSince1970
+        try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
+    }
+
     public static func clean(source: EventKitReminderSource, token: String) throws {
         guard UUID(uuidString: token) != nil else { throw CocoaError(.coderInvalidValue) }
         for list in source.store.calendars(for: .reminder) where list.title.hasPrefix("tsk fixture \(token) ") {

@@ -17,11 +17,14 @@ import TskNative
     #endif
 }
 
-@MainActor func cleanReminderFixtureIfRequested() throws {
+@MainActor func cleanReminderFixtureIfRequested() async throws {
     #if targetEnvironment(simulator)
     let environment = ProcessInfo.processInfo.environment
     guard let token = environment["TSK_TEST_REMINDERS_CLEANUP"], environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { return }
-    try EventKitReminderFixture.clean(source: EventKitReminderSource(), token: token)
+    let source = EventKitReminderSource()
+    do { try await EventKitReminderFixture.observeAuthorizationBeforeCleanup(source: source, token: token) }
+    catch { NSLog("tsk owned Reminders authorization observation failed: %@", error.localizedDescription) }
+    try EventKitReminderFixture.clean(source: source, token: token)
     #endif
 }
 

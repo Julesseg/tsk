@@ -43,7 +43,7 @@ struct TaskStorageRootView: View {
             #if targetEnvironment(simulator)
             if let token = ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_CLEANUP"], ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" { try EventKitCalendarFixture.clean(token: token) }
             #endif
-            try cleanReminderFixtureIfRequested()
+            try await cleanReminderFixtureIfRequested()
             try addForegroundReminderFixtureIfRequested()
             if let description = ProcessInfo.processInfo.environment["TSK_TEST_INTENT_DESCRIPTION"] {
                 _ = try await CreateTaskIntent(description: description).perform()
