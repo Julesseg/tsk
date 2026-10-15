@@ -11,6 +11,15 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        #if canImport(CoreSpotlight)
+        if arguments.count == 6, arguments[1] == "spotlight-worker" {
+            if #available(macOS 14.0, iOS 17.0, *) {
+                do { try await runSpotlightWorker(arguments) }
+                catch { try? write(["error": error.localizedDescription], to: arguments[4]) }
+            } else { try? write(["error": "The owned Spotlight probe requires macOS 14"], to: arguments[4]) }
+            return
+        }
+        #endif
         if arguments.count == 5, arguments[1] == "reconcile-notifications" {
             do {
                 let directory = URL(fileURLWithPath: arguments[2])
@@ -85,6 +94,28 @@ struct MutationProbe {
             try? write(["error": error.localizedDescription], to: arguments[6])
         }
     }
+
+    #if canImport(CoreSpotlight)
+    @available(macOS 14.0, iOS 17.0, *)
+    static func runSpotlightWorker(_ arguments: [String]) async throws {
+        let directory = URL(fileURLWithPath: arguments[2]), control = URL(fileURLWithPath: arguments[3])
+        let mode = arguments[5]
+        let index = ProcessSpotlightIndex(control: control)
+        let execution: TaskSpotlightExecution = mode == "participant" ? .participant : .ownedWorker(SpotlightTaskEffect.containingAppOwner)
+        let effect = SpotlightTaskEffect(directory: directory, index: index, execution: execution)
+        let manager = TaskChampionSession.makeManager(directory: directory, postCommitEffects: effect)
+        var saved: UUID?
+        if mode == "recover" { _ = await effect.reconcile(manager: manager) }
+        else {
+            if mode == "mutate", let first = try await manager.tasks().first { _ = try await manager.complete(id: first.id) }
+            let task = try await manager.create(TaskDraft(description: "Owned process Spotlight " + mode, attributes: ["opaque": "preserved " + mode]))
+            saved = task.id
+            if mode == "mutate" { _ = try await manager.update(id: task.id, changes: ["description": "Latest cross-process projection"]) }
+        }
+        try write(["saved": saved?.uuidString.lowercased() ?? "recovered"], to: arguments[4])
+        while !FileManager.default.fileExists(atPath: control.appendingPathComponent("exit").path) { try await Task.sleep(nanoseconds: 10_000_000) }
+    }
+    #endif
 
     static func verifyUISynchronization() async throws {
         let environment = ProcessInfo.processInfo.environment
@@ -233,3 +264,21 @@ private actor ProcessNotificationCenter: TaskNotificationCenter {
     }
     func remove(identifiers: [String]) {}
 }
+
+#if canImport(CoreSpotlight)
+@available(macOS 14.0, iOS 17.0, *)
+private actor ProcessSpotlightIndex: TaskSpotlightIndex {
+    nonisolated let namespace = "owned.process.spotlight"
+    let control: URL
+    private var calls = 0
+    init(control: URL) { self.control = control }
+    func replace(_ items: [TaskSpotlightItem]) async throws {
+        calls += 1
+        try JSONEncoder().encode(calls).write(to: control.appendingPathComponent("calls.json"), options: .atomic)
+        try Data().write(to: control.appendingPathComponent("entered"))
+        while !FileManager.default.fileExists(atPath: control.appendingPathComponent("release").path) { try await Task.sleep(nanoseconds: 10_000_000) }
+        let projected = items.map { ["id": $0.taskID.uuidString.lowercased(), "title": $0.title, "summary": $0.summary] }
+        try JSONSerialization.data(withJSONObject: projected).write(to: control.appendingPathComponent("projection.json"), options: .atomic)
+    }
+}
+#endif

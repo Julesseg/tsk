@@ -11,8 +11,9 @@ struct SpotlightStatusView: View {
                 Section {
                     Text("Find unfinished tasks in system Spotlight, then open the exact task in tsk. Task descriptions, projects and tags are indexed on this device.")
                     Text("Completed and deleted tasks are removed from new index updates. An old result always checks current storage before opening.").font(.footnote).foregroundStyle(.secondary)
-                    if let count = controller.status?.indexedCount { Text("Indexed \(count) task(s)").accessibilityIdentifier("spotlight-index-count") }
-                    if let date = controller.status?.lastSuccessfulIndex { LabeledContent("Last index update", value: date.formatted()) }
+                    if let count = controller.status?.indexedCount { Text("Last journaled projection: \(count) task(s)").accessibilityIdentifier("spotlight-index-count") }
+                    if let date = controller.status?.lastSuccessfulIndex { LabeledContent("Last system acknowledgement", value: date.formatted()) }
+                    if controller.status?.pending == true { Text("Spotlight update pending. Tasks are saved. Indexing resumes when tsk can run and the system acknowledges its requests.").accessibilityIdentifier("spotlight-index-pending") }
                     if let error = controller.status?.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("spotlight-index-error") }
                     Button("Update Spotlight index") { Task { await controller.reconcile() } }.disabled(controller.isRefreshing).accessibilityIdentifier("spotlight-reconcile")
                     Button("Check indexed tasks") { Task { await controller.query() } }.disabled(controller.isRefreshing).accessibilityIdentifier("spotlight-query")

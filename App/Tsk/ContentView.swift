@@ -146,7 +146,10 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await notifications.observe() }
         }
-        .onChange(of: store.allTasks) { _, _ in spotlight.loadStatus() }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await spotlight.observe() }
+        }
+        .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: path) { _, newPath in if sizeClass != .regular { selectedTaskID = newPath.last } }
         .onChange(of: sizeClass) { _, size in
             path = size == .regular ? [] : selectedTaskID.map { [$0] } ?? []
@@ -205,6 +208,9 @@ struct ContentView: View {
                     }
                     if let error = spotlight.status?.error ?? spotlight.error {
                         Button { isShowingSpotlight = true } label: { Label("Spotlight needs attention: " + error, systemImage: "magnifyingglass") }.font(.footnote).padding().accessibilityIdentifier("spotlight-attention")
+                    }
+                    if spotlight.status?.pending == true {
+                        Button("Spotlight update pending. Tasks are saved.") { isShowingSpotlight = true }.font(.footnote).padding().accessibilityIdentifier("spotlight-pending")
                     }
                     SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
