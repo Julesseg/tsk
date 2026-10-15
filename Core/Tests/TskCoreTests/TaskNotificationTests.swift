@@ -43,3 +43,78 @@ import TskCore
     let excluded = [try record("2026-03-29T10:00:00Z", status: "completed"), try record("2026-03-29T10:00:00Z", status: "deleted"), TaskRecord(id: UUID(), attributes: ["status": "recurring", "due": "1792144800", "recur": "daily"])]
     #expect(try TaskManager.notificationPlan(tasks: excluded, calendar: paris, at: now).future.isEmpty)
 }
+
+private struct NotificationTestLease: TaskMutationLease { func release() {} }
+private actor NotificationTestState: TaskNotificationStateStore {
+    var state = TaskNotificationState()
+    func acquireLease() -> any TaskMutationLease { NotificationTestLease() }
+    func load() -> TaskNotificationState { state }
+    func save(_ state: TaskNotificationState) { self.state = state }
+}
+private actor NotificationPolicyCenter: TaskNotificationCenter {
+    var permission = TaskNotificationAuthorization.authorized
+    var requests: [String: TaskNotificationRequest] = [:]
+    let capacity: Int
+    init(capacity: Int) { self.capacity = capacity }
+    func authorization() -> TaskNotificationAuthorization { permission }
+    func requestAuthorization() -> TaskNotificationAuthorization { permission }
+    func pending() -> [PendingTaskNotification] { requests.values.map { PendingTaskNotification(identifier: $0.identifier, request: $0, nextTriggerDate: $0.fireDate) } }
+    func add(_ request: TaskNotificationRequest) throws {
+        guard permission.permitsAlerts else { throw TaskManagementError.storage("Permission revoked") }
+        guard requests.count < capacity || requests[request.identifier] != nil else { throw TaskManagementError.storage("Registration capacity reached") }
+        requests[request.identifier] = request
+    }
+    func remove(identifiers: [String]) { for id in identifiers { requests[id] = nil } }
+    func deny() { permission = .denied }
+}
+
+@Test func notificationReconciliationRetainsNearestReadBackAlertsAndCancelsKnownLocalChanges() async throws {
+    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792100000) })
+    let state = NotificationTestState()
+    let center = NotificationPolicyCenter(capacity: 2)
+    let first = try await manager.create(TaskDraft(description: "First", attributes: ["due": "1792141200"]))
+    let second = try await manager.create(TaskDraft(description: "Second", attributes: ["due": "1792144800"]))
+    _ = try await manager.create(TaskDraft(description: "Third", attributes: ["due": "1792148400"]))
+    var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let limited = try await manager.reconcileNotifications(center: center, store: state, calendar: calendar)
+    #expect(limited.registered.map(\.taskID) == [first.id, second.id])
+    #expect(limited.unscheduled.count == 1)
+    #expect(!limited.errors.isEmpty)
+    _ = try await manager.complete(id: first.id)
+    _ = try await manager.update(id: second.id, changes: ["due": "1792152000"])
+    let changed = try await manager.reconcileNotifications(center: center, store: state, calendar: calendar)
+    #expect(!changed.registered.contains { $0.taskID == first.id })
+    #expect(changed.registered.first { $0.taskID == second.id }?.fireDate == Date(timeIntervalSince1970: 1792152000))
+    await center.deny()
+    let denied = try await manager.reconcileNotifications(center: center, store: state, calendar: calendar)
+    #expect(denied.authorization == .denied)
+    #expect(denied.registered.isEmpty)
+    #expect(await center.pending().isEmpty)
+    _ = try await manager.create(TaskDraft(description: "Permission does not block task management"))
+}
+
+private final class NotificationTestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant: Date
+    init(_ seconds: Double) { instant = Date(timeIntervalSince1970: seconds) }
+    func now() -> Date { lock.lock(); defer { lock.unlock() }; return instant }
+    func set(_ seconds: Double) { lock.lock(); instant = Date(timeIntervalSince1970: seconds); lock.unlock() }
+}
+
+@Test func changingMidnightPreferencesCannotRepeatAnOriginalEventAfterItsAcceptedDeliveryOpportunity() async throws {
+    let clock = NotificationTestClock(1000)
+    let manager = TaskManager(replica: TestReplica(), now: { clock.now() })
+    let state = NotificationTestState()
+    let center = NotificationPolicyCenter(capacity: 100)
+    _ = try await manager.create(TaskDraft(description: "Combined", attributes: ["scheduled": "0", "due": "32400"]))
+    var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let initial = try await manager.reconcileNotifications(center: center, store: state, calendar: calendar)
+    #expect(initial.registered.first?.kind == .combined)
+    clock.set(40000)
+    await center.remove(identifiers: initial.registered.map(\.identifier))
+    try await manager.saveNotificationPreferences(TaskNotificationPreferences(hour: 12), using: state)
+    let changed = try await manager.reconcileNotifications(center: center, store: state, calendar: calendar)
+    #expect(changed.registered.isEmpty)
+    #expect(changed.unscheduled.isEmpty)
+    #expect(try await manager.notificationState(using: state).accepted.count == 2)
+}
