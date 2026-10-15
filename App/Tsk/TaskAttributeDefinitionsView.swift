@@ -68,6 +68,8 @@ struct TaskAttributeDefinitionEditor: View {
     @State private var name: String
     @State private var label: String
     @State private var type: TaskAttributeType
+    @State private var usesValues: Bool
+    @State private var valuesText: String
     @State private var error: String?
     @State private var isSaving = false
     @FocusState private var field: DefinitionField?
@@ -78,6 +80,8 @@ struct TaskAttributeDefinitionEditor: View {
         _name = State(initialValue: original?.name.rawValue ?? "")
         _label = State(initialValue: original?.label ?? "")
         _type = State(initialValue: original?.type ?? .string)
+        _usesValues = State(initialValue: original?.values != nil)
+        _valuesText = State(initialValue: original?.values?.joined(separator: "\n") ?? "")
     }
 
     var body: some View {
@@ -93,6 +97,21 @@ struct TaskAttributeDefinitionEditor: View {
                         ForEach(TaskAttributeType.allCases, id: \.self) { type in Text(type.title).tag(type) }
                     }
                     .pickerStyle(.menu).disabled(isSaving).accessibilityIdentifier("attribute-definition-type")
+                }
+                if type == .string {
+                    Section("Allowed values") {
+                        Toggle("Limit values and set their order", isOn: $usesValues)
+                            .disabled(isSaving).accessibilityIdentifier("attribute-values-enabled")
+                        if usesValues {
+                            TextEditor(text: $valuesText).focused($field, equals: .values)
+                                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                                .frame(minHeight: 100).disabled(isSaving)
+                                .accessibilityLabel("Allowed values, highest first")
+                                .accessibilityIdentifier("attribute-ordered-values")
+                            Text("One value per line, highest first. Include an empty line to position unset values. Spelling and case are exact; commas are not allowed.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section {
                     Text("Names identify stored task fields. Changing the type validates future edits and leaves existing values untouched.")
@@ -126,14 +145,14 @@ struct TaskAttributeDefinitionEditor: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            _ = try await store.manager.saveAttributeDefinition(name: name, label: label, type: type)
+            _ = try await store.manager.saveAttributeDefinition(name: name, label: label, type: type, values: type == .string && usesValues ? valuesText.components(separatedBy: "\n") : nil)
             try await store.loadAttributeDefinitions()
             dismiss()
         } catch { self.error = error.localizedDescription }
     }
 }
 
-private enum DefinitionField: Hashable { case name, label }
+private enum DefinitionField: Hashable { case name, label, values }
 
 extension TaskAttributeType {
     var title: String {

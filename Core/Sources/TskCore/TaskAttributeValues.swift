@@ -4,7 +4,11 @@ public enum TaskAttributeValues {
     public static func normalized(_ value: String, for definition: TaskAttributeDefinition) throws -> String? {
         guard !value.isEmpty else { return nil }
         switch definition.type {
-        case .string: return value
+        case .string:
+            guard definition.values.map({ $0.contains(where: { $0.matchesBytes(value) }) }) ?? true else {
+                throw invalid(definition, "Choose one of the configured allowed values or clear the field.")
+            }
+            return value
         case .numeric:
             guard value.range(of: #"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil,
                   let number = Double(value), number.isFinite else {
@@ -60,7 +64,7 @@ public enum TaskAttributeValues {
         TaskwarriorDuration(raw)?.seconds
     }
 
-    private static func durationString(_ seconds: Int64) -> String {
+    static func durationString(_ seconds: Int64) -> String {
         guard seconds != 0 else { return "PT0S" }
         let magnitude = abs(seconds)
         let days = magnitude / 86400

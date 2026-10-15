@@ -65,6 +65,18 @@ struct TaskAdvancedAttributesEditor: View {
                                     Button("Use current date") { edits[definition.name.rawValue] = String(Int(store.currentDate.timeIntervalSince1970)) }
                                         .disabled(!task.canEdit || store.isSaving)
                                 }
+                            } else if definition.type == .string, let values = definition.values {
+                                Picker("Value", selection: Binding(get: { UTF8String(raw) }, set: { edits[definition.name.rawValue] = $0.rawValue })) {
+                                    if !values.contains(where: { $0.matchesBytes(raw) }) {
+                                        Text("Unrecognized: \(raw)").tag(UTF8String(raw))
+                                    }
+                                    ForEach(values.map { UTF8String($0) }) { value in
+                                        Text(value.rawValue.isEmpty ? "Unset" : value.rawValue).tag(value)
+                                    }
+                                }
+                                .pickerStyle(.menu).disabled(!task.canEdit || store.isSaving)
+                                .accessibilityIdentifier("uda-value-\(definition.name.rawValue)")
+                                .accessibilityLabel(definition.label.isEmpty ? definition.name.rawValue : definition.label)
                             } else {
                                 TextField(definition.type.example, text: Binding(get: { raw }, set: { edits[definition.name.rawValue] = $0 }), axis: .vertical)
                                     .focused($focusedAttribute, equals: definition.name)
@@ -117,7 +129,8 @@ struct TaskAdvancedAttributesEditor: View {
 
     private func initialValue(_ definition: TaskAttributeDefinition) -> String {
         switch definition.type {
-        case .string, .uuid: ""
+        case .string: definition.values?.first ?? ""
+        case .uuid: ""
         case .numeric: "0"
         case .date: String(Int(store.currentDate.timeIntervalSince1970))
         case .duration: "PT0S"

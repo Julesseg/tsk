@@ -7,6 +7,7 @@ struct FilterDatePredicate: Sendable {
 
     init(name: String, modifier: String, value: String) throws {
         self.name = name
+        let modifier = ["startswith", "left", "endswith", "right"].contains(modifier) ? "has" : modifier
         guard case .comparison(_, let operation, let raw) = try FilterPredicate.attribute(name, modifier: modifier, value: value) else { fatalError() }
         self.operation = operation
         if case .regex = operation { operand = .empty }
@@ -14,6 +15,9 @@ struct FilterDatePredicate: Sendable {
     }
 
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
+        if context.schema.isUserDefined(name), let stored = task.attributes[name], !stored.isEmpty, Int64(stored) == nil {
+            throw TaskFilterError.invalidStoredValue(task.id, name, .date)
+        }
         let actual = FilterDateExpression.storedDate(task.attributes[name])
         let value = try operand.resolve(context)
         if actual == nil, let numeric = operand.numericVariant {
