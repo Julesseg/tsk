@@ -125,7 +125,9 @@ public extension TaskManager {
         let saved = try await createRecurringTemplate(RecurringTaskDraft(task: draft, firstDue: Date(timeIntervalSince1970: Double(timestamp)), recurrence: recurrence))
         guard saved.status == "recurring", saved.attributes["rtype"] == "periodic", saved.attributes["recur"] == recurrence,
               saved.attributes["due"] == raw, saved.attributes["scheduled"] == draft.attributes["scheduled"],
-              saved.attributes["parent"] == nil, saved.attributes["imask"] == nil else {
+              saved.attributes["parent"] == nil, saved.attributes["imask"] == nil,
+              saved.description.matchesBytes(draft.description),
+              draft.attributes.allSatisfy({ key, value in saved.attributes[key].map { $0.matchesBytes(value) } == true }) else {
             throw TaskManagementError.storage("The recurring replacement was not confirmed. The source was kept; inspect saved tasks before retrying.")
         }
         return saved

@@ -58,7 +58,7 @@ public extension TaskManager {
                 try await verifyReminderConfiguration(configuration)
                 result.imported.append(try await saveReminderImportItem(item))
             } catch {
-                result.failures.append(ReminderImportItem(title: item.title, draft: nil, reason: "Task was not saved; source was not removed. \(error.localizedDescription)"))
+                result.failures.append(ReminderImportItem(title: item.title, draft: nil, reason: "Destination save was not confirmed; source was not removed. \(error.localizedDescription)"))
                 break
             }
             do {

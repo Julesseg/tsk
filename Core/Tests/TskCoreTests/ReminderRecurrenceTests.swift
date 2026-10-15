@@ -83,13 +83,14 @@ actor RecurringMoveTestSource: ReminderMoveSource {
 
 @Test func continuousVerifiedRecurrenceIsRemovedOnlyAfterValidDurableTemplateAndCommitFailuresKeepSource() async throws {
     let mappings = [ReminderListMapping(listID: "work", project: "Office")]
-    let manager = TaskManager(replica: TestReplica())
+    let manager = TaskManager(replica: TestReplica(), reminderImportConfiguration: MoveConfigurationStore(device: UUID()))
+    try await manager.configureContinuousReminders(enabled: true, mappings: mappings)
     let source = RecurringMoveTestSource(items: [currentWeeklyReminder()])
-    let result = try await manager.moveReminders(from: source, mappings: mappings)
+    let result = try #require(try await manager.runContinuousReminderImport(from: source))
     #expect(result.imported.first?.status == "recurring")
     #expect(result.removedCount == 1)
     #expect(try await manager.recurringTemplates().count == 1)
-    for replica: any TaskReplica in [RecurringUnwritableReplica(), MalformedRecurringReplica()] {
+    for replica: any TaskReplica in [RecurringUnwritableReplica(), MalformedRecurringReplica(), MalformedRecurringReplica(dropsContent: true)] {
         let failed = TaskManager(replica: replica)
         let kept = RecurringMoveTestSource(items: [currentWeeklyReminder()])
         let failure = try await failed.moveReminders(from: kept, mappings: mappings)
@@ -105,9 +106,11 @@ private struct RecurringUnwritableReplica: TaskReplica {
     func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw TaskManagementError.storage("Actual save failed") }
 }
 private struct MalformedRecurringReplica: TaskReplica {
+    var dropsContent = false
     func tasks() -> [TaskRecord] { [] }
     func create(id: UUID, attributes: TaskAttributes) -> TaskRecord {
-        var changed = attributes; changed["status"] = "pending"
+        var changed = attributes
+        if dropsContent { changed.removeValue(forKey: "project") } else { changed["status"] = "pending" }
         return TaskRecord(id: id, attributes: changed)
     }
     func update(id: UUID, changes: TaskAttributePatch) throws -> TaskRecord { throw TaskManagementError.unsupportedTaskKind }

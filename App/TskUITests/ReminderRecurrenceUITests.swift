@@ -46,7 +46,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
     }
 
     private func inspectTemplate(_ app: XCUIApplication) {
-        let template = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "recurring-template-")).firstMatch
+        let template = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "recurring-template-")).firstMatch
         XCTAssertTrue(template.waitForExistence(timeout: 15)); template.tap()
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Weekly current anchor")
@@ -101,7 +101,9 @@ final class ReminderRecurrenceUITests: XCTestCase {
         XCTAssertNotNil(allow); allow?.tap()
         let identifier = "reminders-list-tsk fixture \(token) recurrence34"
         let list = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 30))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: access)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 30), .completed)
+        XCTAssertTrue(revealTaskElement(list, in: container, app: app))
         setDateSwitch(identifier, to: true, app: app, in: container, keyboardDismissIdentifier: "dismiss-reminders-keyboard")
     }
 

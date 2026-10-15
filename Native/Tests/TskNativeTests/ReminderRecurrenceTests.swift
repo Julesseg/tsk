@@ -35,14 +35,16 @@ private actor RecordedRecurringReminderSource: ReminderMoveSource {
 @Test func recordedRecurringReminderReopensAsValidTemplateBeforeAnyContinuousSourceRemoval() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
-    let manager = TaskChampionSession.makeManager(directory: root)
+    let device = UUID()
+    let manager = TaskChampionSession.makeManager(directory: root, reminderDeviceIdentifier: { device })
     let copy = RecordedRecurringReminderSource(directory: root, title: "Recorded copy")
     let mappings = [ReminderListMapping(listID: "work", project: "Recurring")]
     let copied = try await manager.copyReminders(from: copy, mappings: mappings)
     #expect(copied.imported.count == 1 && copied.skipped.count == 1)
     #expect(await copy.present)
     let move = RecordedRecurringReminderSource(directory: root, title: "Recorded move")
-    let moved = try await manager.moveReminders(from: move, mappings: mappings)
+    try await manager.configureContinuousReminders(enabled: true, mappings: mappings)
+    let moved = try #require(try await manager.runContinuousReminderImport(from: move))
     #expect(moved.imported.count == 1 && moved.removedCount == 1 && moved.skipped.count == 1)
     #expect(await move.removalSawDurableTemplate)
     #expect(await move.present == false)
@@ -131,7 +133,8 @@ private actor RecordedRecurringReminderSource: ReminderMoveSource {
 @Test func actualRecurringReplacementCommitFailureKeepsSourceAndExistingTasksForSafeRetry() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let manager = TaskChampionSession.makeManager(directory: directory)
+    let device = UUID()
+    let manager = TaskChampionSession.makeManager(directory: directory, reminderDeviceIdentifier: { device })
     let original = try await manager.create(TaskDraft(description: "Keep existing", attributes: ["opaque": "unchanged"]))
     func sql(_ statement: String) throws {
         let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
@@ -143,11 +146,13 @@ private actor RecordedRecurringReminderSource: ReminderMoveSource {
     let source = RecordedRecurringReminderSource(directory: directory, title: "Recurring fault retry")
     let mappings = [ReminderListMapping(listID: "work", project: "")]
     #expect(try await manager.copyReminders(from: source, mappings: mappings).failures.count == 1)
-    #expect(try await manager.moveReminders(from: source, mappings: mappings).stopped)
+    try await manager.configureContinuousReminders(enabled: true, mappings: mappings)
+    #expect(try await manager.runContinuousReminderImport(from: source)?.stopped == true)
+    #expect(try await manager.continuousReminderStatus().paused)
     #expect(await source.present)
     #expect(try await manager.tasks() == [original])
     try sql("DROP TRIGGER recurring_import_failure;")
-    #expect(try await manager.moveReminders(from: source, mappings: mappings).removedCount == 1)
+    #expect(try await manager.runContinuousReminderImport(from: source, retry: true)?.removedCount == 1)
     #expect(await source.removalSawDurableTemplate)
     #expect(try await manager.task(id: original.id) == original)
 }

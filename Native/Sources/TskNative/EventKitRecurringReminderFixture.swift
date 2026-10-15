@@ -33,9 +33,13 @@ import Foundation
             try await Task.sleep(for: .milliseconds(300))
         }
         let current = try await next(store, selected, title: "Weekly current anchor")
-        guard current.dueDateComponents?.month == 2, current.dueDateComponents?.day == 6 else { throw CocoaError(.fileReadCorruptFile) }
+        _ = try write(["completedSequence": completedSequence, "currentAnchor": record(current), "sourceType": local.sourceType.rawValue], token: token)
+        guard current.dueDateComponents?.month == 2, current.dueDateComponents?.day == 6 else {
+            throw NSError(domain: "tsk.EventKitFixture", code: 34, userInfo: [NSLocalizedDescriptionKey: "The real current incomplete occurrence did not advance to the verified Feb6 anchor. See captured source fields."])
+        }
         try seed("Unsupported two-week rule", interval: 2)
         let all = await fetch(store, selected)
+        _ = try write(["completedSequence": completedSequence, "currentAnchor": record(current), "beforeImport": all.map(record), "sourceType": local.sourceType.rawValue], token: token)
         guard all.filter(\.isCompleted).count == 5, all.count == 7 else { throw CocoaError(.fileReadCorruptFile) }
         return try write(["completedSequence": completedSequence, "currentAnchor": record(current), "beforeImport": all.map(record), "sourceType": local.sourceType.rawValue], token: token)
     }
@@ -50,6 +54,8 @@ import Foundation
         source.store.reset()
         guard let currentList = source.store.calendar(withIdentifier: identifier) else { throw CocoaError(.fileReadCorruptFile) }
         let after = await fetch(source.store, currentList).map(record)
+        evidence["afterImport"] = after
+        _ = try write(evidence, token: token)
         func sorted(_ records: [[String: Any]]) throws -> Data {
             let encoded = try records.map { try JSONSerialization.data(withJSONObject: $0, options: [.sortedKeys]) }
             return encoded.sorted { $0.lexicographicallyPrecedes($1) }.reduce(into: Data()) { $0.append($1) }
