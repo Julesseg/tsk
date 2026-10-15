@@ -36,6 +36,13 @@ public enum ContinuousReminderError: Error, LocalizedError, Sendable {
 
 public extension TaskManager {
     func moveReminders(from source: any ReminderMoveSource, mappings: [ReminderListMapping]) async throws -> ReminderMoveResult {
+        let admission = try await reminderImportAdmission.acquireImportLease()
+        defer { admission.release() }
+        try Task.checkCancellation()
+        return try await performReminderMove(from: source, mappings: mappings)
+    }
+
+    internal func performReminderMove(from source: any ReminderMoveSource, mappings: [ReminderListMapping], configuration: ContinuousReminderConfiguration? = nil) async throws -> ReminderMoveResult {
         guard !reminderMoveInProgress else { throw ContinuousReminderError.attemptInProgress }
         guard !mappings.isEmpty else { throw ReminderImportError.noLists }
         guard Set(mappings.map(\.listID)).count == mappings.count else { throw ReminderImportError.duplicateList }
@@ -48,6 +55,7 @@ public extension TaskManager {
             guard let draft = item.draft else { result.skipped.append(item); continue }
             do {
                 try Task.checkCancellation()
+                try await verifyReminderConfiguration(configuration)
                 result.imported.append(try await create(draft))
             } catch {
                 result.failures.append(ReminderImportItem(title: item.title, draft: nil, reason: "Task was not saved; source was not removed. \(error.localizedDescription)"))
@@ -55,6 +63,7 @@ public extension TaskManager {
             }
             do {
                 try Task.checkCancellation()
+                try await verifyReminderConfiguration(configuration)
                 try await candidate.removeSource()
                 result.removedCount += 1
             } catch {
@@ -63,5 +72,11 @@ public extension TaskManager {
             }
         }
         return result
+    }
+
+    internal func verifyReminderConfiguration(_ expected: ContinuousReminderConfiguration?) async throws {
+        guard let expected else { return }
+        let status = try await continuousReminderStatus()
+        guard status.active, status.configuration == expected else { throw TaskManagementError.storage("Continuous import settings changed. The source was kept; review settings before retrying.") }
     }
 }

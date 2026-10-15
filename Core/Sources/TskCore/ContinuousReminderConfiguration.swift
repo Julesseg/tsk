@@ -26,12 +26,13 @@ public extension TaskManager {
     func continuousReminderStatus() async throws -> ContinuousReminderStatus {
         guard let reminderImportConfiguration else { throw ContinuousReminderError.configurationUnavailable }
         let configuration = try await reminderImportConfiguration.load()
+        let paused = try await reminderImportAdmission.importPaused()
         guard let configuration, configuration.enabled else {
-            return ContinuousReminderStatus(configuration: configuration, active: false, configuredOnAnotherDevice: false, paused: reminderImportPaused)
+            return ContinuousReminderStatus(configuration: configuration, active: false, configuredOnAnotherDevice: false, paused: paused)
         }
         guard let designated = configuration.designatedDeviceID else { throw ContinuousReminderError.deviceUnavailable }
         let matching = try await reminderImportConfiguration.currentDeviceID() == designated
-        return ContinuousReminderStatus(configuration: configuration, active: matching, configuredOnAnotherDevice: !matching, paused: reminderImportPaused)
+        return ContinuousReminderStatus(configuration: configuration, active: matching, configuredOnAnotherDevice: !matching, paused: paused)
     }
 
     func configureContinuousReminders(enabled: Bool, mappings: [ReminderListMapping]) async throws {
@@ -45,18 +46,22 @@ public extension TaskManager {
         let prior = try await reminderImportConfiguration.load()
         let designated = enabled ? try await reminderImportConfiguration.currentDeviceID() : prior?.designatedDeviceID
         try await reminderImportConfiguration.save(ContinuousReminderConfiguration(enabled: enabled, designatedDeviceID: designated, mappings: mappings))
-        reminderImportPaused = false
+        try await reminderImportAdmission.setImportPaused(false)
     }
 
     func runContinuousReminderImport(from source: any ReminderMoveSource, retry: Bool = false) async throws -> ReminderMoveResult? {
+        let admission = try await reminderImportAdmission.acquireImportLease()
+        defer { admission.release() }
+        try Task.checkCancellation()
         let status = try await continuousReminderStatus()
-        guard status.active, let configuration = status.configuration, retry || !reminderImportPaused else { return nil }
+        guard status.active, let configuration = status.configuration, retry || !status.paused else { return nil }
+        try await reminderImportAdmission.setImportPaused(true)
         do {
-            let result = try await moveReminders(from: source, mappings: configuration.mappings)
-            reminderImportPaused = result.stopped
+            let result = try await performReminderMove(from: source, mappings: configuration.mappings, configuration: configuration)
+            try await reminderImportAdmission.setImportPaused(result.stopped)
             return result
         } catch {
-            reminderImportPaused = true
+            try await reminderImportAdmission.setImportPaused(true)
             throw error
         }
     }

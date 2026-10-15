@@ -68,6 +68,10 @@ final class ContinuousReminderImportUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 20))
         openSettings(app)
+        XCTAssertTrue(app.staticTexts["continuous-reminders-paused"].waitForExistence(timeout: 10))
+        XCTAssertFalse(taskRow(named: "Copy fixture none", app: app).exists)
+        let retry = app.buttons["continuous-reminders-retry"]
+        XCTAssertTrue(revealTaskElement(retry, in: "continuous-reminders-form", app: app)); retry.tap()
         XCTAssertTrue(app.staticTexts["continuous-reminders-error"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["continuous-reminders-paused"].exists)
         XCTAssertTrue(revealTaskElement(app.buttons["continuous-reminders-disable"], in: "continuous-reminders-form", app: app))

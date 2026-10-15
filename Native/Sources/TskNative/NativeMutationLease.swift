@@ -12,6 +12,8 @@ final class NativeMutationLease: TaskMutationLease, @unchecked Sendable {
         guard descriptor >= 0 else { throw TaskManagementError.storage(NSError(domain: NSPOSIXErrorDomain, code: Int(-descriptor)).localizedDescription) }
     }
 
+    init(descriptor: Int32) { self.descriptor = descriptor }
+
     deinit { release() }
 
     func release() {
