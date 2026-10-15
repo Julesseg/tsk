@@ -425,6 +425,26 @@ class ObservabilityTests(unittest.TestCase):
             self.assertEqual(result["cells"][0]["hostObservation"]["elapsedSeconds"], 3)
             self.assertEqual([item["stage"] for item in result["cells"][0]["cleanup"]], ["shutdown", "delete", "remaining-booted"])
 
+    def test_no_start_only_result_write_prevents_entering_observation(self):
+        commands = OwnedDevices()
+        actual_write = runner.write_json
+        observations = []
+        def reject_start_only_write(path, result):
+            spans = [cell["hostObservation"] for cell in result.get("cells", []) if "hostObservation" in cell]
+            if any("endEpochSeconds" not in span for span in spans):
+                raise OSError("controlled write before observation")
+            actual_write(path, result)
+        def observed(*args):
+            observations.append(True)
+            return {"outcome": "pending"}
+        with tempfile.TemporaryDirectory() as directory, patch.object(runner, "write_json", side_effect=reject_start_only_write):
+            output = Path(directory)
+            code = runner.run_cells(commands, output, output / "Control.app", observe=observed)
+            result = json.loads((output / "result.json").read_text())
+        self.assertEqual(code, 1)
+        self.assertEqual(len(observations), 4)
+        self.assertTrue(all("endEpochSeconds" in cell["hostObservation"] for cell in result["cells"]))
+
     def test_launch_failure_has_no_fake_observation_span(self):
         commands = OwnedDevices("protected-delete-first.launch")
         with tempfile.TemporaryDirectory() as directory:

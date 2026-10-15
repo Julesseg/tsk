@@ -275,7 +275,6 @@ def run_cells(commands, output, app, observe=observe):
                                          name + ".container")
                 observation_started = time.monotonic()
                 cell["hostObservation"] = {"startEpochSeconds": time.time()}
-                write_json(output / "result.json", result)
                 try:
                     receipt = observe(Path(container) / "Documents/native-index-control.json", configuration,
                                       destination, started)
