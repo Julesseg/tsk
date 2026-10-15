@@ -47,6 +47,7 @@ struct TaskAdvancedAttributesEditor: View {
                 ForEach(store.attributeDefinitions) { definition in
                     Section(definition.label.isEmpty ? definition.name.rawValue : definition.label) {
                         Toggle("Set value", isOn: Binding(get: { value(definition) != nil }, set: { enabled in
+                            focusedAttribute = nil
                             edits.updateValue(enabled ? initialValue(definition) : nil, forKey: definition.name.rawValue)
                         }))
                         .disabled(!task.canEdit || store.isSaving)
@@ -76,7 +77,7 @@ struct TaskAdvancedAttributesEditor: View {
                                 .accessibilityIdentifier("uda-value-\(definition.name.rawValue)")
                                 .accessibilityLabel(definition.label.isEmpty ? definition.name.rawValue : definition.label)
                             } else {
-                                TextField(definition.type.example, text: Binding(get: { raw }, set: { edits[definition.name.rawValue] = $0 }), axis: .vertical)
+                                TextField(definition.type.example, text: Binding(get: { value(definition) ?? "" }, set: { if value(definition) != nil { edits[definition.name.rawValue] = $0 } }), axis: .vertical)
                                     .focused($focusedAttribute, equals: definition.name)
                                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                                     .keyboardType(definition.type == .numeric ? .numbersAndPunctuation : .default)

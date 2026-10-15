@@ -4,6 +4,11 @@ final class AutomaticSynchronizationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
+        addUIInterruptionMonitor(withDescription: "Optional system password storage") { alert in
+            guard alert.label == "Save Password?", alert.buttons["Not Now"].exists else { return false }
+            alert.buttons["Not Now"].tap()
+            return true
+        }
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()

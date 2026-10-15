@@ -34,7 +34,7 @@ extension XCTestCase {
         }
         let screen = app.frame
         let navigationBottom = app.navigationBars.allElementsBoundByIndex
-            .filter { $0.exists && $0.frame.intersects(form.frame) }
+            .filter { $0.exists && $0.isHittable && $0.frame.intersects(form.frame) }
             .map { $0.frame.maxY }.max() ?? form.frame.minY
         let viewport = form.frame.intersection(screen)
         let top = max(viewport.minY, navigationBottom)
@@ -43,9 +43,11 @@ extension XCTestCase {
         var missingSteps = 0
         for step in 0...14 {
             if element.exists {
-                let frame = element.frame
+                let thumb = element.elementType == .switch ? element.switches.firstMatch : element
+                let target = thumb.exists ? thumb : element
+                let frame = target.frame
                 if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
-                    if frame.minY >= top, frame.maxY <= bottom, element.isHittable { return true }
+                    if frame.minY >= top, frame.maxY <= bottom, target.isHittable { return true }
                     scrollUp = frame.minY >= top
                 }
             } else {
