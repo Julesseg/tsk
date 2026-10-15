@@ -110,6 +110,11 @@ public extension TaskManager {
                 retained = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) }
                 registered = expected.filter { request in retained.contains { $0.identifier == request.identifier && $0.request == request && $0.nextTriggerDate == request.fireDate } }
             }
+            authorization = try await center.authorization()
+            if !authorization.permitsAlerts {
+                await center.remove(identifiers: retained.map(\.identifier))
+                registered = []
+            }
             let retainedEvents = Set(registered.flatMap(\.events))
             state.accepted.removeAll { $0.effectiveDate > now() && !retainedEvents.contains($0.event) }
             for request in registered {
