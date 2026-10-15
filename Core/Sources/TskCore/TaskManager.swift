@@ -103,14 +103,17 @@ public actor TaskManager {
     let reminderImportAdmission: any ReminderImportCoordinating
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
+    let changeTracking: any TaskChangeTracking
+    var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator()) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger()) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.userAttributeDefinitions = attributeDefinitions
         self.reminderImportConfiguration = reminderImportConfiguration
         self.reminderImportAdmission = reminderImportAdmission
+        self.changeTracking = changeTracking
         self.now = now
         self.calendar = calendar
     }
@@ -164,7 +167,7 @@ public actor TaskManager {
         attributes["entry"] = timestamp
         attributes["modified"] = timestamp
         let saved = try await replica.create(id: UUID(), attributes: attributes)
-        localChangeWasCommitted()
+        await localChangeWasCommitted()
         return saved
     }
 
@@ -192,7 +195,7 @@ public actor TaskManager {
         patch["modified"] = String(Int(now().timeIntervalSince1970))
         if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)
-        localChangeWasCommitted()
+        await localChangeWasCommitted()
         return saved
     }
 
@@ -211,7 +214,7 @@ public actor TaskManager {
             "status": "completed", "end": task.attributes["end"] ?? timestamp,
             "modified": timestamp, "start": nil
         ])
-        localChangeWasCommitted()
+        await localChangeWasCommitted()
         return saved
     }
 

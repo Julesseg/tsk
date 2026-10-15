@@ -83,7 +83,7 @@ extension TaskManager {
         guard let atomic = replica as? any TaskAtomicSnapshotMutatingReplica else { throw TaskManagementError.storage("This adapter cannot save a series against its complete preview snapshot.") }
         let saved = try await atomic.updateAtomically(preview.updates, expecting: preview.snapshot)
         guard let template = saved.first(where: { $0.id == preview.template.id }) else { throw TaskManagementError.storage("The atomic series save returned no template.") }
-        localChangeWasCommitted()
+        await localChangeWasCommitted()
         return template
     }
 }
