@@ -101,18 +101,21 @@ public actor TaskManager {
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
     var reminderMoveInProgress = false
     let reminderImportAdmission: any ReminderImportCoordinating
+    var activeMutationScope: TaskMutationScope?
+    let postCommitEffects: any TaskPostCommitEffect
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
     let changeTracking: any TaskChangeTracking
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger()) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.userAttributeDefinitions = attributeDefinitions
         self.reminderImportConfiguration = reminderImportConfiguration
         self.reminderImportAdmission = reminderImportAdmission
+        self.postCommitEffects = postCommitEffects
         self.changeTracking = changeTracking
         self.now = now
         self.calendar = calendar

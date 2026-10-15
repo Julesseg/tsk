@@ -72,6 +72,8 @@ extension TaskManager {
 
     func localChangeWasCommitted() async {
         await publishChange(.tasks)
+        if let scope = activeMutationScope { endMutation(scope) }
+        await postCommitEffects.apply(to: self, origin: .local)
         synchronizationLocalGeneration += 1
         guard synchronizationConfiguration != nil else { return }
         synchronizationRequested = true
@@ -100,6 +102,7 @@ extension TaskManager {
                 try await replica.synchronize(using: configuration)
                 await publishReceivedChanges(since: recordsBeforeSync, origin: .synchronization)
                 await publishChange(.synchronization, origin: .synchronization)
+                await postCommitEffects.apply(to: self, origin: .synchronization)
                 guard configurationGeneration == synchronizationConfigurationGeneration else { break }
                 if Task.isCancelled { break }
                 if localGeneration != synchronizationLocalGeneration || synchronizationRequested {
@@ -120,6 +123,7 @@ extension TaskManager {
                 }
             } catch {
                 await publishReceivedChanges(since: recordsBeforeSync, origin: .partialSynchronization)
+                await postCommitEffects.apply(to: self, origin: .partialSynchronization)
                 guard configurationGeneration == synchronizationConfigurationGeneration else { break }
                 if Task.isCancelled { break }
                 if error as? SynchronizationError == .interrupted {
