@@ -20,7 +20,7 @@ extension TaskManager {
     func saveTaskMutation(_ task: TaskRecord, changes: TaskAttributePatch) async throws -> TaskRecord {
         if task.isOccurrence { return try await saveOccurrence(task, changes: changes) }
         let saved = try await replica.update(id: task.id, changes: changes)
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: [saved])
         return saved
     }
 
@@ -53,7 +53,7 @@ extension TaskManager {
             TaskAtomicUpdate(id: parent.id, expected: parent.attributes, changes: parentChanges)
         ])
         guard let result = saved.first(where: { $0.id == occurrence.id }) else { throw TaskManagementError.storage("The atomic save returned no occurrence.") }
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: saved)
         return result
     }
 }

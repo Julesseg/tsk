@@ -102,6 +102,7 @@ public actor TaskManager {
     var reminderMoveInProgress = false
     let reminderImportAdmission: any ReminderImportCoordinating
     var activeMutationScope: TaskMutationScope?
+    let notificationSynchronization: (any TaskSynchronizationReceiptStore)?
     let postCommitEffects: any TaskPostCommitEffect
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
@@ -109,12 +110,13 @@ public actor TaskManager {
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects(), notificationSynchronization: (any TaskSynchronizationReceiptStore)? = nil) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.userAttributeDefinitions = attributeDefinitions
         self.reminderImportConfiguration = reminderImportConfiguration
         self.reminderImportAdmission = reminderImportAdmission
+        self.notificationSynchronization = notificationSynchronization
         self.postCommitEffects = postCommitEffects
         self.changeTracking = changeTracking
         self.now = now
@@ -170,7 +172,7 @@ public actor TaskManager {
         attributes["entry"] = timestamp
         attributes["modified"] = timestamp
         let saved = try await replica.create(id: UUID(), attributes: attributes)
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: [saved])
         return saved
     }
 
@@ -198,7 +200,7 @@ public actor TaskManager {
         patch["modified"] = String(Int(now().timeIntervalSince1970))
         if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: [saved])
         return saved
     }
 
@@ -217,7 +219,7 @@ public actor TaskManager {
             "status": "completed", "end": task.attributes["end"] ?? timestamp,
             "modified": timestamp, "start": nil
         ])
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: [saved])
         return saved
     }
 

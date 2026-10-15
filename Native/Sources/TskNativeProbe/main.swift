@@ -11,6 +11,15 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        if arguments.count == 5, arguments[1] == "reconcile-notifications" {
+            do {
+                let directory = URL(fileURLWithPath: arguments[2])
+                let manager = TaskChampionSession.makeManager(directory: directory, now: { Date(timeIntervalSince1970: 2000) })
+                _ = try await manager.reconcileNotifications(center: ProcessNotificationCenter(output: URL(fileURLWithPath: arguments[3])), store: LocalTaskNotificationStore(directory: directory))
+                try write(["result": "reconciled"], to: arguments[4])
+            } catch { try? write(["error": error.localizedDescription], to: arguments[4]) }
+            return
+        }
         if arguments.count == 5, arguments[1] == "participant-change" {
             do {
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
@@ -206,4 +215,21 @@ private actor ProcessReminderSource: ReminderMoveSource {
         if failRemoval { throw TaskManagementError.storage("Owned process fixture removal failure") }
         try FileManager.default.removeItem(at: source)
     }
+}
+
+private actor ProcessNotificationCenter: TaskNotificationCenter {
+    let output: URL
+    init(output: URL) { self.output = output }
+    func authorization() -> TaskNotificationAuthorization { .authorized }
+    func requestAuthorization() -> TaskNotificationAuthorization { .authorized }
+    func pending() -> [PendingTaskNotification] { [] }
+    func add(_ request: TaskNotificationRequest) throws { throw TaskManagementError.storage("The process fixture supports missed events only") }
+    func addImmediate(_ request: TaskNotificationRequest) throws {
+        let handle = try FileHandle(forWritingTo: output)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: JSONEncoder().encode(request) + Data([10]))
+        try handle.synchronize()
+    }
+    func remove(identifiers: [String]) {}
 }

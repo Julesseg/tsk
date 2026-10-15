@@ -3,6 +3,12 @@
 import Foundation
 import TskCore
 
+public struct DeliveredTaskNotification: Sendable {
+    public let identifier: String
+    public let request: TaskNotificationRequest?
+    public let deliveredAt: Date
+}
+
 public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked Sendable {
     public static let payloadKey = "tsk.task-alert.payload"
     private let center: UNUserNotificationCenter
@@ -68,8 +74,34 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
         try await addNative(UNNotificationRequest(identifier: request.identifier, content: content, trigger: trigger))
     }
 
+    public func addImmediate(_ request: TaskNotificationRequest) async throws {
+        guard try await authorization().permitsAlerts else { throw TaskManagementError.storage("Notifications are not permitted. Retry missed alerts after enabling notifications.") }
+        let content = UNMutableNotificationContent()
+        content.title = request.title
+        content.body = request.message + " (missed while away)"
+        content.sound = .default
+        content.userInfo = [Self.payloadKey: try JSONEncoder().encode(request), "taskID": request.taskID.uuidString]
+        try await addNative(UNNotificationRequest(identifier: request.immediateIdentifier, content: content, trigger: nil))
+    }
+
+    public func delivered() async throws -> [TaskNotificationRequest] {
+        await deliveredNotifications().filter { $0.identifier.hasPrefix(TaskNotificationRequest.missedIdentifierPrefix) }.compactMap(\.request)
+    }
+
+    public func deliveredNotifications() async -> [DeliveredTaskNotification] {
+        await withCheckedContinuation { continuation in
+            center.getDeliveredNotifications { notifications in
+                let values = notifications.map { notification in
+                    let request = (notification.request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
+                    return DeliveredTaskNotification(identifier: notification.request.identifier, request: request, deliveredAt: notification.date)
+                }
+                continuation.resume(returning: values)
+            }
+        }
+    }
+
     public func remove(identifiers: [String]) async {
-        center.removePendingNotificationRequests(withIdentifiers: identifiers.filter { $0.hasPrefix(TaskNotificationRequest.identifierPrefix) })
+        center.removePendingNotificationRequests(withIdentifiers: identifiers.filter { $0.hasPrefix(TaskNotificationRequest.identifierPrefix) || $0.hasPrefix(TaskNotificationRequest.missedIdentifierPrefix) })
     }
 
     public func deliveredIdentifiers() async -> [String] {

@@ -19,6 +19,8 @@ public protocol TaskNotificationCenter: Sendable {
     func requestAuthorization() async throws -> TaskNotificationAuthorization
     func pending() async throws -> [PendingTaskNotification]
     func add(_ request: TaskNotificationRequest) async throws
+    func delivered() async throws -> [TaskNotificationRequest]
+    func addImmediate(_ request: TaskNotificationRequest) async throws
     func remove(identifiers: [String]) async
 }
 
@@ -26,6 +28,10 @@ public struct TaskNotificationAcceptance: Codable, Sendable {
     public let event: TaskNotificationEvent
     public let effectiveDate: Date
     public let acceptedAt: Date
+    public let immediate: Bool?
+    public init(event: TaskNotificationEvent, effectiveDate: Date, acceptedAt: Date, immediate: Bool? = nil) {
+        self.event = event; self.effectiveDate = effectiveDate; self.acceptedAt = acceptedAt; self.immediate = immediate
+    }
 }
 
 public struct TaskNotificationReport: Codable, Sendable {
@@ -36,6 +42,10 @@ public struct TaskNotificationReport: Codable, Sendable {
     public let invalidTaskIDs: [UUID]
     public let checkedAt: Date
     public let timeZoneIdentifier: String
+    public var acceptedMissed: Int?
+    public var missed: [TaskNotificationRequest]?
+    public var retryableMissed: [TaskNotificationRequest]?
+    public var uncertainMissed: [TaskNotificationRequest]?
 }
 
 public struct TaskNotificationState: Codable, Sendable {
@@ -43,6 +53,9 @@ public struct TaskNotificationState: Codable, Sendable {
     public var known: [TaskNotificationEvent]
     public var accepted: [TaskNotificationAcceptance]
     public var lastSuccessfulSynchronization: UUID?
+    public var initialized: Bool?
+    public var pendingMissed: [TaskNotificationRequest]?
+    public var attemptingMissed: [TaskNotificationRequest]?
     public var lastReport: TaskNotificationReport?
     public init(preferences: TaskNotificationPreferences = .init()) {
         self.preferences = preferences; known = []; accepted = []; lastSuccessfulSynchronization = nil; lastReport = nil
@@ -71,16 +84,17 @@ public extension TaskManager {
         try await store.save(state)
     }
 
-    func reconcileNotifications(center: any TaskNotificationCenter, store: any TaskNotificationStateStore, calendar: Calendar = .autoupdatingCurrent) async throws -> TaskNotificationReport {
+    func reconcileNotifications(center: any TaskNotificationCenter, store: any TaskNotificationStateStore, calendar: Calendar = .autoupdatingCurrent, locallyWritten: [TaskRecord] = []) async throws -> TaskNotificationReport {
         let lease = try await store.acquireLease()
         defer { lease.release() }
         var state = try await store.load()
         var authorization = try await center.authorization()
         var errors: [String] = []
         var registered: [TaskNotificationRequest] = []
+        let history = try await notificationSynchronization?.load()
         var plan = try await notificationPlan(preferences: state.preferences, calendar: calendar)
         for attempt in 0..<3 {
-            let expected = eligibleNotificationRequests(plan.future, accepted: state.accepted, at: now())
+            let expected = eligibleNotificationRequests(plan.future, accepted: state.accepted, uncertain: state.attemptingMissed ?? [], at: now())
             let pending = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) }
             let obsolete = pending.filter { pending in !expected.contains { $0.identifier == pending.identifier && $0 == pending.request && $0.fireDate == pending.nextTriggerDate } }.map(\.identifier)
             await center.remove(identifiers: obsolete)
@@ -136,16 +150,27 @@ public extension TaskManager {
                 errors.append(TaskNotificationError.changedDuringReconciliation.localizedDescription)
             }
         }
-        for event in (plan.future + plan.past).flatMap(\.events) where !state.known.contains(event) { state.known.append(event) }
-        let report = TaskNotificationReport(authorization: authorization, registered: registered, unscheduled: eligibleNotificationRequests(plan.future, accepted: state.accepted, at: now()).filter { !registered.contains($0) }, errors: errors, invalidTaskIDs: plan.invalidTaskIDs, checkedAt: now(), timeZoneIdentifier: calendar.timeZone.identifier)
+        let missed = try await reconcileMissedNotifications(plan: plan, history: history, state: &state, locallyWritten: locallyWritten, calendar: calendar, center: center, store: store, errors: &errors)
+        authorization = try await center.authorization()
+        if !authorization.permitsAlerts {
+            let pending = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) || $0.identifier.hasPrefix(TaskNotificationRequest.missedIdentifierPrefix) }
+            await center.remove(identifiers: pending.map(\.identifier))
+            registered = []
+            state.accepted.removeAll { $0.effectiveDate > now() }
+        }
+        var report = TaskNotificationReport(authorization: authorization, registered: registered, unscheduled: eligibleNotificationRequests(plan.future, accepted: state.accepted, uncertain: state.attemptingMissed ?? [], at: now()).filter { !registered.contains($0) }, errors: errors, invalidTaskIDs: plan.invalidTaskIDs, checkedAt: now(), timeZoneIdentifier: calendar.timeZone.identifier)
+        report.acceptedMissed = state.accepted.filter { $0.immediate == true }.count
+        report.missed = missed
+        report.retryableMissed = state.pendingMissed ?? []
+        report.uncertainMissed = state.attemptingMissed ?? []
         state.lastReport = report
         try await store.save(state)
         return report
     }
 }
 
-private func eligibleNotificationRequests(_ requests: [TaskNotificationRequest], accepted: [TaskNotificationAcceptance], at instant: Date) -> [TaskNotificationRequest] {
-    let consumed = Set(accepted.filter { $0.effectiveDate <= instant }.map(\.event))
+private func eligibleNotificationRequests(_ requests: [TaskNotificationRequest], accepted: [TaskNotificationAcceptance], uncertain: [TaskNotificationRequest], at instant: Date) -> [TaskNotificationRequest] {
+    let consumed = Set(accepted.filter { $0.effectiveDate <= instant }.map(\.event) + uncertain.flatMap(\.events))
     return requests.compactMap { request in
         let events = request.events.filter { !consumed.contains($0) }
         guard !events.isEmpty else { return nil }

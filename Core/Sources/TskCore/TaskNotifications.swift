@@ -22,6 +22,8 @@ public struct TaskNotificationEvent: Codable, Hashable, Sendable {
 }
 
 public struct TaskNotificationRequest: Codable, Equatable, Sendable {
+    public static let missedIdentifierPrefix = "tsk.task-missed."
+    public var immediateIdentifier: String { Self.missedIdentifierPrefix + taskID.uuidString.lowercased() + "." + events.map { $0.source.rawValue + ":" + String($0.storedSeconds) }.sorted().joined(separator: ".") }
     public static let identifierPrefix = "tsk.task-alert."
     public let taskID: UUID
     public let title: String
