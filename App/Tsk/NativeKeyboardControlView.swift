@@ -25,6 +25,7 @@ final class NativeKeyboardControlController: UIViewController, UITextViewDelegat
         view.backgroundColor = .systemBackground
         input.accessibilityIdentifier = "native-keyboard-control-input"
         input.font = .preferredFont(forTextStyle: .body)
+        input.autocapitalizationType = .none
         input.backgroundColor = .secondarySystemBackground
         input.delegate = self
         input.changed = { [weak self] in self?.publish() }
