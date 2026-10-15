@@ -77,6 +77,7 @@ final class TaskKeyboardController: UIHostingController<AnyView> {
             let key: UIKeyCommand
             if let title = command.title {
                 key = UIKeyCommand(title: title, action: #selector(performTaskCommand(_:)), input: command.input, modifierFlags: command.modifiers, propertyList: command.id)
+                key.discoverabilityTitle = title
             } else {
                 key = UIKeyCommand(input: command.input, modifierFlags: command.modifiers, action: #selector(performTaskCommand(_:)))
             }

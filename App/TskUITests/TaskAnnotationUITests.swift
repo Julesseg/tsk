@@ -24,7 +24,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
         capture("Annotations empty in native task detail", app: app)
         app.buttons["add-annotation"].tap()
-        let editor = app.textViews["annotation-editor-text"]
+        let editor = app.descendants(matching: .any).matching(identifier: "annotation-editor-text").firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         app.buttons["save-annotation"].tap()
         XCTAssertTrue(app.staticTexts["annotation-editor-error"].waitForExistence(timeout: 5))
