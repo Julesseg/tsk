@@ -92,7 +92,7 @@ extension TaskManager {
         attributes["entry"] = timestamp
         attributes["modified"] = timestamp
         let saved = try await replica.create(id: UUID(), attributes: attributes)
-        await localChangeWasCommitted()
+        await localChangeWasCommitted(tasks: [saved])
         return saved
     }
 

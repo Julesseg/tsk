@@ -13,7 +13,7 @@ final class TaskNotificationController {
     private var queued = false
     init(store: TaskStore) { self.store = store }
     var needsAttention: Bool {
-        error != nil || !(report?.errors.isEmpty ?? true) || !(report?.unscheduled.isEmpty ?? true) || !(report?.invalidTaskIDs.isEmpty ?? true)
+        !(report?.retryableMissed?.isEmpty ?? true) || !(report?.uncertainMissed?.isEmpty ?? true) || error != nil || !(report?.errors.isEmpty ?? true) || !(report?.unscheduled.isEmpty ?? true) || !(report?.invalidTaskIDs.isEmpty ?? true)
     }
     func observe() async {
         do {

@@ -70,10 +70,10 @@ extension TaskManager {
         }
     }
 
-    func localChangeWasCommitted() async {
+    func localChangeWasCommitted(tasks: [TaskRecord]) async {
         await publishChange(.tasks)
         if let scope = activeMutationScope { endMutation(scope) }
-        await postCommitEffects.apply(to: self, origin: .local)
+        await postCommitEffects.apply(to: self, origin: .local, locallyWritten: tasks)
         synchronizationLocalGeneration += 1
         guard synchronizationConfiguration != nil else { return }
         synchronizationRequested = true

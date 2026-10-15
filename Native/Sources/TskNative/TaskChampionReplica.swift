@@ -39,13 +39,26 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         try request(command: "commitSnapshotAtomically", updates: updating, snapshot: records, creates: creating)
     }
 
+    public func synchronizationHistory() throws -> TaskSynchronizationHistory {
+        try protectReceiptDirectory()
+        return try request(command: "synchronizationHistory")
+    }
+
+    private nonisolated func protectReceiptDirectory() throws {
+        #if os(iOS)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: directory.path)
+        #endif
+    }
+
     public func synchronize(using configuration: SyncConfiguration) async throws {
         do {
+            try protectReceiptDirectory()
             let generation = tsk_bridge_sync_generation(library, directory.standardizedFileURL.path)
             try Task.checkCancellation()
             try await withTaskCancellationHandler {
                 let operation = Task.detached { [self] in
-                    let _: Bool = try request(command: "synchronize", configuration: configuration, syncGeneration: generation)
+                    let _: Bool = try request(command: "synchronizeWithReceipt", configuration: configuration, syncGeneration: generation)
                 }
                 try await operation.value
             } onCancel: { [self] in
@@ -68,10 +81,12 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
             throw TaskManagementError.storage("The TaskChampion native library could not be loaded. Build the pinned native bridge first.")
         }
         defer { tsk_bridge_free(output) }
-        let response = try JSONDecoder().decode(Response<T>.self, from: Data(String(cString: output).utf8))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let response = try decoder.decode(Response<T>.self, from: Data(String(cString: output).utf8))
         if let error = response.error {
             if error == "TSK_SYNC_INTERRUPTED" { throw SynchronizationError.interrupted }
-            if command == "synchronize" { throw SynchronizationError.failed(error) }
+            if command == "synchronize" || command == "synchronizeWithReceipt" { throw SynchronizationError.failed(error) }
             throw TaskManagementError.storage(error)
         }
         guard let value = response.value else { throw TaskManagementError.storage("TaskChampion returned no result.") }

@@ -31,11 +31,12 @@ with socket.socket() as reservation:
     reservation.bind(('127.0.0.1', 0))
     port = reservation.getsockname()[1]
 client = str(uuid.uuid4())
-generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23, 34]}
+generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23, 31, 34, 131, 231]}
 secret = 'tsk-isolated-ui-' + str(uuid.uuid4())
 url = 'http://127.0.0.1:' + str(port)
 settings = {'TSK_UI_SYNC_SERVER_URL': url, 'TSK_UI_SYNC_CLIENT_ID': client, 'TSK_UI_SYNC_SECRET': secret,
-            'TSK_UI_SYNC_FIXTURE_TOKEN': str(uuid.uuid4())}
+            'TSK_UI_SYNC_FIXTURE_TOKEN': str(uuid.uuid4()),
+            'TSK_UI_MISSED_CLIENT_ID': generator_clients[31]}
 environment = dict(os.environ)
 for key, value in settings.items():
     environment[key] = value
