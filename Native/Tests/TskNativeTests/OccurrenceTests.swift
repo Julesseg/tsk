@@ -13,9 +13,11 @@ struct OccurrenceTests {
         let child = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "occurrence", "parent": parent.id.uuidString, "imask": "0", "opaque": "retain"])
         let manager = TaskManager(replica: replica)
         let original = try await manager.tasks()
+        let originalOperations = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
         try sqlite(directory, "CREATE TRIGGER fail_atomic BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'atomic rollback fixture'); END;")
         await #expect(throws: (any Error).self) { try await manager.complete(id: child.id) }
         #expect(try await manager.tasks() == original)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == originalOperations)
         try sqlite(directory, "DROP TRIGGER fail_atomic;")
         var stale = parent.attributes
         stale["opaque"] = "é"
@@ -36,8 +38,8 @@ struct OccurrenceTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let clientString = try #require(env["TSK_SYNC_TEST_CLIENT_ID"])
-        let config = try SyncConfiguration(serverURL: #require(env["TSK_SYNC_TEST_URL"]), clientID: #require(UUID(uuidString: clientString)), encryptionSecret: #require(env["TSK_SYNC_TEST_SECRET"]))
+        let rawClient = try #require(env["TSK_SYNC_TEST_GENERATOR_21_CLIENT_ID"] ?? env["TSK_SYNC_TEST_CLIENT_ID"])
+        let config = try SyncConfiguration(serverURL: #require(env["TSK_SYNC_TEST_URL"]), clientID: #require(UUID(uuidString: rawClient)), encryptionSecret: #require(env["TSK_SYNC_TEST_SECRET"]))
         let manager = try await TaskChampionSession.open(directory: root.appendingPathComponent("app"))
         let parent = try await manager.createRecurringTemplate(RecurringTaskDraft(task: TaskDraft(description: "Occurrence interop", attributes: ["opaque": "keep café e\u{301}"]), firstDue: Date(timeIntervalSince1970: 3913092000), recurrence: "weekly"))
         _ = try await manager.synchronize(using: config)
@@ -146,14 +148,17 @@ struct OccurrenceTests {
         #expect(try await manager.task(id: second.id).status == "completed")
     }
 
-    @MainActor private func sqlite(_ directory: URL, _ sql: String) throws {
+    @discardableResult @MainActor private func sqlite(_ directory: URL, _ sql: String) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         process.arguments = [directory.appendingPathComponent("taskchampion.sqlite3").path, sql]
         let output = Pipe()
         process.standardError = output
+        process.standardOutput = output
         try process.run()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw TaskManagementError.storage(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)) }
+        let result = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        guard process.terminationStatus == 0 else { throw TaskManagementError.storage(result) }
+        return result
     }
 }

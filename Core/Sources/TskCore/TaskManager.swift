@@ -77,7 +77,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         case .invalidAnnotationTimestamp: "A valid timestamp could not be assigned to this annotation."
         case .annotationNotFound: "This annotation is no longer available. Reopen the task and try again."
         case .emptyDescription: "Enter a task description before saving."
-        case .unsupportedTaskKind: "This action is unavailable for recurring templates, occurrences, or unsupported task states. Their attributes remain preserved."
+        case .unsupportedTaskKind: "This action is unavailable for recurring templates or this saved task state. Its attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
         case .taskNotFound: "This task is no longer available."
         case .storage(let message): "Local task storage failed: \(message)"

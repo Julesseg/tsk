@@ -51,3 +51,37 @@ actor OccurrenceReplica: TaskAtomicMutatingReplica {
         }
     }
 }
+
+@Test func occurrenceWaitEditsKeepTheCompatibleMaskAndReservedLinksIntact() async throws {
+    let parent = UUID(), child = UUID()
+    let replica = OccurrenceReplica(records: [TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-"]), TaskRecord(id: child, attributes: ["status": "pending", "description": "Child", "parent": parent.uuidString, "imask": "0", "due": "300"])])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+    _ = try await manager.update(id: child, changes: ["wait": "200"])
+    #expect(try await manager.task(id: parent).attributes["mask"] == "W")
+    _ = try await manager.update(id: child, changes: ["due": "500"])
+    #expect(try await manager.task(id: parent).attributes["mask"] == "W")
+    await #expect(throws: (any Error).self) { try await manager.update(id: child, changes: ["due": nil]) }
+    await #expect(throws: TaskManagementError.reservedAttribute("parent")) { try await manager.update(id: child, changes: ["parent": UUID().uuidString]) }
+    _ = try await manager.update(id: child, changes: ["wait": nil])
+    #expect(try await manager.task(id: parent).attributes["mask"] == "-")
+}
+
+@Test func occurrenceIntegrityFailuresPreserveEveryRecord() async throws {
+    let parent = UUID(), child = UUID()
+    let validParent = TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-"])
+    let validChild = TaskRecord(id: child, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "0", "description": "Child"])
+    for (key, value) in [("parent", child.uuidString), ("parent", "missing"), ("imask", "-1"), ("imask", "999999999999999999999999"), ("imask", ""), ("imask", "1")] {
+        var invalid = validChild
+        invalid.attributes[key] = value
+        let replica = OccurrenceReplica(records: [validParent, invalid])
+        let manager = TaskManager(replica: replica)
+        await #expect(throws: (any Error).self) { try await manager.complete(id: child) }
+        #expect(await replica.records == [validParent, invalid])
+        #expect(await replica.batches == 0)
+    }
+    let duplicate = TaskRecord(id: UUID(), attributes: validChild.attributes)
+    let replica = OccurrenceReplica(records: [validParent, validChild, duplicate])
+    let manager = TaskManager(replica: replica)
+    await #expect(throws: (any Error).self) { try await manager.complete(id: child) }
+    #expect(await replica.batches == 0)
+}

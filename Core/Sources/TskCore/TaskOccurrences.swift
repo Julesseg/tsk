@@ -40,8 +40,9 @@ extension TaskManager {
         guard occurrence.status == "pending", [45, 87].contains(mask[index]) else { throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.") }
         guard let atomic = replica as? any TaskAtomicMutatingReplica else { throw TaskManagementError.storage("This storage adapter cannot save recurrence bookkeeping atomically.") }
         if completing { mask[index] = 43 }
-        else if changes.keys.contains("wait") {
-            let value = changes["wait"] ?? nil
+        else {
+            if changes.keys.contains("due"), (changes["due"] ?? nil)?.isEmpty != false { throw TaskManagementError.storage("A generated occurrence must retain its due date. No tasks were changed.") }
+            let value = changes.keys.contains("wait") ? changes["wait"] ?? nil : occurrence.attributes["wait"]
             if let value, let seconds = TimeInterval(value), seconds.isFinite { mask[index] = seconds > now().timeIntervalSince1970 ? 87 : 45 }
             else if value == nil { mask[index] = 45 }
             else { throw TaskManagementError.storage("The occurrence wait date is invalid. No tasks were changed.") }

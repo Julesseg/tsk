@@ -10,7 +10,7 @@ struct RecurringTemplateTests {
 @MainActor func nativeTemplatesRoundTripThroughTheDesignatedTaskwarriorGeneratorAtCalendarBoundaries() async throws {
     let environment = ProcessInfo.processInfo.environment
     let binary = try #require(environment["TSK_TASKWARRIOR_BINARY"])
-    let rawClient = try #require(environment["TSK_SYNC_TEST_CLIENT_ID"])
+    let rawClient = try #require(environment["TSK_SYNC_TEST_GENERATOR_20_CLIENT_ID"] ?? environment["TSK_SYNC_TEST_CLIENT_ID"])
     let client = try #require(UUID(uuidString: rawClient))
     let server = try #require(environment["TSK_SYNC_TEST_URL"])
     let secret = try #require(environment["TSK_SYNC_TEST_SECRET"])
@@ -111,7 +111,7 @@ struct RecurringTemplateTests {
             #expect(child.attributes["mask"] == nil)
             #expect(child.attributes["opaque"] == "preserve \(fixture.rule)")
             #expect(child.recurrenceInspection?.kind == .occurrence)
-            #expect(!child.canEdit && !child.canComplete)
+            #expect(child.canEdit && child.canComplete)
             let due = try #require(child.deadline)
             #expect(child.plannedDate == due.addingTimeInterval(-7200))
             #expect(child.waitUntil == due.addingTimeInterval(-3600))

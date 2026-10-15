@@ -31,6 +31,7 @@ with socket.socket() as reservation:
     reservation.bind(('127.0.0.1', 0))
     port = reservation.getsockname()[1]
 client = str(uuid.uuid4())
+generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23]}
 secret = 'tsk-isolated-ui-' + str(uuid.uuid4())
 url = 'http://127.0.0.1:' + str(port)
 settings = {'TSK_UI_SYNC_SERVER_URL': url, 'TSK_UI_SYNC_CLIENT_ID': client, 'TSK_UI_SYNC_SECRET': secret,
@@ -41,6 +42,8 @@ for key, value in settings.items():
     environment['TEST_RUNNER_' + key] = value
 for suffix, source in [('URL', 'SERVER_URL'), ('CLIENT_ID', 'CLIENT_ID'), ('SECRET', 'SECRET')]:
     environment['TSK_SYNC_TEST_' + suffix] = settings['TSK_UI_SYNC_' + source]
+for ticket, identity in generator_clients.items():
+    environment[f'TSK_SYNC_TEST_GENERATOR_{ticket}_CLIENT_ID'] = identity
 server_environment = dict(os.environ)
 for name in ['LISTEN', 'DATA_DIR', 'CLIENT_ID', 'CREATE_CLIENTS', 'SNAPSHOT_VERSIONS', 'SNAPSHOT_DAYS']:
     server_environment.pop(name, None)
@@ -56,7 +59,10 @@ signal.signal(signal.SIGINT, interrupted)
 
 try:
     with (fixture / 'server.log').open('w') as log:
-        server = subprocess.Popen([str(binary), '--listen', '127.0.0.1:' + str(port), '--data-dir', str(fixture / 'data'), '--allow-client-id', client], stdout=log, stderr=log, env=server_environment)
+        server_command = [str(binary), '--listen', '127.0.0.1:' + str(port), '--data-dir', str(fixture / 'data')]
+        for identity in [client, *generator_clients.values()]:
+            server_command += ['--allow-client-id', identity]
+        server = subprocess.Popen(server_command, stdout=log, stderr=log, env=server_environment)
         deadline = time.monotonic() + 20
         while True:
             if server.poll() is not None:
@@ -70,7 +76,7 @@ try:
                 if time.monotonic() >= deadline:
                     raise RuntimeError('The real fixture server did not become ready')
                 time.sleep(0.05)
-        (fixture / 'fixture.json').write_text(json.dumps({'serverURL': url, 'clientID': client, 'token': settings['TSK_UI_SYNC_FIXTURE_TOKEN'], 'version': version, 'serverPID': server.pid}, indent=2))
+        (fixture / 'fixture.json').write_text(json.dumps({'serverURL': url, 'clientID': client, 'generatorClientIDs': generator_clients, 'token': settings['TSK_UI_SYNC_FIXTURE_TOKEN'], 'version': version, 'serverPID': server.pid}, indent=2))
         print('Real isolated sync fixture ready at ' + url + '; evidence ' + str(fixture), flush=True)
         tests = subprocess.Popen(command, env=environment, start_new_session=True)
         status = tests.wait()
