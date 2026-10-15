@@ -27,7 +27,7 @@ import TskNative
     }
 
     func refresh(requestingAccess: Bool = false) async {
-        let request = UUID(); generation = request; isLoading = true
+        let request = UUID(); generation = request; isLoading = true; fixtureVerified = false
         var value = await manager.todayCalendar(from: source, requestingAccess: requestingAccess)
         #if DEBUG && targetEnvironment(simulator)
         if value.authorization == .fullAccess, !preparedFixture,

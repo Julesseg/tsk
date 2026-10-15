@@ -52,6 +52,7 @@ import XCTest
         app.terminate(); app.resetAuthorizationStatus(for: .calendar)
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_CALENDAR_CLEANUP")
         app.launch(); select(.today, app)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
         app.buttons["calendar-request-access"].tap(); permission(allow: true)
         select(.unfinished, app)
     }
@@ -62,6 +63,7 @@ import XCTest
         app.resetAuthorizationStatus(for: .calendar)
         defer { app.terminate(); app.resetAuthorizationStatus(for: .calendar) }
         app.launch(); select(.today, app)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
         app.buttons["calendar-request-access"].tap(); permission(allow: true)
         XCTAssertTrue(app.staticTexts["calendar-read-error"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["calendar-read-error"].label.contains("Injected Calendar adapter"))
