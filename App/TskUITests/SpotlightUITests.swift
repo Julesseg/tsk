@@ -133,6 +133,10 @@ import XCTest
             for (_, owner) in owners {
                 let field = owner.searchFields.firstMatch
                 if field.exists && field.isEnabled && field.isHittable { return (owner, field) }
+                let textField = owner.textFields["SpotlightSearchField"].firstMatch
+                if textField.exists && textField.isEnabled && textField.isHittable {
+                    return (owner, textField)
+                }
             }
             let fallback = springboard.textFields.firstMatch
             if fallback.exists && fallback.isEnabled && fallback.isHittable { return (springboard, fallback) }
