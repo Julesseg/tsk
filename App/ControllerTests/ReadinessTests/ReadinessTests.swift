@@ -10,6 +10,71 @@ import Testing
                                    elementFrame: frame ?? CGRect(origin: CGPoint(x: 40, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
     }
 
+    @Test func readySlowSnapshotActsBeforeTheWaitersFirstPollDelay() {
+        let clock = Clock()
+        var actions = 0
+        var waits = 0
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+            clock.now += 3.986889958
+            return sample()
+        })
+        let completed = attempt.waitUntilReady { _, evaluate in
+            waits += 1
+            clock.now += 1.027159625
+            return evaluate()
+        }
+        let performed = attempt.finish(waitCompleted: completed) { _ in actions += 1 }
+        #expect(performed)
+        #expect(actions == 1)
+        #expect(waits == 0)
+        #expect(clock.now == 3.986889958)
+        #expect(!attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+        #expect(actions == 1)
+    }
+
+    @Test func initiallyUnreadyControlWaitsOnlyForTheRemainingBudget() {
+        let clock = Clock()
+        var reads = 0
+        var actions = 0
+        var waitBudget: TimeInterval?
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+            reads += 1
+            clock.now += 1
+            return sample(enabled: reads > 1)
+        })
+        let completed = attempt.waitUntilReady { timeout, evaluate in
+            waitBudget = timeout
+            clock.now += 1
+            return evaluate()
+        }
+        #expect(waitBudget == 4)
+        #expect(completed)
+        #expect(attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+        #expect(actions == 1)
+        #expect(clock.now == 3)
+    }
+
+    @Test func expiredInitialSampleNeverWaitsOrDispatches() {
+        for duration in [5.0, 5.2] {
+            let clock = Clock()
+            var waits = 0
+            var actions = 0
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+                clock.now += duration
+                return sample()
+            })
+            let completed = attempt.waitUntilReady { _, evaluate in
+                waits += 1
+                return evaluate()
+            }
+            #expect(!completed)
+            #expect(waits == 0)
+            #expect(!attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+            #expect(actions == 0)
+            #expect(attempt.failureReason == .deadlineExpired)
+        }
+    }
+
     @Test func transientDisabledAndUnhittableControlGetsOnlyOneFullyReadyAction() {
         let clock = Clock()
         var current = sample(enabled: false)

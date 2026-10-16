@@ -72,6 +72,12 @@ final class TaskControlReadinessAttempt {
         "elapsed=\((finishedAt ?? now()) - started) samples=\(sampleCount) sampleStartedElapsed=\(sampleStartedElapsed.map(String.init(describing:)) ?? "null") sampleElapsed=\(sampleElapsed.map(String.init(describing:)) ?? "null") deadlineExpired=\((finishedAt ?? now()) >= deadline) reason=\(failureReason?.rawValue ?? "ready") \(lastSample?.diagnostic ?? "sample=null")"
     }
 
+    func waitUntilReady(wait: (TimeInterval, @escaping () -> Bool) -> Bool) -> Bool {
+        if evaluate() { return true }
+        guard remainingTime > 0 else { return false }
+        return wait(remainingTime, evaluate)
+    }
+
     func evaluate() -> Bool {
         guard !finished else { return false }
         accepted = nil

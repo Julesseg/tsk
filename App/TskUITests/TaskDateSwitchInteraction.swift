@@ -86,12 +86,17 @@ extension XCTestCase {
             }
             return sample
         }
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in attempt.evaluate() }, object: nil)
-        let result = XCTWaiter.wait(for: [ready], timeout: attempt.remainingTime)
-        guard attempt.finish(waitCompleted: result == .completed, perform: { _ in
+        var result: XCTWaiter.Result?
+        let completed = attempt.waitUntilReady { timeout, evaluate in
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in evaluate() }, object: nil)
+            result = XCTWaiter.wait(for: [ready], timeout: timeout)
+            return result == .completed
+        }
+        guard attempt.finish(waitCompleted: completed, perform: { _ in
             action()
         }) else {
-            recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(result) \(attempt.diagnostic)")
+            let waiter = result.map { String(describing: $0) } ?? "not entered"
+            recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(waiter) \(attempt.diagnostic)")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)
             return
         }
