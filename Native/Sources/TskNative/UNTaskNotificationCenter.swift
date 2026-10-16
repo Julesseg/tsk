@@ -17,12 +17,12 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
     public func authorization() async throws -> TaskNotificationAuthorization {
         let trace = TaskParticipantDiagnostics.begin("notifications.authorization")
         defer { TaskParticipantDiagnostics.end("notifications.authorization", id: trace) }
-        return await withCheckedContinuation { continuation in
-            center.getNotificationSettings { settings in
+        return try await NotificationAuthorizationReader.read { completion in
+            self.center.getNotificationSettings { settings in
                 let authorization: TaskNotificationAuthorization
                 #if os(iOS)
                 if #available(iOS 14, *), settings.authorizationStatus == .ephemeral {
-                    continuation.resume(returning: .ephemeral)
+                    completion(.ephemeral)
                     return
                 }
                 #endif
@@ -33,7 +33,7 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
                 case .provisional: authorization = .provisional
                 @unknown default: authorization = .unavailable
                 }
-                continuation.resume(returning: authorization)
+                completion(authorization)
             }
         }
     }
