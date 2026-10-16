@@ -128,12 +128,12 @@ extension XCTestCase {
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, file: file, line: line)
+    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, bottomInset: XCUIElement? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, bottomInset: bottomInset, file: file, line: line)
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", file: StaticString = #filePath, line: UInt = #line) -> Bool {
+    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", bottomInset: XCUIElement? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         guard form.waitForExistence(timeout: 5) else {
             recordTaskInteraction(app, detail: "Missing form \(context)")
             XCTFail("Missing task form: \(context)", file: file, line: line)
@@ -151,7 +151,9 @@ extension XCTestCase {
             }.max() ?? visible.minY
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
             let keyboard = app.keyboards.firstMatch
-            let bottom = min(visible.maxY - 16, keyboard.exists && keyboard.frame.intersects(visible) ? keyboard.frame.minY - 8 : visible.maxY - 16)
+            let insetFrame = bottomInset.flatMap { $0.exists ? $0.frame : nil }
+            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboard.exists ? keyboard.frame : nil, bottomInsetFrame: insetFrame)
+            let bottom = body.bottom
             guard visible.width > 0, bottom - top > 60 else { break }
             var targetMidY: CGFloat?
             if element.exists {
@@ -159,7 +161,7 @@ extension XCTestCase {
                 let target = thumb.exists ? thumb : element
                 let frame = target.frame
                 if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
-                    if frame.midY >= top, frame.midY <= bottom, target.isHittable { return true }
+                    if body.contains(midY: frame.midY), target.isHittable { return true }
                     targetMidY = frame.midY
                 }
             }

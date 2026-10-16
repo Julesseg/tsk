@@ -51,7 +51,7 @@ final class SeriesMetadataUITests: XCTestCase {
         app.buttons["edit-series-metadata"].tap()
         changeDescription(app)
         let project = app.textFields["task-project"]
-        XCTAssertTrue(revealTaskElement(project, in: "series-metadata-form", app: app))
+        XCTAssertTrue(revealTaskElement(project, in: "series-metadata-form", app: app, bottomInset: app.otherElements["series-keyboard-dismissal"].firstMatch))
         project.tap()
         project.typeText("Series.Work")
         hideKeyboard(app)

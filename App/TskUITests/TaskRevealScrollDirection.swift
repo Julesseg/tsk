@@ -14,3 +14,16 @@ struct TaskRevealScrollDirection {
         return scrollUp
     }
 }
+
+struct TaskRevealVisibleBody {
+    let top: CGFloat
+    let bottom: CGFloat
+
+    init(visibleFrame: CGRect, top: CGFloat, keyboardFrame: CGRect?, bottomInsetFrame: CGRect?) {
+        self.top = top
+        let obstructionTop = [keyboardFrame, bottomInsetFrame].compactMap { $0 }.filter { $0.intersects(visibleFrame) }.map { $0.minY }.min()
+        bottom = min(visibleFrame.maxY - 16, obstructionTop.map { $0 - 8 } ?? visibleFrame.maxY - 16)
+    }
+
+    func contains(midY: CGFloat) -> Bool { midY >= top && midY <= bottom }
+}

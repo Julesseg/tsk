@@ -63,6 +63,7 @@ struct TaskSeriesMetadataEditor: View {
             .safeAreaInset(edge: .bottom) {
                 if field != nil || textField != nil {
                     HStack { Spacer(); Button("Done") { endTyping() }.accessibilityIdentifier("dismiss-series-keyboard") }.padding().background(.regularMaterial)
+                        .accessibilityElement(children: .contain).accessibilityIdentifier("series-keyboard-dismissal")
                 }
             }
             .toolbar {

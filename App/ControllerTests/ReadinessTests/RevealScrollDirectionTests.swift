@@ -1,6 +1,20 @@
+import CoreGraphics
 import Testing
 
 @Suite struct TaskRevealScrollDirectionProof {
+    @Test func observedDismissalBandExcludesProjectAboveTheKeyboardAndRequiresScrolling() {
+        let visible = CGRect(x: 0, y: 72, width: 440, height: 884)
+        let project = CGRect(x: 40, y: 561.666687, width: 360, height: 22)
+        let keyboard = CGRect(x: 0, y: 653, width: 440, height: 245)
+        let dismissalBand = CGRect(x: 0, y: 572.666687, width: 440, height: 36.333313)
+        let body = TaskRevealVisibleBody(visibleFrame: visible, top: 154, keyboardFrame: keyboard, bottomInsetFrame: dismissalBand)
+        #expect(!body.contains(midY: project.midY))
+        var direction = TaskRevealScrollDirection(initialScrollUp: false)
+        let scrollUp = direction.update(targetMidY: project.midY, bottom: body.bottom)
+        #expect(scrollUp)
+        #expect(body.contains(midY: 463))
+    }
+
     @Test func missingTargetDoesNotReverseTheCallerDirectionHalfwayThroughTheBudget() {
         for initialScrollUp in [true, false] {
             var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
