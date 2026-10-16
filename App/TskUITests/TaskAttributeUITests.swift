@@ -61,7 +61,7 @@ final class TaskAttributeUITests: XCTestCase {
         openAdvanced(app)
         XCTAssertTrue(revealTaskElement(field("uda-value-score", app: app), in: "advanced-attributes-form", app: app))
         XCTAssertEqual(field("uda-value-score", app: app).value as? String, "-1.25")
-        XCTAssertTrue(revealTaskElement(field("uda-value-effort", app: app), in: "advanced-attributes-form", app: app))
+        XCTAssertTrue(revealTaskElement(field("uda-value-effort", app: app), in: "advanced-attributes-form", app: app, initialScrollUp: false))
         XCTAssertEqual(field("uda-value-effort", app: app).value as? String, "PT1H30M")
         XCTAssertTrue(revealTaskElement(field("uda-value-reference", app: app), in: "advanced-attributes-form", app: app))
         XCTAssertEqual(field("uda-value-reference", app: app).value as? String, "abcdef12")
