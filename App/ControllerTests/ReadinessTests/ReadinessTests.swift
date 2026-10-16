@@ -10,6 +10,52 @@ import Testing
                                    elementFrame: frame ?? CGRect(origin: CGPoint(x: 40, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
     }
 
+    @Test func enclosingDeadlineBoundsPreparationSamplingAndDispatch() {
+        for phase in 0..<3 {
+            let clock = Clock()
+            clock.now = 2
+            var preparations = 0
+            var samples = 0
+            var actions = 0
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: 3, beforeSample: { deadline in
+                preparations += 1
+                #expect(deadline == 3)
+            }, sample: {
+                samples += 1
+                if phase == 1 { clock.now = 3 }
+                return sample()
+            })
+            #expect(attempt.remainingTime == 1)
+            if phase == 0 { clock.now = 3 }
+            #expect(attempt.evaluate() == (phase == 2))
+            clock.now = 3
+            #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
+            #expect(actions == 0)
+            #expect(preparations == (phase == 0 ? 0 : 1))
+            #expect(samples == (phase == 0 ? 0 : 1))
+            #expect(attempt.failureReason == .deadlineExpired)
+        }
+    }
+
+    @Test func enclosingDeadlineNeverExtendsDefaultFiveSeconds() {
+        for deadline in [nil, 100.0] as [TimeInterval?] {
+            let clock = Clock()
+            clock.now = 2
+            var samples = 0
+            var actions = 0
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: deadline, sample: {
+                samples += 1
+                return sample()
+            })
+            #expect(attempt.remainingTime == 5)
+            clock.now = 7
+            #expect(!attempt.evaluate())
+            #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
+            #expect(samples == 0)
+            #expect(actions == 0)
+        }
+    }
+
     @Test func lateInterruptionIsHandledBeforeResamplingWithinTheOriginalDeadline() {
         let clock = Clock()
         var blocked = true

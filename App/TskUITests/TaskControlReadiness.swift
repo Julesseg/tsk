@@ -61,12 +61,12 @@ final class TaskControlReadinessAttempt {
     private var sampleElapsed: TimeInterval?
     private(set) var failureReason: TaskControlReadinessFailure? = .unsampled
 
-    init(now: @escaping () -> TimeInterval, beforeSample: ((TimeInterval) -> Void)? = nil, sample: @escaping () -> TaskControlReadinessSample) {
+    init(now: @escaping () -> TimeInterval, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, sample: @escaping () -> TaskControlReadinessSample) {
         self.now = now
         self.beforeSample = beforeSample
         self.sample = sample
         started = now()
-        deadline = started + 5
+        self.deadline = min(started + 5, deadline ?? .infinity)
     }
 
     var remainingTime: TimeInterval { max(0, deadline - now()) }

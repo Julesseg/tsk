@@ -65,8 +65,34 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }
         }
         tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
-        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
+        func waitForCaptureDescription() -> Bool {
+            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            func waitUntil(_ sample: @escaping () -> Bool) -> Bool {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                if sample() { return ProcessInfo.processInfo.systemUptime < deadline }
+                let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                guard remaining > 0 else { return false }
+                let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    ProcessInfo.processInfo.systemUptime < deadline && sample() && ProcessInfo.processInfo.systemUptime < deadline
+                }, object: nil)
+                return XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
+            }
+            var interrupted = false
+            guard waitUntil({
+                if description.exists { return true }
+                let previouslyDismissed = dismissedPassword
+                dismissPasswordBeforeSample(deadline)
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                interrupted = !previouslyDismissed && dismissedPassword
+                return interrupted
+            }) else { return false }
+            if description.exists { return ProcessInfo.processInfo.systemUptime < deadline }
+            guard interrupted, ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            tapTaskControl(app.buttons["new-task"], app: app, deadline: deadline)
+            return waitUntil { description.exists }
+        }
+        XCTAssertTrue(waitForCaptureDescription())
         focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
