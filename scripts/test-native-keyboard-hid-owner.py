@@ -143,6 +143,46 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(host.events[-1], 'stop:companion')
 
 
+class CleanupCancellationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_first_cancel_during_normal_group_cleanup_waits_for_all_owned_cleanup(self):
+        for interrupt_status in [130, 143]:
+            with self.subTest(status=interrupt_status), tempfile.TemporaryDirectory() as root:
+                entered = asyncio.Event()
+                release = asyncio.Event()
+                evidence = pathlib.Path(root) / 'evidence'
+
+                class SuspendedCleanupHost(FakeHost):
+                    async def stop(self, process, group=False):
+                        if process.kind == 'tests':
+                            entered.set()
+                            await release.wait()
+                        return await super().stop(process, group)
+
+                host = SuspendedCleanupHost(evidence, complete=False)
+                comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', pathlib.Path(root), evidence, pathlib.Path(root) / 'owned.sock', COMMAND, host=host)
+                comparison.cancel_status = interrupt_status
+                task = asyncio.create_task(comparison.run())
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                self.assertEqual(task.cancelling(), 0)
+                task.cancel()
+                await asyncio.sleep(0)
+                waiting_for_cleanup = not task.done()
+                release.set()
+                try:
+                    result = await asyncio.wait_for(task, timeout=1)
+                except asyncio.CancelledError:
+                    result = None
+                self.assertTrue(waiting_for_cleanup, 'Owner must await cleanup settlement after its first cancellation')
+                self.assertEqual(result, interrupt_status)
+                self.assertEqual(host.events[-4:], ['stop:tests', 'stop:relay', 'UP-only', 'stop:companion'])
+                receipt = json.loads((evidence / 'owner-receipt.json').read_text())
+                self.assertEqual(receipt['status'], interrupt_status)
+                self.assertTrue(receipt['testsCleanup']['reaped'])
+                self.assertTrue(receipt['relayCleanup']['reaped'])
+                self.assertTrue(receipt['companionCleanup']['reaped'])
+                self.assertIn('upOnlyRecovery', receipt)
+
+
 class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
     async def stop_group(self, initially_exited, survives_kill=False):
         class Process:

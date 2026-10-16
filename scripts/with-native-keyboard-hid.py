@@ -240,36 +240,49 @@ class Comparison:
             status = status or 70
             self.receipt['error'] = repr(error)
         finally:
-            for name, process in [('tests', tests), ('relay', relay)]:
-                if process is not None:
-                    try:
-                        self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')
-                    except Exception as error:
-                        self.receipt[name + 'CleanupError'] = repr(error)
-                        status = status or 70
-            final = read_receipt(relay_receipt)
-            self.receipt['relayResult'] = final
-            complete = final.get('state') == 'hid_rpc_completed_native_assertions_required'
-            marked = MARKER in live.read_bytes()[:8 * 1024 * 1024 + 1]
-            self.receipt['markerObserved'] = marked
-            cleanup_confirmed = any('UP cleanup RPC completed' in note for note in final.get('notes', []))
-            if marked and not complete and not cleanup_confirmed:
+            cleanup_task = asyncio.create_task(self._cleanup(tests, relay, companion, live, relay_receipt, status))
+            try:
+                status = await asyncio.shield(cleanup_task)
+            except asyncio.CancelledError:
+                self.receipt['error'] = 'Owner cancelled'
+                self.receipt['cancelledDuringCleanup'] = True
+                await cleanup_task
+                status = self.cancel_status
+                self.receipt['status'] = status
+                self.save()
+        return status
+
+    async def _cleanup(self, tests, relay, companion, live, relay_receipt, status):
+        for name, process in [('tests', tests), ('relay', relay)]:
+            if process is not None:
                 try:
-                    await self.host.recover(self.socket)
-                    self.receipt['upOnlyRecovery'] = 'RPC completed; native key state still requires evidence'
+                    self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')
                 except Exception as error:
-                    self.receipt['upOnlyRecoveryError'] = repr(error)
+                    self.receipt[name + 'CleanupError'] = repr(error)
                     status = status or 70
-            if companion is not None:
-                try:
-                    self.receipt['companionCleanup'] = await self.host.stop(companion)
-                except Exception as error:
-                    self.receipt['companionCleanupError'] = repr(error)
-                    status = status or 70
-            if not complete:
+        final = read_receipt(relay_receipt)
+        self.receipt['relayResult'] = final
+        complete = final.get('state') == 'hid_rpc_completed_native_assertions_required'
+        marked = MARKER in live.read_bytes()[:8 * 1024 * 1024 + 1]
+        self.receipt['markerObserved'] = marked
+        cleanup_confirmed = any('UP cleanup RPC completed' in note for note in final.get('notes', []))
+        if marked and not complete and not cleanup_confirmed:
+            try:
+                await self.host.recover(self.socket)
+                self.receipt['upOnlyRecovery'] = 'RPC completed; native key state still requires evidence'
+            except Exception as error:
+                self.receipt['upOnlyRecoveryError'] = repr(error)
                 status = status or 70
-            self.receipt['status'] = status
-            self.save()
+        if companion is not None:
+            try:
+                self.receipt['companionCleanup'] = await self.host.stop(companion)
+            except Exception as error:
+                self.receipt['companionCleanupError'] = repr(error)
+                status = status or 70
+        if not complete:
+            status = status or 70
+        self.receipt['status'] = status
+        self.save()
         return status
 
 
