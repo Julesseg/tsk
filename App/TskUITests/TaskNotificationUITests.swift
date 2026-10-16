@@ -91,6 +91,7 @@ final class TaskNotificationUITests: XCTestCase {
     }
 
     private func notificationPermissionSwitch(in settings: XCUIApplication) -> XCUIElement {
+        settings.activate()
         let toggle = settings.switches["Allow Notifications"].firstMatch
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         var windowReady = false
