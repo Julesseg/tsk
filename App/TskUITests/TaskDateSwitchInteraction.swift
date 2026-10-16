@@ -158,6 +158,20 @@ extension XCTestCase {
             return
         }
         if !value.isEmpty { element.typeText(value) }
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        func matchesReplacement() -> Bool {
+            let current = element.value as? String ?? ""
+            return current == value || value.isEmpty && current == element.placeholderValue
+        }
+        var acknowledged = matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !acknowledged, remaining > 0 {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                ProcessInfo.processInfo.systemUptime < deadline && matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+            }, object: nil)
+            acknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        XCTAssertTrue(acknowledged, "Text replacement value did not settle within five seconds", file: file, line: line)
         XCTAssertTrue((element.value as? String ?? "") == value || value.isEmpty && (element.value as? String) == element.placeholderValue, "Text replacement value differs", file: file, line: line)
     }
 
