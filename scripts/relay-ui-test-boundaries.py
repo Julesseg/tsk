@@ -193,7 +193,9 @@ class BoundaryCapture:
         return [dict((key, value) for key, value in entry.items() if key != 'process') for entry in self.children]
 
 
-def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
+def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5):
+    if cleanup_grace not in (5, 120):
+        raise ValueError('Owned cleanup grace must be the default or fixed native HID allowance')
     capture = BoundaryCapture(device, evidence, scripts)
     process = None
     interrupted = None
@@ -245,7 +247,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
     reason = 'relay-error'
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-        capture.record('xcodebuild-start', pid=process.pid, command=command)
+        capture.record('owned-native-hid-owner-start' if cleanup_grace == 120 else 'xcodebuild-start', pid=process.pid, command=command, **(dict(cleanupGraceSeconds=120) if cleanup_grace == 120 else {}))
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             signalled = False
@@ -286,7 +288,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
                 if interrupted is not None and not signalled:
                     signal_owned(interrupted)
                     signalled = True
-                    stop_deadline = time.monotonic() + 5
+                    stop_deadline = time.monotonic() + cleanup_grace
                 if stop_deadline is not None and time.monotonic() > stop_deadline:
                     signal_owned(signal.SIGKILL)
                 for key, _ in selector.select(timeout=0.1):
@@ -306,7 +308,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
             if interrupted is not None:
                 if stop_deadline is None:
                     signal_owned(interrupted)
-                    stop_deadline = time.monotonic() + 5
+                    stop_deadline = time.monotonic() + cleanup_grace
                 elif time.monotonic() > stop_deadline:
                     signal_owned(signal.SIGKILL)
             time.sleep(0.05)
@@ -315,7 +317,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
         reason = 'output-pipe' if broken_output else 'signal' if interrupted else 'eof'
-        capture.record('xcodebuild-end', returnCode=code, status=status)
+        capture.record('owned-native-hid-owner-end' if cleanup_grace == 120 else 'xcodebuild-end', returnCode=code, status=status)
     except OSError as error:
         capture.record('relay-error', error=str(error))
         if process is not None and process.poll() is not None:
@@ -324,7 +326,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent):
         signal_owned(signal.SIGKILL if pipe_held_open else signal.SIGTERM, include_exited=pipe_held_open)
         if process is not None and process.poll() is None:
             try:
-                process.wait(timeout=5)
+                process.wait(timeout=cleanup_grace)
             except subprocess.TimeoutExpired:
                 signal_owned(signal.SIGKILL)
                 process.wait(timeout=5)
@@ -346,6 +348,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', required=True)
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--owned-simulator', action='store_true')
+    parser.add_argument('--owned-cleanup-grace-seconds', type=int, choices=[5, 120], default=5)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
     if os.environ.get('CI') != 'true' or os.environ.get('TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR') != '1' or not arguments.owned_simulator:
@@ -353,4 +356,6 @@ if __name__ == '__main__':
     command = arguments.command[1:] if arguments.command[:1] == ['--'] else arguments.command
     if not command:
         parser.error('Pass the original xcodebuild command after --')
-    raise SystemExit(run(command, arguments.device, arguments.evidence))
+    if arguments.owned_cleanup_grace_seconds == 120 and (len(command) < 2 or pathlib.Path(command[1]).resolve() != pathlib.Path(__file__).with_name('with-native-keyboard-hid.py').resolve() or os.environ.get('TSK_NATIVE_KEYBOARD_HID') != '1'):
+        parser.error('Extended owned cleanup is only for the explicit native HID owner')
+    raise SystemExit(run(command, arguments.device, arguments.evidence, cleanup_grace=arguments.owned_cleanup_grace_seconds))

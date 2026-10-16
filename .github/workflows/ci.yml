@@ -76,6 +76,20 @@ jobs:
         with:
           xcode-version: "27.0"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify owned native keyboard transport boundaries
+        run: |
+          python3 scripts/test-native-keyboard-hid-installer.py
+          python3 scripts/test-native-keyboard-hid-relay.py
+          python3 scripts/test-native-keyboard-hid-owner.py
+          python3 scripts/test-native-keyboard-boundary-cleanup.py
+
+      - name: Install pinned native keyboard transport
+        run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
+
       - uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Check out pinned real TaskChampion sync server
@@ -134,6 +148,8 @@ jobs:
           set -o pipefail
           export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
+          export TSK_NATIVE_KEYBOARD_HID=1
+          export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
           coverage=()
           if [[ "${{ matrix.diagnostic }}" == "true" ]]; then
             coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/CustomViewsUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/MissedNotificationUITests -only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks -only-testing:TskUITests/ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/WidgetUITests)

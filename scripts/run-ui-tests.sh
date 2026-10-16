@@ -107,8 +107,20 @@ if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_R
     spotlight_capture_pid=$!
 fi
 main_status=0
+if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 && ( "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no || -z "${TSK_EVENTKIT_EVIDENCE_DIR:-}" ) ]]; then
+    echo 'Native keyboard transport requires the CI-owned isolated simulator and evidence directory.' >&2
+    exit 1
+fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
+    if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 ]]; then
+        python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --owned-cleanup-grace-seconds 120 -- \
+            python3 "$(dirname "${BASH_SOURCE[0]}")/with-native-keyboard-hid.py" --udid "$simulator_id" \
+            --tool-root "${TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT:?Pass the pinned .build HID tools}" \
+            --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/native-keyboard-hid" -- \
+            xcodebuild test-without-building -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+    else
     python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator -- xcodebuild test-without-building -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+    fi
 else
     xcodebuild test-without-building -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
 fi
