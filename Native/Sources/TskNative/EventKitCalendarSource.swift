@@ -18,7 +18,7 @@ public enum CalendarReadError: Error, LocalizedError, Equatable, Sendable {
 @available(iOS 17.0, macOS 14.0, *)
 public actor EventKitCalendarSource: CalendarEventSource {
     private let store = EKEventStore()
-    private let access = EventKitAccessPolicy()
+    private let access = EventKitCalendarAccessObservation()
     #if DEBUG && targetEnvironment(simulator)
     private let diagnosticStoreID = UUID().uuidString
     #endif
