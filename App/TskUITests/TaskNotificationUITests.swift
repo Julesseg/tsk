@@ -92,7 +92,43 @@ final class TaskNotificationUITests: XCTestCase {
 
     private func notificationPermissionSwitch(in settings: XCUIApplication) -> XCUIElement {
         let toggle = settings.switches["Allow Notifications"].firstMatch
-        if toggle.waitForExistence(timeout: 5) { return toggle }
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        var windowReady = false
+        var acceptedToggle: XCUIElement?
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            windowReady = false
+            acceptedToggle = nil
+            guard let application = try? settings.snapshot() else { return false }
+            let windows = application.children.filter {
+                $0.elementType == .window && !$0.frame.isEmpty && !$0.frame.isInfinite && $0.frame.origin.x.isFinite && $0.frame.origin.y.isFinite
+            }
+            guard ProcessInfo.processInfo.systemUptime < deadline, !windows.isEmpty else { return false }
+            windowReady = true
+            let snapshot = try? toggle.snapshot()
+            guard ProcessInfo.processInfo.systemUptime < deadline else { windowReady = false; return false }
+            guard let snapshot, snapshot.elementType == .switch, !snapshot.frame.isEmpty,
+                  windows.contains(where: { $0.frame.contains(snapshot.frame) }) else { return false }
+            acceptedToggle = toggle
+            return true
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let observed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [observed], timeout: remaining) == .completed
+        }
+        if ready {
+            guard ProcessInfo.processInfo.systemUptime < deadline, let acceptedToggle else {
+                XCTFail("Native Settings permission query exceeded the existing five-second budget")
+                return toggle
+            }
+            return acceptedToggle
+        }
+        guard windowReady else {
+            XCTFail("Native Settings window readiness did not finish within the existing five-second budget")
+            return toggle
+        }
         capture("Actual public notification Settings link destination", settings)
         var notifications = settings.cells.containing(.staticText, identifier: "Notifications").firstMatch
         if !notifications.exists {
