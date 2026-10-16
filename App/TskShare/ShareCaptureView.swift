@@ -73,6 +73,7 @@ private struct ShareTaskEditor: View {
     @State private var manager: TaskManager?
     @State private var error: String?
     @State private var tagInput = ""
+    @State private var isChoosingPriority = false
     @State private var saving = false
     @State private var opening = false
     @FocusState private var focus: TaskEditorField?
@@ -92,7 +93,7 @@ private struct ShareTaskEditor: View {
                     TextEditor(text: $draft.content).frame(minHeight: 120).focused($contentFocused).accessibilityIdentifier("share-retained-content")
                     Text("Saved as an editable task annotation. File attachments are not saved.").font(.footnote)
                 }
-                TaskOrganizationSection(draft: $draft.task, tagInput: $tagInput, tagError: nil, focus: $focus, addTag: { _ = addTag() })
+                TaskOrganizationSection(draft: $draft.task, tagInput: $tagInput, isChoosingPriority: $isChoosingPriority, tagError: nil, focus: $focus, addTag: { _ = addTag() })
                 TaskPlanningSection(draft: $draft.task, now: Date())
                 Section {
                     Text("Save stores the task on this device first. Synchronization is best effort while the extension can run and resumes when tsk opens.").font(.footnote).foregroundStyle(.secondary)
@@ -111,7 +112,7 @@ private struct ShareTaskEditor: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: cancel).disabled(saving).accessibilityIdentifier("cancel-shared-task") }
-                ToolbarItem(placement: .confirmationAction) { Button("Save", action: save).disabled(manager == nil || saving || opening).accessibilityIdentifier("save-shared-task") }
+                ToolbarItem(placement: .confirmationAction) { Button("Save", action: save).disabled(manager == nil || saving || opening || isChoosingPriority).accessibilityIdentifier("save-shared-task") }
             }
             .interactiveDismissDisabled(saving)
             .task { await open() }
@@ -134,7 +135,7 @@ private struct ShareTaskEditor: View {
         catch { self.error = error.localizedDescription; return false }
     }
     private func save() {
-        guard let manager, !saving else { return }
+        guard let manager, !saving, !isChoosingPriority else { return }
         focus = nil; contentFocused = false
         if !tagInput.isEmpty, !addTag() { return }
         saving = true

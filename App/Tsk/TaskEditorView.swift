@@ -9,6 +9,7 @@ struct TaskEditorView: View {
     @State private var draft: TaskDraft
     @State private var error: String?
     @State private var tagInput = ""
+    @State private var isChoosingPriority = false
     @State private var tagError: String?
     @FocusState private var focusedField: TaskEditorField?
 
@@ -29,7 +30,7 @@ struct TaskEditorView: View {
                         .accessibilityIdentifier("task-description")
                         .focused($focusedField, equals: .description)
                 }
-                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, focus: $focusedField, addTag: { _ = addTag() })
+                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, isChoosingPriority: $isChoosingPriority, tagError: tagError, focus: $focusedField, addTag: { _ = addTag() })
                 TaskPlanningSection(draft: $draft, now: store.currentDate)
                 Section {
                     Text("Review your task before saving. Changes are stored locally and available offline.")
@@ -69,19 +70,19 @@ struct TaskEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                    .disabled(store.isSaving)
+                    .disabled(store.isSaving || isChoosingPriority)
                     .accessibilityIdentifier("save-task")
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
             .onAppear { focusedField = .description }
-            .taskKeyboardCommands(store.isSaving ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
+            .taskKeyboardCommands(store.isSaving || isChoosingPriority ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
             .modifier(TaskWorkspacePanel(store: store))
         }
     }
 
     private func save() {
-        guard !store.isSaving else { return }
+        guard !store.isSaving, !isChoosingPriority else { return }
         focusedField = nil
         Task {
             if !tagInput.isEmpty, !addTag() { return }

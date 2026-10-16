@@ -9,6 +9,7 @@ struct TaskSeriesMetadataEditor: View {
     @State private var draft: TaskDraft
     @State private var annotation = ""
     @State private var tagInput = ""
+    @State private var isChoosingPriority = false
     @State private var tagError: String?
     @State private var error: String?
     @State private var preview: TaskSeriesMetadataPreview?
@@ -35,7 +36,7 @@ struct TaskSeriesMetadataEditor: View {
                         TextField("What repeats?", text: $draft.description, axis: .vertical)
                             .focused($field, equals: .description).accessibilityIdentifier("series-description")
                     }
-                    TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: tagError, focus: $field, addTag: addTag)
+                    TaskOrganizationSection(draft: $draft, tagInput: $tagInput, isChoosingPriority: $isChoosingPriority, tagError: tagError, focus: $field, addTag: addTag)
                     Section("Series annotations") {
                         ForEach(template.annotations) { note in
                             TextField("Annotation", text: Binding(get: { draft.attributes[note.reference.rawValue] ?? "" }, set: { draft.attributes[note.reference.rawValue] = $0 }), axis: .vertical)
@@ -70,9 +71,9 @@ struct TaskSeriesMetadataEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(store.isSaving) }
                 ToolbarItem(placement: .confirmationAction) {
                     if let preview {
-                        Button("Save series changes") { save(preview) }.disabled(store.isSaving || preview.updates.allSatisfy { $0.changes.isEmpty }).accessibilityIdentifier("save-series-metadata")
+                        Button("Save series changes") { save(preview) }.disabled(store.isSaving || isChoosingPriority || preview.updates.allSatisfy { $0.changes.isEmpty }).accessibilityIdentifier("save-series-metadata")
                     } else {
-                        Button("Preview changes", action: buildPreview).disabled(store.isSaving || isPreviewing).accessibilityIdentifier("preview-series-metadata")
+                        Button("Preview changes", action: buildPreview).disabled(store.isSaving || isPreviewing || isChoosingPriority).accessibilityIdentifier("preview-series-metadata")
                     }
                 }
             }
@@ -170,7 +171,7 @@ struct TaskSeriesMetadataEditor: View {
     }
 
     private var editorActions: TaskEditorActions? {
-        guard !store.isSaving, !isPreviewing else { return nil }
+        guard !store.isSaving, !isPreviewing, !isChoosingPriority else { return nil }
         if let preview {
             guard preview.updates.contains(where: { !$0.changes.isEmpty }) else { return nil }
             return TaskEditorActions(save: { save(preview) })
@@ -181,7 +182,7 @@ struct TaskSeriesMetadataEditor: View {
     private func endTyping() { field = nil; textField = nil }
 
     private func buildPreview() {
-        guard !isPreviewing else { return }
+        guard !isPreviewing, !isChoosingPriority else { return }
         endTyping()
         if !tagInput.isEmpty { addTag(); if tagError != nil { return } }
         isPreviewing = true
@@ -193,6 +194,7 @@ struct TaskSeriesMetadataEditor: View {
     }
 
     private func save(_ preview: TaskSeriesMetadataPreview) {
+        guard !isChoosingPriority else { return }
         endTyping()
         Task {
             if let saved = await store.perform({ try await $0.applySeriesMetadata(preview) }) { onSave(saved); dismiss() }

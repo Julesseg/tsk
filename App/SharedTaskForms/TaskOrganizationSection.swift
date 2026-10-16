@@ -4,6 +4,7 @@ import TskCore
 struct TaskOrganizationSection: View {
     @Binding var draft: TaskDraft
     @Binding var tagInput: String
+    @Binding var isChoosingPriority: Bool
     let tagError: String?
     let focus: FocusState<TaskEditorField?>.Binding
     let addTag: () -> Void
@@ -18,16 +19,24 @@ struct TaskOrganizationSection: View {
                     .accessibilityIdentifier("task-project")
                     .focused(focus, equals: .project)
             }
-            Picker("Priority", selection: $draft.priority) {
-                Text("None").tag("")
-                Text("High").tag("H")
-                Text("Medium").tag("M")
-                Text("Low").tag("L")
-                if !["", "H", "M", "L"].contains(draft.priority) {
-                    Text("Unsupported: \(draft.priority)").tag(draft.priority)
-                }
+            Button { isChoosingPriority = true } label: {
+                HStack { Text("Priority"); Spacer(); Text(priorityTitle) }
             }
+            .accessibilityLabel("Priority").accessibilityValue(priorityTitle)
             .accessibilityIdentifier("task-priority")
+            .popover(isPresented: $isChoosingPriority) {
+                VStack(alignment: .leading) {
+                    Button("None") { choosePriority("") }
+                    Button("High") { choosePriority("H") }
+                    Button("Medium") { choosePriority("M") }
+                    Button("Low") { choosePriority("L") }
+                    if !["", "H", "M", "L"].contains(draft.priority) {
+                        Button("Unsupported: \(draft.priority)") { choosePriority(draft.priority) }
+                    }
+                }
+                .padding()
+                .presentationCompactAdaptation(.popover)
+            }
         }
         Section("Tags") {
             ForEach(draft.tags.map { UTF8String($0) }) { identity in
@@ -60,6 +69,22 @@ struct TaskOrganizationSection: View {
                 Text(tagError).font(.footnote).foregroundStyle(.red).accessibilityIdentifier("tag-error")
             }
         }
+    }
+
+    private var priorityTitle: String {
+        switch draft.priority {
+        case "": "None"
+        case "H": "High"
+        case "M": "Medium"
+        case "L": "Low"
+        default: "Unsupported: \(draft.priority)"
+        }
+    }
+
+    private func choosePriority(_ value: String) {
+        guard isChoosingPriority else { return }
+        draft.priority = value
+        isChoosingPriority = false
     }
 }
 

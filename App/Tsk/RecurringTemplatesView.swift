@@ -62,6 +62,7 @@ private struct RecurringTemplateEditor: View {
     @State private var firstDue: Date
     @State private var recurrence = "weekly"
     @State private var tagInput = ""
+    @State private var isChoosingPriority = false
     @State private var error: String?
     @FocusState private var focusedField: TaskEditorField?
     @FocusState private var ruleIsFocused: Bool
@@ -91,7 +92,7 @@ private struct RecurringTemplateEditor: View {
                     Text("The first due date anchors the series. Older dates can create many missed occurrences when the generator runs.").font(.footnote)
                     Text("Calendar rules use your generator's time zone. Monthly dates can move after a short month; daily rules can change local time across daylight saving.").font(.footnote)
                 }
-                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, tagError: error, focus: $focusedField, addTag: { _ = addTag() })
+                TaskOrganizationSection(draft: $draft, tagInput: $tagInput, isChoosingPriority: $isChoosingPriority, tagError: error, focus: $focusedField, addTag: { _ = addTag() })
                 Section {
                     Text("tsk saves this template and requests synchronization. Your designated Taskwarrior client creates its occurrences; this app does not generate them.").font(.footnote)
                 }
@@ -113,6 +114,7 @@ private struct RecurringTemplateEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(store.isSaving) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard !isChoosingPriority else { return }
                         focusedField = nil
                         ruleIsFocused = false
                         Task {
@@ -123,7 +125,7 @@ private struct RecurringTemplateEditor: View {
                             } else { error = store.error }
                         }
                     }
-                    .disabled(store.isSaving).accessibilityIdentifier("save-recurring-template")
+                    .disabled(store.isSaving || isChoosingPriority).accessibilityIdentifier("save-recurring-template")
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
