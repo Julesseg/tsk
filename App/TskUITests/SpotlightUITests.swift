@@ -18,7 +18,7 @@ import XCTest
         let identity = app.staticTexts[id]
         XCTAssertTrue(revealTaskElement(identity, in: "task-detail-form", app: app))
         capture("Real Spotlight lookup tap opens exact persisted UUID", app)
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app, initialScrollUp: false))
         app.buttons["complete-task"].tap()
         app.buttons["Done"].tap()
         openSettings(app); query(app, id: id, present: false)
