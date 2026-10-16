@@ -147,13 +147,20 @@ final class ContinuousReminderImportUITests: XCTestCase {
     }
 
     private func grantPermission() {
-        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.matching(NSPredicate(format: "label CONTAINS[c] %@", "reminders")).firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 10))
         let button = alert.buttons.allElementsBoundByIndex.first {
             let label = $0.label.lowercased()
             return label.contains("allow") && !label.contains("don’t") && !label.contains("don't")
         }
-        XCTAssertNotNil(button); button?.tap()
+        XCTAssertNotNil(button)
+        guard let button else { return }
+        let attachment = XCTAttachment(string: "alert=\(alert.label)\nbutton=\(button.label)\nframeBeforeReadiness=\(button.frame)")
+        attachment.name = "Matched Reminders permission alert and Allow control"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        tapTaskControl(button, app: springboard)
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {
