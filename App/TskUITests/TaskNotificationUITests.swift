@@ -94,20 +94,19 @@ final class TaskNotificationUITests: XCTestCase {
         settings.activate()
         let toggle = settings.switches["Allow Notifications"].firstMatch
         let deadline = ProcessInfo.processInfo.systemUptime + 5
-        var windowReady = false
+        var windowObserved = false
         var acceptedToggle: XCUIElement?
         func sample() -> Bool {
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-            windowReady = false
             acceptedToggle = nil
             guard let application = try? settings.snapshot() else { return false }
             let windows = application.children.filter {
                 $0.elementType == .window && !$0.frame.isEmpty && !$0.frame.isInfinite && $0.frame.origin.x.isFinite && $0.frame.origin.y.isFinite
             }
             guard ProcessInfo.processInfo.systemUptime < deadline, !windows.isEmpty else { return false }
-            windowReady = true
+            windowObserved = true
             let snapshot = try? toggle.snapshot()
-            guard ProcessInfo.processInfo.systemUptime < deadline else { windowReady = false; return false }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
             guard let snapshot, snapshot.elementType == .switch, !snapshot.frame.isEmpty,
                   windows.contains(where: { $0.frame.contains(snapshot.frame) }) else { return false }
             acceptedToggle = toggle
@@ -126,7 +125,7 @@ final class TaskNotificationUITests: XCTestCase {
             }
             return acceptedToggle
         }
-        guard windowReady else {
+        guard windowObserved else {
             XCTFail("Native Settings window readiness did not finish within the existing five-second budget")
             return toggle
         }
