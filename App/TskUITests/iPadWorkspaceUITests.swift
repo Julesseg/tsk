@@ -61,7 +61,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         field.tap()
         field.typeText("Adaptive planned task")
         let project = app.textFields["task-project"]
-        project.tap()
+        focusTaskText(project, app: app)
         project.typeText("Workspace")
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)

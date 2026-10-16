@@ -51,17 +51,17 @@ struct ContinuousReminderSettingsView: View {
                         }
                     }
                 }
-                if let fixtureReport {
-                    ScrollView { Text(fixtureReport).font(.caption.monospaced()) }.frame(height: 160)
-                        .accessibilityElement(children: .ignore).accessibilityLabel("Real EventKit move evidence")
-                        .accessibilityValue(fixtureReport).accessibilityIdentifier("continuous-reminders-fixture-report")
-                }
                 #if DEBUG
                 if ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" {
                 Button("Add isolated capture") { Task { await changeFixture(edit: false) } }.accessibilityIdentifier("continuous-reminders-add-fixture")
                 Button("Read isolated move fixture") { Task { await verifyFixture() } }.accessibilityIdentifier("continuous-reminders-verify-fixture")
                 }
                 #endif
+                if let fixtureReport {
+                    ScrollView { Text(fixtureReport).font(.caption.monospaced()) }.frame(height: 160)
+                        .accessibilityElement(children: .ignore).accessibilityLabel("Real EventKit move evidence")
+                        .accessibilityValue(fixtureReport).accessibilityIdentifier("continuous-reminders-fixture-report")
+                }
             }
             .accessibilityIdentifier("continuous-reminders-form")
             .disabled(loading || controller.isRunning)

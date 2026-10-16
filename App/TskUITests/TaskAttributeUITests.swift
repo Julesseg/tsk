@@ -48,6 +48,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["advanced-attributes-error"].waitForExistence(timeout: 5))
         capture("Typed numeric validation remains visible", app: app)
         replaceValue("score", with: "-1.25", app: app)
+        XCTAssertTrue(revealTaskElement(app.switches["uda-enabled-effort"].firstMatch, in: "advanced-attributes-form", app: app, initialScrollUp: false))
         setValue("effort", to: "1.5h", app: app)
         setValue("reference", to: "abcdef12", app: app)
         setDateSwitch("uda-enabled-review", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
