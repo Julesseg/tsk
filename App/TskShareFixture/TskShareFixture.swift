@@ -6,31 +6,64 @@ import LinkPresentation
     var body: some Scene { WindowGroup { ShareFixtureView() } }
 }
 
-private struct ShareFixtureView: View {
-    @State private var showing = false
-    var body: some View {
-        VStack(spacing: 24) {
-            Text("tsk isolated sharing fixture").font(.title)
-            Text("Presents a real system share sheet with text and a URL. This app does not access tsk storage.")
-            Button("Share text and link") { showing = true }.accessibilityIdentifier("share-fixture-present")
-        }.padding().sheet(isPresented: $showing) { ShareFixtureSheet(complete: { showing = false }) }
-    }
+private struct ShareFixtureView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> ShareFixtureController { ShareFixtureController() }
+    func updateUIViewController(_ uiViewController: ShareFixtureController, context: Context) {}
 }
 
-private struct ShareFixtureSheet: UIViewControllerRepresentable {
-    let complete: @MainActor @Sendable () -> Void
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+private final class ShareFixtureController: UIViewController {
+    private let shareButton = UIButton(type: .system)
+    private var activityController: UIActivityViewController?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        let title = UILabel()
+        title.text = "tsk isolated sharing fixture"
+        title.font = .preferredFont(forTextStyle: .title1)
+        title.adjustsFontForContentSizeCategory = true
+        title.numberOfLines = 0
+        let detail = UILabel()
+        detail.text = "Presents a real system share sheet with text and a URL. This app does not access tsk storage."
+        detail.font = .preferredFont(forTextStyle: .body)
+        detail.adjustsFontForContentSizeCategory = true
+        detail.numberOfLines = 0
+        shareButton.setTitle("Share text and link", for: .normal)
+        shareButton.accessibilityIdentifier = "share-fixture-present"
+        shareButton.addAction(UIAction { [weak self] _ in self?.presentShare() }, for: .touchUpInside)
+        let content = UIStackView(arrangedSubviews: [title, detail, shareButton])
+        content.axis = .vertical
+        content.alignment = .center
+        content.spacing = 24
+        content.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+            content.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        prepareActivityController()
+    }
+
+    private func prepareActivityController() {
         let token = ProcessInfo.processInfo.environment["TSK_SHARE_FIXTURE_TOKEN"] ?? "isolated"
         let text = "Shared article \(token)\nFull shared text café e\u{301}"
         let url = URL(string: "https://example.com/tsk-share?fixture=\(token)#retained")!
         let controller = UIActivityViewController(activityItems: [text, ShareFixtureURL(url: url)], applicationActivities: nil)
-        let complete = complete
-        controller.completionWithItemsHandler = { @Sendable _, _, _, _ in Task { @MainActor in complete() } }
-        controller.popoverPresentationController?.sourceView = controller.view
-        controller.popoverPresentationController?.sourceRect = CGRect(x: 1, y: 1, width: 1, height: 1)
-        return controller
+        controller.completionWithItemsHandler = { @Sendable [weak self] _, _, _, _ in
+            Task { @MainActor [weak self] in self?.prepareActivityController() }
+        }
+        controller.popoverPresentationController?.sourceView = shareButton
+        controller.popoverPresentationController?.sourceRect = shareButton.bounds
+        activityController = controller
     }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+
+    private func presentShare() {
+        guard presentedViewController == nil, let controller = activityController else { return }
+        activityController = nil
+        controller.popoverPresentationController?.sourceRect = shareButton.bounds
+        present(controller, animated: true)
+    }
 }
 
 private final class ShareFixtureURL: NSObject, UIActivityItemSource {

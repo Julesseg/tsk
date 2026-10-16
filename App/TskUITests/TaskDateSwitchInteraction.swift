@@ -104,7 +104,7 @@ extension XCTestCase {
 
     func focusTaskText(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
-        if element.isHittable { tapTaskControl(element, app: app, file: file, line: line) }
+        tapTaskControl(element, app: app, file: file, line: line)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
     }
 

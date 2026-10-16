@@ -72,6 +72,7 @@ struct TaskAttributeDefinitionEditor: View {
     @State private var valuesText: String
     @State private var error: String?
     @State private var isSaving = false
+    @State private var isChoosingType = false
     @FocusState private var field: DefinitionField?
 
     init(store: TaskStore, original: TaskAttributeDefinition?) {
@@ -93,13 +94,25 @@ struct TaskAttributeDefinitionEditor: View {
                         .disabled(original != nil || isSaving).accessibilityIdentifier("attribute-definition-name")
                     TextField("Label", text: $label).focused($field, equals: .label)
                         .disabled(isSaving).accessibilityIdentifier("attribute-definition-label")
-                    Picker("Type", selection: Binding(get: { type }, set: { value in
-                        TaskUIBoundaryDiagnostics.event("attribute-definition.type.setter", details: ["previous": type.rawValue, "selected": value.rawValue])
-                        type = value
-                    })) {
-                        ForEach(TaskAttributeType.allCases, id: \.self) { type in Text(type.title).tag(type) }
+                    Button { isChoosingType = true } label: {
+                        HStack { Text("Type"); Spacer(); Text(type.title) }
                     }
-                    .pickerStyle(.menu).disabled(isSaving).accessibilityIdentifier("attribute-definition-type")
+                    .accessibilityLabel("Type").accessibilityValue(type.title)
+                    .disabled(isSaving).accessibilityIdentifier("attribute-definition-type")
+                    .popover(isPresented: $isChoosingType) {
+                        VStack(alignment: .leading) {
+                            ForEach(TaskAttributeType.allCases, id: \.self) { value in
+                                Button(value.title) {
+                                    guard isChoosingType, !isSaving else { return }
+                                    TaskUIBoundaryDiagnostics.event("attribute-definition.type.setter", details: ["previous": type.rawValue, "selected": value.rawValue])
+                                    type = value
+                                    isChoosingType = false
+                                }
+                            }
+                        }
+                        .padding().disabled(isSaving)
+                        .presentationCompactAdaptation(.popover)
+                    }
                 }
                 if type == .string {
                     Section("Allowed values") {
@@ -134,7 +147,7 @@ struct TaskAttributeDefinitionEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSaving) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { field = nil; Task { await save() } }
-                        .disabled(isSaving).accessibilityIdentifier("save-attribute-definition")
+                        .disabled(isSaving || isChoosingType).accessibilityIdentifier("save-attribute-definition")
                         .keyboardShortcut(.return, modifiers: .command)
                 }
             }
