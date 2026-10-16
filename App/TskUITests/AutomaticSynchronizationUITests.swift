@@ -58,15 +58,16 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             if passwordSheet.exists { XCTAssertTrue(dismissPassword(passwordSheet)) }
             XCTAssertTrue(passwordSheet.waitForNonExistence(timeout: 5))
         }
-        tapTaskControl(app.buttons["new-task"], app: app, beforeSample: { deadline in
+        func dismissPasswordBeforeSample(_ deadline: TimeInterval) {
             guard !dismissedPassword else { return }
             for dialog in [app.sheets["Save Password?"], app.alerts["Save Password?"]] {
                 if dismissPassword(dialog, before: deadline) { break }
             }
-        })
+        }
+        tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
-        focusTaskText(description, app: app)
+        focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
