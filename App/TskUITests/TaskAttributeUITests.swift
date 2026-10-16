@@ -70,7 +70,7 @@ final class TaskAttributeUITests: XCTestCase {
         capture("Reopened typed values and explicit removal", app: app)
         app.buttons["save-advanced-attributes"].tap()
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app, initialScrollUp: false))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Task with local typed values")
         app.terminate()
         app.launch()
