@@ -63,7 +63,8 @@ jobs:
 
   app-ui-tests:
     name: ${{ matrix.job-name }}
-    runs-on: macos-15
+    runs-on: xcode-27
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -74,7 +75,7 @@ jobs:
       - name: Select latest stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: "27.0"
 
       - uses: dtolnay/rust-toolchain@1.99.0
 
@@ -136,7 +137,7 @@ jobs:
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.diagnostic }}" == "true" ]]; then
-            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/CustomViewsUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/MissedNotificationUITests -only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks -only-testing:TskUITests/ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/WidgetUITests)
+            coverage=(-only-testing:TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks)
           elif [[ "${{ matrix.family }}" == "iPad" ]]; then
             coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests -only-testing:TskUITests/WidgetUITests -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/TaskNotificationUITests -only-testing:TskUITests/MissedNotificationUITests)
           fi
