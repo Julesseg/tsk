@@ -137,7 +137,7 @@ final class TaskNotificationUITests: XCTestCase {
             more.tap()
         }
         XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription)
-        entry.tap()
+        tapTaskControl(entry, app: app)
         XCTAssertTrue(app.staticTexts["notification-permission"].waitForExistence(timeout: 15))
     }
     private func allowNotifications(_ app: XCUIApplication) {
