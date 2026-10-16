@@ -58,17 +58,27 @@ extension XCTestCase {
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }) {
-            guard element.exists else { return TaskControlReadinessSample(exists: false) }
-            guard element.isEnabled else { return TaskControlReadinessSample(exists: true, enabled: false) }
-            guard element.isHittable else { return TaskControlReadinessSample(exists: true, enabled: true, hittable: false) }
-            let frame = element.frame
-            let appFrame = app.frame
-            return TaskControlReadinessSample(exists: true, enabled: true, hittable: true, elementFrame: frame, appFrame: appFrame)
+            var sample = TaskControlReadinessSample(exists: nil)
+            do {
+                let snapshot = try element.snapshot()
+                sample.exists = true
+                sample.enabled = snapshot.isEnabled
+                sample.elementFrame = snapshot.frame
+                guard snapshot.isEnabled else { return sample }
+                sample.hittable = element.isHittable
+                guard sample.hittable == true else { return sample }
+                let application = try app.snapshot()
+                sample.appFrame = application.frame
+                sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
+            } catch {
+                sample.snapshotError = String(describing: error)
+            }
+            return sample
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in attempt.evaluate() }, object: nil)
         let result = XCTWaiter.wait(for: [ready], timeout: attempt.remainingTime)
-        guard attempt.finish(waitCompleted: result == .completed, perform: { geometry in
-            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: geometry.elementFrame.midX - geometry.appFrame.minX, dy: geometry.elementFrame.midY - geometry.appFrame.minY)).tap()
+        guard attempt.finish(waitCompleted: result == .completed, perform: { _ in
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }) else {
             recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(result) \(attempt.diagnostic)")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)

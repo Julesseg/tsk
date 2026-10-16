@@ -40,7 +40,49 @@ import Testing
         var action: TaskControlReadinessGeometry?
         #expect(attempt.finish(waitCompleted: true) { action = $0 })
         #expect(action?.elementFrame == accepted.elementFrame)
-        #expect(action?.appFrame == accepted.appFrame)
+        #expect(action?.containmentFrame == accepted.appFrame)
+    }
+
+    @Test func emptyApplicationFrameUsesObservedContainingWindowForOneAction() {
+        let clock = Clock()
+        let controlFrame = CGRect(x: 40, y: 801.3333333333334, width: 360, height: 22)
+        let windowFrame = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let current = TaskControlReadinessSample(exists: true, enabled: true, hittable: true,
+                                                 elementFrame: controlFrame, appFrame: .zero,
+                                                 appWindowFrames: [windowFrame])
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: { current })
+        #expect(attempt.evaluate())
+        var actions: [TaskControlReadinessGeometry] = []
+        #expect(attempt.finish(waitCompleted: true) { actions.append($0) })
+        #expect(actions.count == 1)
+        #expect(actions.first?.elementFrame == controlFrame)
+        #expect(actions.first?.containmentFrame == windowFrame)
+        #expect(!attempt.finish(waitCompleted: true) { actions.append($0) })
+        #expect(actions.count == 1)
+    }
+
+    @Test func windowFallbackNeverBypassesReadinessOrKnownApplicationBounds() {
+        let controlFrame = CGRect(x: 40, y: 801.3333333333334, width: 360, height: 22)
+        let windowFrame = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let valid = TaskControlReadinessSample(exists: true, enabled: true, hittable: true,
+                                               elementFrame: controlFrame, appFrame: .zero,
+                                               appWindowFrames: [windowFrame])
+        var noWindow = valid; noWindow.appWindowFrames = []
+        var emptyWindow = valid; emptyWindow.appWindowFrames = [.zero]
+        var unboundedWindow = valid; unboundedWindow.appWindowFrames = [.infinite]
+        var outsideWindow = valid; outsideWindow.appWindowFrames = [CGRect(x: 0, y: 0, width: 440, height: 800)]
+        var outsideApplication = valid; outsideApplication.appFrame = CGRect(x: 0, y: 0, width: 440, height: 800)
+        var disabled = valid; disabled.enabled = false
+        var unhittable = valid; unhittable.hittable = false
+        var emptyControl = valid; emptyControl.elementFrame = .zero
+        let missing = TaskControlReadinessSample(exists: false, appFrame: .zero, appWindowFrames: [windowFrame])
+        for current in [noWindow, emptyWindow, unboundedWindow, outsideWindow, outsideApplication, disabled, unhittable, emptyControl, missing] {
+            var performed = false
+            let attempt = TaskControlReadinessAttempt(now: { 0 }, sample: { current })
+            #expect(!attempt.evaluate())
+            #expect(!attempt.finish(waitCompleted: true) { _ in performed = true })
+            #expect(!performed)
+        }
     }
 
     @Test func laterUnreadyObservationInvalidatesAnEarlierReadySample() {
@@ -75,6 +117,23 @@ import Testing
         }
     }
 
+    @Test func expiredSamplingKeepsItsReasonAndElapsedBeforeFailureAttachments() {
+        let clock = Clock()
+        var performed = false
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+            clock.now = 5.2
+            return sample()
+        })
+        #expect(!attempt.evaluate())
+        #expect(!attempt.finish(waitCompleted: false) { _ in performed = true })
+        clock.now = 8
+        #expect(!performed)
+        #expect(attempt.failureReason == .deadlineExpired)
+        #expect(attempt.diagnostic.contains("elapsed=5.2 "))
+        #expect(attempt.diagnostic.contains("sampleStartedElapsed=0.0 "))
+        #expect(attempt.diagnostic.contains("sampleElapsed=5.2 "))
+    }
+
     @Test func waiterFailureCannotActOnAcceptedGeometry() {
         let attempt = TaskControlReadinessAttempt(now: { 0 }, sample: { sample() })
         #expect(attempt.evaluate())
@@ -82,6 +141,30 @@ import Testing
         #expect(!attempt.finish(waitCompleted: false) { _ in performed = true })
         #expect(!performed)
         #expect(attempt.failureReason == .waiterIncomplete)
+    }
+
+    @Test func nativeSnapshotFailureKeepsUnknownPresenceAndCannotAct() {
+        let current = TaskControlReadinessSample(exists: nil, snapshotError: "Native snapshot unavailable")
+        var performed = false
+        let attempt = TaskControlReadinessAttempt(now: { 0 }, sample: { current })
+        #expect(!attempt.evaluate())
+        #expect(!attempt.finish(waitCompleted: true) { _ in performed = true })
+        #expect(!performed)
+        #expect(attempt.failureReason == .snapshotFailed)
+        #expect(attempt.diagnostic.contains("exists=null"))
+    }
+
+    @Test func overBudgetUnhittableSampleRemainsUnhittableInDiagnostics() {
+        let clock = Clock()
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+            clock.now = 6
+            return sample(hittable: false)
+        })
+        #expect(!attempt.evaluate())
+        #expect(!attempt.finish(waitCompleted: false) { _ in Issue.record("An unhittable control must not act") })
+        #expect(attempt.failureReason == .deadlineExpired)
+        #expect(attempt.diagnostic.contains("sampleElapsed=6.0 "))
+        #expect(attempt.diagnostic.contains("sampleReason=unhittable"))
     }
 
     @Test func failedSamplesKeepActualReasonsAndUnknownFieldsDistinct() {
