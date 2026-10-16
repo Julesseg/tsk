@@ -7,32 +7,15 @@ final class AutomaticSynchronizationUITests: XCTestCase {
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
         let app = XCUIApplication()
         var dismissedPassword = false
-        var passwordButtonRead = "No matched password prompt sampled"
-        addTeardownBlock {
-            guard (self.testRun?.totalFailureCount ?? 0) > 0 else { return }
-            let attachment = XCTAttachment(string: passwordButtonRead)
-            attachment.name = "Actual password dismissal read gate"
-            attachment.lifetime = .keepAlways
-            self.add(attachment)
-        }
         func dismissPassword(_ dialog: XCUIElement, before deadline: TimeInterval? = nil) -> Bool {
             guard !dismissedPassword, dialog.exists,
                   dialog.elementType == .alert || dialog.elementType == .sheet,
                   dialog.label == "Save Password?" else { return false }
             let notNow = dialog.buttons["Not Now"]
-            let exists = notNow.exists
-            passwordButtonRead = "exists=\(exists)"
-            guard exists else { return false }
-            let snapshot = try? notNow.snapshot()
-            passwordButtonRead += " snapshot=\(snapshot == nil ? "unavailable" : "success")"
-            guard let snapshot else { return false }
-            let enabled = snapshot.isEnabled
-            passwordButtonRead += " enabled=\(enabled)"
-            guard enabled else { return false }
-            let hittable = notNow.isHittable
-            passwordButtonRead += " hittable=\(hittable)"
-            guard hittable, let application = try? app.snapshot() else { return false }
-            let sample = TaskControlReadinessSample(exists: true, enabled: enabled, hittable: true,
+            guard notNow.exists, let snapshot = try? notNow.snapshot(),
+                  snapshot.isEnabled, notNow.isHittable,
+                  let application = try? app.snapshot() else { return false }
+            let sample = TaskControlReadinessSample(exists: true, enabled: snapshot.isEnabled, hittable: true,
                                                     elementFrame: snapshot.frame, appFrame: application.frame,
                                                     appWindowFrames: application.children.filter { $0.elementType == .window }.map { $0.frame })
             guard sample.failureReason == nil, deadline.map({ ProcessInfo.processInfo.systemUptime < $0 }) ?? true else { return false }
@@ -110,8 +93,25 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             return waitUntil { description.exists }
         }
         XCTAssertTrue(waitForCaptureDescription())
+        func prepareCaptureFocus() -> Bool {
+            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            func sample() -> Bool {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                dismissPasswordBeforeSample(deadline)
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                for dialog in [app.sheets["Save Password?"], app.alerts["Save Password?"]] {
+                    guard !dialog.exists, ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                }
+                return app.keyboards.firstMatch.exists && ProcessInfo.processInfo.systemUptime < deadline
+            }
+            if sample() { return true }
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            guard remaining > 0 else { return false }
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            return XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        XCTAssertTrue(prepareCaptureFocus())
         focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
         XCTAssertTrue(app.buttons["dismiss-editor-keyboard"].waitForExistence(timeout: 5))
