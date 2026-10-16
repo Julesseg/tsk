@@ -29,9 +29,6 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 10))
         capture("Automatic synchronization failure with local capture available", app)
-        tapTaskControl(app.buttons["new-task"], app: app)
-        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 5))
         let passwordSheet = app.sheets["Save Password?"]
         if passwordSheet.waitForExistence(timeout: 5) {
             let notNow = passwordSheet.buttons["Not Now"]
@@ -45,6 +42,9 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             if passwordSheet.exists { notNow.tap() }
             XCTAssertTrue(passwordSheet.waitForNonExistence(timeout: 5))
         }
+        tapTaskControl(app.buttons["new-task"], app: app)
+        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         description.typeText("Durable work while automatic sync fails")
