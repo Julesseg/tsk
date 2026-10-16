@@ -124,8 +124,7 @@ extension XCTestCase {
             XCTFail("Missing task form: \(context)", file: file, line: line)
             return false
         }
-        var scrollUp = initialScrollUp
-        var missingSteps = 0
+        var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
         for step in 0...maximumSteps {
             let visible = form.frame.intersection(app.frame)
             let navigationBottom = app.navigationBars.allElementsBoundByIndex.filter {
@@ -139,18 +138,17 @@ extension XCTestCase {
             let keyboard = app.keyboards.firstMatch
             let bottom = min(visible.maxY - 16, keyboard.exists && keyboard.frame.intersects(visible) ? keyboard.frame.minY - 8 : visible.maxY - 16)
             guard visible.width > 0, bottom - top > 60 else { break }
+            var targetMidY: CGFloat?
             if element.exists {
                 let thumb = element.elementType == .switch ? element.switches.firstMatch : element
                 let target = thumb.exists ? thumb : element
                 let frame = target.frame
                 if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
                     if frame.midY >= top, frame.midY <= bottom, target.isHittable { return true }
-                    scrollUp = frame.midY > bottom
+                    targetMidY = frame.midY
                 }
-            } else {
-                missingSteps += 1
-                if missingSteps == maximumSteps / 2 { scrollUp.toggle() }
             }
+            let scrollUp = direction.update(targetMidY: targetMidY, bottom: bottom)
             guard step < maximumSteps else { break }
             let distance = min(250, (bottom - top) * 0.45)
             let middle = (top + bottom) / 2

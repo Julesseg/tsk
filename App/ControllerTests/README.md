@@ -21,3 +21,9 @@ A third dependency-free target compiles the actual keyboard registration decisio
 through a relative symlink. It checks declaration changes, weak host ownership and
 unchanged-update suppression. UIKit installation and current-scope action dispatch
 remain separate source and canonical iOS checks.
+
+The readiness target also compiles the actual UI-test reveal scroll decision
+through a relative symlink. It checks that an absent target retains the caller's
+or last observed direction across the existing scroll budget, and that observed
+target geometry can redirect the search. It does not establish native scrolling
+progress, boundary detection or target revelation.
