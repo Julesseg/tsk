@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 extension XCTestCase {
     func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let editor = app.collectionViews[editorID]

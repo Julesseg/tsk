@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class CustomViewsUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 

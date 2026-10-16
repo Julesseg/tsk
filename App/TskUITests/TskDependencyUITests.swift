@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class TskDependencyUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
