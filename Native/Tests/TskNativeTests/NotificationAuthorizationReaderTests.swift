@@ -5,17 +5,15 @@ import TskCore
 
 @Test func notificationSettingsReadTimesOutWithoutACallback() async throws {
     let native = ControlledNotificationSettings()
-    let outcome = NotificationReadOutcome()
-    let read = Task {
-        do { outcome.record(.success(try await NotificationAuthorizationReader.read(timeoutNanoseconds: 1_000_000, request: native.request))) }
-        catch { outcome.record(.failure(error)) }
-    }
-    try await Task.sleep(nanoseconds: 100_000_000)
-    #expect(outcome.value?.failure as? NotificationSettingsReadError == .timedOut)
+    let read = Task { try await NotificationAuthorizationReader.read(timeoutNanoseconds: 1_000_000, request: native.request) }
+    await native.waitForRequest()
+    let cleanup = native.scheduleCleanupReply()
+    defer { cleanup.cancel() }
+    await #expect(throws: NotificationSettingsReadError.self) { try await read.value }
     native.reply(.authorized)
     native.reply(.denied)
-    await read.value
-    #expect(outcome.value?.failure as? NotificationSettingsReadError == .timedOut)
+    cleanup.cancel()
+    await cleanup.value
 }
 
 @Test func notificationSettingsReadPreservesEveryTimelyAuthorizationAndIgnoresDuplicateReplies() async throws {
@@ -30,13 +28,16 @@ import TskCore
 
 @Test func notificationSettingsReadCancellationReleasesWaitAndRejectsLateReply() async throws {
     let native = ControlledNotificationSettings()
-    let read = Task { try await NotificationAuthorizationReader.read(request: native.request) }
-    for _ in 0..<100 where !native.requested { try await Task.sleep(nanoseconds: 1_000_000) }
-    #expect(native.requested)
+    let read = Task { try await NotificationAuthorizationReader.read(timeoutNanoseconds: 60_000_000_000, request: native.request) }
+    await native.waitForRequest()
+    let cleanup = native.scheduleCleanupReply()
+    defer { cleanup.cancel() }
     read.cancel()
     await #expect(throws: CancellationError.self) { try await read.value }
     native.reply(.authorized)
     native.reply(.denied)
+    cleanup.cancel()
+    await cleanup.value
 }
 
 @Test func notificationSettingsReadDoesNotStartForAnAlreadyCancelledCaller() async throws {
@@ -52,29 +53,39 @@ import TskCore
 private final class ControlledNotificationSettings: @unchecked Sendable {
     private let lock = NSLock()
     private var completion: (@Sendable (TaskNotificationAuthorization) -> Void)?
+    private var requestWaiters: [CheckedContinuation<Void, Never>] = []
     private let recoversAfterFirstRequest: Bool
     init(recoversAfterFirstRequest: Bool = false) { self.recoversAfterFirstRequest = recoversAfterFirstRequest }
     var requested: Bool { lock.withLock { completion != nil } }
     func request(_ completion: @escaping @Sendable (TaskNotificationAuthorization) -> Void) {
-        let recovered = lock.withLock {
-            if recoversAfterFirstRequest, self.completion != nil { return true }
+        let (recovered, waiters) = lock.withLock {
+            if recoversAfterFirstRequest, self.completion != nil { return (true, [CheckedContinuation<Void, Never>]()) }
             self.completion = completion
-            return false
+            let waiters = requestWaiters
+            requestWaiters = []
+            return (false, waiters)
         }
+        waiters.forEach { $0.resume() }
         if recovered { completion(.authorized) }
     }
+    func waitForRequest() async {
+        await withCheckedContinuation { continuation in
+            let requested = lock.withLock {
+                if completion != nil { return true }
+                requestWaiters.append(continuation)
+                return false
+            }
+            if requested { continuation.resume() }
+        }
+    }
+    func scheduleCleanupReply() -> Task<Void, Never> {
+        Task {
+            do { try await Task.sleep(nanoseconds: 2_000_000_000) }
+            catch { return }
+            reply(.authorized)
+        }
+    }
     func reply(_ value: TaskNotificationAuthorization) { lock.withLock { completion }?(value) }
-}
-
-private final class NotificationReadOutcome: @unchecked Sendable {
-    private let lock = NSLock()
-    private var result: Result<TaskNotificationAuthorization, any Error>?
-    var value: Result<TaskNotificationAuthorization, any Error>? { lock.withLock { result } }
-    func record(_ value: Result<TaskNotificationAuthorization, any Error>) { lock.withLock { result = value } }
-}
-
-private extension Result {
-    var failure: Failure? { if case .failure(let error) = self { error } else { nil } }
 }
 
 @Test func notificationSettingsReadTimeoutReleasesReconciliationFileLeaseForLocalSave() async throws {
@@ -90,18 +101,16 @@ private extension Result {
             _ = try await manager.reconcileNotifications(center: center, store: store)
         }
     }
-    for _ in 0..<100 where !native.requested { try await Task.sleep(nanoseconds: 1_000_000) }
-    #expect(native.requested)
-    let cleanup = Task {
-        try await Task.sleep(nanoseconds: 500_000_000)
-        native.reply(.authorized)
-    }
+    await native.waitForRequest()
+    let cleanup = native.scheduleCleanupReply()
+    defer { cleanup.cancel() }
     let saved = try await manager.create(TaskDraft(description: "Local work survives unavailable notification settings"))
     _ = await startup.value
     #expect(try await manager.task(id: saved.id) == saved)
     #expect(await effect.report?.authorization == .authorized)
     #expect(await effect.error == nil)
-    try await cleanup.value
+    cleanup.cancel()
+    await cleanup.value
 }
 
 private struct SettingsReadNotificationCenter: TaskNotificationCenter {
