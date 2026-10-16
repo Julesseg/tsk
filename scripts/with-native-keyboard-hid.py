@@ -111,22 +111,51 @@ class Host:
 
     async def stop(self, process, group=False):
         hard_killed = False
+        if group:
+            def group_exists():
+                try:
+                    os.killpg(process.pid, 0)
+                    return True
+                except ProcessLookupError:
+                    return False
+
+            async def wait_for_group(seconds):
+                deadline = time.monotonic() + seconds
+                while group_exists():
+                    if time.monotonic() >= deadline:
+                        return False
+                    await asyncio.sleep(0.05)
+                return True
+
+            group_gone = False
+            try:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                group_gone = await wait_for_group(10)
+                if not group_gone:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    hard_killed = True
+                    group_gone = await wait_for_group(5)
+            finally:
+                await asyncio.wait_for(process.wait(), timeout=5)
+            if not group_gone:
+                raise RuntimeError('Owned process group cleanup remains unconfirmed: ' + str(process.pid))
+            return dict(pid=process.pid, status=process.returncode, reaped=True, hardKilled=hard_killed, groupGone=True)
         if process.returncode is None:
             try:
-                if group:
-                    os.killpg(process.pid, signal.SIGTERM)
-                else:
-                    process.terminate()
+                process.terminate()
             except ProcessLookupError:
                 pass
             try:
                 await asyncio.wait_for(process.wait(), timeout=10)
             except TimeoutError:
                 try:
-                    if group:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    else:
-                        process.kill()
+                    process.kill()
                 except ProcessLookupError:
                     pass
                 await asyncio.wait_for(process.wait(), timeout=5)

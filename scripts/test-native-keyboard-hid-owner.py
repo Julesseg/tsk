@@ -7,6 +7,7 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 path = pathlib.Path(__file__).with_name('with-native-keyboard-hid.py')
 spec = importlib.util.spec_from_file_location('hid_owner', path)
@@ -74,6 +75,8 @@ class FakeHost:
 
     async def stop(self, process, group=False):
         self.events.append('stop:' + process.kind)
+        if self.fail == 'group-cleanup' and process.kind == 'tests':
+            raise RuntimeError('Owned process group cleanup remains unconfirmed')
         process.returncode = process.returncode or 0
         return dict(pid=process.pid, status=process.returncode, reaped=True, hardKilled=process.kind == 'relay' and self.fail == 'hard-kill')
 
@@ -127,11 +130,80 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
             self.assertLess(host.events.index('stop:relay'), host.events.index('UP-only'))
             self.assertLess(host.events.index('UP-only'), host.events.index('stop:companion'))
 
+    async def test_unconfirmed_test_group_fails_owner_and_still_stops_other_owned_processes(self):
+        status, host, receipt = await self.run_case(fail='group-cleanup')
+        self.assertEqual(status, 70)
+        self.assertIn('testsCleanupError', receipt)
+        self.assertEqual(host.events[-2:], ['stop:relay', 'stop:companion'])
+
     async def test_unconfirmed_up_recovery_never_reports_success(self):
         status, host, receipt = await self.run_case(fail='recovery', complete=False)
         self.assertEqual(status, 70)
         self.assertIn('upOnlyRecoveryError', receipt)
         self.assertEqual(host.events[-1], 'stop:companion')
+
+
+class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
+    async def stop_group(self, initially_exited, survives_kill=False):
+        class Process:
+            pid = 24101
+
+            def __init__(self):
+                self.returncode = 0 if initially_exited else None
+                self.waits = 0
+
+            async def wait(self):
+                self.waits += 1
+                self.returncode = 0
+                return 0
+
+        process = Process()
+        group_alive = True
+        signals = []
+        clock = 0.0
+
+        def killpg(pgid, number):
+            nonlocal group_alive
+            self.assertEqual(pgid, 24101)
+            if not group_alive:
+                raise ProcessLookupError()
+            if number:
+                signals.append((pgid, number))
+            if number == owner.signal.SIGTERM:
+                process.returncode = 0
+            if number == owner.signal.SIGKILL and not survives_kill:
+                group_alive = False
+
+        async def sleep(seconds):
+            nonlocal clock
+            clock += seconds
+
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            with mock.patch.object(owner.os, 'killpg', side_effect=killpg), mock.patch.object(owner.time, 'monotonic', side_effect=lambda: clock), mock.patch.object(owner.asyncio, 'sleep', side_effect=sleep):
+                if survives_kill:
+                    with self.assertRaisesRegex(RuntimeError, 'process group'):
+                        await host.stop(process, group=True)
+                    receipt = None
+                else:
+                    receipt = await host.stop(process, group=True)
+        self.assertGreater(process.waits, 0)
+        self.assertEqual(signals, [(24101, owner.signal.SIGTERM), (24101, owner.signal.SIGKILL)])
+        return receipt
+
+    async def test_exited_leader_does_not_hide_surviving_owned_child(self):
+        receipt = await self.stop_group(initially_exited=True)
+        self.assertTrue(receipt['groupGone'])
+        self.assertTrue(receipt['hardKilled'])
+        self.assertTrue(receipt['reaped'])
+
+    async def test_leader_exit_after_term_does_not_hide_surviving_owned_child(self):
+        receipt = await self.stop_group(initially_exited=False)
+        self.assertTrue(receipt['groupGone'])
+        self.assertTrue(receipt['hardKilled'])
+
+    async def test_unconfirmed_group_cleanup_fails_after_reaping_leader(self):
+        await self.stop_group(initially_exited=True, survives_kill=True)
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
