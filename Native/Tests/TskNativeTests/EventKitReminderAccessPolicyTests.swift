@@ -3,7 +3,7 @@ import Testing
 
 @Suite @MainActor struct EventKitReminderAccessPolicyTests {
     @Test func unpromptedUndeterminedAccessDoesNotRequestOrAuthorize() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var requests = 0
         let allowed = try await access.requireAccess(authorization: { .notDetermined }, request: {
             requests += 1
@@ -14,7 +14,7 @@ import Testing
     }
 
     @Test func currentFullAccessRequiresNoPermissionRequest() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var requests = 0
         let allowed = try await access.requireAccess(authorization: { .fullAccess }, request: {
             requests += 1
@@ -25,7 +25,7 @@ import Testing
     }
 
     @Test func staleUndeterminedStatusRequiresANewGrantForEveryOperation() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var requests = 0
         let request = {
             requests += 1
@@ -40,7 +40,7 @@ import Testing
     }
 
     @Test func falseRevalidationBlocksAccessAndClearsRequestIntent() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
         #expect(try await !access.requireAccess(authorization: { .notDetermined }, request: { false }))
         var laterRequests = 0
@@ -53,7 +53,7 @@ import Testing
 
     @Test func requestErrorPropagatesWithoutAuthorizingAnotherOperation() async throws {
         enum RequestFailure: Error { case unavailable }
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
         await #expect(throws: RequestFailure.self) {
             try await access.requireAccess(authorization: { .notDetermined }, request: { throw RequestFailure.unavailable })
@@ -68,7 +68,7 @@ import Testing
 
     @Test func knownRevocationNeverRequestsAndClearsEarlierIntent() async throws {
         for revoked in [EventKitAccessPublication.Authorization.denied, .restricted, .writeOnly, .unavailable] {
-            let access = EventKitReminderAccessPolicy()
+            let access = EventKitAccessPolicy()
             #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
             var requests = 0
             let request = {
@@ -84,7 +84,7 @@ import Testing
 
     @Test func knownRevocationDuringNativeRequestRejectsItsTrueResult() async throws {
         for revoked in [EventKitAccessPublication.Authorization.denied, .restricted, .writeOnly, .unavailable] {
-            let access = EventKitReminderAccessPolicy()
+            let access = EventKitAccessPolicy()
             var current = EventKitAccessPublication.Authorization.notDetermined
             #expect(try await access.requestAccess(authorization: { current }, request: { true }))
             let allowed = try await access.requireAccess(authorization: { current }, request: {
@@ -104,7 +104,7 @@ import Testing
 
     @Test func cancellationBeforeOrDuringRequestPreventsTheOperation() async throws {
         for cancelBefore in [true, false] {
-            let access = EventKitReminderAccessPolicy()
+            let access = EventKitAccessPolicy()
             #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
             var requests = 0, operations = 0
             let attempt = Task { @MainActor in
@@ -122,7 +122,7 @@ import Testing
     }
 
     @Test func cancelledExplicitRequestNeverCallsNativePermissionAPI() async {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var requests = 0
         let attempt = Task { @MainActor in
             withUnsafeCurrentTask { $0?.cancel() }
@@ -137,7 +137,7 @@ import Testing
 
     @Test func cancellationDuringAuthorizationSamplingPreventsAnOperation() async {
         for current in [EventKitAccessPublication.Authorization.fullAccess, .notDetermined] {
-            let access = EventKitReminderAccessPolicy()
+            let access = EventKitAccessPolicy()
             var requests = 0
             let attempt = Task { @MainActor in
                 try await access.requireAccess(authorization: {
@@ -154,7 +154,7 @@ import Testing
     }
 
     @Test func cancelledGrantCannotEnableLaterRevalidation() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var samples = 0
         let attempt = Task { @MainActor in
             try await access.requestAccess(authorization: {
@@ -173,7 +173,7 @@ import Testing
     }
 
     @Test func falseInitialGrantNeverEnablesOperationRevalidation() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         #expect(try await !access.requestAccess(authorization: { .notDetermined }, request: { false }))
         var requests = 0
         #expect(try await !access.requireAccess(authorization: { .notDetermined }, request: {
@@ -185,7 +185,7 @@ import Testing
 
     @Test func overlappingOperationsEachRequestFreshAccessAndUseTheirOwnResult() async throws {
         for firstGrant in [true, false] {
-            let access = EventKitReminderAccessPolicy()
+            let access = EventKitAccessPolicy()
             #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
             let pending = PendingPermissionRequest()
             let first = Task { @MainActor in
@@ -212,7 +212,7 @@ import Testing
     }
 
     @Test func initialRequestInFlightDoesNotAuthorizeOrPromptAnotherOperation() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         let pending = PendingPermissionRequest()
         let initial = Task { @MainActor in
             try await access.requestAccess(authorization: { .notDetermined }, request: pending.request)
@@ -229,7 +229,7 @@ import Testing
     }
 
     @Test func observedRevocationRejectsAConcurrentPendingGrant() async throws {
-        let access = EventKitReminderAccessPolicy()
+        let access = EventKitAccessPolicy()
         var current = EventKitAccessPublication.Authorization.notDetermined
         #expect(try await access.requestAccess(authorization: { current }, request: { true }))
         let pending = PendingPermissionRequest()

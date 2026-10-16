@@ -1,9 +1,26 @@
 import Foundation
 
-@MainActor final class EventKitReminderAccessPolicy {
+final class EventKitAccessPolicy {
     private var allowsLiveRevalidation = false
 
+    func effectiveAuthorization(
+        isolation: isolated (any Actor)? = #isolation,
+        authorization: () -> EventKitAccessPublication.Authorization,
+        request: () async throws -> Bool
+    ) async -> EventKitAccessPublication.Authorization {
+        do {
+            if try await requireAccess(isolation: isolation, authorization: authorization, request: request) { return .fullAccess }
+            try Task.checkCancellation()
+            let current = authorization()
+            try Task.checkCancellation()
+            return current == .fullAccess ? .unavailable : current
+        } catch {
+            return .unavailable
+        }
+    }
+
     func requestAccess(
+        isolation: isolated (any Actor)? = #isolation,
         authorization: () -> EventKitAccessPublication.Authorization,
         request: () async throws -> Bool
     ) async throws -> Bool {
@@ -25,6 +42,7 @@ import Foundation
     }
 
     func requireAccess(
+        isolation: isolated (any Actor)? = #isolation,
         authorization: () -> EventKitAccessPublication.Authorization,
         request: () async throws -> Bool
     ) async throws -> Bool {
@@ -34,6 +52,6 @@ import Foundation
         if current == .fullAccess { return true }
         guard current == .notDetermined else { allowsLiveRevalidation = false; return false }
         guard allowsLiveRevalidation else { return false }
-        return try await requestAccess(authorization: authorization, request: request)
+        return try await requestAccess(isolation: isolation, authorization: authorization, request: request)
     }
 }

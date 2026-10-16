@@ -5,11 +5,11 @@ import TskCore
 
 @available(iOS 17.0, *)
 @MainActor public enum EventKitCalendarFixture {
-    public static func prepare(token: String, day: DateInterval) throws {
+    public static func prepare(token: String, day: DateInterval) async throws {
         try validate(token)
         let store = EKEventStore()
-        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { throw CalendarReadError.accessRequired }
-        if store.calendars(for: .event).contains(where: { $0.title == name(token) }) { return }
+        try await requireAccess(store: store)
+        if store.calendars(for: .event).contains(where: { $0.title == name(token) && $0.source.sourceType == .local }) { return }
         var evidence: [String: Any] = ["sources": store.sources.map { ["type": $0.sourceType.rawValue, "title": $0.title] }, "dayStart": day.start.timeIntervalSince1970, "dayEnd": day.end.timeIntervalSince1970, "timeZone": TimeZone.current.identifier]
         do {
             guard let local = store.sources.first(where: { $0.sourceType == .local }) else {
@@ -38,10 +38,11 @@ import TskCore
         }
     }
 
-    public static func verify(token: String, day: DateInterval, displayed: [CalendarEventSnapshot]) throws {
+    public static func verify(token: String, day: DateInterval, displayed: [CalendarEventSnapshot]) async throws {
         try validate(token)
         let store = EKEventStore()
-        guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) }) else { throw CocoaError(.fileNoSuchFile) }
+        try await requireAccess(store: store)
+        guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) && $0.source.sourceType == .local }) else { throw CocoaError(.fileNoSuchFile) }
         var evidence = try JSONSerialization.jsonObject(with: Data(contentsOf: file(token))) as? [String: Any] ?? [:]
         let after = summaries(store: store, calendar: calendar, day: day)
         guard let before = evidence["storedBeforeDisplay"] as? [[String: Any]] else { throw CocoaError(.fileReadCorruptFile) }
@@ -57,10 +58,11 @@ import TskCore
         try write(evidence, token: token)
     }
 
-    public static func addObservedEvent(token: String, day: DateInterval) throws {
+    public static func addObservedEvent(token: String, day: DateInterval) async throws {
         try validate(token)
         let store = EKEventStore()
-        guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) }) else { throw CocoaError(.fileNoSuchFile) }
+        try await requireAccess(store: store)
+        guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) && $0.source.sourceType == .local }) else { throw CocoaError(.fileNoSuchFile) }
         let event = EKEvent(eventStore: store)
         event.calendar = calendar; event.title = "Calendar fixture observed change"; event.startDate = day.start.addingTimeInterval(43200); event.endDate = day.start.addingTimeInterval(45000)
         try store.save(event, span: .thisEvent, commit: true)
@@ -69,7 +71,18 @@ import TskCore
     public static func clean(token: String) throws {
         try validate(token)
         let store = EKEventStore()
-        for calendar in store.calendars(for: .event) where calendar.title == name(token) { try store.removeCalendar(calendar, commit: true) }
+        let raw = EKEventStore.authorizationStatus(for: .event)
+        guard raw == .fullAccess else {
+            TaskParticipantDiagnostics.event("calendar.fixture.cleanup.skipped", details: ["authorization": String(raw.rawValue), "reason": "No published full access; cleanup does not prompt"])
+            return
+        }
+        for calendar in store.calendars(for: .event) where calendar.title == name(token) && calendar.source.sourceType == .local { try store.removeCalendar(calendar, commit: true) }
+        TaskParticipantDiagnostics.event("calendar.fixture.cleanup.completed", details: ["authorization": String(raw.rawValue)])
+    }
+
+    private static func requireAccess(store: EKEventStore) async throws {
+        let access = EventKitAccessPolicy()
+        guard try await access.requestAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }, request: { try await store.requestFullAccessToEvents() }) else { throw CalendarReadError.accessRequired }
     }
 
     private static func summaries(store: EKEventStore, calendar: EKCalendar, day: DateInterval) -> [[String: Any]] {

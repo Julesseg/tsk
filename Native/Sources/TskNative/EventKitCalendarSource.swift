@@ -18,20 +18,27 @@ public enum CalendarReadError: Error, LocalizedError, Equatable, Sendable {
 @available(iOS 17.0, macOS 14.0, *)
 public actor EventKitCalendarSource: CalendarEventSource {
     private let store = EKEventStore()
+    private let access = EventKitAccessPolicy()
     #if DEBUG && targetEnvironment(simulator)
     private let diagnosticStoreID = UUID().uuidString
     #endif
     public init() {}
 
-    public func authorization() -> CalendarReadAuthorization {
-        let value = Self.currentAuthorization()
+    public func authorization() async -> CalendarReadAuthorization {
+        let effective = await access.effectiveAuthorization(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }, request: requestNativeAccess)
+        let value = Self.calendarAuthorization(effective)
         #if DEBUG && targetEnvironment(simulator)
-        recordAccessDiagnostic("calendar.authorization", details: ["mappedAuthorization": String(describing: value)])
+        recordAccessDiagnostic("calendar.authorization", details: ["mappedAuthorization": String(describing: value), "effectiveAuthorization": String(describing: effective)])
         #endif
         return value
     }
 
     public func requestReadAccess() async throws {
+        guard try await access.requestAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }, request: requestNativeAccess) else { throw CalendarReadError.accessRequired }
+        store.reset()
+    }
+
+    private func requestNativeAccess() async throws -> Bool {
         #if DEBUG && targetEnvironment(simulator)
         let request = UUID().uuidString
         let context = accessDiagnosticContext
@@ -41,21 +48,15 @@ public actor EventKitCalendarSource: CalendarEventSource {
                 store.requestFullAccessToEvents(completion: Self.accessCallback(continuation, context: context, request: request))
             }
             recordAccessDiagnostic("calendar.access.returned", details: ["request": request, "granted": String(granted)])
-            guard granted else { throw CalendarReadError.accessRequired }
+            return granted
         } catch {
             let native = error as NSError
             recordAccessDiagnostic("calendar.access.error", details: ["request": request, "errorDomain": native.domain, "errorCode": String(native.code)])
             throw error
         }
         #else
-        guard try await store.requestFullAccessToEvents() else { throw CalendarReadError.accessRequired }
+        return try await store.requestFullAccessToEvents()
         #endif
-        switch try await EventKitAccessPublication.waitForFullAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }) {
-        case .ready: break
-        case .insufficient: throw CalendarReadError.accessRequired
-        case .notReady: throw CalendarReadError.accessNotReady
-        }
-        store.reset()
     }
 
     #if DEBUG && targetEnvironment(simulator)
@@ -70,6 +71,7 @@ public actor EventKitCalendarSource: CalendarEventSource {
         guard var context = accessDiagnosticContext else { return }
         context.merge(details) { _, value in value }
         context["authorization"] = String(EKEventStore.authorizationStatus(for: .event).rawValue)
+        context["rawAuthorization"] = context["authorization"]
         context["mainThread"] = String(Thread.isMainThread)
         TaskParticipantDiagnostics.event(stage, details: context)
     }
@@ -90,24 +92,28 @@ public actor EventKitCalendarSource: CalendarEventSource {
     }
     #endif
 
-    public func events(in window: DateInterval) throws -> [CalendarEventSnapshot] {
-        guard Self.currentAuthorization() == .fullAccess else { throw CalendarReadError.accessRequired }
+    public func events(in window: DateInterval) async throws -> [CalendarEventSnapshot] {
+        try await requireAccess()
         guard window.start.timeIntervalSince1970.isFinite, window.end.timeIntervalSince1970.isFinite, window.duration > 0 else { throw CalendarReadError.invalidWindow }
         store.reset()
         let predicate = store.predicateForEvents(withStart: window.start, end: window.end, calendars: nil)
         let values = try store.events(matching: predicate).map(Self.snapshot)
-        guard Self.currentAuthorization() == .fullAccess else { throw CalendarReadError.accessRequired }
+        try await requireAccess()
         return values
     }
 
-    nonisolated static func currentAuthorization() -> CalendarReadAuthorization {
-        switch EKEventStore.authorizationStatus(for: .event) {
+    private func requireAccess() async throws {
+        guard try await access.requireAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .event)) }, request: requestNativeAccess) else { throw CalendarReadError.accessRequired }
+    }
+
+    nonisolated private static func calendarAuthorization(_ authorization: EventKitAccessPublication.Authorization) -> CalendarReadAuthorization {
+        switch authorization {
         case .notDetermined: .notDetermined
         case .fullAccess: .fullAccess
         case .denied: .denied
         case .restricted: .restricted
         case .writeOnly: .writeOnly
-        @unknown default: .unavailable
+        case .unavailable: .unavailable
         }
     }
 

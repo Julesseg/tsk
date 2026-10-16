@@ -25,7 +25,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor public final class EventKitReminderSource: ReminderMoveSource {
     let store: EKEventStore
-    private let access = EventKitReminderAccessPolicy()
+    private let access = EventKitAccessPolicy()
     #if DEBUG && targetEnvironment(simulator)
     public var fixtureBeforeRemoval: (@MainActor @Sendable () async throws -> Void)?
     private let diagnosticStoreID = UUID().uuidString
