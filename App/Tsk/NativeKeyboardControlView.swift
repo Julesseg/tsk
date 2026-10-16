@@ -163,11 +163,37 @@ private final class NativeKeyboardControlTextView: UITextView {
     var changed: (() -> Void)?
     private(set) var commandNCount = 0
     private(set) var commandReturnCount = 0
+    private var observedPressRows = 0
     private lazy var controlCommands: [UIKeyCommand] = {
         let commands = [UIKeyCommand(input: "n", modifierFlags: .command, action: #selector(commandN(_:))), UIKeyCommand(input: "\r", modifierFlags: .command, action: #selector(commandReturn(_:)))]
         commands.forEach { $0.wantsPriorityOverSystemBehavior = true }
         return commands
     }()
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        recordPresses(presses, phase: "began")
+        super.pressesBegan(presses, with: event)
+    }
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        recordPresses(presses, phase: "ended")
+        super.pressesEnded(presses, with: event)
+    }
+    private func recordPresses(_ presses: Set<UIPress>, phase: String) {
+        for press in presses {
+            guard observedPressRows < 16 else { break }
+            observedPressRows += 1
+            let key = press.key
+            var details = ["ordinal": String(observedPressRows), "phase": phase,
+                           "pressTimestamp": String(press.timestamp), "observedEpoch": String(Date().timeIntervalSince1970),
+                           "keyAvailable": String(key != nil), "keyCode": key.map { String($0.keyCode.rawValue) } ?? "null",
+                           "nativeModifierFlags": key.map { String($0.modifierFlags.rawValue) } ?? "null"]
+            for (field, value) in [("characters", key?.characters), ("charactersIgnoringModifiers", key?.charactersIgnoringModifiers)] {
+                details[field] = value.map { String(decoding: $0.utf8.prefix(64), as: UTF8.self) } ?? "null"
+                details[field + "UTF8Bytes"] = value.map { String($0.utf8.count) } ?? "null"
+                details[field + "Truncated"] = value.map { String($0.utf8.count > 64) } ?? "null"
+            }
+            TaskParticipantDiagnostics.event("keyboard.native-control.press", details: details)
+        }
+    }
     func registrationObservation() -> NativeKeyboardRegistrationRead {
         let focused = isFirstResponder
         let attached = window != nil
