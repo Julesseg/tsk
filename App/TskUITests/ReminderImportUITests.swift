@@ -96,7 +96,7 @@ final class ReminderImportUITests: XCTestCase {
         if app.collectionViews["workspace-sidebar"].exists {
             XCTAssertTrue(revealTaskElement(app.buttons["reminders-import"], in: "workspace-sidebar", app: app))
         } else { app.buttons["workspace-more"].tap() }
-        app.buttons["reminders-import"].tap()
+        tapTaskMenuItem(app.buttons["reminders-import"], app: app)
         XCTAssertTrue(app.buttons["reminders-access"].waitForExistence(timeout: 10))
     }
 
