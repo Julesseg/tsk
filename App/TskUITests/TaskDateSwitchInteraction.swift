@@ -79,7 +79,7 @@ extension XCTestCase {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in attempt.evaluate() }, object: nil)
         let result = XCTWaiter.wait(for: [ready], timeout: attempt.remainingTime)
         guard attempt.finish(waitCompleted: result == .completed, perform: { _ in
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
         }) else {
             recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(result) \(attempt.diagnostic)")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)
