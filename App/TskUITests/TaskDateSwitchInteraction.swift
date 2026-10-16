@@ -68,17 +68,25 @@ extension XCTestCase {
     }
 
     private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: () -> Void) {
+        var lastSampleReads = "not sampled"
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
+            var reads: [String] = []
+            defer { lastSampleReads = reads.joined(separator: ", ") }
+            func measured<T>(_ name: String, read: () throws -> T) rethrows -> T {
+                let started = ProcessInfo.processInfo.systemUptime
+                defer { reads.append("\(name)=\(ProcessInfo.processInfo.systemUptime - started)s") }
+                return try read()
+            }
             do {
-                let snapshot = try element.snapshot()
+                let snapshot = try measured("element.snapshot") { try element.snapshot() }
                 sample.exists = true
                 sample.enabled = snapshot.isEnabled
                 sample.elementFrame = snapshot.frame
                 guard snapshot.isEnabled else { return sample }
-                sample.hittable = element.isHittable
+                sample.hittable = measured("element.isHittable") { element.isHittable }
                 guard sample.hittable == true else { return sample }
-                let application = try app.snapshot()
+                let application = try measured("app.snapshot") { try app.snapshot() }
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
             } catch {
@@ -96,8 +104,8 @@ extension XCTestCase {
             action()
         }) else {
             let waiter = result.map { String(describing: $0) } ?? "not entered"
-            recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(waiter) \(attempt.diagnostic)")
-            XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)
+            recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(waiter) \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]")
+            XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]", file: file, line: line)
             return
         }
     }
