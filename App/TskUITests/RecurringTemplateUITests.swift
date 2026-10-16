@@ -126,7 +126,7 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))
         XCTAssertTrue(app.staticTexts["task-action-error"].label.contains("No tasks were changed"))
         capture("Malformed series mask prevents completion without discarding the occurrence", app)
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app, initialScrollUp: false))
         XCTAssertTrue(app.buttons["complete-task"].exists)
     }
 
