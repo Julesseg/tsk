@@ -182,4 +182,97 @@ import Testing
         }))
         #expect(requests == 0)
     }
+
+    @Test func overlappingOperationsEachRequestFreshAccessAndUseTheirOwnResult() async throws {
+        for firstGrant in [true, false] {
+            let access = EventKitReminderAccessPolicy()
+            #expect(try await access.requestAccess(authorization: { .notDetermined }, request: { true }))
+            let pending = PendingPermissionRequest()
+            let first = Task { @MainActor in
+                try await access.requireAccess(authorization: { .notDetermined }, request: pending.request)
+            }
+            await pending.waitUntilRequested()
+            var secondRequests = 0
+            let secondAllowed = try await access.requireAccess(authorization: { .notDetermined }, request: {
+                secondRequests += 1
+                return true
+            })
+            pending.complete(firstGrant)
+            #expect(try await first.value == firstGrant)
+            #expect(secondAllowed)
+            #expect(secondRequests == 1)
+            var laterRequests = 0
+            let laterAllowed = try await access.requireAccess(authorization: { .notDetermined }, request: {
+                laterRequests += 1
+                return true
+            })
+            #expect(laterAllowed == firstGrant)
+            #expect(laterRequests == (firstGrant ? 1 : 0))
+        }
+    }
+
+    @Test func initialRequestInFlightDoesNotAuthorizeOrPromptAnotherOperation() async throws {
+        let access = EventKitReminderAccessPolicy()
+        let pending = PendingPermissionRequest()
+        let initial = Task { @MainActor in
+            try await access.requestAccess(authorization: { .notDetermined }, request: pending.request)
+        }
+        await pending.waitUntilRequested()
+        var requests = 0
+        #expect(try await !access.requireAccess(authorization: { .notDetermined }, request: {
+            requests += 1
+            return true
+        }))
+        #expect(requests == 0)
+        pending.complete(true)
+        #expect(try await initial.value)
+    }
+
+    @Test func observedRevocationRejectsAConcurrentPendingGrant() async throws {
+        let access = EventKitReminderAccessPolicy()
+        var current = EventKitAccessPublication.Authorization.notDetermined
+        #expect(try await access.requestAccess(authorization: { current }, request: { true }))
+        let pending = PendingPermissionRequest()
+        let first = Task { @MainActor in
+            try await access.requireAccess(authorization: { current }, request: pending.request)
+        }
+        await pending.waitUntilRequested()
+        current = .denied
+        var requests = 0
+        #expect(try await !access.requireAccess(authorization: { current }, request: {
+            requests += 1
+            return true
+        }))
+        pending.complete(true)
+        #expect(try await !first.value)
+        current = .notDetermined
+        #expect(try await !access.requireAccess(authorization: { current }, request: {
+            requests += 1
+            return true
+        }))
+        #expect(requests == 0)
+    }
+}
+
+@MainActor private final class PendingPermissionRequest {
+    private var response: CheckedContinuation<Bool, Never>?
+    private var started: CheckedContinuation<Void, Never>?
+
+    func request() async -> Bool {
+        await withCheckedContinuation {
+            response = $0
+            started?.resume()
+            started = nil
+        }
+    }
+
+    func waitUntilRequested() async {
+        if response != nil { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func complete(_ granted: Bool) {
+        response?.resume(returning: granted)
+        response = nil
+    }
 }

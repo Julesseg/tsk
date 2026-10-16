@@ -7,17 +7,21 @@ import Foundation
         authorization: () -> EventKitAccessPublication.Authorization,
         request: () async throws -> Bool
     ) async throws -> Bool {
-        allowsLiveRevalidation = false
-        try Task.checkCancellation()
-        let current = authorization()
-        try Task.checkCancellation()
-        guard current == .notDetermined || current == .fullAccess else { return false }
-        let granted = try await request()
-        try Task.checkCancellation()
-        let latest = authorization()
-        try Task.checkCancellation()
-        allowsLiveRevalidation = granted && (latest == .notDetermined || latest == .fullAccess)
-        return allowsLiveRevalidation
+        do {
+            try Task.checkCancellation()
+            let current = authorization()
+            try Task.checkCancellation()
+            guard current == .notDetermined || current == .fullAccess else { allowsLiveRevalidation = false; return false }
+            let granted = try await request()
+            try Task.checkCancellation()
+            let latest = authorization()
+            try Task.checkCancellation()
+            allowsLiveRevalidation = granted && (latest == .notDetermined || latest == .fullAccess)
+            return allowsLiveRevalidation
+        } catch {
+            allowsLiveRevalidation = false
+            throw error
+        }
     }
 
     func requireAccess(
