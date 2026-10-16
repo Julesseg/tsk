@@ -48,6 +48,7 @@ struct TaskControlReadinessSample {
 
 final class TaskControlReadinessAttempt {
     private let now: () -> TimeInterval
+    private let beforeSample: ((TimeInterval) -> Void)?
     private let sample: () -> TaskControlReadinessSample
     private let started: TimeInterval
     private let deadline: TimeInterval
@@ -60,8 +61,9 @@ final class TaskControlReadinessAttempt {
     private var sampleElapsed: TimeInterval?
     private(set) var failureReason: TaskControlReadinessFailure? = .unsampled
 
-    init(now: @escaping () -> TimeInterval, sample: @escaping () -> TaskControlReadinessSample) {
+    init(now: @escaping () -> TimeInterval, beforeSample: ((TimeInterval) -> Void)? = nil, sample: @escaping () -> TaskControlReadinessSample) {
         self.now = now
+        self.beforeSample = beforeSample
         self.sample = sample
         started = now()
         deadline = started + 5
@@ -83,6 +85,16 @@ final class TaskControlReadinessAttempt {
         accepted = nil
         let sampleStarted = now()
         guard sampleStarted < deadline else { failureReason = .deadlineExpired; return false }
+        if let beforeSample {
+            beforeSample(deadline)
+            let preparedAt = now()
+            guard preparedAt < deadline else {
+                sampleStartedElapsed = sampleStarted - started
+                sampleElapsed = preparedAt - sampleStarted
+                failureReason = .deadlineExpired
+                return false
+            }
+        }
         let current = sample()
         let sampleCompleted = now()
         sampleStartedElapsed = sampleStarted - started

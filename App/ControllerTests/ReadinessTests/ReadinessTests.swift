@@ -10,6 +10,52 @@ import Testing
                                    elementFrame: frame ?? CGRect(origin: CGPoint(x: 40, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
     }
 
+    @Test func lateInterruptionIsHandledBeforeResamplingWithinTheOriginalDeadline() {
+        let clock = Clock()
+        var blocked = true
+        var deadlines: [TimeInterval] = []
+        var actions = 0
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, beforeSample: { deadline in
+            deadlines.append(deadline)
+            if clock.now >= 2 { blocked = false; clock.now += 1 }
+        }, sample: {
+            clock.now += 0.25
+            return sample(hittable: !blocked)
+        })
+        #expect(!attempt.evaluate())
+        clock.now = 2
+        #expect(attempt.evaluate())
+        #expect(attempt.finish(waitCompleted: true) { _ in actions += 1 })
+        #expect(actions == 1)
+        #expect(deadlines == [5, 5])
+        #expect(clock.now == 3.25)
+        #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
+        #expect(actions == 1)
+    }
+
+    @Test func interruptionHandlingCannotResetOrOverrunTheReadinessDeadline() {
+        for completedAt in [5.0, 5.2] {
+            let clock = Clock()
+            var preparations = 0
+            var samples = 0
+            var actions = 0
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, beforeSample: { _ in
+                preparations += 1
+                clock.now = completedAt
+            }, sample: {
+                samples += 1
+                return sample()
+            })
+            #expect(!attempt.evaluate())
+            #expect(!attempt.evaluate())
+            #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
+            #expect(preparations == 1)
+            #expect(samples == 0)
+            #expect(actions == 0)
+            #expect(attempt.failureReason == .deadlineExpired)
+        }
+    }
+
     @Test func readySlowSnapshotActsBeforeTheWaitersFirstPollDelay() {
         let clock = Clock()
         var actions = 0

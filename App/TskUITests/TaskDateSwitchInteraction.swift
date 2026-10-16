@@ -57,8 +57,8 @@ extension XCTestCase {
         add(attachment)
     }
 
-    func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, file: file, line: line) {
+    func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, beforeSample: beforeSample, file: file, line: line) {
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
         }
     }
@@ -67,8 +67,8 @@ extension XCTestCase {
         activateTaskControl(element, app: app, file: file, line: line) { element.tap() }
     }
 
-    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString, line: UInt, action: () -> Void) {
-        let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }) {
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: () -> Void) {
+        let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
             do {
                 let snapshot = try element.snapshot()

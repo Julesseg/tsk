@@ -5,13 +5,27 @@ final class AutomaticSynchronizationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
-        addUIInterruptionMonitor(withDescription: "Optional system password storage") { dialog in
-            guard dialog.elementType == .alert || dialog.elementType == .sheet,
-                  dialog.label == "Save Password?", dialog.buttons["Not Now"].exists else { return false }
-            dialog.buttons["Not Now"].tap()
+        let app = XCUIApplication()
+        var dismissedPassword = false
+        func dismissPassword(_ dialog: XCUIElement, before deadline: TimeInterval? = nil) -> Bool {
+            guard !dismissedPassword, dialog.exists,
+                  dialog.elementType == .alert || dialog.elementType == .sheet,
+                  dialog.label == "Save Password?" else { return false }
+            let notNow = dialog.buttons["Not Now"]
+            guard notNow.exists, let snapshot = try? notNow.snapshot(),
+                  snapshot.isEnabled, notNow.isHittable,
+                  let application = try? app.snapshot() else { return false }
+            let sample = TaskControlReadinessSample(exists: true, enabled: snapshot.isEnabled, hittable: true,
+                                                    elementFrame: snapshot.frame, appFrame: application.frame,
+                                                    appWindowFrames: application.children.filter { $0.elementType == .window }.map { $0.frame })
+            guard sample.failureReason == nil, deadline.map({ ProcessInfo.processInfo.systemUptime < $0 }) ?? true else { return false }
+            dismissedPassword = true
+            notNow.tap()
             return true
         }
-        let app = XCUIApplication()
+        addUIInterruptionMonitor(withDescription: "Optional system password storage") { dialog in
+            dismissPassword(dialog)
+        }
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["synchronization-settings"].waitForExistence(timeout: 10))
@@ -41,10 +55,15 @@ final class AutomaticSynchronizationUITests: XCTestCase {
                 XCTFail("The observed Save Password? sheet must expose an actionable Not Now button")
                 return
             }
-            if passwordSheet.exists { notNow.tap() }
+            if passwordSheet.exists { XCTAssertTrue(dismissPassword(passwordSheet)) }
             XCTAssertTrue(passwordSheet.waitForNonExistence(timeout: 5))
         }
-        tapTaskControl(app.buttons["new-task"], app: app)
+        tapTaskControl(app.buttons["new-task"], app: app, beforeSample: { deadline in
+            guard !dismissedPassword else { return }
+            for dialog in [app.sheets["Save Password?"], app.alerts["Save Password?"]] {
+                if dismissPassword(dialog, before: deadline) { break }
+            }
+        })
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
