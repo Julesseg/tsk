@@ -62,9 +62,7 @@ final class TaskNotificationUITests: XCTestCase {
         app.launch()
         openNotifications(app)
         allowNotifications(app)
-        let settingsLink = app.links["notification-fixture-system-settings"].firstMatch
-        let settingsButton = app.buttons["notification-fixture-system-settings"].firstMatch
-        let link = settingsLink.exists ? settingsLink : settingsButton
+        let link = app.descendants(matching: .any)["notification-fixture-system-settings"].firstMatch
         reveal(link, in: app); link.tap()
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
         XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 15))
