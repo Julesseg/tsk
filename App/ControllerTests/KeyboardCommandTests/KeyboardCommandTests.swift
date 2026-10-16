@@ -47,14 +47,18 @@ extension KeyboardCommandTests {
     }
 
     func testOnlyFixedCaseSequencesAreAcceptedAndAbortPreventsFurtherRequests() throws {
-        for name in [TaskKeyboardSession.Case.annotations, .workspace] {
+        let cases: [(TaskKeyboardSession.Case, [String])] = [
+            (.annotations, ["secondNoteCommandN", "secondNoteSave", "editSelectAll", "editedNoteSave"]),
+            (.workspace, ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView"])
+        ]
+        for (name, phases) in cases {
             let session = try session(name)
-            for (index, phase) in name.phases.enumerated() {
+            for (index, phase) in phases.enumerated() {
                 let request = try session.begin(phase, now: 100)
                 XCTAssertEqual(request.sequence, index)
                 try session.acknowledge(JSONEncoder().encode(TaskKeyboardAcknowledgement(request: request, state: "transportComplete")), now: 101)
             }
-            XCTAssertThrowsError(try session.begin(name.phases[0], now: 102))
+            XCTAssertThrowsError(try session.begin(phases[0], now: 102))
         }
         let session = try session()
         let request = try session.begin("secondNoteCommandN", now: 100)
