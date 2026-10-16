@@ -11,7 +11,9 @@ final class EventKitCalendarAccessObservation {
     ) async -> EventKitAccessPublication.Authorization {
         var nativeResult: Bool?
         let effective = await policy.effectiveAuthorization(isolation: isolation, authorization: authorization, request: {
-            let granted = try await observeRequest(isolation: isolation, request: request)
+            observedRefusal = false
+            let granted = try await request()
+            try Task.checkCancellation()
             nativeResult = granted
             return granted
         })
@@ -28,7 +30,9 @@ final class EventKitCalendarAccessObservation {
         observedRefusal = false
         var nativeResult: Bool?
         let granted = try await policy.requestAccess(isolation: isolation, authorization: authorization, request: {
-            let granted = try await observeRequest(isolation: isolation, request: request)
+            observedRefusal = false
+            let granted = try await request()
+            try Task.checkCancellation()
             nativeResult = granted
             return granted
         })
@@ -43,7 +47,9 @@ final class EventKitCalendarAccessObservation {
     ) async throws -> Bool {
         var nativeResult: Bool?
         let granted = try await policy.requireAccess(isolation: isolation, authorization: authorization, request: {
-            let granted = try await observeRequest(isolation: isolation, request: request)
+            observedRefusal = false
+            let granted = try await request()
+            try Task.checkCancellation()
             nativeResult = granted
             return granted
         })
@@ -54,15 +60,5 @@ final class EventKitCalendarAccessObservation {
     private func recordCompletedRequest(_ granted: Bool?) {
         guard let granted, !Task.isCancelled else { return }
         observedRefusal = !granted
-    }
-
-    private func observeRequest(
-        isolation: isolated (any Actor)? = #isolation,
-        request: () async throws -> Bool
-    ) async throws -> Bool {
-        observedRefusal = false
-        let granted = try await request()
-        try Task.checkCancellation()
-        return granted
     }
 }
