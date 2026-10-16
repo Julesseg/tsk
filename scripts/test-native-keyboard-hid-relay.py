@@ -170,6 +170,39 @@ class RunTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse((location/(value['request']+'.ack.json')).exists())
 
 
+class DispatchBudgetTests(unittest.IsolatedAsyncioTestCase):
+    async def assert_no_late_dispatch(self, remaining, persistence_seconds):
+        with tempfile.TemporaryDirectory() as directory:
+            root=pathlib.Path(directory); log=root/'live.log'; log.touch(); socket=root/'owned.sock';socket.touch(); stop=root/'stop'
+            clock=100.0
+            value=request();value['expiresAt']=clock+remaining
+            location=root/'Documents/TSKHID'/TOKEN/value['attempt'];location.mkdir(parents=True)
+            (location/(value['request']+'.request.json')).write_text(json.dumps(value))
+            args=SimpleNamespace(log=str(log),socket=str(socket),udid=str(uuid.uuid4()),companion_pid=123,relay_token=TOKEN,receipt=str(root/'relay.json'),stop_file=str(stop))
+            observed=[];armed=asyncio.Event()
+            async def send(events):observed.append(events)
+            async def lookup(*args):return root
+            original_save=relay.save_receipt
+            def save(path,receipt):
+                nonlocal clock
+                original_save(path,receipt)
+                if receipt['state']=='waiting':armed.set()
+                if receipt['state']=='sending':clock+=persistence_seconds
+            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save),mock.patch.object(relay.time,'time',side_effect=lambda:clock):
+                task=asyncio.create_task(relay.run(args));await asyncio.wait_for(armed.wait(),1)
+                with log.open('ab',buffering=0) as writer:writer.write(boundary(relay.CASE)+b'\n'+marker(value))
+                stop.touch()
+                with self.assertRaises(ValueError):await asyncio.wait_for(task,1)
+            self.assertEqual(observed,[],'Expired transport budget must never dispatch DOWN')
+            self.assertFalse((location/(value['request']+'.ack.json')).exists())
+
+    async def test_less_than_five_seconds_remaining_cannot_start_a_fresh_five_second_rpc(self):
+        await self.assert_no_late_dispatch(4.9,0)
+
+    async def test_receipt_persistence_consuming_dispatch_budget_is_rechecked_before_down(self):
+        await self.assert_no_late_dispatch(12,8)
+
+
 class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
     async def test_actual_relay_acknowledges_only_after_rpc_and_completes_sequential_case(self):
         with tempfile.TemporaryDirectory() as directory:

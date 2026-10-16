@@ -280,9 +280,9 @@ class Exchange:
         except FileNotFoundError:
             return False
 
-    def verify(self, now):
+    def verify(self, now, minimum_remaining=0):
         remaining = self.request['expiresAt'] - now
-        if not 0 < remaining <= 12 or self.exists('.abort.json') or self.exists('.ack.json'):
+        if not 0 < remaining <= 12 or remaining < minimum_remaining or self.exists('.abort.json') or self.exists('.ack.json'):
             raise ValueError('Expired, aborted or already acknowledged request')
         descriptor = os.open(self.name + '.request.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=self.directory)
         with os.fdopen(descriptor, 'rb') as file:
@@ -374,6 +374,7 @@ async def run(args):
                         receipt['exchanges'].append(exchange_record)
                         receipt.update(state='sending', inFlight=request, transportComplete=False)
                         save_receipt(receipt_path, receipt)
+                        exchange.verify(time.time(), minimum_remaining=5)
                         await dispatch_chord(send, events)
                         exchange_record.update(transportComplete=True, rpcDurationSeconds=time.monotonic() - exchange_record['startedMonotonic'])
                         receipt['transportComplete'] = True
