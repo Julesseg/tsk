@@ -58,6 +58,16 @@ extension XCTestCase {
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, file: file, line: line) {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
+        }
+    }
+
+    func tapTaskMenuItem(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, file: file, line: line) { element.tap() }
+    }
+
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, file: StaticString, line: UInt, action: () -> Void) {
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }) {
             var sample = TaskControlReadinessSample(exists: nil)
             do {
@@ -79,7 +89,7 @@ extension XCTestCase {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in attempt.evaluate() }, object: nil)
         let result = XCTWaiter.wait(for: [ready], timeout: attempt.remainingTime)
         guard attempt.finish(waitCompleted: result == .completed, perform: { _ in
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
+            action()
         }) else {
             recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(result) \(attempt.diagnostic)")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic)", file: file, line: line)

@@ -94,7 +94,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
             XCTFail("The requested task destination must be an actionable button: \(identifier)")
             return
         }
-        tapTaskControl(button, app: app)
+        tapTaskMenuItem(button, app: app)
     }
 
     private func prepareAndSelect(_ token: String, in container: String, app: XCUIApplication) {
