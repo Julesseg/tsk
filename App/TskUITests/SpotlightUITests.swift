@@ -120,6 +120,10 @@ import XCTest
     private func systemSearch(_ title: String, _ app: XCUIApplication) throws {
         XCUIDevice.shared.press(.home)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        guard springboard.otherElements["Home screen icons"].waitForExistence(timeout: 15) else {
+            XCTFail("Actual Home screen icons must be available before opening system Search")
+            return
+        }
         springboard.swipeDown()
         capture("Actual system Search surface before first-run handling", springboard)
         let education = springboard.buttons["Continue"].firstMatch
