@@ -6,19 +6,25 @@ final class TaskAnnotationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAddValidateEditAndReopenTimestampedAnnotations() throws {
-        try exerciseAnnotationRoundTrip { $0.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
+        try exerciseAnnotationRoundTrip()
     }
 
     func testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations() throws {
-        try exerciseAnnotationRoundTrip(keyboardShortcuts: false) { $0.buttons["save-annotation"].tap() }
+        try exerciseAnnotationRoundTrip(keyboardShortcuts: false)
     }
 
-    private func exerciseAnnotationRoundTrip(keyboardShortcuts: Bool = true, save: (XCUIApplication) -> Void) throws {
+    private func exerciseAnnotationRoundTrip(keyboardShortcuts: Bool = true) throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = XCUIApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
+        let commands = keyboardShortcuts ? try TaskKeyboardCommand(.annotations, app: app) : nil
+        func save(_ phase: String) throws {
+            if let commands {
+                try commands.perform(phase) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
+            } else { app.buttons["save-annotation"].tap() }
+        }
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         app.buttons["new-task"].tap()
@@ -51,19 +57,19 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
         editor.typeText("Second independent note")
-        if keyboardShortcuts {
-            app.typeKey("n", modifierFlags: .command)
+        if let commands {
+            try commands.perform("secondNoteCommandN") { app.typeKey("n", modifierFlags: .command) }
             XCTAssertFalse(app.textFields["task-description"].exists)
             XCTAssertTrue(editor.exists)
         }
-        save(app)
+        try save("secondNoteSave")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
-        if keyboardShortcuts {
-            editor.typeKey("a", modifierFlags: .command)
+        if let commands {
+            try commands.perform("editSelectAll") { editor.typeKey("a", modifierFlags: .command) }
         } else {
             let original = try XCTUnwrap(editor.value as? String)
             XCTAssertEqual(original, "First supporting note\nAnother line")
@@ -78,7 +84,7 @@ final class TaskAnnotationUITests: XCTestCase {
         editor.typeText("First supporting note\nAnother line revised")
         if !keyboardShortcuts { XCTAssertEqual(editor.value as? String, "First supporting note\nAnother line revised") }
         capture("Edit annotation keeps its original timestamp", app: app)
-        save(app)
+        try save("editedNoteSave")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
         app.launch()
@@ -142,7 +148,9 @@ final class TaskAnnotationUITests: XCTestCase {
         retain(.commandN)
         XCTAssertEqual(commandNResult, .completed)
         XCTAssertEqual(input.value as? String, "n")
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        let commands = try TaskKeyboardCommand(.native, app: app)
+        let nativeState = state().map { TaskKeyboardRequest.NativeState(processID: $0.processID, firstResponder: $0.firstResponder, textLength: $0.textLength, textIsPlainN: $0.textIsPlainN, commandNCount: $0.commandNCount, commandReturnCount: $0.commandReturnCount) }
+        try commands.perform("commandReturn", nativeState: nativeState) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         let commandReturn = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in state()?.commandReturnCount == 1 }, object: nil)
         let commandReturnResult = XCTWaiter.wait(for: [commandReturn], timeout: 10)
         retain(.commandReturn)

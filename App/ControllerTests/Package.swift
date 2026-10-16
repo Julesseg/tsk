@@ -7,5 +7,6 @@ let package = Package(
     dependencies: [.package(path: "../../Core"), .package(path: "../../Native")],
     targets: [.testTarget(name: "CalendarControllerProof", dependencies: [.product(name: "TskCore", package: "Core"), .product(name: "TskNative", package: "Native")], path: "Tests"),
               .testTarget(name: "TaskControlReadinessProof", path: "ReadinessTests"),
-              .testTarget(name: "TaskKeyboardRegistrationProof", path: "KeyboardRegistrationTests")]
+              .testTarget(name: "TaskKeyboardRegistrationProof", path: "KeyboardRegistrationTests"),
+              .testTarget(name: "TaskKeyboardCommandProof", path: "KeyboardCommandTests")]
 )

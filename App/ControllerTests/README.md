@@ -27,3 +27,9 @@ through a relative symlink. It checks that an absent target retains the caller's
 or last observed direction across the existing scroll budget, and that observed
 target geometry can redirect the search. It does not establish native scrolling
 progress, boundary detection or target revelation.
+
+The keyboard command target compiles the exact Foundation portion of the UI-test
+command helper through a relative symlink. It checks fixed phase order, complete
+nonce-bound acknowledgements, expiry/abort rejection, explicit driver ownership
+and atomic runner-file boundaries. The UIKit adapter, host relay integration and
+actual native key delivery require separate compilation and canonical UI checks.

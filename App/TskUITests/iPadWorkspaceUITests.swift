@@ -13,31 +13,32 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testInjectedKeyboardCaptureSelectionEditCompletionAndReopen() throws {
         let app = launch()
+        let commands = try TaskKeyboardCommand(.workspace, app: app)
         XCTAssertTrue(app.buttons["sidebar-view-unfinished"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.otherElements["workspace-detail-empty"].exists || app.staticTexts["Select a task"].exists)
         capture("iPad landscape empty workspace", app: app)
-        app.typeKey("n", modifierFlags: .command)
+        try commands.perform("capture") { app.typeKey("n", modifierFlags: .command) }
         let field = description(app)
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText("Keyboard task")
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        try commands.perform("saveNew") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         XCTAssertTrue(field.waitForNonExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Keyboard task", app: app).waitForExistence(timeout: 10))
-        app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: .command)
+        try commands.perform("select") { app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: .command) }
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad selected task with simultaneous sidebar list and detail", app: app)
-        app.typeKey("e", modifierFlags: .command)
+        try commands.perform("edit") { app.typeKey("e", modifierFlags: .command) }
         XCTAssertTrue(description(app).waitForExistence(timeout: 5))
         description(app).typeText(" revised")
         capture("iPad native editor sheet", app: app)
         let editedField = description(app)
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        try commands.perform("saveEdit") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         XCTAssertTrue(editedField.waitForNonExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: [.command, .shift])
+        try commands.perform("complete") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: [.command, .shift]) }
         XCTAssertTrue(app.buttons["complete-task"].waitForNonExistence(timeout: 10))
-        app.typeKey("4", modifierFlags: .command)
+        try commands.perform("completedView") { app.typeKey("4", modifierFlags: .command) }
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         capture("iPad completed view from injected command", app: app)
         app.terminate()
