@@ -158,7 +158,7 @@ import XCTest
             return
         }
         selected.field.tap(); selected.field.typeText(title)
-        let result = selected.owner.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        let result = selected.owner.cells.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "Identifier:ResultCell,", title)).firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 30), "Indexed task must appear in actual system Spotlight, independently of CSSearchQuery proof")
         let screenshot = XCTAttachment(screenshot: selected.owner.screenshot()); screenshot.name = "Actual system Spotlight result"; screenshot.lifetime = .keepAlways; add(screenshot)
         result.tap()
