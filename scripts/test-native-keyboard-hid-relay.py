@@ -156,7 +156,7 @@ class RunTests(unittest.IsolatedAsyncioTestCase):
             args=SimpleNamespace(log=str(log),socket=str(socket),udid=str(uuid.uuid4()),companion_pid=123,relay_token=TOKEN,receipt=str(root/'relay.json'),stop_file=str(stop))
             observed=[]; armed=asyncio.Event()
             async def send(events):observed.append(events)
-            async def lookup(*args):return root
+            async def lookup(*args, **kwargs):return root
             original_save=relay.save_receipt
             def save(path,value):
                 original_save(path,value)
@@ -171,7 +171,7 @@ class RunTests(unittest.IsolatedAsyncioTestCase):
 
 
 class DispatchBudgetTests(unittest.IsolatedAsyncioTestCase):
-    async def assert_no_late_dispatch(self, remaining, persistence_seconds):
+    async def assert_no_late_dispatch(self, remaining, persistence_seconds, freeze_wall=False):
         with tempfile.TemporaryDirectory() as directory:
             root=pathlib.Path(directory); log=root/'live.log'; log.touch(); socket=root/'owned.sock';socket.touch(); stop=root/'stop'
             clock=100.0
@@ -181,14 +181,14 @@ class DispatchBudgetTests(unittest.IsolatedAsyncioTestCase):
             args=SimpleNamespace(log=str(log),socket=str(socket),udid=str(uuid.uuid4()),companion_pid=123,relay_token=TOKEN,receipt=str(root/'relay.json'),stop_file=str(stop))
             observed=[];armed=asyncio.Event()
             async def send(events):observed.append(events)
-            async def lookup(*args):return root
+            async def lookup(*args, **kwargs):return root
             original_save=relay.save_receipt
             def save(path,receipt):
                 nonlocal clock
                 original_save(path,receipt)
                 if receipt['state']=='waiting':armed.set()
                 if receipt['state']=='sending':clock+=persistence_seconds
-            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save),mock.patch.object(relay.time,'time',side_effect=lambda:clock):
+            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save),mock.patch.object(relay,'time',SimpleNamespace(time=lambda:100.0 if freeze_wall else clock,monotonic=lambda:clock)):
                 task=asyncio.create_task(relay.run(args));await asyncio.wait_for(armed.wait(),1)
                 with log.open('ab',buffering=0) as writer:writer.write(boundary(relay.CASE)+b'\n'+marker(value))
                 stop.touch()
@@ -201,6 +201,9 @@ class DispatchBudgetTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_receipt_persistence_consuming_dispatch_budget_is_rechecked_before_down(self):
         await self.assert_no_late_dispatch(12,8)
+
+    async def test_monotonic_dispatch_reservation_survives_a_stalled_wall_clock(self):
+        await self.assert_no_late_dispatch(12,8,freeze_wall=True)
 
 
 class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
@@ -215,7 +218,7 @@ class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
                 if len(observed)==1:
                     sending.set()
                     await release.wait()
-            async def lookup(*args):return root
+            async def lookup(*args, **kwargs):return root
             original_save=relay.save_receipt
             def save(path,receipt):
                 original_save(path,receipt)
@@ -252,6 +255,43 @@ class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(receipt['cases'][relay.ANNOTATIONS]['completed'],['secondNoteCommandN','secondNoteSave','editSelectAll','editedNoteSave'])
             self.assertEqual(observed,[((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))])
             self.assertEqual(lookup_mock.await_count,1)
+
+
+class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_readonly_discovery_longer_than_two_seconds_uses_remaining_handshake_budget(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', "import time;time.sleep(2.1);print('/tmp/owned-runner')", **kwargs)
+            processes.append(process)
+            return process
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+            result = await relay.container_for('owned-udid', request(), {}, deadline=time.monotonic()+12)
+        self.assertEqual(result, pathlib.Path('/tmp/owned-runner'))
+        self.assertIsNotNone(processes[0].returncode)
+
+    async def test_insufficient_budget_does_not_start_discovery(self):
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', new_callable=mock.AsyncMock) as start:
+            with self.assertRaises(ValueError):
+                await relay.container_for('owned-udid', request(), {}, deadline=time.monotonic()+4.9)
+            start.assert_not_awaited()
+
+    async def test_hung_discovery_is_killed_reaped_and_cannot_extend_reservation(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', 'import time;time.sleep(60)', **kwargs)
+            processes.append(process)
+            return process
+        receipt = {}
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+            with self.assertRaises(TimeoutError):
+                await relay.container_for('owned-udid', request(), receipt, deadline=time.monotonic()+5.1)
+        self.assertIsNotNone(processes[0].returncode)
+        self.assertTrue(receipt['containerLookups'][0]['reaped'])
+        self.assertEqual(receipt['containerLookups'][0]['failure'], 'TimeoutError')
 
 
 class FileAndMappingTests(unittest.TestCase):

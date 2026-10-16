@@ -310,13 +310,20 @@ class Exchange:
                 pass
 
 
-async def container_for(udid, request, receipt):
+async def container_for(udid, request, receipt, deadline):
+    budget = deadline - time.monotonic() - 5
+    if budget <= 0:
+        raise ValueError('Runner discovery cannot consume the five-second dispatch reservation')
     command = ['xcrun', 'simctl', 'get_app_container', udid, RUNNER, 'data']
     process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    entry = dict(command=command, pid=process.pid)
+    entry = dict(command=command, pid=process.pid, deadlineMonotonic=deadline, startedMonotonic=time.monotonic())
     receipt.setdefault('containerLookups', []).append(entry)
     try:
-        raw, error = await asyncio.wait_for(process.communicate(), timeout=2)
+        budget = deadline - time.monotonic() - 5
+        if budget <= 0:
+            raise ValueError('Runner discovery exhausted its transport budget before communication')
+        entry['timeoutSeconds'] = budget
+        raw, error = await asyncio.wait_for(process.communicate(), timeout=budget)
         entry['status'] = process.returncode
         if process.returncode or len(raw) > 4096:
             raise ValueError('Owned runner container lookup failed')
@@ -325,10 +332,17 @@ async def container_for(udid, request, receipt):
             raise ValueError('Owned runner container is not absolute')
         entry['path'] = str(path)
         return path
+    except BaseException as error:
+        entry['failure'] = type(error).__name__
+        raise
     finally:
         if process.returncode is None:
-            process.kill()
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
         await asyncio.wait_for(process.wait(), timeout=5)
+        entry.update(status=process.returncode, reaped=True, finishedMonotonic=time.monotonic())
 
 
 async def run(args):
@@ -359,9 +373,13 @@ async def run(args):
                     for following in lines:
                         protocol.line(following)
                     lines.clear()
+                    remaining = request['expiresAt'] - time.time()
+                    if not 0 < remaining <= 12:
+                        raise ValueError('Request is outside its original transport deadline')
+                    deadline = time.monotonic() + remaining
                     binding = (request['caseName'], request['attempt'])
                     if binding not in containers:
-                        containers[binding] = await container_for(args.udid, request, receipt)
+                        containers[binding] = await container_for(args.udid, request, receipt, deadline=deadline)
                     exchange = Exchange(containers[binding], request)
                     try:
                         end = log.path.stat().st_size
@@ -375,6 +393,8 @@ async def run(args):
                         receipt.update(state='sending', inFlight=request, transportComplete=False)
                         save_receipt(receipt_path, receipt)
                         exchange.verify(time.time(), minimum_remaining=5)
+                        if deadline - time.monotonic() < 5:
+                            raise ValueError('Transport deadline cannot reserve the complete five-second dispatch')
                         await dispatch_chord(send, events)
                         exchange_record.update(transportComplete=True, rpcDurationSeconds=time.monotonic() - exchange_record['startedMonotonic'])
                         receipt['transportComplete'] = True
@@ -383,6 +403,8 @@ async def run(args):
                         while log.file.tell() < end:
                             for following in log.poll():
                                 protocol.line(following)
+                        if time.monotonic() >= deadline:
+                            raise ValueError('Transport deadline expired before acknowledgement')
                         exchange.acknowledge(time.time())
                         protocol.acknowledged(request)
                         exchange_record['acknowledgedAtEpoch'] = time.time()

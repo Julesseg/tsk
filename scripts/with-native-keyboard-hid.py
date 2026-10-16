@@ -154,16 +154,36 @@ class Host:
     async def stop(self, process, group=False):
         hard_killed = False
         if group:
-            def group_exists():
+            pgid = process.pid
+            if type(pgid) is not int or pgid <= 1 or pgid == os.getpgrp():
+                raise RuntimeError('Refusing invalid or current process group: ' + str(pgid))
+            detail = dict(pid=process.pid, pgid=pgid, phases=[])
+            path = self.evidence / ('process-cleanup-' + str(process.pid) + '.json')
+
+            def record(phase, error=None):
+                row = dict(phase=phase, timeMonotonic=time.monotonic())
+                if error is not None:
+                    row.update(error=repr(error), errno=getattr(error, 'errno', None))
+                detail['phases'].append(row)
                 try:
-                    os.killpg(process.pid, 0)
+                    path.write_text(json.dumps(detail, indent=2) + '\n')
+                except OSError as error:
+                    detail['receiptError'] = repr(error)
+
+            def signal_group(number, phase):
+                record(phase)
+                try:
+                    os.killpg(pgid, number)
                     return True
                 except ProcessLookupError:
                     return False
+                except OSError as error:
+                    record(phase, error)
+                    raise RuntimeError('Owned process group cleanup failed phase=' + phase + ' pid=' + str(process.pid) + ' pgid=' + str(pgid) + ' errno=' + str(error.errno)) from error
 
             async def wait_for_group(seconds):
                 deadline = time.monotonic() + seconds
-                while group_exists():
+                while signal_group(0, 'group-existence'):
                     if time.monotonic() >= deadline:
                         return False
                     await asyncio.sleep(0.05)
@@ -171,20 +191,42 @@ class Host:
 
             group_gone = False
             try:
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                group_gone = await wait_for_group(10)
-                if not group_gone:
+                if process.returncode is None:
+                    record('parent-interrupt')
                     try:
-                        os.killpg(process.pid, signal.SIGKILL)
+                        process.send_signal(signal.SIGINT)
                     except ProcessLookupError:
                         pass
+                    try:
+                        await asyncio.wait_for(process.wait(), timeout=5)
+                    except TimeoutError:
+                        record('parent-interrupt-timeout')
+                signal_group(signal.SIGTERM, 'group-term')
+                group_gone = await wait_for_group(10)
+                if not group_gone:
+                    signal_group(signal.SIGKILL, 'group-kill')
                     hard_killed = True
                     group_gone = await wait_for_group(5)
             finally:
-                await asyncio.wait_for(process.wait(), timeout=5)
+                if process.returncode is None:
+                    record('parent-term')
+                    try:
+                        process.terminate()
+                    except ProcessLookupError:
+                        pass
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=5)
+                except TimeoutError:
+                    record('parent-kill')
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+                    await asyncio.wait_for(process.wait(), timeout=5)
+                detail.update(status=process.returncode, reaped=True, groupGone=group_gone)
+                record('parent-reaped')
+            if detail.get('receiptError'):
+                raise RuntimeError('Owned process cleanup receipt could not be persisted: ' + detail['receiptError'])
             if not group_gone:
                 raise RuntimeError('Owned process group cleanup remains unconfirmed: ' + str(process.pid))
             return dict(pid=process.pid, status=process.returncode, reaped=True, hardKilled=hard_killed, groupGone=True)

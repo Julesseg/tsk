@@ -331,6 +331,9 @@ class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
                 self.returncode = 0 if initially_exited else None
                 self.waits = 0
 
+            def send_signal(self, number):
+                pass
+
             async def wait(self):
                 self.waits += 1
                 self.returncode = 0
@@ -383,6 +386,64 @@ class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unconfirmed_group_cleanup_fails_after_reaping_leader(self):
         await self.stop_group(initially_exited=True, survives_kill=True)
+
+
+class CleanupPermissionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_group_permission_failures_still_interrupt_and_reap_owned_parent(self):
+        for failure_signal in [owner.signal.SIGTERM, 0]:
+            with self.subTest(signal=failure_signal), tempfile.TemporaryDirectory() as root:
+                events = []
+                class Process:
+                    pid = 24102
+                    returncode = None
+                    def send_signal(self, number):
+                        events.append(('parent', number))
+                        self.returncode = 130
+                    async def wait(self):
+                        events.append(('reap', self.pid))
+                        return self.returncode
+                def killpg(pgid, number):
+                    events.append(('group', number))
+                    if number == failure_signal:
+                        raise PermissionError(1, 'Operation not permitted')
+                host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+                with mock.patch.object(owner.os, 'killpg', side_effect=killpg):
+                    with self.assertRaisesRegex(RuntimeError, 'phase=.*pid=24102.*errno=1'):
+                        await host.stop(Process(), group=True)
+                self.assertEqual(events[0], ('parent', owner.signal.SIGINT))
+                self.assertIn(('reap', 24102), events)
+
+
+    async def test_owned_parent_can_finalize_before_group_cleanup(self):
+        with tempfile.TemporaryDirectory() as root:
+            directory = pathlib.Path(root)
+            ready, finalized = directory/'ready', directory/'finalized'
+            host = owner.Host(path.parent, directory, directory)
+            code = "import pathlib,signal,time;ready=pathlib.Path(" + repr(str(ready)) + ");final=pathlib.Path(" + repr(str(finalized)) + ");signal.signal(signal.SIGINT,lambda *_:(final.write_text('finalized'),exit(0)));ready.touch();time.sleep(60)"
+            process = await host.start([sys.executable, '-c', code], directory/'child.log')
+            try:
+                async def wait_ready():
+                    while not ready.exists():
+                        await asyncio.sleep(.005)
+                await asyncio.wait_for(wait_ready(), 2)
+                receipt = await host.stop(process, group=True)
+                self.assertTrue(finalized.exists())
+                self.assertTrue(receipt['reaped'])
+                self.assertTrue(receipt['groupGone'])
+                self.assertEqual(process.returncode, 0)
+            finally:
+                if process.returncode is None:
+                    process.kill()
+                await process.wait()
+
+    async def test_reserved_and_current_process_groups_are_never_signalled(self):
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            for pgid in [0, 1, -1, owner.os.getpgrp()]:
+                with mock.patch.object(owner.os, 'killpg') as killpg:
+                    with self.assertRaisesRegex(RuntimeError, 'Refusing'):
+                        await host.stop(SimpleNamespace(pid=pgid), group=True)
+                    killpg.assert_not_called()
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
