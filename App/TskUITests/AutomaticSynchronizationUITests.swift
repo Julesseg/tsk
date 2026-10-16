@@ -5,9 +5,10 @@ final class AutomaticSynchronizationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
-        addUIInterruptionMonitor(withDescription: "Optional system password storage") { alert in
-            guard alert.elementType == .alert, alert.label == "Save Password?", alert.buttons["Not Now"].exists else { return false }
-            alert.buttons["Not Now"].tap()
+        addUIInterruptionMonitor(withDescription: "Optional system password storage") { dialog in
+            guard dialog.elementType == .alert || dialog.elementType == .sheet,
+                  dialog.label == "Save Password?", dialog.buttons["Not Now"].exists else { return false }
+            dialog.buttons["Not Now"].tap()
             return true
         }
         let app = XCUIApplication()
