@@ -74,6 +74,11 @@ class Host:
                 raise TimeoutError('Owned companion socket exceeded 30 seconds')
             await asyncio.sleep(0.02)
 
+    async def wait_initialized(self, process):
+        status = await asyncio.wait_for(process.wait(), timeout=30)
+        if status:
+            raise RuntimeError('UP-only transport initialization failed with status ' + str(status))
+
     async def wait_armed(self, path, relay, token, companion_pid):
         deadline = time.monotonic() + 10
         while True:
@@ -206,7 +211,7 @@ class Comparison:
         live = self.evidence / 'live-xcodebuild.log'
         live.touch(exist_ok=False)
         relay_receipt = self.evidence / 'relay-receipt.json'
-        companion = relay = tests = None
+        companion = initialization = relay = tests = None
         status = 70
         try:
             args = [str(self.tools / 'companion/idb_companion'), '--udid', self.udid, '--only', 'simulator', '--grpc-domain-sock', str(self.socket), '--terminate-offline', '1', '--log-hid-details', '1', '--log-level', 'debug']
@@ -214,6 +219,13 @@ class Comparison:
             self.receipt['companion'] = dict(pid=companion.pid, command=args)
             self.save()
             await self.host.wait_socket(self.socket, companion)
+            args = [str(self.tools / 'venv/bin/python'), str(self.scripts / 'with-native-keyboard-hid.py'), '--initialize-transport', '--socket', str(self.socket)]
+            initialization = await self.host.start(args, self.evidence / 'transport-initialization.log')
+            self.receipt['transportInitialization'] = dict(pid=initialization.pid, command=args, timeoutSeconds=30, events=[[40, 'UP'], [227, 'UP']], state='started')
+            self.save()
+            await self.host.wait_initialized(initialization)
+            self.receipt['transportInitialization']['state'] = 'up_only_rpc_completed_native_assertions_required'
+            self.save()
             args = [str(self.tools / 'venv/bin/python'), str(self.scripts / 'relay-native-keyboard-hid.py'), '--log', str(live), '--socket', str(self.socket), '--udid', self.udid, '--companion-pid', str(companion.pid), '--relay-token', self.token, '--receipt', str(relay_receipt)]
             relay = await self.host.start(args, self.evidence / 'relay.log')
             self.receipt['relay'] = dict(pid=relay.pid, command=args)
@@ -240,7 +252,7 @@ class Comparison:
             status = status or 70
             self.receipt['error'] = repr(error)
         finally:
-            cleanup_task = asyncio.create_task(self._cleanup(tests, relay, companion, live, relay_receipt, status))
+            cleanup_task = asyncio.create_task(self._cleanup(tests, relay, initialization, companion, live, relay_receipt, status))
             try:
                 status = await asyncio.shield(cleanup_task)
             except asyncio.CancelledError:
@@ -252,8 +264,8 @@ class Comparison:
                 self.save()
         return status
 
-    async def _cleanup(self, tests, relay, companion, live, relay_receipt, status):
-        for name, process in [('tests', tests), ('relay', relay)]:
+    async def _cleanup(self, tests, relay, initialization, companion, live, relay_receipt, status):
+        for name, process in [('tests', tests), ('relay', relay), ('initialization', initialization)]:
             if process is not None:
                 try:
                     self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')
@@ -286,29 +298,31 @@ class Comparison:
         return status
 
 
-async def release_only(socket):
+async def release_only(socket, timeout=5):
     if not socket.is_absolute() or not stat.S_ISSOCK(socket.stat().st_mode):
         raise ValueError('UP-only recovery requires the explicit owned Unix socket')
     spec = importlib.util.spec_from_file_location('fixed_native_hid_relay', pathlib.Path(__file__).with_name('relay-native-keyboard-hid.py'))
     relay = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(relay)
-    await asyncio.wait_for(relay.make_sender(str(socket))(relay.RELEASES), timeout=5)
+    await asyncio.wait_for(relay.make_sender(str(socket))(relay.RELEASES), timeout=timeout)
     print('Owned UP-only RPC completed (40UP,227UP); native key state remains unverified', flush=True)
 
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--release-only', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--release-only', action='store_true')
+    mode.add_argument('--initialize-transport', action='store_true')
     parser.add_argument('--socket', type=pathlib.Path)
     parser.add_argument('--udid')
     parser.add_argument('--tool-root', type=pathlib.Path)
     parser.add_argument('--evidence', type=pathlib.Path)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    if args.release_only:
+    if args.release_only or args.initialize_transport:
         if not args.socket or args.command:
             parser.error('UP-only mode requires only the explicit socket')
-        await release_only(args.socket)
+        await release_only(args.socket, timeout=30 if args.initialize_transport else 5)
         return 0
     if not args.udid or not args.tool_root or not args.evidence:
         parser.error('Pass owned UDID, pinned tool root and evidence directory')

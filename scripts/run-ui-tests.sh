@@ -90,7 +90,7 @@ xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphones
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
 share_status=0
-xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?
+xcodebuild test-without-building -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?
 printf 'Share-first UI status: %s\n' "$share_status"
 case "$share_status" in
     0|65) ;;
