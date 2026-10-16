@@ -91,7 +91,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(second, in: "task-detail-form", app: app))
         XCTAssertEqual(second.label, "Second independent note")
         capture("Both annotations after durable reopen", app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app, initialScrollUp: false))
     }
 
     func testIndependentNativeTextViewRecognizesPlainAndCommandKeys() throws {
