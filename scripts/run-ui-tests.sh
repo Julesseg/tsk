@@ -107,7 +107,16 @@ if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_R
     spotlight_capture_pid=$!
 fi
 main_status=0
-if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
+if [[ "${TSK_NATIVE_KEYBOARD_HID_PILOT:-0}" == 1 ]]; then
+    if [[ "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no || -z "${TSK_EVENTKIT_EVIDENCE_DIR:-}" ]]; then
+        echo 'The native HID pilot requires the CI-owned isolated simulator and evidence directory.' >&2
+        exit 1
+    fi
+    python3 "$(dirname "${BASH_SOURCE[0]}")/with-native-keyboard-hid.py" \
+        --udid "$simulator_id" --tool-root "${TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT:?Pass the pinned .build HID tools}" \
+        --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/native-keyboard-hid" -- \
+        xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+elif [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
     python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator -- xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
 else
     xcodebuild test-without-building -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?

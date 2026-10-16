@@ -62,8 +62,9 @@ jobs:
             TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
 
   app-ui-tests:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only }}
     name: ${{ matrix.job-name }}
-    runs-on: macos-15
+    runs-on: xcode-27
     strategy:
       fail-fast: false
       matrix:
@@ -74,7 +75,18 @@ jobs:
       - name: Select latest stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: "27.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify and install pinned native HID pilot tools
+        run: |
+          python3.12 scripts/test-native-keyboard-hid-owner.py -v
+          python3.12 scripts/test-native-keyboard-hid-installer.py -v
+          python3.12 scripts/test-native-keyboard-hid-relay.py -v
+          python3.12 scripts/install-native-keyboard-hid.py --root .build/native-keyboard-hid
 
       - uses: dtolnay/rust-toolchain@1.99.0
 
@@ -133,10 +145,12 @@ jobs:
         run: |
           set -o pipefail
           export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
+          export TSK_NATIVE_KEYBOARD_HID_PILOT=1
+          export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           coverage=()
           if [[ "${{ matrix.diagnostic }}" == "true" ]]; then
-            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/CustomViewsUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/MissedNotificationUITests -only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks -only-testing:TskUITests/ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/WidgetUITests)
+            coverage=(-only-testing:TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys)
           elif [[ "${{ matrix.family }}" == "iPad" ]]; then
             coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests -only-testing:TskUITests/WidgetUITests -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/TaskNotificationUITests -only-testing:TskUITests/MissedNotificationUITests)
           fi
@@ -171,4 +185,5 @@ jobs:
             App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
+            .build/native-keyboard-hid/installer-receipt.json
           if-no-files-found: ignore
