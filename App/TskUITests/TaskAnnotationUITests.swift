@@ -142,7 +142,28 @@ final class TaskAnnotationUITests: XCTestCase {
         retain(.commandN)
         XCTAssertEqual(commandNResult, .completed)
         XCTAssertEqual(input.value as? String, "n")
-        app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command)
+        struct HIDRequest: Encodable {
+            let caseName = "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys"
+            let phase = "commandReturn"
+            let relayToken: UUID
+            let token: String
+            let state: State
+        }
+        let relayToken = try XCTUnwrap(ProcessInfo.processInfo.environment["TSK_TEST_HID_RELAY_TOKEN"].flatMap(UUID.init(uuidString:)))
+        let readyState = try XCTUnwrap(state())
+        guard readyState.processID > 0, readyState.firstResponder, readyState.textLength == 1,
+              readyState.textIsPlainN, readyState.commandNCount == 1, readyState.commandReturnCount == 0 else {
+            XCTFail("Native control must retain its focused original input baseline before HID Return")
+            return
+        }
+        let request = HIDRequest(relayToken: relayToken, token: token, state: readyState)
+        let requestData = try JSONEncoder().encode(request)
+        guard requestData.count <= 1024 else {
+            XCTFail("Native HID request exceeds its byte budget")
+            return
+        }
+        let requestLine = Data(("TSK_NATIVE_KEYBOARD_HID_REQUEST_V1 " + String(decoding: requestData, as: UTF8.self) + "\n").utf8)
+        try FileHandle.standardOutput.write(contentsOf: requestLine)
         let commandReturn = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in state()?.commandReturnCount == 1 }, object: nil)
         let commandReturnResult = XCTWaiter.wait(for: [commandReturn], timeout: 10)
         retain(.commandReturn)
