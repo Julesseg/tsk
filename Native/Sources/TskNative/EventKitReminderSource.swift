@@ -25,6 +25,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
 @available(iOS 17.0, macOS 14.0, *)
 @MainActor public final class EventKitReminderSource: ReminderMoveSource {
     let store: EKEventStore
+    private let access = EventKitReminderAccessPolicy()
     #if DEBUG && targetEnvironment(simulator)
     public var fixtureBeforeRemoval: (@MainActor @Sendable () async throws -> Void)?
     private let diagnosticStoreID = UUID().uuidString
@@ -34,6 +35,12 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     public init() { store = EKEventStore() }
 
     public func requestAccess() async throws {
+        guard try await access.requestAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .reminder)) }, request: requestNativeAccess) else {
+            throw ReminderAccessError.accessRequired
+        }
+    }
+
+    private func requestNativeAccess() async throws -> Bool {
         #if DEBUG && targetEnvironment(simulator)
         let requestID = UUID().uuidString
         let context = accessDiagnosticContext
@@ -56,20 +63,15 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
                     }
                 }
             }
-            guard granted else { throw ReminderAccessError.accessRequired }
+            return granted
         } catch {
             let native = error as NSError
             recordAccessDiagnostic("reminders.access.error", details: ["request": requestID, "errorDomain": native.domain, "errorCode": String(native.code)])
             throw error
         }
         #else
-        guard try await store.requestFullAccessToReminders() else { throw ReminderAccessError.accessRequired }
+        return try await store.requestFullAccessToReminders()
         #endif
-        switch try await EventKitAccessPublication.waitForFullAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .reminder)) }) {
-        case .ready: break
-        case .insufficient: throw ReminderAccessError.accessRequired
-        case .notReady: throw ReminderAccessError.accessNotReady
-        }
     }
 
     #if DEBUG && targetEnvironment(simulator)
@@ -108,7 +110,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         #if DEBUG && targetEnvironment(simulator)
         recordAccessDiagnostic("reminders.lists.begin")
         #endif
-        try requireAccess()
+        try await requireAccess()
         let lists = store.calendars(for: .reminder).map { ReminderList(id: $0.calendarIdentifier, title: $0.title) }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         #if DEBUG && targetEnvironment(simulator)
         recordAccessDiagnostic("reminders.lists.returned", details: ["count": String(lists.count)])
@@ -127,7 +129,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
     }
 
     private func fetch(in listIDs: [String]) async throws -> [ReminderTransferValue] {
-        try requireAccess()
+        try await requireAccess()
         let calendars = try listIDs.map { id in
             guard let calendar = store.calendar(withIdentifier: id), calendar.allowedEntityTypes.contains(.reminder) else { throw ReminderAccessError.missingList }
             return calendar
@@ -137,7 +139,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         let identifiers: [String]? = await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate, completion: Self.identifierCallback(continuation))
         }
-        try requireAccess()
+        try await requireAccess()
         guard let identifiers else { throw ReminderAccessError.fetchFailed }
         store.reset()
         let result: [ReminderTransferValue] = try identifiers.compactMap { reference in
@@ -161,7 +163,7 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         try await fixtureBeforeRemoval?()
         #endif
         try Task.checkCancellation()
-        try requireAccess()
+        try await requireAccess()
         store.reset()
         guard let current = store.calendarItem(withIdentifier: reference) as? EKReminder,
               current.calendar.allowsContentModifications, Self.snapshot(current) == expected else { throw ReminderAccessError.sourceChanged }
@@ -196,11 +198,10 @@ public enum ReminderAccessError: Error, LocalizedError, Sendable {
         return String(decoding: data, as: UTF8.self)
     }
 
-    private func requireAccess() throws {
-        let authorization = EKEventStore.authorizationStatus(for: .reminder)
-        guard authorization == .fullAccess else {
+    private func requireAccess() async throws {
+        guard try await access.requireAccess(authorization: { .init(EKEventStore.authorizationStatus(for: .reminder)) }, request: requestNativeAccess) else {
             #if DEBUG && targetEnvironment(simulator)
-            recordAccessDiagnostic("reminders.access.rejected", details: ["checkedAuthorization": String(authorization.rawValue)])
+            recordAccessDiagnostic("reminders.access.rejected")
             #endif
             throw ReminderAccessError.accessRequired
         }
