@@ -81,7 +81,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["continuous-reminders-paused"].exists)
         XCTAssertTrue(revealTaskElement(app.buttons["continuous-reminders-disable"], in: "continuous-reminders-form", app: app))
         app.buttons["continuous-reminders-disable"].tap()
-        XCTAssertTrue(revealTaskElement(app.buttons["reminders-access"], in: "continuous-reminders-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["reminders-access"], in: "continuous-reminders-form", app: app, initialScrollUp: false))
         app.buttons["reminders-access"].tap()
         grantPermission()
         readEvidence(app, contains: "Verified four source reminders unchanged")
