@@ -136,7 +136,7 @@ final class TaskNotificationUITests: XCTestCase {
             let sidebar = settings.collectionViews.matching(NSPredicate(format: "label == %@", "Sidebar")).firstMatch
             let root = sidebar.exists ? sidebar : settings.collectionViews.firstMatch
             guard revealTaskElement(apps, in: root, app: settings, maximumSteps: 12) else { return toggle }
-            tapTaskControl(apps, app: settings)
+            tapTaskMenuItem(apps, app: settings)
             capture("Actual system Apps settings before selecting tsk", settings)
             let taskApp = settings.cells.containing(.staticText, identifier: "tsk").firstMatch
             let collection = settings.collectionViews.matching(NSPredicate(format: "label != %@", "Sidebar")).firstMatch
