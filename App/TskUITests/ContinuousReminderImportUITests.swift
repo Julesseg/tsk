@@ -45,9 +45,14 @@ final class ContinuousReminderImportUITests: XCTestCase {
         XCTAssertTrue(resume.waitForExistence(timeout: 20))
         app.buttons["continuous-reminders-edit-fixture"].tap()
         XCTAssertTrue(app.staticTexts["continuous-reminders-fixture-changed"].waitForExistence(timeout: 10))
-        resume.tap()
-        XCTAssertTrue(app.staticTexts["continuous-reminders-paused"].waitForExistence(timeout: 15))
-        XCTAssertEqual(app.staticTexts["continuous-reminders-result"].label, "Saved 1; removed 0; skipped 0; failed 1.")
+        tapTaskControl(resume, app: app)
+        let result = app.staticTexts["continuous-reminders-result"]
+        let completed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.descendants(matching: .any).matching(identifier: "continuous-reminders-progress").firstMatch.exists &&
+                app.staticTexts["continuous-reminders-paused"].exists && result.exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 15), .completed)
+        XCTAssertEqual(result.label, "Saved 1; removed 0; skipped 0; failed 1.")
         readEvidence(app, contains: "Changed source and newly recurring rule preserved")
         capture("Source edited after durable save stays intact and stops the attempt", app)
         app.buttons["Done"].tap()

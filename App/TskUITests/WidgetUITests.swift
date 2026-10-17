@@ -92,7 +92,10 @@ final class WidgetUITests: XCTestCase {
         configuredView.tap()
         let filterSearch = springboard.searchFields.firstMatch
         if filterSearch.waitForExistence(timeout: 3) { filterSearch.tap(); filterSearch.typeText(view) }
-        tap(springboard, labels: [view])
+        let savedView = springboard.staticTexts[view].firstMatch
+        tapTaskControl(savedView, app: springboard)
+        XCTAssertTrue(filterSearch.waitForNonExistence(timeout: 15), "Native widget view picker did not dismiss after selection")
+        XCTAssertTrue(springboard.buttons[view].firstMatch.waitForExistence(timeout: 15), "Native widget configuration did not select the saved view")
         if springboard.buttons["Done"].exists { springboard.buttons["Done"].tap() }
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(springboard.staticTexts[custom].firstMatch.waitForExistence(timeout: 30), springboard.debugDescription)

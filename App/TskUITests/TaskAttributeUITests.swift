@@ -32,15 +32,20 @@ final class TaskAttributeUITests: XCTestCase {
             XCTAssertTrue(nameField.waitForExistence(timeout: 5))
             focusTaskText(nameField, app: app)
             nameField.typeText(name)
-            if app.buttons["dismiss-definition-keyboard"].exists { app.buttons["dismiss-definition-keyboard"].tap() }
+            XCTAssertEqual(nameField.value as? String, name)
+            tapTaskControl(app.buttons["dismiss-definition-keyboard"], app: app)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            XCTAssertEqual(nameField.value as? String, name)
             app.buttons["attribute-definition-type"].tap()
             tapTaskMenuItem(app.buttons[type], app: app)
             if name == "reference" { capture("Native UUID definition editor", app: app) }
             tapTaskControl(app.buttons["save-attribute-definition"], app: app)
             XCTAssertTrue(nameField.waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["attribute-definition-\(name)"].waitForExistence(timeout: 5))
         }
         capture("All five local attribute types", app: app)
-        app.buttons["Done"].tap()
+        tapTaskControl(app.navigationBars["Attribute definitions"].buttons["Done"], app: app)
+        XCTAssertTrue(app.buttons["new-attribute-definition"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForExistence(timeout: 5))
         setValue("note", to: "Local note", app: app)
         setValue("score", to: "invalid", app: app)
