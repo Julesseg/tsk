@@ -1,0 +1,58 @@
+# CI test tiers
+
+Pull requests and pushes to `main` run all Core and persistent Native tests,
+plus focused UI smoke coverage on both device families. Existing check names
+stay unchanged for branch protection. The UI runner builds once per lane and
+reuses that build, simulator and synchronization fixture.
+
+| UI coverage | iPhone | iPad | Trigger |
+| --- | --- | --- | --- |
+| Smoke | 8 methods | 5 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 50 declared methods | Existing 40-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
+
+The iPhone smoke selection checks capture/validation/cancel/reopen, durable
+editing/completion, real-server synchronization, annotation toolbar saves,
+native keyboard input, installed Share capture, installed widget behavior and
+actual Spotlight opening/completion. The iPad selection checks keyboard-driven
+capture/edit/completion/reopen, adaptive landscape/portrait views, custom views
+at accessibility text sizes, modal annotation commands and native text input.
+Share runs first only when selected; the iPad smoke lane skips its separate
+launch and host-fixture installation.
+
+Native task actions, exhaustive typed attributes and filters, recurrence, Reminders copy/move and
+permission changes, notification delivery/revocation, stale/peer Spotlight
+results and repeated persistence/error journeys remain in the full suite.
+Existing test bodies and assertions are unchanged. iPad-only methods still
+skip on iPhone. Source selectors live in `scripts/ui-test-selection.py`; its
+checks reject renamed selectors and empty UI selections.
+
+Smoke UI build/execution has a 30-minute step limit and a 45-minute job limit.
+Full coverage has 150/180-minute limits; diagnostics have 60/90-minute limits.
+These are ceilings, not measured completion times. Every method retains the
+600-second XCTest limit. The later `always()` step removes the owned simulator
+after a UI step failure or timeout. Runtime and signed-distribution acceptance
+still require their actual results; a smoke pass establishes only its selected
+workflows.
+
+Run the full suite on a published branch before accepting changes to system
+integrations or workflows outside smoke coverage:
+
+```sh
+gh workflow run ci.yml --repo Julesseg/tsk --ref <branch> -f ui_suite=full
+```
+
+Manual dispatch defaults to full coverage. The nightly schedule runs the
+default branch once the workflow is merged. Manual, scheduled and PR/push
+runs have separate concurrency groups, so dispatching full coverage preserves
+an active PR run. Repeated dispatches on the same branch replace each other.
+Verify the run's head SHA before attributing its result to a change. Existing
+artifact names and ownership/cleanup evidence are retained.
+
+Inspect the exact selection or verify routing without booting a simulator:
+
+```sh
+python3 scripts/ui-test-selection.py select smoke iPhone
+python3 scripts/ui-test-selection.py select full iPad
+python3 scripts/test-ui-test-selection.py
+```

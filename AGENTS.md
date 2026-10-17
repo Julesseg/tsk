@@ -60,10 +60,12 @@ CI verify it.
 
 #### CI is the canonical UI gate (background, not a decision to revisit)
 
-The `App · XCUITest (macOS)` job in `.github/workflows/ci.yml` is the
-canonical, reproducible gate for the UI test suite, and it runs on every PR.
-You **never** need to run the UI suite locally as a precondition for
-implementing an issue.
+The iPhone `App · XCUITest (macOS)` and iPad checks run focused smoke coverage
+on every PR. All Core and Native tests remain mandatory. Full UI coverage runs
+nightly and through manual dispatch. Read `docs/verification/ci-test-tiers.md`
+when changing CI coverage or verifying a workflow outside the smoke selection.
+You **never** need to run the UI suite locally as a precondition for implementing
+an issue.
 
 Whether the box you are on can run the UI suite at all is **environment-
 specific**, so it is not stated here as a flat fact. A startup hook

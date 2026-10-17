@@ -60,6 +60,7 @@ fi
 xcrun simctl bootstatus "$simulator_id" -b
 build_arguments=()
 share_arguments=()
+test_filters=()
 derived_data=""
 result_path=""
 while [[ $# -gt 0 ]]; do
@@ -74,6 +75,7 @@ while [[ $# -gt 0 ]]; do
             shift 2 ;;
         -only-testing:*|-skip-testing:*)
             build_arguments+=("$1")
+            test_filters+=("$1")
             shift ;;
         *)
             build_arguments+=("$1")
@@ -85,19 +87,25 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
     echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed share fixture.' >&2
     exit 1
 fi
+test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
 xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
-xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
 share_status=0
-xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?
+if [[ "$test_phases" == *share* ]]; then
+    xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
+    xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult" || share_status=$?
+fi
 printf 'Share-first UI status: %s\n' "$share_status"
 case "$share_status" in
     0|65) ;;
     130|143) exit "$share_status" ;;
     *) exit "$share_status" ;;
 esac
+if [[ "$test_phases" == share ]]; then
+    exit "$share_status"
+fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
     mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
     spotlight_stop_file="$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-log-stop-$simulator_id"

@@ -4,8 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
+      ui_suite:
+        description: UI coverage to run
+        type: choice
+        options: [full, smoke]
+        required: true
+        default: full
       diagnostic_only:
         description: Run only the existing diagnostic iPhone lane
         type: boolean
@@ -19,7 +27,7 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -64,6 +72,7 @@ jobs:
   app-ui-tests:
     name: ${{ matrix.job-name }}
     runs-on: xcode-27
+    timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 45 }}
     strategy:
       fail-fast: false
       matrix:
@@ -82,6 +91,7 @@ jobs:
 
       - name: Verify owned native keyboard transport boundaries
         run: |
+          python3 scripts/test-ui-test-selection.py
           python3 scripts/test-native-keyboard-hid-installer.py
           python3 scripts/test-native-keyboard-hid-relay.py
           python3 scripts/test-native-keyboard-hid-owner.py
@@ -143,19 +153,23 @@ jobs:
           '
 
       - name: Build & run UI tests
+        timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 30 }}
         working-directory: App
+        env:
+          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
+          UI_FAMILY: ${{ matrix.family }}
         run: |
-          set -o pipefail
+          set -eo pipefail
           export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           export TSK_NATIVE_KEYBOARD_HID=1
           export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
           coverage=()
-          if [[ "${{ matrix.diagnostic }}" == "true" ]]; then
-            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/CustomViewsUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/MissedNotificationUITests -only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks -only-testing:TskUITests/ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/WidgetUITests)
-          elif [[ "${{ matrix.family }}" == "iPad" ]]; then
-            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests -only-testing:TskUITests/WidgetUITests -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/TaskNotificationUITests -only-testing:TskUITests/MissedNotificationUITests)
-          fi
+          selection=$(python3 ../scripts/ui-test-selection.py select "$UI_SUITE" "$UI_FAMILY")
+          while IFS= read -r selector; do
+            if [[ -n "$selector" ]]; then coverage+=("$selector"); fi
+          done <<< "$selection"
+          printf 'UI suite: %s (%s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$selection"
           peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
           python3 ../scripts/with-sync-fixture.py \
