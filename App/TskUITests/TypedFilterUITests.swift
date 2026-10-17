@@ -25,7 +25,8 @@ final class TypedFilterUITests: XCTestCase {
         app.buttons["manage-attribute-definitions"].tap()
         addDefinition("score", type: "Numeric", app: app)
         addDefinition("rating", type: "String", app: app, orderedValues: "high\nmid\nlow\n")
-        app.buttons["Done"].tap()
+        tapTaskControl(app.navigationBars["Attribute definitions"].buttons["Done"], app: app)
+        XCTAssertTrue(app.buttons["new-attribute-definition"].waitForNonExistence(timeout: 5))
         setDateSwitch("uda-enabled-score", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
         replaceScore("3", app: app)
         setDateSwitch("uda-enabled-rating", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
@@ -51,7 +52,7 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(expression, in: "raw-filter-form", app: app))
         expression.tap()
         expression.typeText("score.above:2 and rating.above:mid")
-        app.buttons["dismiss-filter-keyboard"].tap()
+        dismissKeyboard("dismiss-filter-keyboard", app: app)
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         XCTAssertTrue(app.buttons["save-custom-view"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Typed view task", app: app).waitForExistence(timeout: 10))
@@ -92,7 +93,7 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
         description.typeText("Computed urgency task")
-        app.buttons["dismiss-editor-keyboard"].tap()
+        dismissKeyboard("dismiss-editor-keyboard", app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["task-priority"], in: "task-editor-form", app: app))
         app.buttons["task-priority"].tap()
         app.buttons["Medium"].tap()
@@ -104,7 +105,7 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap()
         name.typeText("Default urgency arithmetic")
-        app.buttons["dismiss-filter-keyboard"].tap()
+        dismissKeyboard("dismiss-filter-keyboard", app: app)
         replaceExpression("urgency / 0 > 0", app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["check-filter"], in: "raw-filter-form", app: app))
         app.buttons["check-filter"].tap()
@@ -153,7 +154,8 @@ final class TypedFilterUITests: XCTestCase {
         let expression = app.textViews["raw-filter-expression"]
         XCTAssertTrue(revealTaskElement(expression, in: "raw-filter-form", app: app))
         replaceTaskText(expression, with: value, app: app)
-        app.buttons["dismiss-filter-keyboard"].tap()
+        dismissKeyboard("dismiss-filter-keyboard", app: app)
+        XCTAssertTrue(app.buttons["save-custom-view"].exists)
     }
 
     private func addDefinition(_ name: String, type: String, app: XCUIApplication, orderedValues: String? = nil) {
@@ -162,7 +164,9 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         focusTaskText(nameField, app: app)
         nameField.typeText(name)
-        app.buttons["dismiss-definition-keyboard"].tap()
+        XCTAssertEqual(nameField.value as? String, name)
+        dismissKeyboard("dismiss-definition-keyboard", app: app)
+        XCTAssertEqual(nameField.value as? String, name)
         app.buttons["attribute-definition-type"].tap()
         tapTaskControl(app.buttons[type], app: app)
         if let orderedValues {
@@ -171,18 +175,25 @@ final class TypedFilterUITests: XCTestCase {
             XCTAssertTrue(revealTaskElement(values, in: "attribute-definition-form", app: app))
             values.tap()
             values.typeText(orderedValues)
-            app.buttons["dismiss-definition-keyboard"].tap()
+            dismissKeyboard("dismiss-definition-keyboard", app: app)
+            XCTAssertEqual(values.value as? String, orderedValues)
             capture("Local allowed string values in declared order", app: app)
         }
         tapTaskControl(app.buttons["save-attribute-definition"], app: app)
         XCTAssertTrue(nameField.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["attribute-definition-\(name)"].waitForExistence(timeout: 5))
     }
 
     private func replaceScore(_ value: String, app: XCUIApplication) {
         let field = app.descendants(matching: .any).matching(identifier: "uda-value-score").firstMatch
         XCTAssertTrue(revealTaskElement(field, in: "advanced-attributes-form", app: app))
         replaceTaskText(field, with: value, app: app)
-        app.buttons["dismiss-attributes-keyboard"].tap()
+        dismissKeyboard("dismiss-attributes-keyboard", app: app)
+    }
+
+    private func dismissKeyboard(_ identifier: String, app: XCUIApplication) {
+        tapTaskControl(app.buttons[identifier], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
     private func openAdvanced(_ app: XCUIApplication) {

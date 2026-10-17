@@ -117,7 +117,7 @@ extension XCTestCase {
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
             return
         }
-        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         func sample() -> Bool {
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
             beforeSample(deadline)

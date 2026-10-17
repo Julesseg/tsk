@@ -1,6 +1,10 @@
 import Foundation
 import CoreGraphics
 
+enum TaskControlReadinessPolicy {
+    static let accessibilityAdmissionTimeout: TimeInterval = 20
+}
+
 enum TaskControlReadinessFailure: String {
     case missing, disabled, unhittable, unsampled, snapshotFailed, nonpositiveFrame, outsideApp
     case deadlineExpired, waiterIncomplete, alreadyFinished
@@ -66,7 +70,7 @@ final class TaskControlReadinessAttempt {
         self.beforeSample = beforeSample
         self.sample = sample
         started = now()
-        self.deadline = min(started + 5, deadline ?? .infinity)
+        self.deadline = min(started + TaskControlReadinessPolicy.accessibilityAdmissionTimeout, deadline ?? .infinity)
     }
 
     var remainingTime: TimeInterval { max(0, deadline - now()) }

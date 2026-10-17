@@ -87,8 +87,11 @@ final class ReminderImportUITests: XCTestCase {
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task after denied Reminders access")
-        app.buttons["save-task"].tap()
-        XCTAssertTrue(taskRow(named: "Task after denied Reminders access", app: app).waitForExistence(timeout: 10))
+        XCTAssertEqual(description.value as? String, "Task after denied Reminders access")
+        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        tapTaskControl(app.buttons["save-task"], app: app)
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task after denied Reminders access", app: app), timeout: 10))
     }
 
     private func openImport(_ app: XCUIApplication) {

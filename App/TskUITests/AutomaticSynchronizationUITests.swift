@@ -78,7 +78,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }
         }
         func prepareCaptureControl() {
-            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
             func sample() -> Bool {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
                 dismissPasswordBeforeSample(deadline)
@@ -111,7 +111,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         func waitForCaptureDescription() -> Bool {
-            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
             func waitUntil(_ sample: @escaping () -> Bool) -> Bool {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
                 if sample() { return ProcessInfo.processInfo.systemUptime < deadline }
@@ -138,7 +138,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         }
         XCTAssertTrue(waitForCaptureDescription())
         func prepareCaptureFocus() -> Bool {
-            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
             func sample() -> Bool {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
                 dismissPasswordBeforeSample(deadline)

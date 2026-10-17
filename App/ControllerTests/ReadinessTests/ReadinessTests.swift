@@ -10,6 +10,48 @@ import Testing
                                    elementFrame: frame ?? CGRect(origin: CGPoint(x: 40, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
     }
 
+    @Test func observedAccessibilityLatencyStillAdmitsOneReadyAction() {
+        for duration in [6.259, 8.749, 11.964] {
+            let clock = Clock()
+            var reads = 0
+            var actions = 0
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+                reads += 1
+                clock.now += duration
+                return sample()
+            })
+            let completed = attempt.waitUntilReady { _, _ in
+                Issue.record("An already ready sample must not require another poll")
+                return false
+            }
+            #expect(completed)
+            #expect(attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+            #expect(reads == 1)
+            #expect(actions == 1)
+            #expect(!attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+            #expect(actions == 1)
+        }
+    }
+
+    @Test func explicitFiveSecondDeadlineStillRejectsObservedSlowReadySample() {
+        let clock = Clock()
+        var actions = 0
+        var waits = 0
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: 5, sample: {
+            clock.now += 8.749
+            return sample()
+        })
+        let completed = attempt.waitUntilReady { _, _ in
+            waits += 1
+            return true
+        }
+        #expect(!completed)
+        #expect(!attempt.finish(waitCompleted: completed) { _ in actions += 1 })
+        #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
+        #expect(actions == 0)
+        #expect(waits == 0)
+    }
+
     @Test func enclosingDeadlineBoundsPreparationSamplingAndDispatch() {
         for phase in 0..<3 {
             let clock = Clock()
@@ -37,7 +79,7 @@ import Testing
         }
     }
 
-    @Test func enclosingDeadlineNeverExtendsDefaultFiveSeconds() {
+    @Test func enclosingDeadlineNeverExtendsDefaultTwentySeconds() {
         for deadline in [nil, 100.0] as [TimeInterval?] {
             let clock = Clock()
             clock.now = 2
@@ -47,8 +89,8 @@ import Testing
                 samples += 1
                 return sample()
             })
-            #expect(attempt.remainingTime == 5)
-            clock.now = 7
+            #expect(attempt.remainingTime == 20)
+            clock.now = 22
             #expect(!attempt.evaluate())
             #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
             #expect(samples == 0)
@@ -73,7 +115,7 @@ import Testing
         #expect(attempt.evaluate())
         #expect(attempt.finish(waitCompleted: true) { _ in actions += 1 })
         #expect(actions == 1)
-        #expect(deadlines == [5, 5])
+        #expect(deadlines == [20, 20])
         #expect(clock.now == 3.25)
         #expect(!attempt.finish(waitCompleted: true) { _ in actions += 1 })
         #expect(actions == 1)
@@ -85,7 +127,7 @@ import Testing
             var preparations = 0
             var samples = 0
             var actions = 0
-            let attempt = TaskControlReadinessAttempt(now: { clock.now }, beforeSample: { _ in
+            let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: 5, beforeSample: { _ in
                 preparations += 1
                 clock.now = completedAt
             }, sample: {
@@ -139,7 +181,7 @@ import Testing
             clock.now += 1
             return evaluate()
         }
-        #expect(waitBudget == 4)
+        #expect(waitBudget == 19)
         #expect(completed)
         #expect(attempt.finish(waitCompleted: completed) { _ in actions += 1 })
         #expect(actions == 1)
@@ -147,7 +189,7 @@ import Testing
     }
 
     @Test func expiredInitialSampleNeverWaitsOrDispatches() {
-        for duration in [5.0, 5.2] {
+        for duration in [20.0, 20.2] {
             let clock = Clock()
             var waits = 0
             var actions = 0
@@ -261,12 +303,12 @@ import Testing
             var performed = false
             let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
                 reads += 1
-                if phase == 1 { clock.now = 5 }
+                if phase == 1 { clock.now = 20 }
                 return sample()
             })
-            if phase == 0 { clock.now = 5 }
+            if phase == 0 { clock.now = 20 }
             #expect(attempt.evaluate() == (phase == 2))
-            clock.now = 5
+            clock.now = 20
             #expect(!attempt.finish(waitCompleted: true) { _ in performed = true })
             #expect(!performed)
             #expect(reads == (phase == 0 ? 0 : 1))
@@ -277,7 +319,7 @@ import Testing
     @Test func expiredSamplingKeepsItsReasonAndElapsedBeforeFailureAttachments() {
         let clock = Clock()
         var performed = false
-        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: 5, sample: {
             clock.now = 5.2
             return sample()
         })
@@ -313,7 +355,7 @@ import Testing
 
     @Test func overBudgetUnhittableSampleRemainsUnhittableInDiagnostics() {
         let clock = Clock()
-        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: {
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, deadline: 5, sample: {
             clock.now = 6
             return sample(hittable: false)
         })
