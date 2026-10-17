@@ -37,19 +37,41 @@ extension XCTestCase {
             tapTaskControl(keyboardDone, app: app, file: file, line: line)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)
         }
-        let control = app.switches[identifier].firstMatch
+        let control = app.collectionViews[containerID].switches[identifier].firstMatch
         guard revealTaskElement(control, in: containerID, app: app, file: file, line: line) else { return }
-        let expected = enabled ? "1" : "0"
-        if control.value as? String != expected {
+        if !TaskSwitchValue.matches(control.value, enabled: enabled) {
             let thumb = control.switches.firstMatch
             let selected = thumb.exists ? thumb : control
             recordTaskSwitchInteraction(row: control, selected: selected, phase: "before", app: app)
             tapTaskControl(selected, app: app, file: file, line: line)
         }
-        let changed = expectation(for: NSPredicate(format: "value == %@", expected), evaluatedWith: control)
-        let result = XCTWaiter.wait(for: [changed], timeout: 5)
-        recordTaskSwitchInteraction(row: control, selected: control.switches.firstMatch.exists ? control.switches.firstMatch : control, phase: "after", app: app, includeHierarchy: result != .completed)
-        XCTAssertEqual(result, .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        var lastSample = "not sampled"
+        func changed() -> Bool {
+            let started = ProcessInfo.processInfo.systemUptime
+            guard started < deadline else { return false }
+            do {
+                let snapshot = try control.snapshot()
+                let value = snapshot.value
+                let matches = TaskSwitchValue.matches(value, enabled: enabled)
+                let finished = ProcessInfo.processInfo.systemUptime
+                let accepted = finished < deadline && matches
+                let type = value.map { String(reflecting: Swift.type(of: $0)) } ?? "nil"
+                lastSample = "value=\(String(describing: value)); type=\(type); readSeconds=\(finished - started); remainingSeconds=\(deadline - finished)"
+                return accepted
+            } catch {
+                lastSample = "snapshotError=\(error); readSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
+                return false
+            }
+        }
+        var acknowledged = changed()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !acknowledged, remaining > 0 {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in changed() }, object: nil)
+            acknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        recordTaskSwitchInteraction(row: control, selected: control.switches.firstMatch.exists ? control.switches.firstMatch : control, phase: "after", app: app, includeHierarchy: !acknowledged)
+        XCTAssertTrue(acknowledged, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier); \(lastSample)", file: file, line: line)
     }
 
     func recordTaskSwitchInteraction(row: XCUIElement, selected: XCUIElement, phase: String, app: XCUIApplication, includeHierarchy: Bool = false) {

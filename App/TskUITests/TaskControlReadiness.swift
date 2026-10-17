@@ -126,3 +126,11 @@ final class TaskControlReadinessAttempt {
         return true
     }
 }
+
+enum TaskSwitchValue {
+    static func matches(_ value: Any?, enabled: Bool) -> Bool {
+        if let text = value as? String { return text == (enabled ? "1" : "0") }
+        if let number = value as? NSNumber { return number == NSNumber(value: enabled) }
+        return false
+    }
+}

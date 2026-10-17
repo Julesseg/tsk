@@ -381,3 +381,20 @@ import Testing
         #expect(nonfinite.diagnostic.contains("inf"))
     }
 }
+
+@Suite struct TaskSwitchValueProof {
+    @Test func nativeBinaryRepresentationsMatchOnlyTheirExactState() {
+        for value: Any in ["0", NSString(string: "0"), NSNumber(value: 0), NSNumber(value: false)] {
+            #expect(TaskSwitchValue.matches(value, enabled: false))
+            #expect(!TaskSwitchValue.matches(value, enabled: true))
+        }
+        for value: Any in ["1", NSString(string: "1"), NSNumber(value: 1), NSNumber(value: true)] {
+            #expect(TaskSwitchValue.matches(value, enabled: true))
+            #expect(!TaskSwitchValue.matches(value, enabled: false))
+        }
+        for value: Any? in [nil, "", "true", "1.0", NSNumber(value: -1), NSNumber(value: 2), NSNumber(value: 0.5)] {
+            #expect(!TaskSwitchValue.matches(value, enabled: false))
+            #expect(!TaskSwitchValue.matches(value, enabled: true))
+        }
+    }
+}
