@@ -23,7 +23,7 @@ struct TaskAttributeDefinitionsView: View {
                         }
                     }
                     .accessibilityIdentifier("attribute-definition-\(definition.name.rawValue)")
-                    .swipeActions { Button("Remove definition", role: .destructive) { Task { await remove(definition) } } }
+                    .swipeActions { Button("Remove definition") { Task { await remove(definition) } }.tint(.red) }
                     .contextMenu { Button("Remove definition", systemImage: "trash", role: .destructive) { Task { await remove(definition) } } }
                 }
             }
