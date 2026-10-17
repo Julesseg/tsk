@@ -75,8 +75,12 @@ extension XCTestCase {
         }
     }
 
-    func tapTaskMenuItem(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    func tapTaskButton(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         activateTaskControl(element, app: app, file: file, line: line) { element.tap() }
+    }
+
+    func tapTaskMenuItem(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        tapTaskButton(element, app: app, file: file, line: line)
     }
 
     private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: () -> Void) {
@@ -222,25 +226,41 @@ extension XCTestCase {
             return false
         }
         var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
+        let pinnedIDs: Set<String> = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
         for step in 0...maximumSteps {
+            let application: any XCUIElementSnapshot
+            do { application = try app.snapshot() }
+            catch {
+                XCTFail("Cannot snapshot native reveal geometry in \(context): \(error)", file: file, line: line)
+                return false
+            }
+            var snapshots = [application]
+            var pending = Array(application.children.reversed())
+            while let snapshot = pending.popLast() {
+                snapshots.append(snapshot)
+                pending.append(contentsOf: snapshot.children.reversed())
+            }
             let formFrame = form.frame
-            let appFrame = app.frame
+            let appFrame = application.frame
             let visible = formFrame.intersection(appFrame)
             let navigationBottom = app.navigationBars.allElementsBoundByIndex.compactMap { item -> CGFloat? in
                 guard item.exists, item.isHittable else { return nil }
                 let frame = item.frame
                 return frame.intersection(visible).width > visible.width / 2 && frame.maxY <= visible.minY + 140 ? frame.maxY : nil
             }.max() ?? visible.minY
-            let pinnedIDs = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
-            let pinnedBottom = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", pinnedIDs)).allElementsBoundByIndex.compactMap { item -> CGFloat? in
-                guard item.exists, item.isHittable else { return nil }
-                let frame = item.frame
-                return frame.intersects(visible) ? frame.maxY : nil
+            var pinnedQueries: Set<String> = []
+            let pinnedBottom = snapshots.filter { pinnedIDs.contains($0.identifier) }.compactMap { snapshot -> CGFloat? in
+                guard pinnedQueries.insert("\(snapshot.elementType.rawValue):\(snapshot.identifier)").inserted else { return nil }
+                return app.descendants(matching: snapshot.elementType).matching(identifier: snapshot.identifier).allElementsBoundByIndex.compactMap { item -> CGFloat? in
+                    guard item.exists, item.isHittable else { return nil }
+                    let frame = item.frame
+                    return frame.intersects(visible) ? frame.maxY : nil
+                }.max()
             }.max() ?? visible.minY
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
-            let keyboard = app.keyboards.firstMatch
+            let keyboardFrame = snapshots.first { $0.elementType == .keyboard }?.frame
             let insetFrame = bottomInset.flatMap { $0.exists ? $0.frame : nil }
-            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboard.exists ? keyboard.frame : nil, bottomInsetFrame: insetFrame)
+            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboardFrame, bottomInsetFrame: insetFrame)
             let bottom = body.bottom
             guard visible.width > 0, bottom - top > 60 else { break }
             var targetMidY: CGFloat?

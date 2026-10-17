@@ -106,7 +106,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap()
         name.typeText("All local tasks")
-        tapTaskControl(app.buttons["dismiss-filter-keyboard"], app: app)
+        tapTaskButton(app.buttons["dismiss-filter-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         XCTAssertTrue(revealTaskElement(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "sidebar-custom-")).firstMatch, in: "workspace-sidebar", app: app))
@@ -164,7 +164,7 @@ final class iPadWorkspaceUITests: XCTestCase {
     }
 
     private func description(_ app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
+        app.collectionViews["task-editor-form"].textFields["task-description"].firstMatch
     }
 
     private func capture(_ name: String, app: XCUIApplication) {
