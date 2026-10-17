@@ -43,18 +43,25 @@ extension XCTestCase {
         }
         let changed = expectation(for: NSPredicate(format: "value == %@", expected), evaluatedWith: control)
         let result = XCTWaiter.wait(for: [changed], timeout: 5)
-        recordTaskSwitchInteraction(row: control, selected: control.switches.firstMatch.exists ? control.switches.firstMatch : control, phase: "after", app: app)
+        recordTaskSwitchInteraction(row: control, selected: control.switches.firstMatch.exists ? control.switches.firstMatch : control, phase: "after", app: app, includeHierarchy: result != .completed)
         XCTAssertEqual(result, .completed, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier)", file: file, line: line)
     }
 
-    func recordTaskSwitchInteraction(row: XCUIElement, selected: XCUIElement, phase: String, app: XCUIApplication) {
+    func recordTaskSwitchInteraction(row: XCUIElement, selected: XCUIElement, phase: String, app: XCUIApplication, includeHierarchy: Bool = false) {
         guard ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" else { return }
-        let frame = selected.frame
-        let metadata = "phase=\(phase)\nrowIdentifier=\(row.identifier)\nrowValue=\(String(describing: row.value))\nselectedIdentifier=\(selected.identifier)\nselectedValue=\(String(describing: selected.value))\nenabled=\(selected.isEnabled)\nhittable=\(selected.isHittable)\nframe=\(frame)\nappFrame=\(app.frame)\nrequestedTap=\(frame.midX),\(frame.midY)\nrowHierarchy=\(row.debugDescription)"
-        let attachment = XCTAttachment(string: metadata)
-        attachment.name = "Actual selected switch \(phase) metadata and hierarchy"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        do {
+            let rowSnapshot = try row.snapshot()
+            let selectedSnapshot = try selected.snapshot()
+            let frame = selectedSnapshot.frame
+            var metadata = "phase=\(phase)\nrowIdentifier=\(rowSnapshot.identifier)\nrowValue=\(String(describing: rowSnapshot.value))\nselectedIdentifier=\(selectedSnapshot.identifier)\nselectedValue=\(String(describing: selectedSnapshot.value))\nenabled=\(selectedSnapshot.isEnabled)\nhittable=\(selected.isHittable)\nframe=\(frame)\nappFrame=\(app.frame)\nrequestedTap=\(frame.midX),\(frame.midY)"
+            if includeHierarchy { metadata += "\nrowHierarchy=\(row.debugDescription)" }
+            let attachment = XCTAttachment(string: metadata)
+            attachment.name = "Actual selected switch \(phase) metadata"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        } catch {
+            recordTaskInteraction(app, detail: "Switch diagnostic snapshot unavailable for \(phase): \(error)")
+        }
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
@@ -206,13 +213,19 @@ extension XCTestCase {
         }
         var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
         for step in 0...maximumSteps {
-            let visible = form.frame.intersection(app.frame)
-            let navigationBottom = app.navigationBars.allElementsBoundByIndex.filter {
-                $0.exists && $0.isHittable && $0.frame.intersection(visible).width > visible.width / 2 && $0.frame.maxY <= visible.minY + 140
-            }.map { $0.frame.maxY }.max() ?? visible.minY
+            let formFrame = form.frame
+            let appFrame = app.frame
+            let visible = formFrame.intersection(appFrame)
+            let navigationBottom = app.navigationBars.allElementsBoundByIndex.compactMap { item -> CGFloat? in
+                guard item.exists, item.isHittable else { return nil }
+                let frame = item.frame
+                return frame.intersection(visible).width > visible.width / 2 && frame.maxY <= visible.minY + 140 ? frame.maxY : nil
+            }.max() ?? visible.minY
             let pinnedIDs = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
             let pinnedBottom = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", pinnedIDs)).allElementsBoundByIndex.compactMap { item -> CGFloat? in
-                return item.exists && item.isHittable && item.frame.intersects(visible) ? item.frame.maxY : nil
+                guard item.exists, item.isHittable else { return nil }
+                let frame = item.frame
+                return frame.intersects(visible) ? frame.maxY : nil
             }.max() ?? visible.minY
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
             let keyboard = app.keyboards.firstMatch
@@ -238,8 +251,8 @@ extension XCTestCase {
             let startY = middle + (scrollUp ? distance / 2 : -distance / 2)
             let endY = middle + (scrollUp ? -distance / 2 : distance / 2)
             let origin = app.coordinate(withNormalizedOffset: .zero)
-            origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: startY - app.frame.minY))
-                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: endY - app.frame.minY)))
+            origin.withOffset(CGVector(dx: visible.midX - appFrame.minX, dy: startY - appFrame.minY))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: visible.midX - appFrame.minX, dy: endY - appFrame.minY)))
         }
         recordTaskInteraction(app, detail: "Cannot reveal \(element) in \(context); form=\(form.frame)")
         XCTFail("Task element could not be revealed in \(context): \(element)", file: file, line: line)
