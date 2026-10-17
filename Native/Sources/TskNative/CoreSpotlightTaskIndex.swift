@@ -84,22 +84,39 @@ public actor CoreSpotlightTaskIndex: TaskSpotlightIndex {
     public func query() async throws -> [SpotlightIndexedItem] {
         let query = CSSearchQuery(queryString: "domainIdentifier == \"\(Self.escaped(namespace))\"", attributes: ["title"])
         let id = UUID(), collector = SpotlightQueryCollector()
+        let trace = TaskParticipantDiagnostics.begin("spotlight.query")
+        if let trace { TaskParticipantDiagnostics.event("spotlight.query.invocation", details: ["queryID": id.uuidString, "spanID": trace.uuidString]) }
         activeQueries[id] = query
-        defer { activeQueries[id] = nil }
+        defer { activeQueries[id] = nil; TaskParticipantDiagnostics.end("spotlight.query", id: trace) }
         return try await withCheckedThrowingContinuation { continuation in
-            query.foundItemsHandler = Self.foundHandler(collector)
-            query.completionHandler = Self.completionHandler(collector, continuation)
+            query.foundItemsHandler = Self.foundHandler(collector, queryID: id)
+            query.completionHandler = Self.completionHandler(collector, continuation, queryID: id)
+            let submission = TaskParticipantDiagnostics.begin("spotlight.query.submit")
+            defer { TaskParticipantDiagnostics.end("spotlight.query.submit", id: submission) }
+            if let submission { TaskParticipantDiagnostics.event("spotlight.query.submission", details: ["queryID": id.uuidString, "spanID": submission.uuidString, "mainThread": String(Thread.isMainThread)]) }
             query.start()
         }
     }
 
-    nonisolated private static func foundHandler(_ collector: SpotlightQueryCollector) -> @Sendable ([CSSearchableItem]) -> Void {
-        { items in collector.append(items.map { SpotlightIndexedItem(identifier: $0.uniqueIdentifier, title: $0.attributeSet.title ?? "") }) }
+    nonisolated private static func foundHandler(_ collector: SpotlightQueryCollector, queryID: UUID) -> @Sendable ([CSSearchableItem]) -> Void {
+        { items in
+            collector.append(items.map { SpotlightIndexedItem(identifier: $0.uniqueIdentifier, title: $0.attributeSet.title ?? "") })
+            TaskParticipantDiagnostics.event("spotlight.query.found", details: ["queryID": queryID.uuidString, "count": String(items.count), "mainThread": String(Thread.isMainThread)])
+        }
     }
-    nonisolated private static func completionHandler(_ collector: SpotlightQueryCollector, _ continuation: CheckedContinuation<[SpotlightIndexedItem], any Error>) -> @Sendable ((any Error)?) -> Void {
+    nonisolated private static func completionHandler(_ collector: SpotlightQueryCollector, _ continuation: CheckedContinuation<[SpotlightIndexedItem], any Error>, queryID: UUID) -> @Sendable ((any Error)?) -> Void {
         { error in
+            let receivedAt = Date().timeIntervalSince1970
             if let error { continuation.resume(throwing: error) }
             else { continuation.resume(returning: collector.values()) }
+            var details = ["queryID": queryID.uuidString, "receivedAt": String(receivedAt), "succeeded": String(error == nil), "mainThread": String(Thread.isMainThread)]
+            if let error {
+                let native = error as NSError
+                details["errorDomain"] = native.domain
+                details["errorCode"] = String(native.code)
+                details["error"] = native.localizedDescription
+            }
+            TaskParticipantDiagnostics.event("spotlight.query.callback", details: details)
         }
     }
     nonisolated private static func escaped(_ raw: String) -> String { raw.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }

@@ -10,7 +10,7 @@ import XCTest
         app.launch()
         let id = create(title, app)
         openSettings(app)
-        query(app, id: id, present: true)
+        query(app, id: id, present: true, expectedIndexedCount: 1)
         app.buttons["Done"].tap()
         try systemSearch(title, app)
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 20))
@@ -21,7 +21,7 @@ import XCTest
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app, initialScrollUp: false))
         app.buttons["complete-task"].tap()
         app.buttons["Done"].tap()
-        openSettings(app); query(app, id: id, present: false)
+        openSettings(app); query(app, id: id, present: false, expectedIndexedCount: 0)
         capture("Confirmed local completion removes actual indexed UUID", app)
     }
 
@@ -93,20 +93,30 @@ import XCTest
         tapTaskMenuItem(app.buttons["spotlight-settings"], app: app)
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
-    private func query(_ app: XCUIApplication, id: String, present: Bool) {
+    private func query(_ app: XCUIApplication, id: String, present: Bool, expectedIndexedCount: Int? = nil) {
         let deadline = Date().addingTimeInterval(60)
         let button = app.buttons["spotlight-query"]
         let ids = app.staticTexts["spotlight-fixture-query-ids"]
+        let count = app.staticTexts["spotlight-index-count"]
+        let pending = app.staticTexts["spotlight-index-pending"]
+        let expectedProjection = expectedIndexedCount.map { "Last journaled projection: \($0) task(s)" }
+        var lastCompletedQuery = "No completed query"
         XCTAssertTrue(revealTaskElement(button, in: "spotlight-settings-form", app: app))
         repeat {
-            if button.isEnabled { button.tap() }
+            let indexed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                button.isEnabled && count.exists && !pending.exists && (expectedProjection.map { count.label == $0 } ?? true)
+            }, object: nil)
+            guard XCTWaiter.wait(for: [indexed], timeout: max(0, deadline.timeIntervalSinceNow)) == .completed,
+                  Date() < deadline else { break }
+            button.tap()
             let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                 button.isEnabled && app.staticTexts["spotlight-query-result"].exists
             }, object: nil)
             guard XCTWaiter.wait(for: [finished], timeout: max(0, deadline.timeIntervalSinceNow)) == .completed else { break }
-            if ids.exists, let values = ids.value as? String,
-               values.lowercased().contains(id.lowercased()) == present,
-               !app.staticTexts["spotlight-index-pending"].exists { return }
+            if ids.exists, let values = ids.value as? String {
+                lastCompletedQuery = values
+                if values.lowercased().contains(id.lowercased()) == present, !pending.exists { return }
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
         } while Date() < deadline
         capture("Actual Spotlight membership did not settle within the bounded 60-second query budget", app)
@@ -115,7 +125,7 @@ import XCTest
         let message = error.exists ? error.label : "No query error label"
         let hierarchy = XCTAttachment(string: app.debugDescription)
         hierarchy.name = "Actual Spotlight membership failure accessibility endpoint"; hierarchy.lifetime = .keepAlways; add(hierarchy)
-        XCTFail("Actual indexed UUID membership must become \(present ? "present" : "absent"): \(id). Observed \(observed); \(message); pending=\(app.staticTexts["spotlight-index-pending"].exists)")
+        XCTFail("Actual indexed UUID membership must become \(present ? "present" : "absent"): \(id). Observed \(observed); last completed query: \(lastCompletedQuery); \(message); pending=\(app.staticTexts["spotlight-index-pending"].exists)")
     }
     private func systemSearch(_ title: String, _ app: XCUIApplication) throws {
         XCUIDevice.shared.press(.home)
