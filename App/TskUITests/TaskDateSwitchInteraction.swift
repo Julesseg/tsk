@@ -193,12 +193,12 @@ extension XCTestCase {
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, bottomInset: XCUIElement? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, bottomInset: bottomInset, file: file, line: line)
+    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, bottomInset: bottomInset, requireFullVisibility: requireFullVisibility, file: file, line: line)
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", bottomInset: XCUIElement? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         guard form.waitForExistence(timeout: 5) else {
             recordTaskInteraction(app, detail: "Missing form \(context)")
             XCTFail("Missing task form: \(context)", file: file, line: line)
@@ -226,8 +226,9 @@ extension XCTestCase {
                 let target = thumb.exists ? thumb : element
                 let frame = target.frame
                 if frame.minY.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0 {
-                    if body.contains(midY: frame.midY), target.isHittable { return true }
-                    targetMidY = frame.midY
+                    let targetVisible = requireFullVisibility ? body.contains(frame: frame) : body.contains(midY: frame.midY)
+                    if targetVisible, target.isHittable { return true }
+                    targetMidY = body.scrollTargetY(for: frame, requireFullVisibility: requireFullVisibility)
                 }
             }
             let scrollUp = direction.update(targetMidY: targetMidY, bottom: bottom)

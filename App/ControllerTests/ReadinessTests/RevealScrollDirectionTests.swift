@@ -2,6 +2,25 @@ import CoreGraphics
 import Testing
 
 @Suite struct TaskRevealScrollDirectionProof {
+    @Test func observedAppsRowMustClearFloatingSettingsSearchBeforeActivation() {
+        let visible = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let apps = CGRect(x: 20, y: 833.666667, width: 400, height: 52)
+        let search = CGRect(x: 28, y: 890, width: 384, height: 28)
+        let body = TaskRevealVisibleBody(visibleFrame: visible, top: 124, keyboardFrame: nil, bottomInsetFrame: search)
+        #expect(body.bottom == 882)
+        #expect(body.contains(midY: apps.midY))
+        #expect(!body.contains(frame: apps))
+        var direction = TaskRevealScrollDirection(initialScrollUp: false)
+        let scrollUp = direction.update(targetMidY: body.scrollTargetY(for: apps, requireFullVisibility: true), bottom: body.bottom)
+        #expect(scrollUp)
+        let shifted = apps.offsetBy(dx: 0, dy: -250)
+        #expect(body.contains(frame: shifted))
+        #expect(shifted.maxY < 880)
+        var legacy = TaskRevealScrollDirection(initialScrollUp: true)
+        let legacyScrollUp = legacy.update(targetMidY: body.scrollTargetY(for: apps, requireFullVisibility: false), bottom: body.bottom)
+        #expect(!legacyScrollUp)
+    }
+
     @Test func observedDismissalBandExcludesProjectAboveTheKeyboardAndRequiresScrolling() {
         let visible = CGRect(x: 0, y: 72, width: 440, height: 884)
         let project = CGRect(x: 40, y: 561.666687, width: 360, height: 22)
