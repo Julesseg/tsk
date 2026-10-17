@@ -15,85 +15,62 @@ struct ContinuousReminderSettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("One designated device") {
-                    Text("Keep continuous import enabled on only one device. It is disabled by default elsewhere. Sources are removed only after each valid task is saved locally.")
-                    Text("An interrupted move, failed removal, or explicit retry can leave a saved task and its source together. Retrying can create duplicates; no per-reminder tracking is retained.").font(.footnote)
-                    if controller.status?.configuredOnAnotherDevice == true { Text("These settings designate another device. Moving is disabled here. Disable the other device before enabling this one.") }
-                    ReminderRecurrenceInformation()
-                    Button("Allow Reminders access / Refresh lists") { Task { await loadLists() } }.accessibilityIdentifier("reminders-access")
-                }
-                ReminderListMappingSection(lists: lists, projects: $projects, focused: $editingProject)
-                Section {
-                    Button("Enable and move on this device") { Task { await enable() } }
-                        .disabled(projects.isEmpty).accessibilityIdentifier("continuous-reminders-enable")
-                    Button("Disable on this device") { Task { await disable() } }
-                        .accessibilityIdentifier("continuous-reminders-disable")
-                    Button("Scan / Retry moving now") { Task { editingProject = false; await controller.scan(retry: true) } }
-                        .disabled(controller.status?.active != true).accessibilityIdentifier("continuous-reminders-retry")
-                    Text("Windows share one import attempt. Pauses survive reopening the app; Scan / Retry or re-enabling explicitly resumes moving. Selected-list changes and app opening can trigger scans. iOS background opportunities are best effort; reminders may wait until you reopen tsk.").font(.footnote)
-                    if let schedulingError = SynchronizationAppDelegate.schedulingError { Text(schedulingError).font(.footnote) }
-                }
-                if let result = controller.result {
-                    Section("Current attempt") {
-                        ForEach(result.imported) { task in
-                            VStack(alignment: .leading) {
-                                Text(task.description)
-                                if task.status == "recurring" { Text("Recurring template").font(.caption) }
-                            }
-                        }
-                        if result.imported.contains(where: { $0.status == "recurring" }) {
-                            Button("View recurring templates") { isShowingTemplates = true }.accessibilityIdentifier("continuous-reminders-view-templates")
-                        }
-                        ForEach((result.skipped + result.failures).indices, id: \.self) { index in
-                            let item = (result.skipped + result.failures)[index]
-                            VStack(alignment: .leading) { Text(item.title).font(.headline); Text(item.reason ?? "Not moved").font(.footnote) }
-                        }
+            VStack(spacing: 0) {
+                statusAndActions
+                Form {
+                    Section("One designated device") {
+                        Text("Keep continuous import enabled on only one device. It is disabled by default elsewhere. Sources are removed only after each valid task is saved locally.")
+                        Text("An interrupted move, failed removal, or explicit retry can leave a saved task and its source together. Retrying can create duplicates; no per-reminder tracking is retained.").font(.footnote)
+                        if controller.status?.configuredOnAnotherDevice == true { Text("These settings designate another device. Moving is disabled here. Disable the other device before enabling this one.") }
+                        ReminderRecurrenceInformation()
+                        Button("Allow Reminders access / Refresh lists") { Task { await loadLists() } }.accessibilityIdentifier("reminders-access")
                     }
-                }
-                #if DEBUG
-                if ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" {
-                Button("Add isolated capture") { Task { await changeFixture(edit: false) } }.accessibilityIdentifier("continuous-reminders-add-fixture")
-                Button("Read isolated move fixture") { Task { await verifyFixture() } }.accessibilityIdentifier("continuous-reminders-verify-fixture")
-                }
-                #endif
-                if let fixtureReport {
-                    ScrollView { Text(fixtureReport).font(.caption.monospaced()) }.frame(height: 160)
-                        .accessibilityElement(children: .ignore).accessibilityLabel("Real EventKit move evidence")
-                        .accessibilityValue(fixtureReport).accessibilityIdentifier("continuous-reminders-fixture-report")
-                }
-            }
-            .accessibilityIdentifier("continuous-reminders-form")
-            .disabled(loading || controller.isRunning)
-            .overlay { if loading || controller.isRunning { ProgressView(controller.isRunning ? "Waiting for other windows or moving reminders…" : "Loading Reminders…").accessibilityIdentifier("continuous-reminders-progress").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
-            .safeAreaInset(edge: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(controller.status?.active == true ? "Enabled on this device" : "Disabled on this device").accessibilityIdentifier("continuous-reminders-status")
-                    if controller.status?.active == true && controller.status?.paused == true {
-                        Text("Automatic moves are paused. Review the source before explicitly retrying.").font(.footnote).accessibilityIdentifier("continuous-reminders-paused")
+                    ReminderListMappingSection(lists: lists, projects: $projects, focused: $editingProject)
+                    Section {
+                        Button("Enable and move on this device") { Task { await enable() } }
+                            .disabled(projects.isEmpty).accessibilityIdentifier("continuous-reminders-enable")
+                        Button("Disable on this device") { Task { await disable() } }
+                            .accessibilityIdentifier("continuous-reminders-disable")
+                        Button("Scan / Retry moving now") { Task { editingProject = false; await controller.scan(retry: true) } }
+                            .disabled(controller.status?.active != true).accessibilityIdentifier("continuous-reminders-retry")
+                        Text("Windows share one import attempt. Pauses survive reopening the app; Scan / Retry or re-enabling explicitly resumes moving. Selected-list changes and app opening can trigger scans. iOS background opportunities are best effort; reminders may wait until you reopen tsk.").font(.footnote)
+                        if let schedulingError = SynchronizationAppDelegate.schedulingError { Text(schedulingError).font(.footnote) }
                     }
                     if let result = controller.result {
-                        Text("Saved \(result.imported.count); removed \(result.removedCount); skipped \(result.skipped.count); failed \(result.failures.count).")
-                            .font(.footnote).accessibilityIdentifier("continuous-reminders-result")
+                        Section("Current attempt") {
+                            ForEach(result.imported) { task in
+                                VStack(alignment: .leading) {
+                                    Text(task.description)
+                                    if task.status == "recurring" { Text("Recurring template").font(.caption) }
+                                }
+                            }
+                            if result.imported.contains(where: { $0.status == "recurring" }) {
+                                Button("View recurring templates") { isShowingTemplates = true }.accessibilityIdentifier("continuous-reminders-view-templates")
+                            }
+                            ForEach((result.skipped + result.failures).indices, id: \.self) { index in
+                                let item = (result.skipped + result.failures)[index]
+                                VStack(alignment: .leading) { Text(item.title).font(.headline); Text(item.reason ?? "Not moved").font(.footnote) }
+                            }
+                        }
                     }
-                    if controller.isRunning { Button("Stop moving") { controller.cancel() }.padding().background(.bar).disabled(false).accessibilityIdentifier("continuous-reminders-stop") }
-                    if let message = error ?? controller.error { Text(message).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial).accessibilityIdentifier("continuous-reminders-error") }
                     #if DEBUG
-                    if controller.fixtureWaiting {
-                        Button("Edit fixture source before removal") { Task { await changeFixture(edit: true) } }.disabled(false).accessibilityIdentifier("continuous-reminders-edit-fixture")
-                        Text("Fixture source updated")
-                            .opacity(fixtureChanged ? 1 : 0).accessibilityHidden(!fixtureChanged)
-                            .accessibilityIdentifier("continuous-reminders-fixture-changed")
-                        Button("Resume fixture removal") { controller.resumeFixture() }.disabled(false).padding().background(.bar).accessibilityIdentifier("continuous-reminders-resume-fixture")
+                    if ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" {
+                    Button("Add isolated capture") { Task { await changeFixture(edit: false) } }.accessibilityIdentifier("continuous-reminders-add-fixture")
+                    Button("Read isolated move fixture") { Task { await verifyFixture() } }.accessibilityIdentifier("continuous-reminders-verify-fixture")
                     }
                     #endif
+                    if let fixtureReport {
+                        ScrollView { Text(fixtureReport).font(.caption.monospaced()) }.frame(height: 160)
+                            .accessibilityElement(children: .ignore).accessibilityLabel("Real EventKit move evidence")
+                            .accessibilityValue(fixtureReport).accessibilityIdentifier("continuous-reminders-fixture-report")
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.background)
-            }
-            .safeAreaInset(edge: .bottom) {
-                if editingProject { HStack { Spacer(); Button("Done") { editingProject = false }.accessibilityIdentifier("dismiss-reminders-keyboard") }.padding().background(.bar) }
+                .accessibilityIdentifier("continuous-reminders-form")
+                .disabled(loading || controller.isRunning)
+                .overlay { if loading || controller.isRunning { ProgressView(controller.isRunning ? "Waiting for other windows or moving reminders…" : "Loading Reminders…").accessibilityIdentifier("continuous-reminders-progress").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) } }
+                .safeAreaInset(edge: .bottom) {
+                    if editingProject { HStack { Spacer(); Button("Done") { editingProject = false }.accessibilityIdentifier("dismiss-reminders-keyboard") }.padding().background(.bar) }
+                }
             }
             .navigationTitle("Move from Reminders")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() }.disabled(controller.isRunning) } }
@@ -105,6 +82,31 @@ struct ContinuousReminderSettingsView: View {
         }
         .modifier(TaskWorkspacePanel(store: controller.store))
         .sheet(isPresented: $isShowingTemplates) { RecurringTemplatesView(store: controller.store) }
+    }
+
+    private var statusAndActions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(controller.status?.active == true ? "Enabled on this device" : "Disabled on this device").accessibilityIdentifier("continuous-reminders-status")
+            if controller.status?.active == true && controller.status?.paused == true {
+                Text("Automatic moves are paused. Review the source before explicitly retrying.").font(.footnote).accessibilityIdentifier("continuous-reminders-paused")
+            }
+            if let result = controller.result {
+                Text("Saved \(result.imported.count); removed \(result.removedCount); skipped \(result.skipped.count); failed \(result.failures.count).")
+                    .font(.footnote).accessibilityIdentifier("continuous-reminders-result")
+            }
+            if controller.isRunning { Button("Stop moving") { controller.cancel() }.padding().background(.bar).disabled(false).accessibilityIdentifier("continuous-reminders-stop") }
+            if let message = error ?? controller.error { Text(message).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial).accessibilityIdentifier("continuous-reminders-error") }
+            #if DEBUG
+            if controller.fixtureWaiting {
+                Button("Edit fixture source before removal") { Task { await changeFixture(edit: true) } }.disabled(false).accessibilityIdentifier("continuous-reminders-edit-fixture")
+                if fixtureChanged { Text("Fixture source updated").accessibilityIdentifier("continuous-reminders-fixture-changed") }
+                Button("Resume fixture removal") { controller.resumeFixture() }.disabled(false).padding().background(.bar).accessibilityIdentifier("continuous-reminders-resume-fixture")
+            }
+            #endif
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.background)
     }
 
     private func loadLists() async {
