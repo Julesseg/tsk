@@ -54,6 +54,7 @@ struct TaskStorageRootView: View {
             #endif
             let opened = try TaskStore()
             #if DEBUG && targetEnvironment(simulator)
+            try await installTaskAttributeFixture(in: opened)
             if ProcessInfo.processInfo.environment["TSK_TEST_SPOTLIGHT_CLEANUP"] == "1", ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
                 try await CoreSpotlightTaskIndex(namespace: SpotlightTaskEffect.namespace(directory: opened.directory)).replace([])
                 spotlightFixtureCleaned = true

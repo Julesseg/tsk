@@ -5,7 +5,7 @@ import XCTest
 final class TaskAttributeUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen() throws {
+    func testAllFiveLocalDefinitionTypesPersistAfterNativeCreation() throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
@@ -13,18 +13,8 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
-        let description = field("task-description", app: app)
-        XCTAssertTrue(description.waitForExistence(timeout: 5))
-        focusTaskText(description, app: app)
-        description.typeText("Task with local typed values")
-        app.buttons["save-task"].tap()
-        XCTAssertTrue(description.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(taskRow(named: "Task with local typed values", app: app).waitForExistence(timeout: 10))
-        taskRow(named: "Task with local typed values", app: app).tap()
-        openAdvanced(app)
-        app.buttons["manage-attribute-definitions"].tap()
-        XCTAssertTrue(app.buttons["new-attribute-definition"].waitForExistence(timeout: 5))
+        openDefinitions(app)
+        XCTAssertTrue(app.staticTexts["No local attribute definitions"].exists)
         capture("Local definitions empty", app: app)
         for (name, type) in [("note", "String"), ("score", "Numeric"), ("review", "Date"), ("effort", "Duration"), ("reference", "UUID")] {
             app.buttons["new-attribute-definition"].tap()
@@ -38,6 +28,7 @@ final class TaskAttributeUITests: XCTestCase {
             XCTAssertEqual(nameField.value as? String, name)
             app.buttons["attribute-definition-type"].tap()
             tapTaskMenuItem(app.buttons[type], app: app)
+            XCTAssertEqual(app.buttons["attribute-definition-type"].value as? String, type)
             if name == "reference" { capture("Native UUID definition editor", app: app) }
             tapTaskControl(app.buttons["save-attribute-definition"], app: app)
             XCTAssertTrue(nameField.waitForNonExistence(timeout: 10))
@@ -46,6 +37,46 @@ final class TaskAttributeUITests: XCTestCase {
         capture("All five local attribute types", app: app)
         tapTaskControl(app.navigationBars["Attribute definitions"].buttons["Done"], app: app)
         XCTAssertTrue(app.buttons["new-attribute-definition"].waitForNonExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        openDefinitions(app)
+        for (name, type) in [("note", "String"), ("score", "Numeric"), ("review", "Date"), ("effort", "Duration"), ("reference", "UUID")] {
+            let definition = app.buttons["attribute-definition-\(name)"]
+            XCTAssertTrue(revealTaskElement(definition, in: "attribute-definitions-list", app: app))
+            tapTaskControl(definition, app: app)
+            let nameField = app.textFields["attribute-definition-name"]
+            XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+            XCTAssertEqual(nameField.value as? String, name)
+            XCTAssertEqual(app.buttons["attribute-definition-type"].value as? String, type)
+            tapTaskControl(app.navigationBars["Edit definition"].buttons["Cancel"], app: app)
+            XCTAssertTrue(nameField.waitForNonExistence(timeout: 5))
+        }
+        capture("All five local definitions after persistent reopen", app: app)
+    }
+
+    func testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen() throws {
+        if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
+        app.launch()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
+        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        app.buttons["new-task"].tap()
+        let description = field("task-description", app: app)
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        focusTaskText(description, app: app)
+        description.typeText("Task with local typed values")
+        app.buttons["save-task"].tap()
+        XCTAssertTrue(description.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Task with local typed values", app: app).waitForExistence(timeout: 10))
+        taskRow(named: "Task with local typed values", app: app).tap()
+        openAdvanced(app)
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForExistence(timeout: 5))
         setValue("note", to: "Local note", app: app)
         setValue("score", to: "invalid", app: app)
@@ -99,6 +130,15 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(storedScore, in: "task-detail-form", app: app))
         XCTAssertEqual(storedScore.value as? String, "-1.25")
         capture("Removing a local definition keeps the raw task value", app: app)
+    }
+
+    private func openDefinitions(_ app: XCUIApplication) {
+        let definitions = app.buttons["attribute-definitions"]
+        if app.collectionViews["workspace-sidebar"].exists {
+            XCTAssertTrue(revealTaskElement(definitions, in: "workspace-sidebar", app: app))
+        } else { tapTaskControl(app.buttons["workspace-more"], app: app) }
+        tapTaskControl(definitions, app: app)
+        XCTAssertTrue(app.buttons["new-attribute-definition"].waitForExistence(timeout: 5))
     }
 
     private func openAdvanced(_ app: XCUIApplication) {
