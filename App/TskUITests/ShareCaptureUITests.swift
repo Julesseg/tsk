@@ -83,7 +83,7 @@ import XCTest
         XCTAssertTrue(app.buttons["share-fixture-present"].waitForExistence(timeout: 10))
         app.buttons["share-fixture-present"].tap()
         let sheet = app.collectionViews["activityCollectionView"]
-        guard sheet.waitForExistence(timeout: 5) else {
+        guard sheet.waitForExistence(timeout: TaskControlReadinessPolicy.accessibilityAdmissionTimeout) else {
             shareDiscoveryEvidence("System activity sheet missing", app: app)
             XCTFail("The host did not present its system activity sheet")
             return
