@@ -25,7 +25,7 @@ final class SeriesTransitionUITests: XCTestCase {
             } else { movedID = id }
             records[index]["attributes"] = attributes
         }
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)

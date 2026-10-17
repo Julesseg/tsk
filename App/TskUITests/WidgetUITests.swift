@@ -10,7 +10,7 @@ final class WidgetUITests: XCTestCase {
         let today = "Widget Today " + token
         let custom = "Widget Custom " + token
         let view = "Widget saved " + token
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_WIDGET_FIXTURE"] = token
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launch()

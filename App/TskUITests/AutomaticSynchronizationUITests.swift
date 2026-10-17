@@ -5,7 +5,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         let authenticationService = XCUIApplication(bundleIdentifier: "com.apple.AuthenticationServicesUI")
         var dismissedPassword = false
         var observedPassword = false

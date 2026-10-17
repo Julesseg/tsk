@@ -5,7 +5,7 @@ final class MissedNotificationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         let token = UUID().uuidString
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = "missed-notifications-" + token
         app.launchEnvironment["TSK_TEST_MISSED_NOTIFICATION_FIXTURE"] = token

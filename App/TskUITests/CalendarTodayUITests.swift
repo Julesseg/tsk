@@ -84,7 +84,7 @@ import XCTest
         } else { app.segmentedControls["task-status-view"].buttons[title].tap() }
     }
     private func configuredApp(_ token: String) -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"

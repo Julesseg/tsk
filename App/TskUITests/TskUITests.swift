@@ -5,7 +5,7 @@ final class TskUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testCaptureReviewCancelSaveAndRelaunch() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
@@ -38,7 +38,7 @@ final class TskUITests: XCTestCase {
     }
 
     func testDescriptionEditAndCompletionPersistAcrossRelaunch() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
@@ -76,7 +76,7 @@ final class TskUITests: XCTestCase {
     }
 
     func testOrganizationProjectViewsAndListActionsPersist() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))

@@ -155,7 +155,7 @@ final class iPadWorkspaceUITests: XCTestCase {
     }
 
     private func launch(arguments: [String] = []) -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchArguments = arguments

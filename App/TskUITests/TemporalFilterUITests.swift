@@ -5,7 +5,7 @@ final class TemporalFilterUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testSavedReadyDeadlineViewReevaluatesNextDayAndCompletion() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792058400"
         app.launch()

@@ -25,7 +25,7 @@ final class SeriesMetadataUITests: XCTestCase {
             let attributes = record["attributes"] as? [[String: String]] ?? []
             return attributes.contains { $0["key"] == "parent" } && attributes.contains { $0["key"] == "status" && $0["value"] == "pending" } ? record["id"] as? String : nil
         }
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)

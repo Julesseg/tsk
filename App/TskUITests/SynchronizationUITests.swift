@@ -5,7 +5,7 @@ final class SynchronizationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testConnectionValidationPersistenceAndServerFailureRetainOfflineTask() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
@@ -67,7 +67,7 @@ final class SynchronizationUITests: XCTestCase {
         let clientID = try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])
         let secret = try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"])
         let token = try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))

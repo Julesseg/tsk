@@ -16,7 +16,7 @@ final class TaskAnnotationUITests: XCTestCase {
     private func exerciseAnnotationRoundTrip(keyboardShortcuts: Bool = true) throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         let commands = keyboardShortcuts ? try TaskKeyboardCommand(.annotations, app: app) : nil
@@ -110,7 +110,7 @@ final class TaskAnnotationUITests: XCTestCase {
             let commandReturnCount: Int
         }
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
-        let app = XCUIApplication(), token = UUID().uuidString
+        let app = taskTestApplication(), token = UUID().uuidString
         addTeardownBlock { app.terminate() }
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token

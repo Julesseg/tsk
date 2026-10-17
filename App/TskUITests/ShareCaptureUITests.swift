@@ -11,7 +11,7 @@ import XCTest
         let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
         host.launchEnvironment["TSK_SHARE_FIXTURE_TOKEN"] = token
         defer { host.terminate() }
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         defer { app.terminate() }
         host.launch()
         openExtension(host)

@@ -165,7 +165,7 @@ final class TaskNotificationUITests: XCTestCase {
     }
 
     private func application() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_NOTIFICATION_FIXTURE"] = UUID().uuidString
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] ?? "0"
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = "notifications-" + UUID().uuidString

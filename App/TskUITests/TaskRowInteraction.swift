@@ -1,6 +1,13 @@
 import XCTest
 
 extension XCTestCase {
+    @MainActor func taskTestApplication() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
+        app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
+        return app
+    }
+
     @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {
         guard ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", UUID(uuidString: token) != nil else {
             XCTFail("Reminders authorization timeline requires the owned isolated fixture")

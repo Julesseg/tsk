@@ -60,7 +60,7 @@ final class RecurringTemplateUITests: XCTestCase {
         let id = try XCTUnwrap(child["id"] as? String)
         let rawParentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
         let parentID = try XCTUnwrap(UUID(uuidString: rawParentID), "The recorded occurrence must reference a valid template UUID").uuidString
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
@@ -114,7 +114,7 @@ final class RecurringTemplateUITests: XCTestCase {
         let child = try XCTUnwrap(records.first { record in (record["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
         let id = try XCTUnwrap(child["id"] as? String)
         let parentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
@@ -131,7 +131,7 @@ final class RecurringTemplateUITests: XCTestCase {
     }
 
     private func launch() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()

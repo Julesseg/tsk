@@ -5,7 +5,7 @@ final class CustomViewsUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testRawViewValidationSaveEditReopenResultsActionsAndDeletion() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))

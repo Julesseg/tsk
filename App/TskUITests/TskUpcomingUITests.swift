@@ -5,7 +5,7 @@ final class TskUpcomingUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testFutureDateRolesShareTaskIdentityAndActionsAcrossDayGroups() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()

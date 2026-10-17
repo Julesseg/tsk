@@ -65,7 +65,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
     private func launchFixture() -> (XCUIApplication, String) {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
-        let token = UUID().uuidString, app = XCUIApplication()
+        let token = UUID().uuidString, app = taskTestApplication()
         resetOwnedReminderAuthorization(app, token: token, stage: "recurring-before-launch")
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"

@@ -2,7 +2,7 @@ import XCTest
 
 final class TskIntentUITests: XCTestCase {
     @MainActor func testNativeIntentCaptureIsVisibleAndSurvivesAppRelaunch() {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Captured through native intent"
         app.launch()

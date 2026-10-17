@@ -8,7 +8,7 @@ final class TaskActivityUITests: XCTestCase {
     func testOrdinaryTaskListStartDetailStopPersistentReopenAndCompletionClearActiveState() throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
@@ -54,7 +54,7 @@ final class TaskActivityUITests: XCTestCase {
         let records = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         let child = try XCTUnwrap(records.first { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
         let id = try XCTUnwrap(child["id"] as? String)
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
@@ -87,7 +87,7 @@ final class TaskActivityUITests: XCTestCase {
         attributes[maskIndex]["value"] = "?WW"; records[parentIndex]["attributes"] = attributes
         let child = try XCTUnwrap(records.first { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
         let id = try XCTUnwrap(child["id"] as? String)
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()

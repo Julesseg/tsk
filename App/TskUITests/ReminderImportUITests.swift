@@ -7,7 +7,7 @@ final class ReminderImportUITests: XCTestCase {
     func testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks() throws {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", "Run the real fixture only in the canonical disposable simulator lane.")
         let token = UUID().uuidString
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         resetOwnedReminderAuthorization(app, token: token, stage: "ordinary-before-launch")
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
@@ -71,7 +71,7 @@ final class ReminderImportUITests: XCTestCase {
     }
 
     func testDeniedRealRemindersPermissionKeepsOrdinaryTaskWorkspaceUsable() {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.resetAuthorizationStatus(for: .reminders)
         defer { app.terminate(); app.resetAuthorizationStatus(for: .reminders) }
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString

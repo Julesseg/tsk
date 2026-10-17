@@ -5,7 +5,7 @@ final class TskWaitingUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testWaitingTaskStaysInTodayAndWaitExpiresOrClearsWithoutChangingPlanning() throws {
-        let app = XCUIApplication()
+        let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
