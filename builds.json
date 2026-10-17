@@ -1,0 +1,14 @@
+[
+  {
+    "pr": 36,
+    "title": "feat: implement native Taskwarrior workflows",
+    "sha": "e75cf2d",
+    "time": "2026-10-17T16:34:31.199Z"
+  },
+  {
+    "pr": 1,
+    "title": "chore: bootstrap tsk and configure engineering skills",
+    "sha": "c78176b",
+    "time": "2026-10-13T09:23:08.158Z"
+  }
+]
