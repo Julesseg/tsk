@@ -81,7 +81,9 @@ struct ContinuousReminderSettingsView: View {
                     #if DEBUG
                     if controller.fixtureWaiting {
                         Button("Edit fixture source before removal") { Task { await changeFixture(edit: true) } }.disabled(false).accessibilityIdentifier("continuous-reminders-edit-fixture")
-                        if fixtureChanged { Text("Fixture source updated").accessibilityIdentifier("continuous-reminders-fixture-changed") }
+                        Text("Fixture source updated")
+                            .opacity(fixtureChanged ? 1 : 0).accessibilityHidden(!fixtureChanged)
+                            .accessibilityIdentifier("continuous-reminders-fixture-changed")
                         Button("Resume fixture removal") { controller.resumeFixture() }.disabled(false).padding().background(.bar).accessibilityIdentifier("continuous-reminders-resume-fixture")
                     }
                     #endif
