@@ -44,7 +44,7 @@ final class WidgetUITests: XCTestCase {
             nativeMedium.tap()
             if springboard.buttons["Done"].exists && springboard.buttons["Done"].isHittable { springboard.buttons["Done"].tap() }
         } else {
-            tap(springboard, labels: ["Edit Home Screen"])
+            enterHomeEditing(springboard)
             tap(springboard, labels: ["Edit", "Add Widget", "Add Widgets"])
             if springboard.buttons["Add Widget"].waitForExistence(timeout: 3) { springboard.buttons["Add Widget"].tap() }
             else if springboard.buttons["Add Widgets"].exists { springboard.buttons["Add Widgets"].tap() }
@@ -115,6 +115,21 @@ final class WidgetUITests: XCTestCase {
             let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in completed.exists && completed.isSelected }, object: nil)
             XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
         }
+    }
+
+    private func enterHomeEditing(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(15)
+        while Date() < deadline {
+            let edit = app.buttons["Edit"].firstMatch
+            let done = app.buttons["Done"].firstMatch
+            if edit.exists && done.exists && edit.isHittable && done.isHittable { return }
+            let editHome = app.buttons["Edit Home Screen"].firstMatch
+            if editHome.exists && editHome.isHittable { editHome.tap(); return }
+            let editHomeText = app.staticTexts["Edit Home Screen"].firstMatch
+            if editHomeText.exists && editHomeText.isHittable { editHomeText.tap(); return }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTFail("Home screen did not expose its editing controls\n" + app.debugDescription, file: file, line: line)
     }
 
     private func tap(_ app: XCUIApplication, labels: [String], file: StaticString = #filePath, line: UInt = #line) {
