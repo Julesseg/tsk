@@ -1,5 +1,10 @@
 import XCTest
 
+enum TaskTextSelection {
+    case editMenu
+    case commandA
+}
+
 @MainActor
 extension XCTestCase {
     func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {
@@ -140,11 +145,44 @@ extension XCTestCase {
         XCTAssertTrue(ready, "Text input has no keyboard: \(element)", file: file, line: line)
     }
 
-    func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, selection: TaskTextSelection = .editMenu, file: StaticString = #filePath, line: UInt = #line) {
         focusTaskText(element, app: app, file: file, line: line)
         let previous = element.value as? String ?? ""
         if !previous.isEmpty && previous != element.placeholderValue {
-            element.typeKey("a", modifierFlags: .command)
+            switch selection {
+            case .editMenu:
+                element.press(forDuration: 1.1)
+                let started = ProcessInfo.processInfo.systemUptime
+                let deadline = started + 5
+                let menu = app.menuItems["Select All"]
+                let button = app.buttons["Select All"]
+                var selected: XCUIElement?
+                func sample() -> Bool {
+                    guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                    if menu.exists { selected = menu; return true }
+                    guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                    if button.exists { selected = button; return true }
+                    return false
+                }
+                let immediate = sample()
+                var result: XCTWaiter.Result?
+                let remaining = deadline - ProcessInfo.processInfo.systemUptime
+                if !immediate, remaining > 0 {
+                    let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+                    result = XCTWaiter.wait(for: [ready], timeout: remaining)
+                }
+                let elapsed = ProcessInfo.processInfo.systemUptime - started
+                guard immediate || result == .completed, elapsed < 5, let selectAll = selected else {
+                    let reason = elapsed >= 5 ? "deadline expired" : selected == nil ? "native menu absent" : "waiter did not complete"
+                    let waiter = result.map { String(describing: $0) } ?? "not entered"
+                    recordTaskInteraction(app, detail: "Native Select All was not ready for \(element); reason=\(reason) immediate=\(immediate) waiter=\(waiter) elapsed=\(elapsed)s")
+                    XCTFail("Text replacement has no ready native Select All control", file: file, line: line)
+                    return
+                }
+                selectAll.tap()
+            case .commandA:
+                element.typeKey("a", modifierFlags: .command)
+            }
         }
         element.typeText(XCUIKeyboardKey.delete.rawValue)
         let cleared = element.value as? String ?? ""

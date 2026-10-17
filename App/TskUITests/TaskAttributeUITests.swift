@@ -115,7 +115,7 @@ final class TaskAttributeUITests: XCTestCase {
     private func replaceValue(_ name: String, with value: String, app: XCUIApplication) {
         let valueField = field("uda-value-\(name)", app: app)
         XCTAssertTrue(revealTaskElement(valueField, in: "advanced-attributes-form", app: app))
-        replaceTaskText(valueField, with: value, app: app)
+        replaceTaskText(valueField, with: value, app: app, selection: .commandA)
         let done = app.buttons["dismiss-attributes-keyboard"]
         if done.exists { tapTaskControl(done, app: app) }
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers advanced attributes")
