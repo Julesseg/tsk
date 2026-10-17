@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 
 enum SpotlightQueryReadError: Error, LocalizedError, Sendable {
@@ -23,7 +24,7 @@ enum SpotlightQueryReader {
                     read.finish(.timedOut)
                 }
                 read.installTimeout(timeout)
-                Task.detached {
+                DispatchQueue.global(qos: .userInitiated).async {
                     let operation = request({ read.append($0) }, { read.complete($0) })
                     read.start(operation)
                 }
@@ -130,6 +131,6 @@ private final class SpotlightQueryRead<Item: Sendable>: @unchecked Sendable {
         guard let (continuation, timeout, result, cancel) = waiting else { return }
         timeout?.cancel()
         continuation?.resume(with: result)
-        if let cancel { Task.detached { cancel() } }
+        if let cancel { DispatchQueue.global(qos: .userInitiated).async(execute: cancel) }
     }
 }

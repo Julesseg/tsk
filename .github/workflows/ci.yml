@@ -68,6 +68,7 @@ jobs:
           swift build --package-path Native --product tsk-native-probe
           TSK_NATIVE_PROBE_BINARY="$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
             TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+          LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
 
   app-ui-tests:
     name: ${{ matrix.job-name }}
