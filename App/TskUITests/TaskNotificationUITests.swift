@@ -138,9 +138,13 @@ final class TaskNotificationUITests: XCTestCase {
             guard revealTaskElement(apps, in: root, app: settings, maximumSteps: 12) else { return toggle }
             tapTaskMenuItem(apps, app: settings)
             capture("Actual system Apps settings before selecting tsk", settings)
+            guard settings.navigationBars["Apps"].waitForExistence(timeout: 5) else {
+                XCTFail("Native Settings Apps destination did not appear within the existing five-second list budget")
+                return toggle
+            }
             let taskApp = settings.cells.containing(.staticText, identifier: "tsk").firstMatch
             let collection = settings.collectionViews.matching(NSPredicate(format: "label != %@", "Sidebar")).firstMatch
-            let list = collection.waitForExistence(timeout: 5) ? collection : settings.tables.firstMatch
+            let list = collection.exists ? collection : settings.tables.firstMatch
             if let search = settings.searchFields.allElementsBoundByIndex.first(where: { $0.isHittable && list.frame.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }) {
                 tapTaskControl(search, app: settings)
                 search.typeText("tsk")
