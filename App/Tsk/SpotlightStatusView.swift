@@ -15,6 +15,7 @@ struct SpotlightStatusView: View {
                     if let date = controller.status?.lastSuccessfulIndex { LabeledContent("Last system acknowledgement", value: date.formatted()) }
                     if controller.status?.pending == true { Text("Spotlight update pending. Tasks are saved. Indexing resumes when tsk can run and the system acknowledges its requests.").accessibilityIdentifier("spotlight-index-pending") }
                     if let error = controller.status?.error { Text(error).foregroundStyle(.red).accessibilityIdentifier("spotlight-index-error") }
+                    if let error = controller.statusError { Text(error).foregroundStyle(.red).accessibilityIdentifier("spotlight-status-error") }
                     Button("Update Spotlight index") { Task { await controller.reconcile() } }.disabled(controller.isRefreshing).accessibilityIdentifier("spotlight-reconcile")
                     Button("Check indexed tasks") { Task { await controller.query() } }.disabled(controller.isRefreshing).accessibilityIdentifier("spotlight-query")
                     if let result = controller.queryResult { Text(result).accessibilityIdentifier("spotlight-query-result") }

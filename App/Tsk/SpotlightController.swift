@@ -7,14 +7,15 @@ import TskNative
     let store: TaskStore
     private(set) var status: TaskSpotlightIndexStatus?
     private(set) var error: String?
+    private(set) var statusError: String?
     private(set) var isRefreshing = false
     private(set) var queryResult: String?
     private(set) var queryItems: [SpotlightIndexedItem] = []
     private(set) var fixtureResult: String?
     init(store: TaskStore) { self.store = store }
     func loadStatus() {
-        do { status = try SpotlightTaskEffect.status(directory: store.directory); error = nil }
-        catch { self.error = "Spotlight status could not be read: " + error.localizedDescription }
+        do { status = try SpotlightTaskEffect.status(directory: store.directory); statusError = nil }
+        catch { statusError = "Spotlight status could not be read: " + error.localizedDescription }
     }
     func observe() async {
         do {
@@ -39,6 +40,7 @@ import TskNative
     func query() async {
         isRefreshing = true
         queryResult = nil
+        error = nil
         do {
             let index = CoreSpotlightTaskIndex(namespace: SpotlightTaskEffect.namespace(directory: store.directory))
             queryItems = try await index.query()

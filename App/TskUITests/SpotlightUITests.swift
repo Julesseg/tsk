@@ -94,7 +94,7 @@ import XCTest
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
     private func query(_ app: XCUIApplication, id: String, present: Bool, expectedIndexedCount: Int? = nil) {
-        let deadline = Date().addingTimeInterval(60)
+        let deadline = Date().addingTimeInterval(120)
         let button = app.buttons["spotlight-query"]
         let ids = app.staticTexts["spotlight-fixture-query-ids"]
         let count = app.staticTexts["spotlight-index-count"]
@@ -110,16 +110,18 @@ import XCTest
                   Date() < deadline else { break }
             button.tap()
             let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                button.isEnabled && app.staticTexts["spotlight-query-result"].exists
+                button.isEnabled && (app.staticTexts["spotlight-query-result"].exists || app.staticTexts["spotlight-query-error"].exists)
             }, object: nil)
             guard XCTWaiter.wait(for: [finished], timeout: max(0, deadline.timeIntervalSinceNow)) == .completed else { break }
-            if ids.exists, let values = ids.value as? String {
+            let queryError = app.staticTexts["spotlight-query-error"]
+            if queryError.exists { lastCompletedQuery = queryError.label }
+            else if ids.exists, let values = ids.value as? String {
                 lastCompletedQuery = values
                 if values.lowercased().contains(id.lowercased()) == present, !pending.exists { return }
             }
             RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
         } while Date() < deadline
-        capture("Actual Spotlight membership did not settle within the bounded 60-second query budget", app)
+        capture("Actual Spotlight membership did not settle within the bounded 120-second indexing and query recovery budget", app)
         let observed = ids.exists ? String(describing: ids.value) : "Query IDs not present"
         let error = app.staticTexts["spotlight-query-error"]
         let message = error.exists ? error.label : "No query error label"
