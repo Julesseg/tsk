@@ -94,7 +94,6 @@ import XCTest
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
     private func query(_ app: XCUIApplication, id: String, present: Bool, expectedIndexedCount: Int? = nil) {
-        let deadline = Date().addingTimeInterval(120)
         let button = app.buttons["spotlight-query"]
         let ids = app.staticTexts["spotlight-fixture-query-ids"]
         let count = app.staticTexts["spotlight-index-count"]
@@ -102,10 +101,18 @@ import XCTest
         let expectedProjection = expectedIndexedCount.map { "Last journaled projection: \($0) task(s)" }
         var lastCompletedQuery = "No completed query"
         XCTAssertTrue(revealTaskElement(button, in: "spotlight-settings-form", app: app))
+        let currentProjection = NSPredicate { _, _ in
+            button.isEnabled && count.exists && !pending.exists && (expectedProjection.map { count.label == $0 } ?? true)
+        }
+        let admission = XCTNSPredicateExpectation(predicate: currentProjection, object: nil)
+        guard XCTWaiter.wait(for: [admission], timeout: 120) == .completed else {
+            capture("Current Spotlight projection was not acknowledged within the 120-second indexing budget", app)
+            XCTFail("Current Spotlight projection must be acknowledged before starting the query recovery budget; pending=\(pending.exists); observed=\(count.exists ? count.label : "No projection status")")
+            return
+        }
+        let deadline = Date().addingTimeInterval(120)
         repeat {
-            let indexed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                button.isEnabled && count.exists && !pending.exists && (expectedProjection.map { count.label == $0 } ?? true)
-            }, object: nil)
+            let indexed = XCTNSPredicateExpectation(predicate: currentProjection, object: nil)
             guard XCTWaiter.wait(for: [indexed], timeout: max(0, deadline.timeIntervalSinceNow)) == .completed,
                   Date() < deadline else { break }
             button.tap()
@@ -121,7 +128,7 @@ import XCTest
             }
             RunLoop.current.run(until: Date().addingTimeInterval(min(0.25, max(0, deadline.timeIntervalSinceNow))))
         } while Date() < deadline
-        capture("Actual Spotlight membership did not settle within the bounded 120-second indexing and query recovery budget", app)
+        capture("Actual Spotlight membership did not settle within the 120-second query recovery budget after indexing acknowledgement", app)
         let observed = ids.exists ? String(describing: ids.value) : "Query IDs not present"
         let error = app.staticTexts["spotlight-query-error"]
         let message = error.exists ? error.label : "No query error label"
