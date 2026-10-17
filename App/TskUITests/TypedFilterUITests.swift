@@ -29,10 +29,16 @@ final class TypedFilterUITests: XCTestCase {
         setDateSwitch("uda-enabled-score", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
         replaceScore("3", app: app)
         setDateSwitch("uda-enabled-rating", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
-        XCTAssertTrue(revealTaskElement(app.buttons["uda-value-rating"], in: "advanced-attributes-form", app: app))
-        app.buttons["uda-value-rating"].tap()
-        app.buttons["high"].tap()
-        app.buttons["save-advanced-attributes"].tap()
+        let rating = app.buttons["uda-value-rating"]
+        XCTAssertTrue(revealTaskElement(rating, in: "advanced-attributes-form", app: app))
+        for value in ["mid", "high"] {
+            tapTaskControl(rating, app: app)
+            let option = app.buttons[value]
+            tapTaskMenuItem(option, app: app)
+            XCTAssertTrue(option.waitForNonExistence(timeout: 5), "Rating menu did not dismiss after selecting \(value)")
+            XCTAssertTrue(rating.staticTexts[value].exists, "Rating did not become \(value)")
+        }
+        tapTaskControl(app.buttons["save-advanced-attributes"], app: app)
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
         if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
         openViews(app, isPad: isPad)
