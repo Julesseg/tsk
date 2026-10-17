@@ -113,7 +113,24 @@ extension XCTestCase {
     func focusTaskText(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
         tapTaskControl(element, app: app, beforeSample: beforeSample, file: file, line: line)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
+        guard let beforeSample else {
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
+            return
+        }
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            beforeSample(deadline)
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            return app.keyboards.firstMatch.exists && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let keyboard = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [keyboard], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
+        }
+        XCTAssertTrue(ready, "Text input has no keyboard: \(element)", file: file, line: line)
     }
 
     func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
