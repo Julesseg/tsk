@@ -32,8 +32,8 @@ final class TypedFilterUITests: XCTestCase {
         setDateSwitch("uda-enabled-rating", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
         let rating = app.buttons["uda-value-rating"]
         XCTAssertTrue(revealTaskElement(rating, in: "advanced-attributes-form", app: app))
-        for value in ["mid", "high"] {
-            tapTaskControl(rating, app: app)
+        for (current, value) in [("high", "mid"), ("mid", "high")] {
+            tapTaskControl(rating.staticTexts[current], app: app)
             let option = app.buttons[value]
             tapTaskMenuItem(option, app: app)
             XCTAssertTrue(option.waitForNonExistence(timeout: 5), "Rating menu did not dismiss after selecting \(value)")
