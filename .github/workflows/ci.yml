@@ -67,7 +67,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"},{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"}]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -106,8 +106,8 @@ jobs:
             Native/Bridge
             .build/sync-server
 
-      - name: Build pinned TaskChampion for iOS
-        run: scripts/build-native.sh apple
+      - name: Build pinned TaskChampion for iOS Simulator
+        run: scripts/build-native.sh simulator
 
       - name: Build the real isolated synchronization fixture and independent peer
         run: |
