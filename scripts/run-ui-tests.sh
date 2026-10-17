@@ -61,10 +61,14 @@ xcrun simctl bootstatus "$simulator_id" -b
 build_arguments=()
 share_arguments=()
 test_filters=()
+skip_build=false
 derived_data=""
 result_path=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --skip-build)
+            skip_build=true
+            shift ;;
         -derivedDataPath)
             derived_data=$2
             build_arguments+=("$1" "$2")
@@ -88,7 +92,14 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
     exit 1
 fi
 test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
-xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
+if [[ "$skip_build" == true ]]; then
+    if [[ ! -d "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" ]]; then
+        echo 'Prebuilt UI tests require existing signed simulator products.' >&2
+        exit 1
+    fi
+else
+    xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
+fi
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)

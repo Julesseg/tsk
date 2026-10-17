@@ -65,11 +65,20 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             selection.phases([SHARE, "-skip-testing:TskUITests/ShareCaptureUITests"])
 
+    def test_independent_peer_requires_the_matching_real_sync_ui_scenario(self):
+        for suite, family, expected in (("smoke", "iPhone", True), ("smoke", "iPad", False), ("full", "iPhone", True), ("full", "iPad", True), ("diagnostic", "iPhone", True)):
+            with self.subTest(suite=suite, family=family):
+                self.assertEqual(selection.requires_sync_peer(selection.selection(suite, family)), expected)
+        filters = selection.selection("smoke", "iPhone") + ["-skip-testing:TskUITests/SynchronizationUITests"]
+        self.assertFalse(selection.requires_sync_peer(filters))
+
 
 class RunnerTests(unittest.TestCase):
-    def run_runner(self, filters=(), share_status=0, main_status=0):
+    def run_runner(self, filters=(), share_status=0, main_status=0, prebuilt=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
+            if prebuilt:
+                (root / "DerivedData/Build/Products/Debug-iphonesimulator/Tsk.app").mkdir(parents=True)
             log = root / "calls.jsonl"
             tool = root / "tool"
             tool.write_text("""#!/usr/bin/env python3
@@ -129,6 +138,19 @@ if name == 'xcodebuild' and 'test-without-building' in args:
         result, calls = self.run_runner([PHONE], main_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
+
+    def test_prebuilt_smoke_executes_without_repeating_the_build(self):
+        result, calls = self.run_runner(["--skip-build", PHONE], prebuilt=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
+        self.assertEqual(len(builds), 1)
+        self.assertIn("test-without-building", builds[0])
+        self.assertNotIn("--skip-build", builds[0])
+
+    def test_prebuilt_mode_rejects_missing_products(self):
+        result, calls = self.run_runner(["--skip-build", PHONE])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(call["name"] == "xcodebuild" for call in calls))
 
 
 if __name__ == "__main__":

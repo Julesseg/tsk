@@ -88,6 +88,10 @@ def phases(filters):
     return [phase for phase, enabled in (("share", share), ("main", selected - share)) if enabled]
 
 
+def requires_sync_peer(filters):
+    return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -96,9 +100,16 @@ def main():
     select.add_argument("family", choices=("iPhone", "iPad"))
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)
+    peer = commands.add_parser("sync-peer")
+    peer.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
-        output = selection(args.suite, args.family) if args.command == "select" else phases(args.filters)
+        if args.command == "select":
+            output = selection(args.suite, args.family)
+        elif args.command == "phases":
+            output = phases(args.filters)
+        else:
+            output = ["yes" if requires_sync_peer(args.filters) else "no"]
     except ValueError as error:
         parser.error(str(error))
     print("\n".join(output))

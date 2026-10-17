@@ -3,7 +3,10 @@
 Pull requests and pushes to `main` run all Core and persistent Native tests,
 plus focused UI smoke coverage on both device families. Existing check names
 stay unchanged for branch protection. The UI runner builds once per lane and
-reuses that build, simulator and synchronization fixture.
+reuses that build, simulator and synchronization fixture. An independent peer
+verifies the uploaded UI task whenever the real-server synchronization scenario
+is selected. The iPad smoke selection exercises workspace/keyboard behavior and
+does not create that server task.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
@@ -27,8 +30,10 @@ Existing test bodies and assertions are unchanged. iPad-only methods still
 skip on iPhone. Source selectors live in `scripts/ui-test-selection.py`; its
 checks reject renamed selectors and empty UI selections.
 
-Smoke UI build/execution has a 30-minute step limit and a 45-minute job limit.
-Full coverage has 150/180-minute limits; diagnostics have 60/90-minute limits.
+UI products build in a separate 20-minute step before creating/booting a test
+simulator. Execution reuses those signed arm64 products with `--skip-build`.
+Smoke execution has a 30-minute step limit and a 45-minute overall job limit.
+Full execution/job limits are 150/180 minutes; diagnostics have 60/90-minute limits.
 These are ceilings, not measured completion times. Every method retains the
 600-second XCTest limit. The later `always()` step removes the owned simulator
 after a UI step failure or timeout. Runtime and signed-distribution acceptance

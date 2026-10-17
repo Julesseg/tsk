@@ -135,6 +135,17 @@ jobs:
       - name: Toolchain versions
         run: xcodebuild -version
 
+      - name: Build UI test products
+        timeout-minutes: 20
+        working-directory: App
+        run: |
+          xcodebuild build-for-testing \
+            -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" \
+            -destination 'generic/platform=iOS Simulator' \
+            -parallel-testing-enabled NO -derivedDataPath ../.build/ui \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+
       - name: Resolve an available ${{ matrix.family }} simulator
         env:
           DEVICE_FAMILY: ${{ matrix.family }}
@@ -152,7 +163,7 @@ jobs:
               output.write("id=" + identifier + "\n")
           '
 
-      - name: Build & run UI tests
+      - name: Run prebuilt UI tests
         timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 30 }}
         working-directory: App
         env:
@@ -170,12 +181,16 @@ jobs:
             if [[ -n "$selector" ]]; then coverage+=("$selector"); fi
           done <<< "$selection"
           printf 'UI suite: %s (%s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$selection"
-          peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
+          peer=()
+          verify_peer=$(python3 ../scripts/ui-test-selection.py sync-peer -- "${coverage[@]}")
+          if [[ "$verify_peer" == yes ]]; then
+            peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
+          fi
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
           python3 ../scripts/with-sync-fixture.py \
             --server ../.build/sync-server/target/release/taskchampion-sync-server \
             --output ../.build/ui-sync "${peer[@]}" -- \
-            ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
+            ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" --skip-build \
             -project "$APP_NAME.xcodeproj" \
             -scheme "$APP_NAME" "${coverage[@]}" \
             -resultBundlePath TestResults.xcresult \
