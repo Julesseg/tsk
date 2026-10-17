@@ -1,0 +1,379 @@
+{
+  "version": "3.5.0",
+  "host": "Darwin",
+  "records": [
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "Alpha note"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "Work"
+        },
+        {
+          "key": "tag_home",
+          "value": ""
+        },
+        {
+          "key": "tag_next",
+          "value": ""
+        },
+        {
+          "key": "score",
+          "value": "0"
+        },
+        {
+          "key": "effort",
+          "value": "PT2H"
+        },
+        {
+          "key": "rating",
+          "value": "high"
+        },
+        {
+          "key": "annotation_1791972000",
+          "value": "Beta evidence"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000002",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "alpha Meeting"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "Work.sub"
+        },
+        {
+          "key": "tag_home",
+          "value": ""
+        },
+        {
+          "key": "score",
+          "value": "2.5"
+        },
+        {
+          "key": "effort",
+          "value": "PT30M"
+        },
+        {
+          "key": "rating",
+          "value": "low"
+        },
+        {
+          "key": "annotation_1791972001",
+          "value": "Alpha in an annotation"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000003",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "workplace"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "Workplace"
+        },
+        {
+          "key": "score",
+          "value": "-1"
+        },
+        {
+          "key": "rating",
+          "value": "mid"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000004",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "Unrelated"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "Artwork"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000005",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "café"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "café"
+        },
+        {
+          "key": "tag_café",
+          "value": ""
+        },
+        {
+          "key": "opaque-name",
+          "value": "café"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000006",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "café"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "café"
+        },
+        {
+          "key": "tag_café",
+          "value": ""
+        },
+        {
+          "key": "opaque-name",
+          "value": "café"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000007",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "Completed work"
+        },
+        {
+          "key": "status",
+          "value": "completed"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        },
+        {
+          "key": "project",
+          "value": "Work"
+        },
+        {
+          "key": "end",
+          "value": "1791972000"
+        }
+      ]
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000008",
+      "attributes": [
+        {
+          "key": "description",
+          "value": "No project"
+        },
+        {
+          "key": "status",
+          "value": "pending"
+        },
+        {
+          "key": "entry",
+          "value": "1791968400"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "expression": "project:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000007",
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002",
+        "bbbbbbbb-0000-4000-8000-000000000003"
+      ]
+    },
+    {
+      "expression": "project.is:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000007",
+        "bbbbbbbb-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "expression": "project.not:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000004",
+        "bbbbbbbb-0000-4000-8000-000000000005",
+        "bbbbbbbb-0000-4000-8000-000000000006",
+        "bbbbbbbb-0000-4000-8000-000000000008"
+      ]
+    },
+    {
+      "expression": "project.isnt:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000002",
+        "bbbbbbbb-0000-4000-8000-000000000003",
+        "bbbbbbbb-0000-4000-8000-000000000004",
+        "bbbbbbbb-0000-4000-8000-000000000005",
+        "bbbbbbbb-0000-4000-8000-000000000006",
+        "bbbbbbbb-0000-4000-8000-000000000008"
+      ]
+    },
+    {
+      "expression": "project.none:",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000008"
+      ]
+    },
+    {
+      "expression": "project.any:",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000007",
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002",
+        "bbbbbbbb-0000-4000-8000-000000000003",
+        "bbbbbbbb-0000-4000-8000-000000000004",
+        "bbbbbbbb-0000-4000-8000-000000000005",
+        "bbbbbbbb-0000-4000-8000-000000000006"
+      ]
+    },
+    {
+      "expression": "description:Alpha",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "expression": "Alpha",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "description.has:Alpha",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "/Alpha/",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "+home project:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "project.is:Work or project.is:Artwork",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000007",
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000004"
+      ]
+    },
+    {
+      "expression": "( project:Work and +home ) xor status:completed",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000007",
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "not project:Work",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000001",
+        "bbbbbbbb-0000-4000-8000-000000000002"
+      ]
+    },
+    {
+      "expression": "project.is:café",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000005"
+      ]
+    },
+    {
+      "expression": "project.is:café",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000006"
+      ]
+    },
+    {
+      "expression": "+café",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000005"
+      ]
+    },
+    {
+      "expression": "+café",
+      "selected": [
+        "bbbbbbbb-0000-4000-8000-000000000006"
+      ]
+    }
+  ]
+}

@@ -1,10 +1,24 @@
 # tsk
 
-An iOS Taskwarrior client with TaskChampion as its intended backend.
+A native iOS and iPadOS Taskwarrior client backed by TaskChampion. Task data is
+stored locally in a shared App Group and synchronized through TaskChampion's
+encrypted protocol. `TskCore` owns task behavior; `TskNative` connects storage and
+system services; SwiftUI presents the app, Share extension and widgets.
+
+Implemented workflows include task editing, projects/tags, Today/Upcoming,
+Taskwarrior filters and saved views, recurring templates and occurrence/series
+editing, Shortcuts, sharing, widgets, Spotlight, Calendar display, Reminders
+import and task-date notifications. The designated desktop Taskwarrior client
+creates recurring occurrences after sync and a recurrence-enabled report.
+
+Portable Core tests, real native/Taskwarrior interoperability checks and signed
+generic builds cover the implementation. Canonical iPhone/iPad XCUITest is the
+runtime gate; current failures still require fixes and another run. Distribution
+requires App Group-capable profiles for the app and both extensions. Physical
+keyboard, personal-account, Focus and background behavior require separate
+acceptance evidence; compiled targets and registered requests do not prove it.
 
 Bootstrapped from [iOS-Swift-app-template](https://github.com/Julesseg/iOS-Swift-app-template).
-The app currently runs the template greeting screen. TaskChampion integration,
-task management, and synchronization are yet to be implemented.
 
 The [PRD](docs/prd.md) defines the initial product requirements, implementation
 decisions, and testing seams. The [product brief](docs/product-direction.md)
@@ -25,7 +39,8 @@ the issue tracker for implementation planning.
 ## Layout
 
 - `Core/`: `TskCore`, the SwiftPM package for business logic and unit tests.
-- `App/`: the SwiftUI app and XCUITest smoke suite.
+- `Native/`: TaskChampion bridge and platform adapters.
+- `App/`: SwiftUI app, Share extension, widgets, owned test host and XCUITest.
 - `.github/workflows/`: Core/UI CI, release pipelines, and optional agent dispatch.
 - `docs/agents/`: GitHub issue workflow, default triage labels, and domain-doc rules.
 

@@ -97,31 +97,25 @@ jobs:
           echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           echo "Imported identity: $IDENTITY"
 
-      # Drop the ad-hoc profile where Xcode looks for it, and read its name/UUID
-      # out of the profile itself so you never have to copy them into a secret.
-      - name: Install provisioning profile
+      - name: Install target-specific provisioning profiles
         if: steps.preflight.outputs.configured == 'true'
         env:
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
-        run: |
-          set -euo pipefail
-          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
-          echo -n "$APPLE_PROVISIONING_PROFILE" | base64 --decode -o "$PP_PATH"
-
-          security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/pp.plist"
-          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/pp.plist")"
-          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/pp.plist")"
-
-          PP_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PP_DIR"
-          cp "$PP_PATH" "$PP_DIR/$PROFILE_UUID.mobileprovision"
-
-          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
-          echo "Installed profile: $PROFILE_NAME ($PROFILE_UUID)"
+          APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
+          APPLE_WIDGET_PROVISIONING_PROFILE: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python3 scripts/install-provisioning-profiles.py
 
       # Manual signing, pinned to the imported identity + ad-hoc profile. The app
       # depends on Core as a local SwiftPM package, which xcodebuild resolves on
       # its own — there are no CocoaPods here.
+      - uses: dtolnay/rust-toolchain@1.99.0
+        if: steps.preflight.outputs.configured == 'true'
+
+      - name: Build pinned TaskChampion for iOS
+        if: steps.preflight.outputs.configured == 'true'
+        run: scripts/build-native.sh apple
+
       - name: Archive
         if: steps.preflight.outputs.configured == 'true'
         env:
@@ -137,7 +131,9 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            TSK_APP_PROVISIONING_PROFILE="$TSK_APP_PROVISIONING_PROFILE" \
+            TSK_SHARE_PROVISIONING_PROFILE="$TSK_SHARE_PROVISIONING_PROFILE" \
+            TSK_WIDGET_PROVISIONING_PROFILE="$TSK_WIDGET_PROVISIONING_PROFILE" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
 
       - name: Export .ipa
@@ -146,19 +142,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          {
-            echo '<?xml version="1.0" encoding="UTF-8"?>'
-            echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
-            echo '<plist version="1.0"><dict>'
-            echo '<key>method</key><string>ad-hoc</string>'
-            echo "<key>teamID</key><string>${APPLE_TEAM_ID}</string>"
-            echo '<key>signingStyle</key><string>manual</string>'
-            echo '<key>compileBitcode</key><false/>'
-            echo '<key>provisioningProfiles</key><dict>'
-            echo "<key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>"
-            echo '</dict></dict></plist>'
-          } > "$RUNNER_TEMP/ExportOptions.plist"
-
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \

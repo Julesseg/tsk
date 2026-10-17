@@ -152,6 +152,11 @@ jobs:
       # Archive with automatic signing, resolving the App Store profile(s) via
       # the API key. MARKETING_VERSION / CURRENT_PROJECT_VERSION are stamped from
       # the tag + run number for every target in the build.
+      - uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Build pinned TaskChampion for iOS
+        run: scripts/build-native.sh apple
+
       - name: Archive
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

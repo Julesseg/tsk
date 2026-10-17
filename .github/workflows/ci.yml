@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      diagnostic_only:
+        description: Run only the existing diagnostic iPhone lane
+        type: boolean
+        required: false
+        default: false
 
 # The one project-specific value in this workflow. Must match the name of the
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
@@ -12,58 +19,172 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
   core-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
     steps:
       - uses: actions/checkout@v4
+      - name: Install standard C++ development headers
+        run: apt-get update && apt-get install -y g++
       - name: Run Core tests
         working-directory: Core
         run: swift test
 
+  native-tests:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+    name: TaskChampion · persistent replica (Linux)
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: |
+          apt-get update
+          apt-get install -y curl gcc g++ sqlite3
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Native/Bridge
+
+      - name: Build native bridge and exercise persistent Core flows
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          scripts/build-native.sh host
+          swift build --package-path Native --product tsk-native-probe
+          TSK_NATIVE_PROBE_BINARY="$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
+            TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+
   app-ui-tests:
-    name: App · XCUITest (macOS)
-    runs-on: macos-15
+    name: ${{ matrix.job-name }}
+    runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"}]') }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest stable Xcode
+      - name: Select Xcode 27
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: "27.0"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify owned native keyboard transport boundaries
+        run: |
+          python3 scripts/test-native-keyboard-hid-installer.py
+          python3 scripts/test-native-keyboard-hid-relay.py
+          python3 scripts/test-native-keyboard-hid-owner.py
+          python3 scripts/test-native-keyboard-boundary-cleanup.py
+
+      - name: Install pinned native keyboard transport
+        run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
+
+      - uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Check out pinned real TaskChampion sync server
+        uses: actions/checkout@v4
+        with:
+          repository: GothenburgBitFactory/taskchampion-sync-server
+          ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
+          path: .build/sync-server
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            Native/Bridge
+            .build/sync-server
+
+      - name: Build pinned TaskChampion for iOS Simulator
+        run: scripts/build-native.sh simulator
+
+      - name: Build the real isolated synchronization fixture and independent peer
+        run: |
+          cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
+          scripts/build-native.sh host
+          swift build --package-path Native --product tsk-native-probe
+
+      - name: Run Calendar controller regressions
+        timeout-minutes: 5
+        run: TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib" swift test --package-path App/ControllerTests
+
+      - name: Validate target-specific release profile rules
+        run: python3 scripts/test-provisioning-profiles.py
 
       - name: Toolchain versions
         run: xcodebuild -version
 
-      - name: Resolve an available iPhone simulator
+      - name: Resolve an available ${{ matrix.family }} simulator
+        env:
+          DEVICE_FAMILY: ${{ matrix.family }}
         id: sim
         run: |
           set -euo pipefail
-          NAME=$(xcrun simctl list devices available --json \
-            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; names=[x['name'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(sorted(names)[-1] if names else 'iPhone 16')")
-          echo "Using simulator: $NAME"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, subprocess, sys
+          devices = json.load(sys.stdin)["devices"]
+          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if device["name"].startswith(os.environ["DEVICE_FAMILY"])]
+          runtime, device = max(available, key=lambda item: (item[0], "13-inch" in item[1]["name"] or "12.9-inch" in item[1]["name"], "Pro" in item[1]["name"], item[1]["name"]))
+          identifier = subprocess.check_output(["xcrun", "simctl", "create", "tsk isolated " + os.environ["DEVICE_FAMILY"], device["deviceTypeIdentifier"], runtime], text=True).strip()
+          print("Created isolated simulator: " + device["name"] + " (" + identifier + ")")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("id=" + identifier + "\n")
+          '
 
       - name: Build & run UI tests
         working-directory: App
         run: |
           set -o pipefail
-          xcodebuild test \
+          export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
+          export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
+          export TSK_NATIVE_KEYBOARD_HID=1
+          export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
+          coverage=()
+          if [[ "${{ matrix.diagnostic }}" == "true" ]]; then
+            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/CustomViewsUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/MissedNotificationUITests -only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer -only-testing:TskUITests/ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks -only-testing:TskUITests/ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/WidgetUITests)
+          elif [[ "${{ matrix.family }}" == "iPad" ]]; then
+            coverage=(-only-testing:TskUITests/ShareCaptureUITests -only-testing:TskUITests/SynchronizationUITests -only-testing:TskUITests/iPadWorkspaceUITests -only-testing:TskUITests/TaskAnnotationUITests -only-testing:TskUITests/TaskAutomationUITests -only-testing:TskUITests/RecurringTemplateUITests -only-testing:TskUITests/SeriesMetadataUITests -only-testing:TskUITests/SeriesTransitionUITests -only-testing:TskUITests/TaskAttributeUITests -only-testing:TskUITests/TypedFilterUITests -only-testing:TskUITests/ReminderImportUITests -only-testing:TskUITests/ContinuousReminderImportUITests -only-testing:TskUITests/TaskActivityUITests -only-testing:TskUITests/ReminderRecurrenceUITests -only-testing:TskUITests/CalendarTodayUITests -only-testing:TskUITests/WidgetUITests -only-testing:TskUITests/SpotlightUITests -only-testing:TskUITests/TaskNotificationUITests -only-testing:TskUITests/MissedNotificationUITests)
+          fi
+          peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
+          export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
+          python3 ../scripts/with-sync-fixture.py \
+            --server ../.build/sync-server/target/release/taskchampion-sync-server \
+            --output ../.build/ui-sync "${peer[@]}" -- \
+            ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" \
             -project "$APP_NAME.xcodeproj" \
-            -scheme "$APP_NAME" \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }},OS=latest" \
+            -scheme "$APP_NAME" "${coverage[@]}" \
             -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO
+            -derivedDataPath ../.build/ui \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+
+      - name: Verify simulator intent metadata and shared storage entitlement
+        run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
+
+      - name: Remove owned isolated simulator
+        if: ${{ always() && steps.sim.outputs.id != '' }}
+        run: |
+          xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
+          xcrun simctl delete "${{ steps.sim.outputs.id }}"
 
       - name: Upload test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ui-test-results
-          path: App/TestResults.xcresult
+          name: ${{ matrix.artifact }}
+          path: |
+            App/TestResults.xcresult
+            App/TestResults-sharing.xcresult
+            .build/ui-sync
+            .build/eventkit-fixture
           if-no-files-found: ignore
