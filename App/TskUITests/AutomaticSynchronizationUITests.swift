@@ -9,6 +9,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         let authenticationService = XCUIApplication(bundleIdentifier: "com.apple.AuthenticationServicesUI")
         var dismissedPassword = false
         var observedPassword = false
+        var observedPasswordDialog: (element: XCUIElement, queryRoot: String)?
         var passwordAction = "No exact Save Password? prompt observed"
         addTeardownBlock {
             guard (self.testRun?.totalFailureCount ?? 0) > 0 else { return }
@@ -23,6 +24,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
                   dialog.elementType == .alert || dialog.elementType == .sheet,
                   dialog.label == "Save Password?" else { return false }
             observedPassword = true
+            observedPasswordDialog = (dialog, queryRoot)
             passwordAction = "queryRoot=\(queryRoot) title=Save Password? action=notRequested"
             let notNow = dialog.buttons["Not Now"]
             guard notNow.exists, let snapshot = try? notNow.snapshot(),
@@ -62,19 +64,6 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 10))
         capture("Automatic synchronization failure with local capture available", app)
-        let passwordSheet = app.sheets["Save Password?"]
-        if passwordSheet.waitForExistence(timeout: 5) {
-            let notNow = passwordSheet.buttons["Not Now"]
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                !passwordSheet.exists || (notNow.exists && notNow.isEnabled && notNow.isHittable)
-            }, object: nil)
-            guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
-                XCTFail("The observed Save Password? sheet must expose an actionable Not Now button")
-                return
-            }
-            if passwordSheet.exists { XCTAssertTrue(dismissPassword(passwordSheet)) }
-            XCTAssertTrue(passwordSheet.waitForNonExistence(timeout: 5))
-        }
         func dismissPasswordBeforeSample(_ deadline: TimeInterval) {
             guard !dismissedPassword, ProcessInfo.processInfo.systemUptime < deadline else { return }
             observedPassword = false
@@ -87,6 +76,37 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             for dialog in [authenticationService.sheets["Save Password?"], authenticationService.alerts["Save Password?"]] {
                 if dismissPassword(dialog, queryRoot: "com.apple.AuthenticationServicesUI", before: deadline) { return }
             }
+        }
+        func prepareCaptureControl() {
+            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            func sample() -> Bool {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                dismissPasswordBeforeSample(deadline)
+                guard !observedPassword, ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                return app.buttons["new-task"].isHittable && ProcessInfo.processInfo.systemUptime < deadline
+            }
+            if sample() { return }
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            if remaining > 0 {
+                let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+                _ = XCTWaiter.wait(for: [ready], timeout: remaining)
+            }
+        }
+        prepareCaptureControl()
+        if let observedDialog = observedPasswordDialog {
+            let passwordDialog = observedDialog.element
+            if !dismissedPassword {
+                let notNow = passwordDialog.buttons["Not Now"]
+                let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    !passwordDialog.exists || (notNow.exists && notNow.isEnabled && notNow.isHittable)
+                }, object: nil)
+                guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+                    XCTFail("The observed Save Password? sheet must expose an actionable Not Now button")
+                    return
+                }
+                if passwordDialog.exists { XCTAssertTrue(dismissPassword(passwordDialog, queryRoot: observedDialog.queryRoot)) }
+            }
+            XCTAssertTrue(passwordDialog.waitForNonExistence(timeout: 5))
         }
         tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
