@@ -135,7 +135,11 @@ final class TaskNotificationUITests: XCTestCase {
             let apps = settings.buttons["com.apple.settings.apps"].firstMatch
             let sidebar = settings.collectionViews.matching(NSPredicate(format: "label == %@", "Sidebar")).firstMatch
             let root = sidebar.exists ? sidebar : settings.collectionViews.firstMatch
-            guard revealTaskElement(apps, in: root, app: settings, maximumSteps: 12, bottomInset: settings.searchFields.firstMatch, requireFullVisibility: true) else { return toggle }
+            let search = settings.searchFields.firstMatch
+            let visible = root.frame.intersection(settings.frame)
+            let searchFrame = search.exists ? search.frame : nil
+            let bottomSearch = TaskRevealVisibleBody.lowerInsetFrame(searchFrame, in: visible) == nil ? nil : search
+            guard revealTaskElement(apps, in: root, app: settings, maximumSteps: 12, bottomInset: bottomSearch, requireFullVisibility: true) else { return toggle }
             tapTaskMenuItem(apps, app: settings)
             capture("Actual system Apps settings before selecting tsk", settings)
             guard settings.navigationBars["Apps"].waitForExistence(timeout: 5) else {

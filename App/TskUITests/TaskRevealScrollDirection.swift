@@ -27,6 +27,11 @@ struct TaskRevealVisibleBody {
         bottom = min(visibleFrame.maxY - 16, obstructionTop.map { $0 - 8 } ?? visibleFrame.maxY - 16)
     }
 
+    static func lowerInsetFrame(_ candidate: CGRect?, in visibleFrame: CGRect) -> CGRect? {
+        guard let candidate, candidate.intersects(visibleFrame), candidate.minY >= visibleFrame.midY else { return nil }
+        return candidate
+    }
+
     func contains(midY: CGFloat) -> Bool { midY >= top && midY <= bottom }
 
     func contains(frame: CGRect) -> Bool {
