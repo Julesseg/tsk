@@ -109,6 +109,8 @@ struct CustomViewsView: View {
                     Button("Edit", systemImage: "pencil") { editing = ViewEditorRoute(view: saved) }
                     Button("Delete", systemImage: "trash", role: .destructive) { Task { await remove(saved) } }
                 }
+                .labelStyle(.iconOnly)
+                .accessibilityLabel("Options for " + view.title(in: store))
                 .accessibilityIdentifier("view-options-" + id.uuidString)
             }
         }

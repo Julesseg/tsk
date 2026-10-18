@@ -156,6 +156,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         capture("Projects list")
         tapTaskControl(app.buttons["project-Launch"], app: app)
         XCTAssertTrue(taskRow(named: "Prepare launch", app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
         capture("Project tasks")
         tapTaskControl(taskRow(named: "Prepare launch", app: app), app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))

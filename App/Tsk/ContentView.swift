@@ -155,8 +155,7 @@ struct ContentView: View {
             .navigationTitle("Projects")
             .toolbar { settingsToolbar }
             .navigationDestination(for: TaskProjectSelection.self) { project in
-                taskList(selection: nil)
-                    .navigationTitle(project.projectName ?? "No project")
+                taskList(selection: nil, title: project.projectName ?? "No project")
                     .onAppear { openProject(project) }
             }
             .navigationDestination(for: UUID.self) { id in
@@ -308,9 +307,9 @@ struct ContentView: View {
 
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
-    private func taskList(selection: Binding<UUID?>?) -> some View {
+    private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
-            .navigationTitle(store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+            .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
