@@ -87,10 +87,7 @@ import XCTest
         return String(row.identifier.dropFirst("task-".count))
     }
     private func openSettings(_ app: XCUIApplication) {
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(app.buttons["spotlight-settings"], in: "workspace-sidebar", app: app))
-        } else { app.buttons["workspace-more"].tap() }
-        tapTaskMenuItem(app.buttons["spotlight-settings"], app: app)
+        openWorkspaceSetting("spotlight-diagnostics", app: app)
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
     private func query(_ app: XCUIApplication, id: String, present: Bool, expectedIndexedCount: Int? = nil) {

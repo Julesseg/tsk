@@ -42,7 +42,7 @@ final class TypedFilterUITests: XCTestCase {
         tapTaskControl(app.buttons["save-advanced-attributes"], app: app)
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
         if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
-        openViews(app, isPad: isPad)
+        openViews(app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -71,7 +71,7 @@ final class TypedFilterUITests: XCTestCase {
         capture("Valid numeric edit removes result from saved expression", app: app)
         app.terminate()
         app.launch()
-        openViews(app, isPad: isPad)
+        openViews(app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         saved.tap()
@@ -99,7 +99,7 @@ final class TypedFilterUITests: XCTestCase {
         app.buttons["Medium"].tap()
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(taskRow(named: "Computed urgency task", app: app).waitForExistence(timeout: 10))
-        openViews(app, isPad: isPad)
+        openViews(app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -129,7 +129,7 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         app.terminate()
         app.launch()
-        openViews(app, isPad: isPad)
+        openViews(app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         saved.swipeLeft()
@@ -202,10 +202,8 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["manage-attribute-definitions"].waitForExistence(timeout: 5))
     }
 
-    private func openViews(_ app: XCUIApplication, isPad: Bool) {
-        if isPad { XCTAssertTrue(revealTaskElement(app.buttons["custom-views"], in: "workspace-sidebar", app: app)) }
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+    private func openViews(_ app: XCUIApplication) {
+        openWorkspaceSetting("custom-views", app: app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

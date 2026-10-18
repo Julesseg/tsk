@@ -18,7 +18,7 @@ final class TemporalFilterUITests: XCTestCase {
         setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["Relative deadline"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -57,8 +57,7 @@ final class TemporalFilterUITests: XCTestCase {
     }
 
     private func openSavedView(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.label.contains("Ready today"))

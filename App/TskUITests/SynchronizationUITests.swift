@@ -122,10 +122,7 @@ final class SynchronizationUITests: XCTestCase {
     }
 
     private func revealSynchronizationSettings(_ app: XCUIApplication) -> Bool {
-        if app.collectionViews["workspace-sidebar"].exists {
-            return revealTaskElement(app.buttons["synchronization-settings"], in: "workspace-sidebar", app: app)
-        }
-        return app.buttons["synchronization-settings"].waitForExistence(timeout: 10)
+        revealWorkspaceSetting("synchronization-settings", app: app)
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

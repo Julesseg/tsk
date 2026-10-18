@@ -89,9 +89,7 @@ final class SeriesTransitionUITests: XCTestCase {
     }
 
     private func openTemplates(_ app: XCUIApplication) {
-        let button = app.buttons["recurring-templates"]
-        if UIDevice.current.userInterfaceIdiom == .pad, !button.isHittable { XCTAssertTrue(revealTaskElement(button, in: "workspace-sidebar", app: app)) }
-        button.tap()
+        openWorkspaceSetting("recurring-templates", app: app)
         XCTAssertTrue(app.buttons["new-recurring-template"].waitForExistence(timeout: 10))
     }
     private func openEditor(_ app: XCUIApplication) {

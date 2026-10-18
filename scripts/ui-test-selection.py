@@ -4,6 +4,7 @@ import re
 
 
 PHONE_SMOKE = (
+    "WorkspaceSettingsUITests",
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
     "TskUITests/testDescriptionEditAndCompletionPersistAcrossRelaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
@@ -14,11 +15,13 @@ PHONE_SMOKE = (
     "SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry",
 )
 PAD_SMOKE = (
+    "WorkspaceSettingsUITests",
     "iPadWorkspaceUITests",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
 )
 PAD_FULL = (
+    "WorkspaceSettingsUITests",
     "ShareCaptureUITests", "SynchronizationUITests", "iPadWorkspaceUITests",
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",

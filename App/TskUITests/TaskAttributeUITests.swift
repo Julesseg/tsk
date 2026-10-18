@@ -133,11 +133,7 @@ final class TaskAttributeUITests: XCTestCase {
     }
 
     private func openDefinitions(_ app: XCUIApplication) {
-        let definitions = app.buttons["attribute-definitions"]
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(definitions, in: "workspace-sidebar", app: app))
-        } else { tapTaskControl(app.buttons["workspace-more"], app: app) }
-        tapTaskControl(definitions, app: app)
+        openWorkspaceSetting("attribute-definitions", app: app)
         XCTAssertTrue(app.buttons["new-attribute-definition"].waitForExistence(timeout: 5))
     }
 

@@ -47,8 +47,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         }
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["synchronization-settings"].waitForExistence(timeout: 10))
-        app.buttons["synchronization-settings"].tap()
+        openWorkspaceSetting("synchronization-settings", app: app)
         let server = app.textFields["sync-server-url"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
         server.tap()

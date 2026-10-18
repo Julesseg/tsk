@@ -19,7 +19,7 @@ final class CustomViewsUITests: XCTestCase {
         app.buttons["save-task"].tap()
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Filter task", app: app), timeout: 10))
         XCTAssertTrue(app.staticTexts["Filter task"].exists)
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -39,8 +39,7 @@ final class CustomViewsUITests: XCTestCase {
         capture("Custom view real task results", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.label.contains("Work view"))
@@ -59,7 +58,7 @@ final class CustomViewsUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("Completion removes task from custom result", app: app)
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         saved.swipeLeft()
         app.buttons["Delete"].tap()
@@ -67,8 +66,7 @@ final class CustomViewsUITests: XCTestCase {
         app.buttons["Done"].tap()
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         XCTAssertFalse(saved.exists)
     }
 

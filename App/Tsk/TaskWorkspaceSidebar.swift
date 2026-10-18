@@ -5,15 +5,6 @@ struct TaskWorkspaceSidebar: View {
     let store: TaskStore
     let openView: (TaskQuery) -> Void
     let openProject: (TaskProjectSelection) -> Void
-    let customViews: () -> Void
-    let synchronization: () -> Void
-    let shortcuts: () -> Void
-    let recurring: () -> Void
-    let attributeDefinitions: () -> Void
-    let reminders: () -> Void
-    let continuousReminders: () -> Void
-    let notifications: () -> Void
-    let spotlight: () -> Void
 
     var body: some View {
         List {
@@ -30,31 +21,16 @@ struct TaskWorkspaceSidebar: View {
                     project(name.rawValue, selection: .project(name.rawValue))
                 }
             }
-            Section("Custom views") {
-                ForEach(store.savedViews) { view in
-                    Button { store.openView(view) } label: {
-                        Label(view.name, systemImage: "line.3.horizontal.decrease")
+            if !store.savedViews.isEmpty {
+                Section("Custom views") {
+                    ForEach(store.savedViews) { view in
+                        Button { store.openView(view) } label: {
+                            Label(view.name, systemImage: "line.3.horizontal.decrease")
+                        }
+                        .accessibilityIdentifier("sidebar-custom-\(view.id.uuidString)")
+                        .listRowBackground(store.customView?.id == view.id ? Color.accentColor.opacity(0.12) : Color.clear)
                     }
-                    .accessibilityIdentifier("sidebar-custom-\(view.id.uuidString)")
-                    .listRowBackground(store.customView?.id == view.id ? Color.accentColor.opacity(0.12) : Color.clear)
                 }
-                Button("Manage custom views", systemImage: "slider.horizontal.3", action: customViews)
-                    .accessibilityIdentifier("custom-views")
-            }
-            Section {
-                Button("Spotlight", systemImage: "magnifyingglass", action: spotlight).accessibilityIdentifier("spotlight-settings")
-                Button("Task notifications", systemImage: "bell", action: notifications).accessibilityIdentifier("notification-settings")
-                Button("Move from Reminders automatically", systemImage: "arrow.down.forward.circle", action: continuousReminders)
-                    .accessibilityIdentifier("continuous-reminders-settings")
-                Button("Copy from Reminders", systemImage: "square.and.arrow.down", action: reminders)
-                    .accessibilityIdentifier("reminders-import")
-                Button("Recurring templates", systemImage: "repeat", action: recurring).accessibilityIdentifier("recurring-templates")
-                Button("Attribute definitions", systemImage: "slider.horizontal.3", action: attributeDefinitions)
-                    .accessibilityIdentifier("attribute-definitions")
-                Button("Synchronization", systemImage: "arrow.triangle.2.circlepath", action: synchronization)
-                    .accessibilityIdentifier("synchronization-settings")
-                Button("Shortcuts and Siri", systemImage: "square.stack.3d.up", action: shortcuts)
-                    .accessibilityIdentifier("task-shortcuts")
             }
         }
         .listStyle(.sidebar)

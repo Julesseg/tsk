@@ -4,8 +4,11 @@ import TskNative
 import EventKit
 
 struct ContentView: View {
-    private enum WorkspaceIntegration {
-        case spotlight, notifications, continuousReminders, remindersImport, attributeDefinitions
+    enum WorkspaceSetting {
+        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport, attributeDefinitions
+        #if DEBUG && targetEnvironment(simulator)
+        case spotlightDiagnostics
+        #endif
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -17,7 +20,9 @@ struct ContentView: View {
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
     @State private var spotlight: SpotlightController
-    @State private var isShowingSpotlight = false
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var isShowingSpotlightDiagnostics = false
+    #endif
     @State private var calendar: TodayCalendarController
     @State private var notifications: TaskNotificationController
     @State private var isConfiguringNotifications = false
@@ -26,12 +31,11 @@ struct ContentView: View {
     @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
-    @State private var isShowingShortcuts = false
     @State private var isShowingRecurring = false
     @State private var isDefiningAttributes = false
     @State private var isImportingReminders = false
-    @State private var isShowingWorkspaceMore = false
-    @State private var pendingWorkspaceIntegration: WorkspaceIntegration?
+    @State private var isShowingSettings = false
+    @State private var pendingWorkspaceSetting: WorkspaceSetting?
     @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
@@ -62,6 +66,18 @@ struct ContentView: View {
             case .accessibilityColumns: accessibleWorkspace
             case .compact: compactWorkspace
             }
+        }
+        .safeAreaInset(edge: .bottom, alignment: .trailing) {
+            Button(action: capture) {
+                Image(systemName: "plus")
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("New task")
+            .accessibilityIdentifier("new-task")
+            .padding()
         }
     }
 
@@ -102,18 +118,21 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private var selectedTaskDetail: some View {
-        if let task = selectedTask {
-            TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                .id(task.id)
-        } else {
-            ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
-                .accessibilityIdentifier("workspace-detail-empty")
+    private var selectedTaskDetail: some View {
+        Group {
+            if let task = selectedTask {
+                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+                    .id(task.id)
+            } else {
+                ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
+                    .accessibilityIdentifier("workspace-detail-empty")
+            }
         }
+        .toolbar { settingsToolbar }
     }
 
     private var workspaceSidebar: some View {
-        TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
+        TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject)
     }
 
     private var compactWorkspace: some View {
@@ -135,7 +154,9 @@ struct ContentView: View {
     private var integrationSheets: some View {
         navigationWorkspace
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
-        .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "spotlight"]) } }
+        #if DEBUG && targetEnvironment(simulator)
+        .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
+        #endif
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
@@ -148,7 +169,9 @@ struct ContentView: View {
         .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
         .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
-        .sheet(isPresented: $isShowingShortcuts) { NavigationStack { TaskShortcutsView().toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { isShowingShortcuts = false } } } } }
+        .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
+            TaskSettingsView(choose: chooseWorkspaceSetting)
+        }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
     }
 
@@ -247,17 +270,11 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar { workspaceToolbar }
+            .toolbar { if presentation != .columns { settingsToolbar } }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
-                    }
-                    if let error = spotlight.status?.error ?? spotlight.error {
-                        Button { isShowingSpotlight = true } label: { Label("Spotlight needs attention: " + error, systemImage: "magnifyingglass") }.font(.footnote).padding().accessibilityIdentifier("spotlight-attention")
-                    }
-                    if spotlight.status?.pending == true {
-                        Button("Spotlight update pending. Tasks are saved.") { isShowingSpotlight = true }.font(.footnote).padding().accessibilityIdentifier("spotlight-pending")
                     }
                     SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
@@ -266,61 +283,35 @@ struct ContentView: View {
             }
     }
 
-    @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
-        if presentation == .compact {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
-                Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
-                Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }.accessibilityIdentifier("synchronization-settings")
-                Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
-            }
+    @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                .accessibilityIdentifier("workspace-settings")
         }
-        if presentation == .compact {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("More", systemImage: "ellipsis") {
-                    pendingWorkspaceIntegration = nil
-                    isShowingWorkspaceMore = true
-                }
-                .accessibilityIdentifier("workspace-more")
-                .popover(isPresented: $isShowingWorkspaceMore) { workspaceMorePopover }
-            }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button("New task", systemImage: "plus", action: capture).accessibilityIdentifier("new-task")
-        }
-
     }
 
-    private var workspaceMorePopover: some View {
-        VStack(alignment: .leading) {
-            Button("Spotlight") { chooseWorkspaceIntegration(.spotlight) }.accessibilityIdentifier("spotlight-settings")
-            Button("Task notifications") { chooseWorkspaceIntegration(.notifications) }.accessibilityIdentifier("notification-settings")
-            Button("Move from Reminders automatically") { chooseWorkspaceIntegration(.continuousReminders) }.accessibilityIdentifier("continuous-reminders-settings")
-            Button("Copy from Reminders") { chooseWorkspaceIntegration(.remindersImport) }.accessibilityIdentifier("reminders-import")
-            Button("Attribute definitions") { chooseWorkspaceIntegration(.attributeDefinitions) }.accessibilityIdentifier("attribute-definitions")
-        }
-        .padding()
-        .presentationCompactAdaptation(.popover)
-        .onDisappear(perform: presentPendingWorkspaceIntegration)
+    private func chooseWorkspaceSetting(_ destination: WorkspaceSetting) {
+        guard isShowingSettings, pendingWorkspaceSetting == nil else { return }
+        pendingWorkspaceSetting = destination
+        isShowingSettings = false
     }
 
-    private func chooseWorkspaceIntegration(_ destination: WorkspaceIntegration) {
-        guard isShowingWorkspaceMore, pendingWorkspaceIntegration == nil else { return }
-        pendingWorkspaceIntegration = destination
-        isShowingWorkspaceMore = false
-    }
-
-    private func presentPendingWorkspaceIntegration() {
-        guard let destination = pendingWorkspaceIntegration else { return }
-        pendingWorkspaceIntegration = nil
+    private func presentPendingWorkspaceSetting() {
+        guard let destination = pendingWorkspaceSetting else { return }
+        pendingWorkspaceSetting = nil
         switch destination {
-        case .spotlight: requestIntegrationPresentation("spotlight", state: $isShowingSpotlight)
+        case .customViews: isChoosingCustomView = true
+        case .recurring: isShowingRecurring = true
+        case .synchronization: isConfiguringSync = true
         case .notifications:
-            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "workspace-menu"])
+            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "settings"])
             isConfiguringNotifications = true
         case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
         case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
         case .attributeDefinitions: requestIntegrationPresentation("attribute-definitions", state: $isDefiningAttributes)
+        #if DEBUG && targetEnvironment(simulator)
+        case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
+        #endif
         }
     }
 
@@ -363,7 +354,10 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingWorkspaceMore, pendingWorkspaceIntegration == nil, !isConfiguringNotifications, !isShowingSpotlight, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        #if DEBUG && targetEnvironment(simulator)
+        guard !isShowingSpotlightDiagnostics else { return nil }
+        #endif
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },

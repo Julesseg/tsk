@@ -28,14 +28,7 @@ final class MissedNotificationUITests: XCTestCase {
     }
 
     private func openNotifications(_ app: XCUIApplication) {
-        let entry = app.buttons["notification-settings"].firstMatch
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(entry, in: "workspace-sidebar", app: app))
-        } else if !entry.waitForExistence(timeout: 5) {
-            let more = app.buttons["workspace-more"].firstMatch
-            XCTAssertTrue(more.waitForExistence(timeout: 20), app.debugDescription); more.tap()
-        }
-        XCTAssertTrue(entry.waitForExistence(timeout: 10), app.debugDescription); tapTaskMenuItem(entry, app: app)
+        openWorkspaceSetting("notification-settings", app: app)
         XCTAssertTrue(app.staticTexts["notification-permission"].waitForExistence(timeout: 15))
     }
     private func allowNotifications(_ app: XCUIApplication) {

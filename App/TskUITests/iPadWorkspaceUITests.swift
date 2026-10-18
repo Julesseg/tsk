@@ -97,8 +97,8 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testNativeSidebarCustomViewAndAccessibilityText() throws {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(revealTaskElement(app.buttons["custom-views"], in: "workspace-sidebar", app: app))
-        XCTAssertEqual(app.buttons["custom-views"].label, "Manage custom views")
+        XCTAssertTrue(revealWorkspaceSetting("custom-views", app: app))
+        XCTAssertEqual(app.buttons["custom-views"].label, "Custom views")
         XCTAssertFalse(app.otherElements["workspace-detail-empty"].exists, "Largest text must not reserve a third column for empty detail")
         app.buttons["custom-views"].tap()
         app.buttons["new-custom-view"].tap()

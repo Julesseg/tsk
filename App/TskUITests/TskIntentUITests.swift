@@ -11,7 +11,6 @@ final class TskIntentUITests: XCTestCase {
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_DESCRIPTION")
         app.launch()
         XCTAssertTrue(app.staticTexts["Captured through native intent"].waitForExistence(timeout: 15))
-        app.buttons["task-shortcuts"].tap()
-        XCTAssertTrue(app.navigationBars["Shortcuts and Siri"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["task-shortcuts"].exists)
     }
 }

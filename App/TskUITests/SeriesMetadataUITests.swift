@@ -87,17 +87,7 @@ final class SeriesMetadataUITests: XCTestCase {
     }
 
     private func openTemplate(_ id: String, app: XCUIApplication) {
-        let templates = app.buttons["recurring-templates"]
-        let sidebar = app.collectionViews["workspace-sidebar"].firstMatch
-        if sidebar.exists && !templates.isHittable {
-            guard revealTaskElement(templates, in: sidebar, app: app) else { return }
-        }
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in templates.exists && templates.isHittable }, object: nil)
-        guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
-            XCTFail("Recurring templates control is unavailable: " + app.debugDescription)
-            return
-        }
-        tapTaskControl(templates, app: app)
+        openWorkspaceSetting("recurring-templates", app: app)
         let row = app.buttons["recurring-template-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
