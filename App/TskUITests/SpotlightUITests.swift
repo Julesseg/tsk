@@ -140,7 +140,9 @@ import XCTest
             XCTFail("Actual Home screen icons must be available before opening system Search")
             return
         }
-        springboard.swipeDown()
+        let search = springboard.otherElements["spotlight-pill"].firstMatch
+        if search.exists { tapTaskControl(search, app: springboard) }
+        else { springboard.swipeDown() }
         capture("Actual system Search surface before first-run handling", springboard)
         let education = springboard.buttons["Continue"].firstMatch
         if education.exists && education.isHittable {
@@ -150,7 +152,7 @@ import XCTest
         let spotlight = XCUIApplication(bundleIdentifier: "com.apple.Spotlight")
         let owners = [("com.apple.springboard", springboard), ("com.apple.Spotlight", spotlight)]
         func readySearch() -> (owner: XCUIApplication, field: XCUIElement)? {
-            for (_, owner) in owners {
+            for (_, owner) in owners where owner.state == .runningForeground {
                 let field = owner.searchFields.firstMatch
                 if field.exists && field.isEnabled && field.isHittable { return (owner, field) }
                 let textField = owner.textFields["SpotlightSearchField"].firstMatch
