@@ -424,7 +424,7 @@ struct ContentView: View {
     }
 
     private func openProject(_ project: TaskProjectSelection) {
-        store.customView = nil
+        guard isProjectWorkspace else { return }
         store.query = .unfinished
         store.projectSelection = project
     }
