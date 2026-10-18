@@ -35,7 +35,11 @@ checks reject renamed selectors and empty UI selections.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.
-Smoke execution has a 30-minute step limit and a 45-minute overall job limit.
+Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
+The expanded workspace selection exceeded the former 30-minute step limit;
+the measured iPad run spent 10 minutes 33 seconds in simulator preparation
+before starting `xcodebuild`. The additional budget covers preparation and
+the selected journeys without changing individual test limits or assertions.
 Full execution/job limits are 150/180 minutes; diagnostics have 60/90-minute limits.
 These are ceilings, not measured completion times. Every method retains the
 600-second XCTest limit. The later `always()` step removes the owned simulator

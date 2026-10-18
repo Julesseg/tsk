@@ -73,7 +73,7 @@ jobs:
   app-ui-tests:
     name: ${{ matrix.job-name }}
     runs-on: xcode-27
-    timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 45 }}
+    timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -165,7 +165,7 @@ jobs:
           '
 
       - name: Run prebuilt UI tests
-        timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 30 }}
+        timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 45 }}
         working-directory: App
         env:
           UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
