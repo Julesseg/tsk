@@ -58,6 +58,8 @@ struct ContentView: View {
         return dynamicTypeSize.isAccessibilitySize ? .accessibilityColumns : .columns
     }
 
+    private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects && store.customView == nil }
+
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
             resetNavigation()
@@ -104,7 +106,7 @@ struct ContentView: View {
 
     private var workspaceContent: some View {
         Group {
-            if store.selectedWorkspaceView == .projects && store.customView == nil {
+            if isProjectWorkspace {
                 projectsWorkspace
             } else {
                 tasksWorkspace
@@ -265,7 +267,7 @@ struct ContentView: View {
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
-        .onChange(of: path) { _, newPath in if presentation != .columns || store.selectedWorkspaceView == .projects { selectedTaskID = newPath.last } }
+        .onChange(of: path) { _, newPath in if presentation != .columns || isProjectWorkspace { selectedTaskID = newPath.last } }
         .onChange(of: presentation) { previous, current in
             if previous != .columns { selectedTaskID = path.last ?? selectedTaskID }
             path = current != .columns ? selectedTaskID.map { [$0] } ?? [] : []
@@ -320,7 +322,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar { if presentation != .columns || store.selectedWorkspaceView == .projects { settingsToolbar } }
+            .toolbar { if presentation != .columns || isProjectWorkspace { settingsToolbar } }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
@@ -336,7 +338,7 @@ struct ContentView: View {
     @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
         if store.customView != nil && store.customView?.id == nil {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Close filter", systemImage: "xmark") { store.selectWorkspaceView(store.selectedWorkspaceView) }
+                Button("Close filter", systemImage: "xmark") { tabSelection.wrappedValue = store.selectedWorkspaceView }
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -400,7 +402,7 @@ struct ContentView: View {
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.complete(id: task.id) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
-                if store.selectedWorkspaceView == .projects { projectPath.append(task.id) }
+                if isProjectWorkspace { projectPath.append(task.id) }
                 else if presentation != .columns { path = [task.id] }
             } },
             openView: openView,
