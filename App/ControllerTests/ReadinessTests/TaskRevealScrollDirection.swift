@@ -1,0 +1,1 @@
+../../TskUITests/TaskRevealScrollDirection.swift

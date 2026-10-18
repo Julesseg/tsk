@@ -22,7 +22,8 @@ EOF
 else
   cat <<'EOF'
 ENV=LOCAL MAC. Xcode is available, so UI tests can run locally when useful.
-`cd Core && swift test` remains the fast loop and CI is the full UI gate. For
+`cd Core && swift test` remains the fast loop. PR CI runs UI smoke coverage;
+nightly/manual CI runs full UI coverage (docs/verification/ci-test-tiers.md). For
 UI tests, boot a simulator you own, then run:
   cd App && xcodebuild test -project Tsk.xcodeproj -scheme Tsk \
     -destination 'platform=iOS Simulator,id=<booted-udid>' CODE_SIGNING_ALLOWED=NO
