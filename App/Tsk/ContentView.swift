@@ -14,8 +14,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var accessibleSidebarMinimum: CGFloat = 190
-    @ScaledMetric(relativeTo: .body) private var accessibleSidebarWidth: CGFloat = 220
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
@@ -41,6 +39,7 @@ struct ContentView: View {
     @State private var path: [UUID] = []
     @State private var sidebarError: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var projectPath = NavigationPath()
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
@@ -59,12 +58,46 @@ struct ContentView: View {
         return dynamicTypeSize.isAccessibilitySize ? .accessibilityColumns : .columns
     }
 
+    private var tabSelection: Binding<WorkspaceView> {
+        Binding(get: { store.selectedWorkspaceView }, set: { view in
+            projectPath = NavigationPath()
+            selectedTaskID = nil
+            path = []
+            store.selectWorkspaceView(view)
+        })
+    }
+
     private var navigationWorkspace: some View {
         Group {
-            switch presentation {
-            case .columns: regularWorkspace
-            case .accessibilityColumns: accessibleWorkspace
-            case .compact: compactWorkspace
+            if !store.workspaceViewsLoaded && sidebarError == nil {
+                ProgressView("Loading views")
+            } else if store.customView != nil && store.customView?.id == nil {
+                workspaceContent
+            } else {
+                TabView(selection: tabSelection) {
+                    ForEach(store.workspaceViews.active) { view in
+                        Tab(view.title(in: store), systemImage: view.systemImage, value: view) {
+                            if view == store.selectedWorkspaceView {
+                                workspaceContent
+                                    .environment(\.horizontalSizeClass, sizeClass)
+                            }
+                        }
+                        .accessibilityIdentifier("tab-" + view.id)
+                    }
+                }
+                .tabViewStyle(.tabBarOnly)
+                // Keep the native tab bar at the bottom on iPad while retaining regular content columns.
+                .environment(\.horizontalSizeClass, .compact)
+            }
+        }
+    }
+
+    private var workspaceContent: some View {
+        Group {
+            if store.selectedWorkspaceView == .projects && store.customView == nil {
+                projectsWorkspace
+            } else {
+                tasksWorkspace
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
@@ -73,7 +106,7 @@ struct ContentView: View {
                     .font(.title2)
                     .frame(width: 44, height: 44)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .accessibilityLabel("New task")
             .accessibilityIdentifier("new-task")
@@ -81,41 +114,58 @@ struct ContentView: View {
         }
     }
 
-    private var regularWorkspace: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            workspaceSidebar
-                .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-        } content: {
-            taskList(selection: $selectedTaskID)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
-        } detail: {
-            selectedTaskDetail
-        }
-        .navigationSplitViewStyle(.balanced)
-        .accessibilityIdentifier("task-workspace")
-    }
-
-    private var accessibleTaskPath: Binding<[UUID]> {
-        Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
-    }
-
-    private var accessibleWorkspace: some View {
-        GeometryReader { geometry in
-            let width = min(accessibleSidebarWidth, geometry.size.width * 0.45)
+    @ViewBuilder private var tasksWorkspace: some View {
+        if presentation == .columns {
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                workspaceSidebar
-                    .navigationSplitViewColumnWidth(min: min(accessibleSidebarMinimum, width), ideal: width, max: geometry.size.width / 2)
+                taskList(selection: $selectedTaskID)
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 360, max: 480)
             } detail: {
-                NavigationStack(path: accessibleTaskPath) {
-                    taskList(selection: $selectedTaskID)
-                        .navigationDestination(for: UUID.self) { id in taskDestination(id).id(id) }
-                }
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .accessibilityIdentifier("workspace-accessibility-navigation")
+                selectedTaskDetail
             }
             .navigationSplitViewStyle(.balanced)
             .accessibilityIdentifier("task-workspace")
+        } else {
+            NavigationStack(path: $path) {
+                taskList(selection: nil)
+                    .navigationDestination(for: UUID.self) { id in taskDestination(id) }
+            }
+            .accessibilityIdentifier("workspace-accessibility-navigation")
         }
+    }
+
+    private var projectsWorkspace: some View {
+        NavigationStack(path: $projectPath) {
+            List {
+                projectLink("No project", selection: .unassigned)
+                ForEach(store.availableProjects.map { UTF8String($0) }) { project in
+                    projectLink(project.rawValue, selection: .project(project.rawValue))
+                }
+                if store.availableProjects.isEmpty {
+                    Text("Add a project when creating or editing a task.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("projects-list")
+            .navigationTitle("Projects")
+            .toolbar { settingsToolbar }
+            .navigationDestination(for: TaskProjectSelection.self) { project in
+                taskList(selection: nil)
+                    .navigationTitle(project.projectName ?? "No project")
+                    .onAppear { openProject(project) }
+            }
+            .navigationDestination(for: UUID.self) { id in
+                taskDestination(id).onAppear { selectedTaskID = id }
+            }
+        }
+        .onChange(of: projectPath) { _, value in
+            if value.isEmpty { store.projectSelection = .all }
+            if value.count < 2 { selectedTaskID = nil }
+        }
+    }
+
+    private func projectLink(_ title: String, selection: TaskProjectSelection) -> some View {
+        NavigationLink(value: selection) { Label(title, systemImage: "folder") }
+            .accessibilityIdentifier("project-" + title)
     }
 
     private var selectedTaskDetail: some View {
@@ -129,18 +179,6 @@ struct ContentView: View {
             }
         }
         .toolbar { settingsToolbar }
-    }
-
-    private var workspaceSidebar: some View {
-        TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject)
-    }
-
-    private var compactWorkspace: some View {
-        NavigationStack(path: $path) {
-            taskList(selection: nil)
-                .safeAreaInset(edge: .top) { compactViewPicker }
-                .navigationDestination(for: UUID.self) { id in taskDestination(id) }
-        }
     }
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
@@ -215,10 +253,10 @@ struct ContentView: View {
             if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
-        .onChange(of: path) { _, newPath in if presentation == .compact { selectedTaskID = newPath.last } }
+        .onChange(of: path) { _, newPath in if presentation != .columns || store.selectedWorkspaceView == .projects { selectedTaskID = newPath.last } }
         .onChange(of: presentation) { previous, current in
-            if previous == .compact { selectedTaskID = path.last ?? selectedTaskID }
-            path = current == .compact ? selectedTaskID.map { [$0] } ?? [] : []
+            if previous != .columns { selectedTaskID = path.last ?? selectedTaskID }
+            path = current != .columns ? selectedTaskID.map { [$0] } ?? [] : []
         }
     }
 
@@ -266,11 +304,11 @@ struct ContentView: View {
 
     private func taskList(selection: Binding<UUID?>?) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
-            .navigationTitle(store.customView?.name ?? "Tasks")
+            .navigationTitle(store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar { if presentation != .columns { settingsToolbar } }
+            .toolbar { if presentation != .columns || store.selectedWorkspaceView == .projects { settingsToolbar } }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
@@ -284,6 +322,11 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
+        if store.customView != nil && store.customView?.id == nil {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close filter", systemImage: "xmark") { store.selectWorkspaceView(store.selectedWorkspaceView) }
+            }
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
                 .accessibilityIdentifier("workspace-settings")
@@ -321,25 +364,6 @@ struct ContentView: View {
         TaskUIBoundaryDiagnostics.event("workspace.menu.state-assigned", details: ["destination": destination, "presented": String(state.wrappedValue)])
     }
 
-    private var compactViewPicker: some View {
-        VStack(spacing: 8) {
-            if let view = store.customView {
-                Button { isChoosingCustomView = true } label: { Label(view.name, systemImage: "line.3.horizontal.decrease") }.accessibilityIdentifier("active-custom-view")
-                Button("Predefined views") { store.customView = nil }
-            } else {
-                ProjectPicker(store: store)
-                Picker("Task status", selection: $store.query) {
-                    Text("Today").tag(TaskQuery.today)
-                    Text("Upcoming").tag(TaskQuery.upcoming)
-                    Text("Unfinished").tag(TaskQuery.unfinished)
-                    Text("Completed").tag(TaskQuery.completed)
-                }
-                .pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
-                .accessibilityIdentifier("task-status-view")
-            }
-        }
-    }
-
     private func errorBanner(_ error: String, retry: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(error).font(.footnote)
@@ -364,11 +388,8 @@ struct ContentView: View {
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.complete(id: task.id) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
-                switch presentation {
-                case .columns: break
-                case .accessibilityColumns: selectedTaskID = task.id
-                case .compact: path = [task.id]
-                }
+                if store.selectedWorkspaceView == .projects { projectPath.append(task.id) }
+                else if presentation != .columns { path = [task.id] }
             } },
             openView: openView,
             refresh: { Task { await store.reload() } }
@@ -376,23 +397,24 @@ struct ContentView: View {
     }
 
     private func capture() {
-        if store.customView == nil { store.query = .unfinished }
         isCapturing = true
     }
 
     private func openView(_ query: TaskQuery) {
-        store.customView = nil
-        store.query = query
+        guard let view = WorkspaceView.defaults.first(where: { $0.query == query }) else { return }
+        guard store.workspaceViews.active.contains(view) else { isChoosingCustomView = true; return }
+        tabSelection.wrappedValue = view
     }
 
     private func openProject(_ project: TaskProjectSelection) {
         store.customView = nil
+        store.query = .unfinished
         store.projectSelection = project
     }
 
     private func moveSelection(_ movement: TaskSelectionMovement) {
         selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if presentation == .compact, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
+        if presentation != .columns, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {

@@ -7,6 +7,32 @@ enum TaskTextSelection {
 
 @MainActor
 extension XCTestCase {
+    func activateSavedWorkspaceView(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
+        guard revealTaskElement(saved, in: "views-list", app: app, file: file, line: line) else { return }
+        let id = String(saved.identifier.dropFirst("saved-view-".count))
+        let add = app.buttons["activate-custom-" + id]
+        if add.exists {
+            if !add.isEnabled {
+                let remove = app.buttons["deactivate-completed"]
+                guard revealTaskElement(remove, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
+                tapTaskControl(remove, app: app, file: file, line: line)
+            }
+            guard revealTaskElement(add, in: "views-list", app: app, file: file, line: line) else { return }
+            tapTaskControl(add, app: app, file: file, line: line)
+        }
+        guard revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
+        tapTaskControl(saved, app: app, file: file, line: line)
+        XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(app.tabBars.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-custom-")).firstMatch.isSelected, file: file, line: line)
+    }
+
+    func openSavedViewOptions(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let options = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "view-options-")).firstMatch
+        guard revealTaskElement(options, in: "views-list", app: app, file: file, line: line) else { return }
+        tapTaskControl(options, app: app, file: file, line: line)
+    }
+
     @discardableResult
     func revealWorkspaceSetting(_ identifier: String, app: XCUIApplication, initialScrollUp: Bool = true, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let settings = app.collectionViews["workspace-settings-list"]

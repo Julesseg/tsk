@@ -70,7 +70,7 @@ final class TskWaitingUITests: XCTestCase {
     }
 
     private func selectToday(_ app: XCUIApplication) {
-        app.segmentedControls["task-status-view"].buttons["Today"].tap()
+        app.tabBars.buttons["Today"].tap()
     }
 
     private func waitingReasons(_ app: XCUIApplication) -> XCUIElementQuery {

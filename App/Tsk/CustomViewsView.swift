@@ -12,7 +12,10 @@ struct CustomViewSelection: Equatable {
 }
 
 extension TaskStore {
-    func loadSavedViews() async throws { savedViews = try await manager.savedViews() }
+    func loadSavedViews() async throws {
+        savedViews = try await manager.savedViews()
+        try loadWorkspaceViews()
+    }
 
     func openView(_ view: SavedTaskView) {
         customView = CustomViewSelection(id: view.id, name: view.name, expression: view.expression)
@@ -29,35 +32,32 @@ struct CustomViewsView: View {
         NavigationStack {
             List {
                 if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("saved-view-error") }
-                if store.savedViews.isEmpty {
-                    Text("Save a Taskwarrior filter to reopen its task view on this device.")
-                        .foregroundStyle(.secondary)
+                Section {
+                    ForEach(store.workspaceViews.active) { view in
+                        viewRow(view, active: true)
+                    }
+                    .onMove { from, to in update { $0.moveActive(from: from, to: to) } }
+                } header: {
+                    Text("Active · \(store.workspaceViews.active.count) of \(WorkspaceViews.maximumActive)")
+                } footer: {
+                    Text("Drag to reorder the tabs. The first view opens when you launch tsk. Keep at least one active view.")
                 }
-                ForEach(store.savedViews) { view in
-                    Button {
-                        store.openView(view)
-                        dismiss()
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(view.name)
-                            Text(view.expression.isEmpty ? "All tasks" : view.expression)
-                                .font(.caption.monospaced()).foregroundStyle(.secondary)
-                        }
+                Section {
+                    ForEach(store.workspaceViews.inactive) { view in
+                        viewRow(view, active: false)
                     }
-                    .accessibilityIdentifier("saved-view-\(view.id.uuidString)")
-                    .swipeActions {
-                        Button("Delete", role: .destructive) { Task { await remove(view) } }
-                        Button("Edit") { editing = ViewEditorRoute(view: view) }.tint(.blue)
-                    }
-                    .contextMenu {
-                        Button("Edit", systemImage: "pencil") { editing = ViewEditorRoute(view: view) }
-                        Button("Delete", systemImage: "trash", role: .destructive) { Task { await remove(view) } }
-                    }
+                    .onMove { from, to in update { $0.moveInactive(from: from, to: to) } }
+                } header: {
+                    Text("Other views")
+                } footer: {
+                    Text("Add up to five active views. Use a custom view’s options to edit or delete its filter.")
                 }
             }
-            .navigationTitle("Custom views")
+            .environment(\.editMode, .constant(.active))
+            .accessibilityIdentifier("views-list")
+            .navigationTitle("Views")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() }.accessibilityIdentifier("close-views") }
                 ToolbarItem(placement: .primaryAction) {
                     Button("New view", systemImage: "plus") { editing = ViewEditorRoute(view: nil) }
                         .accessibilityIdentifier("new-custom-view")
@@ -71,13 +71,73 @@ struct CustomViewsView: View {
                 catch { self.error = error.localizedDescription }
             }
         }
+        .tint(.primary)
+    }
+
+    private func viewRow(_ view: WorkspaceView, active: Bool) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                update {
+                    if active { try $0.deactivate(view) }
+                    else { try $0.activate(view) }
+                }
+            } label: {
+                Image(systemName: active ? "minus.circle.fill" : "plus.circle.fill")
+                    .foregroundStyle(active ? Color.red : Color.green)
+                    .font(.title3)
+            }
+            .buttonStyle(.borderless)
+            .disabled(active ? store.workspaceViews.active.count == 1 : store.workspaceViews.active.count == WorkspaceViews.maximumActive)
+            .accessibilityLabel((active ? "Remove " : "Add ") + view.title(in: store))
+            .accessibilityIdentifier((active ? "deactivate-" : "activate-") + view.id)
+            Button {
+                if active {
+                    store.selectWorkspaceView(view)
+                    dismiss()
+                } else if case .custom(let id) = view, let saved = store.savedViews.first(where: { $0.id == id }) {
+                    editing = ViewEditorRoute(view: saved)
+                }
+            } label: {
+                Label(view.title(in: store), systemImage: view.systemImage)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityIdentifier(rowIdentifier(view))
+            if case .custom(let id) = view, let saved = store.savedViews.first(where: { $0.id == id }) {
+                Menu("View options", systemImage: "ellipsis") {
+                    Button("Edit", systemImage: "pencil") { editing = ViewEditorRoute(view: saved) }
+                    Button("Delete", systemImage: "trash", role: .destructive) { Task { await remove(saved) } }
+                }
+                .accessibilityIdentifier("view-options-" + id.uuidString)
+            }
+        }
+        .deleteDisabled(true)
+        .accessibilityAction(named: "Move to first") {
+            update {
+                let rows = active ? $0.active : $0.inactive
+                if let index = rows.firstIndex(of: view) {
+                    if active { $0.moveActive(from: IndexSet(integer: index), to: 0) }
+                    else { $0.moveInactive(from: IndexSet(integer: index), to: 0) }
+                }
+            }
+        }
+    }
+
+    private func rowIdentifier(_ view: WorkspaceView) -> String {
+        if case .custom(let id) = view { return "saved-view-" + id.uuidString }
+        return "view-" + view.id
+    }
+
+    private func update(_ change: (inout WorkspaceViews) throws -> Void) {
+        do { try store.updateWorkspaceViews(change); error = nil }
+        catch { self.error = error.localizedDescription }
     }
 
     private func remove(_ view: SavedTaskView) async {
         do {
             try await store.manager.deleteView(id: view.id)
             try await store.loadSavedViews()
-            if store.customView?.id == view.id { store.customView = nil }
             error = nil
         } catch { self.error = error.localizedDescription }
     }

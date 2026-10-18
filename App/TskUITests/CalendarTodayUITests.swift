@@ -79,9 +79,7 @@ import XCTest
     private func select(_ query: Selection, _ app: XCUIApplication) {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
         let title = query == .today ? "Today" : "Unfinished"
-        if app.collectionViews["workspace-sidebar"].exists {
-            app.buttons[query == .today ? "sidebar-view-today" : "sidebar-view-unfinished"].tap()
-        } else { app.segmentedControls["task-status-view"].buttons[title].tap() }
+        app.tabBars.buttons[title].tap()
     }
     private func configuredApp(_ token: String) -> XCUIApplication {
         let app = taskTestApplication()

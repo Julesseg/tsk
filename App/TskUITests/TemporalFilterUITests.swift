@@ -32,7 +32,7 @@ final class TemporalFilterUITests: XCTestCase {
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         done.tap()
         app.buttons["save-custom-view"].tap()
-        XCTAssertTrue(app.buttons["active-custom-view"].waitForExistence(timeout: 10))
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(app.staticTexts["Relative deadline"].exists)
         capture("Relative deadline and READY saved view", app: app)
         app.terminate()
@@ -61,7 +61,7 @@ final class TemporalFilterUITests: XCTestCase {
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.label.contains("Ready today"))
-        saved.tap()
+        activateSavedWorkspaceView(app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

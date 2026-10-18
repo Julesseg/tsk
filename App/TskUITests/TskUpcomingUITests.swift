@@ -10,7 +10,7 @@ final class TskUpcomingUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.segmentedControls["task-status-view"].buttons["Upcoming"].tap()
+        app.tabBars.buttons["Upcoming"].tap()
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 5))
         capture("Upcoming empty", app: app)
         app.buttons["new-task"].tap()
@@ -64,13 +64,13 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         selectUpcoming(app)
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
-        app.segmentedControls["task-status-view"].buttons["Completed"].tap()
+        app.tabBars.buttons["Completed"].tap()
         XCTAssertTrue(app.staticTexts["One task two future dates"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts.matching(identifier: "One task two future dates").count, 1)
     }
 
     private func selectUpcoming(_ app: XCUIApplication) {
-        app.segmentedControls["task-status-view"].buttons["Upcoming"].tap()
+        app.tabBars.buttons["Upcoming"].tap()
     }
 
     private func plannedRows(_ app: XCUIApplication) -> XCUIElementQuery {

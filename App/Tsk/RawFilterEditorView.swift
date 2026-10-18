@@ -107,10 +107,11 @@ struct RawFilterEditorView: View {
         isWorking = true
         defer { isWorking = false }
         do {
-            let view = try await store.manager.saveView(id: original?.id, name: name, expression: expression)
+            _ = try await store.manager.saveView(id: original?.id, name: name, expression: expression)
             try await store.loadSavedViews()
-            store.openView(view)
-            dismiss(); onOpen()
+            if let original, store.customView?.id == original.id,
+               let current = store.savedViews.first(where: { $0.id == original.id }) { store.openView(current) }
+            dismiss()
         } catch { self.error = error.localizedDescription }
     }
 }

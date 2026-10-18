@@ -111,13 +111,10 @@ final class WidgetUITests: XCTestCase {
     }
 
     private func chooseCompleted(_ app: XCUIApplication) {
-        if app.buttons["sidebar-view-completed"].exists { app.buttons["sidebar-view-completed"].tap() }
-        else {
-            let completed = app.segmentedControls["task-status-view"].buttons["Completed"]
-            tapTaskControl(completed, app: app)
-            let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in completed.exists && completed.isSelected }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
-        }
+        let completed = app.tabBars.buttons["Completed"]
+        tapTaskControl(completed, app: app)
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in completed.exists && completed.isSelected }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
     }
 
     private func enterHomeEditing(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {

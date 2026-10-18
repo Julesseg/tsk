@@ -10,12 +10,13 @@ does not create that server task.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 10 methods | 7 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 52 declared methods | 42-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Smoke | 12 methods | 9 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 54 declared methods | 44-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 
 Both device families check workspace control placement, every Settings destination,
-and Settings at the largest accessibility text size. The iPhone smoke selection
+Settings at the largest accessibility text size, persisted tab ordering and capacity,
+and Projects drill-down in light and dark appearances. The iPhone smoke selection
 checks capture/validation/cancel/reopen, durable
 editing/completion, real-server synchronization, annotation toolbar saves,
 native keyboard input, installed Share capture, installed widget behavior and
