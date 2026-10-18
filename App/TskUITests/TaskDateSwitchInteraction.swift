@@ -22,9 +22,12 @@ extension XCTestCase {
             tapTaskControl(add, app: app, file: file, line: line)
         }
         guard revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
+        let title = saved.label
         tapTaskControl(saved, app: app, file: file, line: line)
         XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 10), file: file, line: line)
-        XCTAssertTrue(app.tabBars.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-custom-")).firstMatch.isSelected, file: file, line: line)
+        let tab = app.tabBars.buttons[title]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(tab.isSelected, file: file, line: line)
     }
 
     func openSavedViewOptions(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
