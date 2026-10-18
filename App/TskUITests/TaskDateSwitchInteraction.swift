@@ -138,7 +138,7 @@ extension XCTestCase {
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
         activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) {
-            taskControlCoordinate(element, app: app).press(forDuration: 0.1)
+            element.tap()
         }
     }
 

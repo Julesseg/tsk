@@ -35,6 +35,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         focusTaskText(field, app: app)
         field.typeText("Plan the week")
         tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        XCTAssertEqual(field.value as? String, "Plan the week")
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Plan the week", app: app), timeout: 15))
         capture("After populated workspace")
@@ -96,6 +97,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         focusTaskText(name, app: app)
         name.typeText("All local tasks")
         tapTaskControl(app.buttons["dismiss-filter-keyboard"], app: app)
+        XCTAssertEqual(name.value as? String, "All local tasks")
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app))
