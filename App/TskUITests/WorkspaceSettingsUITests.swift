@@ -12,7 +12,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testCreationPlacementAndEverySettingsDestination() {
         let app = launch()
-        capture("After empty workspace", app)
+        capture("After empty workspace")
         let create = app.buttons["new-task"]
         let settings = app.buttons["workspace-settings"]
         XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
@@ -27,17 +27,17 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertFalse(app.buttons["spotlight-pending"].exists)
         tapTaskControl(create, app: app)
         XCTAssertTrue(app.buttons["save-task"].waitForExistence(timeout: 5))
-        capture("After task editor", app)
+        capture("After task editor")
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         focusTaskText(field, app: app)
         field.typeText("Plan the week")
         tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Plan the week", app: app), timeout: 15))
-        capture("After populated workspace", app)
+        capture("After populated workspace")
         tapTaskControl(settings, app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
-        capture("After settings", app)
+        capture("After settings")
         XCTAssertFalse(app.buttons["task-shortcuts"].exists)
         XCTAssertFalse(app.buttons["spotlight-settings"].exists)
         XCTAssertFalse(app.buttons["spotlight-diagnostics"].exists)
@@ -69,9 +69,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.buttons["new-task"].isHittable)
         XCTAssertTrue(revealWorkspaceSetting("continuous-reminders-settings", app: app))
-        capture("After settings at largest text size", app)
+        capture("After settings at largest text size")
         XCTAssertTrue(app.buttons["continuous-reminders-settings"].isHittable)
-        XCTAssertTrue(revealWorkspaceSetting("custom-views", app: app))
+        XCTAssertTrue(revealWorkspaceSetting("custom-views", app: app, initialScrollUp: false))
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["new-task"].isHittable)
@@ -87,8 +87,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         return app
     }
 
-    private func capture(_ name: String, _ app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+    private func capture(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
