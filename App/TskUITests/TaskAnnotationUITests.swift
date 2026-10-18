@@ -31,7 +31,7 @@ final class TaskAnnotationUITests: XCTestCase {
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task with supporting notes")
-        app.buttons["save-task"].tap()
+        tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(description.waitForNonExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Task with supporting notes", app: app).tap()

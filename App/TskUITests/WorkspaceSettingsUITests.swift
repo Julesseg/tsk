@@ -110,8 +110,10 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
         let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
         let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-unfinished").firstMatch
-        source.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
-            .press(forDuration: 1, thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.2)))
+        taskControlCoordinate(source, app: app, position: CGVector(dx: 0.96, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: taskControlCoordinate(first, app: app, position: CGVector(dx: 0.96, dy: 0.2)))
+        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
         tapTaskControl(app.buttons["close-views"], app: app)
         app.terminate()

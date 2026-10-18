@@ -138,8 +138,17 @@ extension XCTestCase {
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
         activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
+            taskControlCoordinate(element, app: app).press(forDuration: 0.1)
         }
+    }
+
+    func taskControlCoordinate(_ element: XCUIElement, app: XCUIApplication, position: CGVector = CGVector(dx: 0.5, dy: 0.5)) -> XCUICoordinate {
+        let frame = element.frame
+        let appFrame = app.frame
+        return app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+            dx: frame.minX + frame.width * position.dx - appFrame.minX,
+            dy: frame.minY + frame.height * position.dy - appFrame.minY
+        ))
     }
 
     func tapTaskButton(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
