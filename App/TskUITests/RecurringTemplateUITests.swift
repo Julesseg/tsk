@@ -41,6 +41,7 @@ final class RecurringTemplateUITests: XCTestCase {
         capture("Saved recurring template with explicit generator dependency", app)
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["No unfinished tasks"].waitForExistence(timeout: 10))
         openTemplates(app)
         XCTAssertTrue(app.staticTexts["Review recurring work"].waitForExistence(timeout: 10))
@@ -65,6 +66,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.tap()
@@ -94,6 +96,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertFalse(row.waitForExistence(timeout: 2))
         openTemplates(app)
         app.collectionViews["recurring-template-list"].buttons["recurring-template-" + parentID].tap()
@@ -118,6 +121,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.tap()

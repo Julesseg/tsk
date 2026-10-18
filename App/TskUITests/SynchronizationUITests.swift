@@ -46,6 +46,7 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).exists)
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).waitForExistence(timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
@@ -105,6 +106,7 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].exists)
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
     }
 

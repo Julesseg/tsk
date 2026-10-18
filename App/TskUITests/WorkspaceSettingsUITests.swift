@@ -87,6 +87,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
         let app = launch()
+        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "Done"])
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
         openWorkspaceSetting("custom-views", app: app)
         capture("Views with five default active tabs")
         tapTaskControl(app.buttons["new-custom-view"], app: app)
@@ -109,7 +111,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(add, app: app)
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
         let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
-        let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-unfinished").firstMatch
+        let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
         taskControlCoordinate(source, app: app, position: CGVector(dx: 0.96, dy: 0.5))
             .press(forDuration: 1, thenDragTo: taskControlCoordinate(first, app: app, position: CGVector(dx: 0.96, dy: 0.2)))
         let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
@@ -123,7 +125,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(custom.isSelected)
         XCTAssertEqual(app.tabBars.buttons.element(boundBy: 0).label, "All local tasks")
         XCTAssertEqual(app.tabBars.buttons.count, 5)
-        XCTAssertFalse(app.tabBars.buttons["Completed"].exists)
+        XCTAssertFalse(app.tabBars.buttons["Done"].exists)
         capture("First active custom tab after relaunch")
         openWorkspaceSetting("custom-views", app: app)
         for identifier in ["unfinished", "today", "upcoming", "projects"] {

@@ -18,8 +18,8 @@ struct TaskWorkspaceActions {
             TaskKeyboardCommand(id: "next", input: UIKeyCommand.inputDownArrow, modifiers: .command, title: "Next Task", action: { move(.next) }),
             TaskKeyboardCommand(id: "today", input: "1", modifiers: .command, title: "Today", action: { openView(.today) }),
             TaskKeyboardCommand(id: "upcoming", input: "2", modifiers: .command, title: "Upcoming", action: { openView(.upcoming) }),
-            TaskKeyboardCommand(id: "unfinished", input: "3", modifiers: .command, title: "Unfinished", action: { openView(.unfinished) }),
-            TaskKeyboardCommand(id: "completed", input: "4", modifiers: .command, title: "Completed", action: { openView(.completed) }),
+            TaskKeyboardCommand(id: "unfinished", input: "3", modifiers: .command, title: "All", action: { openView(.unfinished) }),
+            TaskKeyboardCommand(id: "completed", input: "4", modifiers: .command, title: "Done", action: { openView(.completed) }),
             TaskKeyboardCommand(id: "refresh", input: "r", modifiers: .command, title: "Refresh Tasks", action: refresh)
         ]
         if let edit { commands.append(TaskKeyboardCommand(id: "edit", input: "e", modifiers: .command, title: "Edit Task", action: edit)) }

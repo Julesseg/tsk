@@ -111,7 +111,7 @@ final class WidgetUITests: XCTestCase {
     }
 
     private func chooseCompleted(_ app: XCUIApplication) {
-        let completed = app.tabBars.buttons["Completed"]
+        let completed = app.tabBars.buttons["Done"]
         tapTaskControl(completed, app: app)
         let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in completed.exists && completed.isSelected }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)

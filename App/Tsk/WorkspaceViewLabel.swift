@@ -6,8 +6,8 @@ extension WorkspaceView {
         switch self {
         case .today: "Today"
         case .upcoming: "Upcoming"
-        case .unfinished: "Unfinished"
-        case .completed: "Completed"
+        case .unfinished: "All"
+        case .completed: "Done"
         case .projects: "Projects"
         case .custom(let id): store.savedViews.first(where: { $0.id == id })?.name ?? "Custom view"
         }

@@ -171,6 +171,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 20))
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["Durable work while automatic sync fails"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 20))
         capture("App opening retries without losing local work", app)

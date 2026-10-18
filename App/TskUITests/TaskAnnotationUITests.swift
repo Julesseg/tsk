@@ -88,6 +88,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Task with supporting notes", app: app).tap()
         let first = app.staticTexts["annotation-text-annotation_1792144800"]

@@ -14,7 +14,7 @@ final class iPadWorkspaceUITests: XCTestCase {
     func testInjectedKeyboardCaptureSelectionEditCompletionAndReopen() throws {
         let app = launch()
         let commands = try TaskKeyboardCommand(.workspace, app: app)
-        XCTAssertTrue(app.tabBars.buttons["Unfinished"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.tabBars.buttons["All"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.otherElements["workspace-detail-empty"].exists || app.staticTexts["Select a task"].exists)
         capture("iPad landscape empty workspace", app: app)
         try commands.perform("capture") { app.typeKey("n", modifierFlags: .command) }
@@ -43,8 +43,8 @@ final class iPadWorkspaceUITests: XCTestCase {
         capture("iPad completed view from injected command", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Completed"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Completed"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Done"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Done"].tap()
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Keyboard task revised", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))

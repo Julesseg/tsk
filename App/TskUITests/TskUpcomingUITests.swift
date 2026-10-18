@@ -64,7 +64,7 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         selectUpcoming(app)
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Completed"].tap()
+        app.tabBars.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["One task two future dates"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts.matching(identifier: "One task two future dates").count, 1)
     }

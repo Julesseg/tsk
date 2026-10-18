@@ -71,6 +71,7 @@ final class SeriesTransitionUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["task-" + movedID].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["task-" + overdueID].exists)
         openTemplates(app)

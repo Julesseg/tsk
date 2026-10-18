@@ -4,7 +4,7 @@ import Testing
 
 @Test func workspaceViewsKeepFiveTabsAndRequireOne() throws {
     var views = WorkspaceViews(customIDs: [])
-    #expect(views.active == [.unfinished, .today, .upcoming, .projects, .completed])
+    #expect(views.active == [.today, .upcoming, .projects, .unfinished, .completed])
     let id = UUID()
     views.reconcile(customIDs: [id])
     #expect(throws: WorkspaceViewsError.limitReached) { try views.activate(.custom(id)) }
@@ -42,4 +42,13 @@ import Testing
     #expect(views.active.count == 1)
     #expect(Set(views.active + views.inactive) == Set(WorkspaceView.defaults))
     #expect(throws: WorkspaceViewsError.unavailableView) { try views.activate(.custom(UUID())) }
+}
+
+@Test func workspaceViewsPreservePreviouslySavedDefaultOrder() throws {
+    var previous = WorkspaceViews(customIDs: [])
+    previous.moveActive(from: IndexSet(integer: 3), to: 0)
+    let data = try JSONEncoder().encode(previous)
+    var restored = try JSONDecoder().decode(WorkspaceViews.self, from: data)
+    restored.reconcile(customIDs: [])
+    #expect(restored.active == [.unfinished, .today, .upcoming, .projects, .completed])
 }

@@ -10,6 +10,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Automation dates and completion"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 20))
         let row = taskRow(named: "Automation dates and completion", app: app)
         let id = try XCTUnwrap(UUID(uuidString: String(row.identifier.dropFirst(5)))).uuidString
@@ -35,15 +36,15 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_INTENT_ACTION"] = "complete"
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
-        choose("Unfinished", app: app)
+        choose("All", app: app)
         XCTAssertFalse(taskRow(named: "Automation dates and completion", app: app).exists)
-        choose("Completed", app: app)
+        choose("Done", app: app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 10))
         capture("Native completion visible in completed tasks", app)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_ACTION")
         app.launch()
-        choose("Completed", app: app)
+        choose("Done", app: app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 10))
     }
 
@@ -52,6 +53,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Keep after rejected action"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Keep after rejected action", app: app).waitForExistence(timeout: 20))
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_DESCRIPTION")
@@ -63,6 +65,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_ACTION")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Keep after rejected action", app: app).waitForExistence(timeout: 15))
     }
 

@@ -37,6 +37,7 @@ final class TaskActivityUITests: XCTestCase {
         XCTAssertTrue(waitForEnabledTaskControl(app.buttons["stop-task"], app: app, timeout: 10))
         capture("Task detail distinguishes activity from planned day and deadline", app)
         app.terminate(); app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Act on independent plans", app: app).waitForExistence(timeout: 15))
         waitForLabel("Active", on: taskRow(named: "Act on independent plans", app: app))
         taskRow(named: "Act on independent plans", app: app).tap()
@@ -59,6 +60,7 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20)); row.tap()
         XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
@@ -91,6 +93,7 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 20)); app.buttons["task-" + id].tap()
         XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
         XCTAssertTrue(app.staticTexts["task-action-banner"].waitForExistence(timeout: 10))

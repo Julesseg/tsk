@@ -30,6 +30,7 @@ final class TskUITests: XCTestCase {
         screenshot("Tasks saved", app: app)
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["Buy milk from the market"].waitForExistence(timeout: 10))
         screenshot("Tasks after relaunch", app: app)
         app.staticTexts["Buy milk from the market"].tap()
@@ -70,7 +71,7 @@ final class TskUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Original task revised"].exists)
-        app.tabBars.buttons["Completed"].tap()
+        app.tabBars.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["Original task revised"].waitForExistence(timeout: 10))
         screenshot("Completed list after relaunch", app: app)
     }
@@ -124,7 +125,7 @@ final class TskUITests: XCTestCase {
         app.staticTexts["Project fixture"].swipeLeft()
         app.buttons["Complete"].tap()
         XCTAssertFalse(app.staticTexts["Project fixture"].waitForExistence(timeout: 2))
-        app.tabBars.buttons["Completed"].tap()
+        app.tabBars.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["Project fixture"].waitForExistence(timeout: 10))
         screenshot("Completed task in project view", app: app)
     }

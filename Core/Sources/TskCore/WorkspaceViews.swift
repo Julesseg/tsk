@@ -3,7 +3,7 @@ import Foundation
 public enum WorkspaceView: Hashable, Codable, Identifiable, Sendable {
     case today, upcoming, unfinished, completed, projects, custom(UUID)
 
-    public static let defaults: [Self] = [.unfinished, .today, .upcoming, .projects, .completed]
+    public static let defaults: [Self] = [.today, .upcoming, .projects, .unfinished, .completed]
 
     public var id: String {
         switch self {

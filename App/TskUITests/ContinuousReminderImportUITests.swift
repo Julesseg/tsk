@@ -25,6 +25,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
         app.launchEnvironment["TSK_TEST_REMINDERS_ADD_ON_OPEN"] = token
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Foreground fixture capture", app: app).waitForExistence(timeout: 20))
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).exists)
         XCTAssertFalse(taskRow(named: "Exclude completed", app: app).exists)
@@ -71,6 +72,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_PAUSE_REMOVAL")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 20))
         openSettings(app)
         XCTAssertTrue(app.staticTexts["continuous-reminders-paused"].waitForExistence(timeout: 10))

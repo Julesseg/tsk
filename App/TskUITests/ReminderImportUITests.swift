@@ -63,6 +63,7 @@ final class ReminderImportUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 15))
         taskRow(named: "Copy fixture H", app: app).tap()
         let notes = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Fixture notes")).firstMatch

@@ -21,6 +21,7 @@ import XCTest
         capture("Actual extension-first shared storage error preserves source draft", host)
         host.buttons["cancel-shared-task"].tap()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
         XCTAssertFalse(taskRow(named: "Shared article " + token, app: app).exists)
         app.terminate()
@@ -31,6 +32,7 @@ import XCTest
         replace(description, with: "Cancelled share " + token)
         host.buttons["cancel-shared-task"].tap()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
         XCTAssertFalse(taskRow(named: "Cancelled share " + token, app: app).exists)
         app.terminate()
@@ -65,6 +67,7 @@ import XCTest
         if completion != .completed { shareDiscoveryEvidence("Actual extension editor after Save did not dismiss", app: host) }
         XCTAssertEqual(completion, .completed)
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 15))
         capture("Extension-created task is visible in the main app after process reopen", app)
         taskRow(named: title, app: app).tap()

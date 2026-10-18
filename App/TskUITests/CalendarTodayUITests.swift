@@ -78,7 +78,7 @@ import XCTest
     private enum Selection { case today, unfinished }
     private func select(_ query: Selection, _ app: XCUIApplication) {
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-        let title = query == .today ? "Today" : "Unfinished"
+        let title = query == .today ? "Today" : "All"
         app.tabBars.buttons[title].tap()
     }
     private func configuredApp(_ token: String) -> XCUIApplication {

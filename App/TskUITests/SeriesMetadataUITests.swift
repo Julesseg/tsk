@@ -73,6 +73,7 @@ final class SeriesMetadataUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
+        selectAllTasks(app)
         for id in futureIDs {
             let row = app.buttons["task-" + id]
             XCTAssertTrue(row.waitForExistence(timeout: 15))
