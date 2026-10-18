@@ -16,7 +16,8 @@ does not create that server task.
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
-and Projects drill-down in light and dark appearances. The iPhone smoke selection
+and Projects drill-down. Appearance captures require visual confirmation of the
+rendered mode. The iPhone smoke selection
 checks capture/validation/cancel/reopen, durable
 editing/completion, real-server synchronization, annotation toolbar saves,
 native keyboard input, installed Share capture, installed widget behavior and

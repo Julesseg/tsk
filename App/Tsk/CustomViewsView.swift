@@ -24,6 +24,7 @@ extension TaskStore {
 
 struct CustomViewsView: View {
     let store: TaskStore
+    let select: (WorkspaceView) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var editing: ViewEditorRoute?
     @State private var error: String?
@@ -92,7 +93,7 @@ struct CustomViewsView: View {
             .accessibilityIdentifier((active ? "deactivate-" : "activate-") + view.id)
             Button {
                 if active {
-                    store.selectWorkspaceView(view)
+                    select(view)
                     dismiss()
                 } else if case .custom(let id) = view, let saved = store.savedViews.first(where: { $0.id == id }) {
                     editing = ViewEditorRoute(view: saved)

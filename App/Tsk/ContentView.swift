@@ -60,11 +60,15 @@ struct ContentView: View {
 
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
-            projectPath = NavigationPath()
-            selectedTaskID = nil
-            path = []
+            resetNavigation()
             store.selectWorkspaceView(view)
         })
+    }
+
+    private func resetNavigation() {
+        projectPath = NavigationPath()
+        selectedTaskID = nil
+        path = []
     }
 
     private var taskNavigationPath: Binding<[UUID]> {
@@ -209,7 +213,9 @@ struct ContentView: View {
     private var editorSheets: some View {
         integrationSheets
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
-        .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
+        .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) {
+            CustomViewsView(store: store, select: { tabSelection.wrappedValue = $0 })
+        }
         .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
         .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
@@ -258,6 +264,7 @@ struct ContentView: View {
             if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
+        .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
         .onChange(of: path) { _, newPath in if presentation != .columns || store.selectedWorkspaceView == .projects { selectedTaskID = newPath.last } }
         .onChange(of: presentation) { previous, current in
             if previous != .columns { selectedTaskID = path.last ?? selectedTaskID }

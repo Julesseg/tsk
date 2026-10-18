@@ -164,6 +164,13 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(app.navigationBars["Task"].buttons.element(boundBy: 0), app: app)
         tapTaskControl(app.navigationBars["Launch"].buttons.element(boundBy: 0), app: app)
         XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 5))
+        tapTaskControl(app.buttons["project-Launch"], app: app)
+        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
+        openWorkspaceSetting("custom-views", app: app)
+        let projects = app.buttons["view-projects"]
+        XCTAssertTrue(revealTaskElement(projects, in: "views-list", app: app))
+        tapTaskControl(projects, app: app)
+        XCTAssertTrue(app.collectionViews["projects-list"].waitForExistence(timeout: 5))
         XCUIDevice.shared.appearance = .dark
         capture("Projects dark")
         tapTaskControl(app.buttons["workspace-settings"], app: app)
