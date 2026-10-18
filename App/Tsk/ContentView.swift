@@ -67,6 +67,12 @@ struct ContentView: View {
         })
     }
 
+    private var taskNavigationPath: Binding<[UUID]> {
+        if presentation == .accessibilityColumns {
+            Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
+        } else { $path }
+    }
+
     private var navigationWorkspace: some View {
         Group {
             if !store.workspaceViewsLoaded && sidebarError == nil {
@@ -125,8 +131,8 @@ struct ContentView: View {
             .navigationSplitViewStyle(.balanced)
             .accessibilityIdentifier("task-workspace")
         } else {
-            NavigationStack(path: $path) {
-                taskList(selection: nil)
+            NavigationStack(path: taskNavigationPath) {
+                taskList(selection: presentation == .accessibilityColumns ? $selectedTaskID : nil)
                     .navigationDestination(for: UUID.self) { id in taskDestination(id) }
             }
             .accessibilityIdentifier("workspace-accessibility-navigation")
@@ -397,6 +403,9 @@ struct ContentView: View {
     }
 
     private func capture() {
+        if store.customView == nil, store.selectedWorkspaceView != .projects, store.workspaceViews.active.contains(.unfinished) {
+            tabSelection.wrappedValue = .unfinished
+        }
         isCapturing = true
     }
 
