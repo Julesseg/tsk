@@ -286,12 +286,30 @@ class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
             processes.append(process)
             return process
         receipt = {}
-        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+            clock.monotonic.return_value = 100.0
             with self.assertRaises(TimeoutError):
-                await relay.container_for('owned-udid', request(), receipt, deadline=time.monotonic()+5.1)
+                await relay.container_for('owned-udid', request(), receipt, deadline=105.1)
         self.assertIsNotNone(processes[0].returncode)
         self.assertTrue(receipt['containerLookups'][0]['reaped'])
         self.assertEqual(receipt['containerLookups'][0]['failure'], 'TimeoutError')
+
+    async def test_discovery_spawn_exhaustion_still_kills_and_reaps_the_child(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', 'import time;time.sleep(60)', **kwargs)
+            processes.append(process)
+            return process
+        receipt = {}
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+            clock.monotonic.side_effect = [100.0, 100.2, 100.2, 100.2]
+            with self.assertRaisesRegex(ValueError, 'before communication'):
+                await relay.container_for('owned-udid', request(), receipt, deadline=105.1)
+        self.assertIsNotNone(processes[0].returncode)
+        self.assertTrue(receipt['containerLookups'][0]['reaped'])
+        self.assertEqual(receipt['containerLookups'][0]['failure'], 'ValueError')
 
 
 class FileAndMappingTests(unittest.TestCase):
