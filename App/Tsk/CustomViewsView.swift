@@ -37,7 +37,17 @@ struct CustomViewsView: View {
                     ForEach(store.workspaceViews.active) { view in
                         viewRow(view, active: true)
                     }
-                    .onMove { from, to in update { $0.moveActive(from: from, to: to) } }
+                    .onMove { from, to in
+                        let before = store.workspaceViews.active.map(\.id)
+                        update { $0.moveActive(from: from, to: to) }
+                        TaskUIBoundaryDiagnostics.event("workspace.views.move", details: [
+                            "section": "active",
+                            "from": from.map { String($0) }.joined(separator: ","),
+                            "to": String(to),
+                            "before": before.joined(separator: ","),
+                            "after": store.workspaceViews.active.map(\.id).joined(separator: ",")
+                        ])
+                    }
                 } header: {
                     Text("Active · \(store.workspaceViews.active.count) of \(WorkspaceViews.maximumActive)")
                 } footer: {

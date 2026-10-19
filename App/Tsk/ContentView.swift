@@ -31,6 +31,7 @@ struct ContentView: View {
     @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
+    @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
     @State private var isDefiningAttributes = false
     @State private var isImportingReminders = false
@@ -103,7 +104,7 @@ struct ContentView: View {
                 workspaceContent
             } else {
                 TabView(selection: workspaceTabSelection) {
-                    ForEach(store.workspaceViews.active) { view in
+                    ForEach(tabsBeforeEditingViews ?? store.workspaceViews.active) { view in
                         Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                             if view == store.selectedWorkspaceView {
                                 workspaceContent
@@ -242,8 +243,14 @@ struct ContentView: View {
     private var editorSheets: some View {
         integrationSheets
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
-        .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) {
-            CustomViewsView(store: store, select: { tabSelection.wrappedValue = $0 })
+        .sheet(isPresented: $isChoosingCustomView, onDismiss: {
+            tabsBeforeEditingViews = nil
+            Task { await loadSavedViews() }
+        }) {
+            CustomViewsView(store: store, select: {
+                tabsBeforeEditingViews = nil
+                tabSelection.wrappedValue = $0
+            })
         }
         .sheet(isPresented: $isConfiguringSync) {
             SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError)
@@ -396,7 +403,7 @@ struct ContentView: View {
         guard let destination = pendingWorkspaceSetting else { return }
         pendingWorkspaceSetting = nil
         switch destination {
-        case .customViews: isChoosingCustomView = true
+        case .customViews: presentViews()
         case .recurring: isShowingRecurring = true
         case .synchronization: isConfiguringSync = true
         case .notifications:
@@ -409,6 +416,11 @@ struct ContentView: View {
         case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
         #endif
         }
+    }
+
+    private func presentViews() {
+        tabsBeforeEditingViews = store.workspaceViews.active
+        isChoosingCustomView = true
     }
 
     private func requestIntegrationPresentation(_ destination: String, state: Binding<Bool>) {
@@ -458,7 +470,7 @@ struct ContentView: View {
 
     private func openView(_ query: TaskQuery) {
         guard let view = WorkspaceView.defaults.first(where: { $0.query == query }) else { return }
-        guard store.workspaceViews.active.contains(view) else { isChoosingCustomView = true; return }
+        guard store.workspaceViews.active.contains(view) else { presentViews(); return }
         tabSelection.wrappedValue = view
     }
 
