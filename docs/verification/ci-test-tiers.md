@@ -44,6 +44,10 @@ failure recovery. This focused manual selection uses the smoke time limits and
 does not change PR or nightly coverage. Keyboard-dismissal admission requires a
 visible software keyboard, a control outside its occupied area, and two stable
 geometry samples within the existing 20-second control deadline.
+Its distinct check names prevent the focused subset from satisfying the
+canonical XCUITest branch-protection checks.
+Its separate concurrency group allows diagnostics to run alongside full coverage;
+repeated keyboard dispatches replace only the earlier keyboard run.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.

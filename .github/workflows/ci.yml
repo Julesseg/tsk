@@ -27,7 +27,7 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'keyboard' && format('ci-keyboard-{0}', github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -71,7 +71,7 @@ jobs:
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
 
   app-ui-tests:
-    name: ${{ matrix.job-name }}
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'keyboard' && !inputs.diagnostic_only && format('App · Keyboard diagnostics ({0})', matrix.family) || matrix.job-name }}
     runs-on: xcode-27
     timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 60 }}
     strategy:
