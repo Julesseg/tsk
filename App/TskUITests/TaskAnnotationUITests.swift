@@ -117,16 +117,10 @@ final class TaskAnnotationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NATIVE_KEYBOARD_CONTROL"] = token
         func state() -> State? {
-            guard let application = try? app.snapshot() else { return nil }
-            var pending: [any XCUIElementSnapshot] = [application]
-            while let snapshot = pending.popLast() {
-                if snapshot.identifier == "native-keyboard-control-status" {
-                    guard let raw = snapshot.value as? String, raw.utf8.count <= 1024 else { return nil }
-                    return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
-                }
-                pending.append(contentsOf: snapshot.children)
-            }
-            return nil
+            guard let application = try? app.snapshot(),
+                  let snapshot = taskSnapshot("native-keyboard-control-status", type: .staticText, in: application),
+                  let raw = snapshot.value as? String, raw.utf8.count <= 1024 else { return nil }
+            return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
         }
         enum Phase: String, Encodable { case startup, plain, commandN, commandReturn, teardown }
         struct Observation: Encodable { let phase: Phase; let state: State? }

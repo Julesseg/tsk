@@ -7,6 +7,15 @@ enum TaskTextSelection {
 
 @MainActor
 extension XCTestCase {
+    func taskSnapshot(_ identifier: String, type: XCUIElement.ElementType? = nil, in root: any XCUIElementSnapshot) -> (any XCUIElementSnapshot)? {
+        var pending: [any XCUIElementSnapshot] = [root]
+        while let snapshot = pending.popLast() {
+            if snapshot.identifier == identifier, type == nil || snapshot.elementType == type { return snapshot }
+            pending.append(contentsOf: snapshot.children)
+        }
+        return nil
+    }
+
     func activateSavedWorkspaceView(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         guard revealTaskElement(saved, in: "views-list", app: app, file: file, line: line) else { return }
@@ -96,7 +105,12 @@ extension XCTestCase {
             let started = ProcessInfo.processInfo.systemUptime
             guard started < deadline else { return false }
             do {
-                let snapshot = try control.snapshot()
+                let application = try app.snapshot()
+                guard let form = taskSnapshot(containerID, in: application),
+                      let snapshot = taskSnapshot(identifier, type: .switch, in: form) else {
+                    lastSample = "Switch absent from application snapshot"
+                    return false
+                }
                 let value = snapshot.value
                 let matches = TaskSwitchValue.matches(value, enabled: enabled)
                 let finished = ProcessInfo.processInfo.systemUptime
