@@ -14,6 +14,7 @@ does not create that server task.
 | Full | All 55 declared methods | 45-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
+| Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
@@ -50,6 +51,12 @@ Its distinct check names prevent the focused subset from satisfying the
 canonical XCUITest branch-protection checks.
 Its separate concurrency group allows diagnostics to run alongside full coverage;
 repeated keyboard dispatches replace only the earlier keyboard run.
+
+Text diagnostics cover local attribute creation, series-rule and typed-value
+replacement, Share editing and independent native text input on both families.
+They use the smoke time limits,
+separate check names and a separate concurrency group. They do not change smoke,
+full or keyboard selections or satisfy canonical branch-protection checks.
 
 Native keyboard cases prepare the runner container in the background at case
 start, with a 30-second discovery cap. Each request still keeps its original

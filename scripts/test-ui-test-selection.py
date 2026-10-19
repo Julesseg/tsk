@@ -55,11 +55,26 @@ class SelectionTests(unittest.TestCase):
             with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
                 selection.phases(filters)
 
+    def test_text_diagnostics_cover_editing_share_and_native_transport_without_sync(self):
+        for family in ("iPhone", "iPad"):
+            filters = selection.selection("text", family)
+            selected = selection.selected_methods(filters)
+            self.assertEqual(selected, {
+                "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+                "TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+                "TskUITests/TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
+                "TskUITests/SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
+                "TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+            })
+            self.assertLess(selected, selection.selected_methods(selection.selection("full", family)))
+            self.assertEqual(selection.phases(filters), ["share", "main"])
+            self.assertFalse(selection.requires_sync_peer(filters))
+
     def test_every_canonical_selection_retains_the_required_keyboard_transport_cases(self):
         spec = importlib.util.spec_from_file_location("hid_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad")):
+        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad"), ("text", "iPhone"), ("text", "iPad")):
             with self.subTest(suite=suite, family=family):
                 command = [
                     "xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",

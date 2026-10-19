@@ -22,7 +22,7 @@ final class TaskAttributeUITests: XCTestCase {
             XCTAssertTrue(nameField.waitForExistence(timeout: 5))
             focusTaskText(nameField, app: app)
             nameField.typeText(name)
-            XCTAssertEqual(nameField.value as? String, name)
+            assertTaskText(nameField, equals: name)
             tapTaskControlAtCenter(app.buttons["dismiss-definition-keyboard"], app: app)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
             XCTAssertEqual(nameField.value as? String, name)

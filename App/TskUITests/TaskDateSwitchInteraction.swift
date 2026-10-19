@@ -338,28 +338,33 @@ extension XCTestCase {
             }
         }
         element.typeText(XCUIKeyboardKey.delete.rawValue)
-        let cleared = element.value as? String ?? ""
-        guard cleared.isEmpty || cleared == element.placeholderValue else {
+        guard assertTaskText(element, equals: "", file: file, line: line) else {
             recordTaskInteraction(app, detail: "Replacement did not clear \(element)")
-            XCTFail("Text replacement did not clear the previous value: \(cleared)", file: file, line: line)
             return
         }
         if !value.isEmpty { element.typeText(value) }
+        assertTaskText(element, equals: value, file: file, line: line)
+    }
+
+    @discardableResult
+    func assertTaskText(_ element: XCUIElement, equals value: String, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let deadline = ProcessInfo.processInfo.systemUptime + 5
-        func matchesReplacement() -> Bool {
+        func matchesValue() -> Bool {
             let current = element.value as? String ?? ""
             return current == value || value.isEmpty && current == element.placeholderValue
         }
-        var acknowledged = matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+        var acknowledged = matchesValue() && ProcessInfo.processInfo.systemUptime < deadline
         let remaining = deadline - ProcessInfo.processInfo.systemUptime
         if !acknowledged, remaining > 0 {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                ProcessInfo.processInfo.systemUptime < deadline && matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+                ProcessInfo.processInfo.systemUptime < deadline && matchesValue() && ProcessInfo.processInfo.systemUptime < deadline
             }, object: nil)
             acknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
         }
-        XCTAssertTrue(acknowledged, "Text replacement value did not settle within five seconds", file: file, line: line)
-        XCTAssertTrue((element.value as? String ?? "") == value || value.isEmpty && (element.value as? String) == element.placeholderValue, "Text replacement value differs", file: file, line: line)
+        XCTAssertTrue(acknowledged, "Text value did not settle within five seconds", file: file, line: line)
+        let matches = matchesValue()
+        XCTAssertTrue(matches, "Text value differs", file: file, line: line)
+        return acknowledged && matches
     }
 
     @discardableResult

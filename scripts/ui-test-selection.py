@@ -51,6 +51,13 @@ PHONE_KEYBOARD = (
     "TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday",
     "TskUITests/testOrganizationProjectViewsAndListActionsPersist",
 )
+TEXT = (
+    "ShareCaptureUITests",
+    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
+    "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
+    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 
 
@@ -81,7 +88,9 @@ def selected_methods(filters):
 
 
 def selection(suite, family):
-    if suite == "keyboard":
+    if suite == "text":
+        tests = TEXT
+    elif suite == "keyboard":
         tests = KEYBOARD + (PHONE_KEYBOARD if family == "iPhone" else ())
     elif suite == "diagnostic":
         if family != "iPhone":
@@ -116,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)
