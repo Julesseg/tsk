@@ -195,7 +195,7 @@ final class TypedFilterUITests: XCTestCase {
     }
 
     private func dismissKeyboard(_ identifier: String, app: XCUIApplication) {
-        tapTaskControl(app.buttons[identifier], app: app)
+        tapTaskControlAtCenter(app.buttons[identifier], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 

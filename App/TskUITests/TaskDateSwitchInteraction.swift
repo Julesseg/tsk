@@ -79,7 +79,7 @@ extension XCTestCase {
         let keyboardDone = app.buttons[keyboardDismissIdentifier]
         if app.keyboards.firstMatch.exists {
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
-            tapTaskControl(keyboardDone, app: app, file: file, line: line)
+            tapTaskControlAtCenter(keyboardDone, app: app, file: file, line: line)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)
         }
         let control = app.collectionViews[containerID].switches[identifier].firstMatch
@@ -88,7 +88,7 @@ extension XCTestCase {
             let thumb = control.switches.firstMatch
             let selected = thumb.exists ? thumb : control
             recordTaskSwitchInteraction(row: control, selected: selected, phase: "before", app: app)
-            tapTaskControl(selected, app: app, file: file, line: line)
+            tapTaskControlAtCenter(selected, app: app, file: file, line: line)
         }
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         var lastSample = "not sampled"
@@ -137,29 +137,31 @@ extension XCTestCase {
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) {
+        activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) { _ in
             element.tap()
         }
     }
 
-    func taskControlCoordinate(_ element: XCUIElement, app: XCUIApplication, position: CGVector = CGVector(dx: 0.5, dy: 0.5)) -> XCUICoordinate {
-        let frame = element.frame
-        let appFrame = app.frame
-        return app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
-            dx: frame.minX + frame.width * position.dx - appFrame.minX,
-            dy: frame.minY + frame.height * position.dy - appFrame.minY
-        ))
+    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, file: file, line: line) { geometry in
+            let frame = geometry.elementFrame
+            let appFrame = app.frame
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                dx: frame.midX - appFrame.minX,
+                dy: frame.midY - appFrame.minY
+            )).tap()
+        }
     }
 
     func tapTaskButton(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, file: file, line: line) { element.tap() }
+        activateTaskControl(element, app: app, file: file, line: line) { _ in element.tap() }
     }
 
     func tapTaskMenuItem(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         tapTaskButton(element, app: app, file: file, line: line)
     }
 
-    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: () -> Void) {
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
         var lastSampleReads = "not sampled"
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, deadline: deadline, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
@@ -192,9 +194,7 @@ extension XCTestCase {
             result = XCTWaiter.wait(for: [ready], timeout: timeout)
             return result == .completed
         }
-        guard attempt.finish(waitCompleted: completed, perform: { _ in
-            action()
-        }) else {
+        guard attempt.finish(waitCompleted: completed, perform: action) else {
             let waiter = result.map { String(describing: $0) } ?? "not entered"
             recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(waiter) \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]", file: file, line: line)

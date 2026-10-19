@@ -78,7 +78,7 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 10))
         description.tap()
         description.typeText(" occurrence edit")
-        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         app.buttons["save-task"].tap()
         XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 10))
         XCTAssertTrue(app.staticTexts["task-detail-description"].label.contains("occurrence edit"))
@@ -150,7 +150,7 @@ final class RecurringTemplateUITests: XCTestCase {
 
     private func hideKeyboard(_ app: XCUIApplication) {
         let hide = app.buttons["dismiss-recurring-keyboard"]
-        if hide.exists { hide.tap() }
+        if hide.exists { tapTaskControlAtCenter(hide, app: app) }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

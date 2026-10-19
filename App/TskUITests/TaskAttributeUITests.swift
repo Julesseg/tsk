@@ -23,7 +23,7 @@ final class TaskAttributeUITests: XCTestCase {
             focusTaskText(nameField, app: app)
             nameField.typeText(name)
             XCTAssertEqual(nameField.value as? String, name)
-            tapTaskControl(app.buttons["dismiss-definition-keyboard"], app: app)
+            tapTaskControlAtCenter(app.buttons["dismiss-definition-keyboard"], app: app)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
             XCTAssertEqual(nameField.value as? String, name)
             app.buttons["attribute-definition-type"].tap()
@@ -155,7 +155,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(valueField, in: "advanced-attributes-form", app: app))
         replaceTaskText(valueField, with: value, app: app, selection: .commandA)
         let done = app.buttons["dismiss-attributes-keyboard"]
-        if done.exists { tapTaskControl(done, app: app) }
+        if done.exists { tapTaskControlAtCenter(done, app: app) }
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers advanced attributes")
         XCTAssertEqual(valueField.value as? String, value)
     }

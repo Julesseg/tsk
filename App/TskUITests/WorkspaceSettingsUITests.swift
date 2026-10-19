@@ -38,7 +38,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         focusTaskText(field, app: app)
         field.typeText("Plan the week")
-        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertEqual(field.value as? String, "Plan the week")
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Plan the week", app: app), timeout: 15))
@@ -103,7 +103,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let name = app.textFields["custom-view-name"]
         focusTaskText(name, app: app)
         name.typeText("All local tasks")
-        tapTaskControl(app.buttons["dismiss-filter-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-filter-keyboard"], app: app)
         XCTAssertEqual(name.value as? String, "All local tasks")
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
@@ -165,7 +165,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let project = app.textFields["task-project"]
         focusTaskText(project, app: app)
         project.typeText("Launch")
-        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Prepare launch", app: app), timeout: 15))
         tapTaskControl(app.tabBars.buttons["Projects"], app: app)
@@ -239,7 +239,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
             focusTaskText(field, app: app)
             field.typeText(value)
         }
-        tapTaskControl(app.buttons["dismiss-sync-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-sync-keyboard"], app: app)
         tapTaskControl(app.buttons["save-sync-connection"], app: app)
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
@@ -249,11 +249,14 @@ final class WorkspaceSettingsUITests: XCTestCase {
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
             XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)
             XCTAssertEqual(app.navigationBars.staticTexts.matching(identifier: "workspace-title-text").count, 1)
-            let heading = try XCTUnwrap(app.navigationBars.staticTexts.matching(identifier: "workspace-title-text")
-                .allElementsBoundByIndex.first(where: { $0.isHittable }))
+            let heading = try app.navigationBars.staticTexts["workspace-title-text"].snapshot()
+            let progressFrame = try progress.snapshot().frame
             XCTAssertEqual(heading.label, title)
-            XCTAssertGreaterThan(progress.frame.minX, heading.frame.maxX)
-            XCTAssertEqual(progress.frame.midY, heading.frame.midY, accuracy: 12)
+            XCTAssertGreaterThan(heading.frame.width, 0)
+            XCTAssertGreaterThan(heading.frame.height, 0)
+            XCTAssertTrue(app.frame.contains(heading.frame))
+            XCTAssertGreaterThan(progressFrame.minX, heading.frame.maxX)
+            XCTAssertEqual(progressFrame.midY, heading.frame.midY, accuracy: 12)
             XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
             XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
             XCTAssertFalse(app.buttons["retry-task-sync"].exists)

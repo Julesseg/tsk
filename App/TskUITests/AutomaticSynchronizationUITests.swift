@@ -158,7 +158,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
         XCTAssertTrue(app.buttons["dismiss-editor-keyboard"].waitForExistence(timeout: 5))
-        app.buttons["dismiss-editor-keyboard"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["save-task"].isHittable)
         app.buttons["save-task"].tap()

@@ -80,7 +80,7 @@ import XCTest
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20)); app.buttons["New task"].tap()
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
-        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         app.buttons["save-task"].tap()
         let row = taskRow(named: title, app: app)
         XCTAssertTrue(waitForTaskSave(app, row: row, timeout: 20))

@@ -110,7 +110,7 @@ final class SeriesMetadataUITests: XCTestCase {
     }
 
     private func hideKeyboard(_ app: XCUIApplication) {
-        if app.buttons["dismiss-series-keyboard"].exists { app.buttons["dismiss-series-keyboard"].tap() }
+        if app.buttons["dismiss-series-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-series-keyboard"], app: app) }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

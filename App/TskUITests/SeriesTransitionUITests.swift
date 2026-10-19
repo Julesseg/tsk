@@ -103,7 +103,7 @@ final class SeriesTransitionUITests: XCTestCase {
         let field = app.textFields["transition-rule"]
         XCTAssertTrue(revealTaskElement(field, in: "series-transition-form", app: app))
         replaceTaskText(field, with: value, app: app)
-        if app.buttons["dismiss-transition-keyboard"].exists { app.buttons["dismiss-transition-keyboard"].tap() }
+        if app.buttons["dismiss-transition-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-transition-keyboard"], app: app) }
     }
     private func assertPreview(_ id: String, app: XCUIApplication) {
         XCTAssertTrue(app.buttons["save-series-transition"].waitForExistence(timeout: 10))

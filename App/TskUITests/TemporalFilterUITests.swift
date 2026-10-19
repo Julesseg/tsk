@@ -30,7 +30,7 @@ final class TemporalFilterUITests: XCTestCase {
         expression.typeText("due:today and +READY")
         let done = app.buttons["dismiss-filter-keyboard"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
-        done.tap()
+        tapTaskControlAtCenter(done, app: app)
         app.buttons["save-custom-view"].tap()
         activateSavedWorkspaceView(app)
         XCTAssertTrue(app.staticTexts["Relative deadline"].exists)

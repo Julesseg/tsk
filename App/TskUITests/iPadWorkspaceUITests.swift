@@ -65,7 +65,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let project = app.textFields["task-project"]
         focusTaskText(project, app: app)
         project.typeText("Workspace")
-        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
@@ -112,7 +112,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap()
         name.typeText("All local tasks")
-        tapTaskButton(app.buttons["dismiss-filter-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-filter-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         activateSavedWorkspaceView(app)
@@ -125,7 +125,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         guard revealTaskElement(field, in: "task-editor-form", app: app) else { return }
         focusTaskText(field, app: app)
         field.typeText("Accessible task")
-        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app) }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         tapTaskControl(app.buttons["save-task"], app: app)
         let row = taskRow(named: "Accessible task", app: app)
         guard waitForTaskSave(app, row: row, timeout: 15) else { return }
@@ -138,7 +138,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let editedField = description(app)
         guard revealTaskElement(editedField, in: "task-editor-form", app: app) else { return }
         replaceTaskText(editedField, with: "Accessible task revised", app: app)
-        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app) }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         tapTaskControl(app.buttons["save-task"], app: app)
         let saved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             !app.collectionViews["task-editor-form"].exists && app.staticTexts["task-detail-description"].exists && app.staticTexts["task-detail-description"].label == "Accessible task revised"

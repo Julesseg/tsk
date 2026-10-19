@@ -33,7 +33,7 @@ final class ReminderImportUITests: XCTestCase {
         let project = app.textFields["reminders-project-" + listName]
         XCTAssertTrue(revealTaskElement(project, in: "reminders-import-form", app: app))
         project.tap(); project.typeKey("a", modifierFlags: .command); project.typeText("Fixture.Reminders")
-        app.buttons["dismiss-reminders-keyboard"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-reminders-keyboard"], app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["reminders-preview"], in: "reminders-import-form", app: app))
         app.buttons["reminders-preview"].tap()
         XCTAssertTrue(app.staticTexts["reminders-preview-count"].waitForExistence(timeout: 20))
@@ -89,7 +89,7 @@ final class ReminderImportUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task after denied Reminders access")
         XCTAssertEqual(description.value as? String, "Task after denied Reminders access")
-        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task after denied Reminders access", app: app), timeout: 10))
