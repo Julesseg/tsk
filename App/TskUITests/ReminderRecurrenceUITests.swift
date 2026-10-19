@@ -76,7 +76,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
             app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_RECURRING_FIXTURE")
             app.launchEnvironment["TSK_TEST_REMINDERS_CLEANUP"] = token
             app.launch()
-            XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
             app.terminate(); self.resetOwnedReminderAuthorization(app, token: token, stage: "recurring-after-cleanup")
             XCUIDevice.shared.orientation = .portrait
         }
@@ -85,7 +85,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
     }
 
     private func open(_ identifier: String, app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         openWorkspaceSetting(identifier, app: app)
     }
 

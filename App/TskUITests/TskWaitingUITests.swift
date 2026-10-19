@@ -9,8 +9,8 @@ final class TskWaitingUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
@@ -27,7 +27,7 @@ final class TskWaitingUITests: XCTestCase {
         capture("Matching waiting task remains in Today with reason", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertTrue(waitingReasons(app).firstMatch.waitForExistence(timeout: 10))
         app.staticTexts["Planned task waiting for tomorrow"].tap()
@@ -38,7 +38,7 @@ final class TskWaitingUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1792058400"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertTrue(app.staticTexts["Planned task waiting for tomorrow"].waitForExistence(timeout: 10))
         XCTAssertEqual(waitingReasons(app).count, 0)
@@ -63,7 +63,7 @@ final class TskWaitingUITests: XCTestCase {
         capture("Clearing wait leaves planned and due task visible", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertTrue(app.staticTexts["Planned task waiting for tomorrow"].waitForExistence(timeout: 10))
         XCTAssertEqual(waitingReasons(app).count, 0)

@@ -109,7 +109,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
             app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_PAUSE_REMOVAL")
             app.launchEnvironment["TSK_TEST_REMINDERS_CLEANUP"] = token
             app.launch()
-            XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
             app.terminate(); app.resetAuthorizationStatus(for: .reminders)
             XCUIDevice.shared.orientation = .portrait
         }
@@ -118,7 +118,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
     }
 
     private func openSettings(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         openWorkspaceSetting("continuous-reminders-settings", app: app)
         let form = app.collectionViews["continuous-reminders-form"].firstMatch
         if !form.exists { XCTAssertTrue(form.waitForExistence(timeout: 10)) }

@@ -8,8 +8,8 @@ final class SynchronizationUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let draft = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
@@ -71,8 +71,8 @@ final class SynchronizationUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let draft = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
@@ -103,7 +103,7 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["sync-error"].exists)
         capture("Successful manual synchronization with real server", app)
         app.navigationBars.buttons["Done"].tap()
-        XCTAssertTrue(app.buttons["new-task"].exists)
+        XCTAssertTrue(app.buttons["New task"].exists)
         XCTAssertTrue(app.staticTexts["sync-status"].waitForNonExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         capture("Synchronized workspace without idle status", app)

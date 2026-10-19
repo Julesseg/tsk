@@ -35,7 +35,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_INTENT_ACTION"] = "complete"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         choose("All", app: app)
         XCTAssertFalse(taskRow(named: "Automation dates and completion", app: app).exists)
         choose("Done", app: app)
@@ -70,7 +70,7 @@ final class TaskAutomationUITests: XCTestCase {
     }
 
     private func choose(_ title: String, app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         if title == "Done" { selectDoneTasks(app) }
         else { app.tabBars.buttons[title].tap() }
     }

@@ -8,16 +8,16 @@ final class TskUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         screenshot("Tasks empty", app: app)
-        app.buttons["new-task"].tap()
+        app.buttons["New task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
         description.typeText("Cancelled capture")
         app.buttons["Cancel"].tap()
         XCTAssertFalse(app.staticTexts["Cancelled capture"].exists)
-        app.buttons["new-task"].tap()
+        app.buttons["New task"].tap()
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
         screenshot("Draft validation", app: app)
@@ -42,8 +42,8 @@ final class TskUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
@@ -70,7 +70,7 @@ final class TskUITests: XCTestCase {
         screenshot("Completed detail", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Original task revised"].exists)
         selectDoneTasks(app)
         XCTAssertTrue(app.staticTexts["Original task revised"].waitForExistence(timeout: 10))
@@ -81,8 +81,8 @@ final class TskUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Project fixture")

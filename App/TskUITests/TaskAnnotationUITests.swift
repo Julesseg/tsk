@@ -26,8 +26,8 @@ final class TaskAnnotationUITests: XCTestCase {
             } else { app.buttons["save-annotation"].tap() }
         }
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task with supporting notes")
@@ -118,7 +118,7 @@ final class TaskAnnotationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NATIVE_KEYBOARD_CONTROL"] = token
         let status = app.staticTexts["native-keyboard-control-status"]
         func state() -> State? {
-            guard status.exists, let raw = status.value as? String, raw.utf8.count <= 1024 else { return nil }
+            guard let snapshot = try? status.snapshot(), let raw = snapshot.value as? String, raw.utf8.count <= 1024 else { return nil }
             return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
         }
         enum Phase: String, Encodable { case startup, plain, commandN, commandReturn, teardown }
@@ -138,7 +138,10 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(inputExists)
         input.tap()
         app.typeKey("n", modifierFlags: [])
-        let plain = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in state()?.firstResponder == true && state()?.textIsPlainN == true }, object: nil)
+        let plain = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard let state = state() else { return false }
+            return state.firstResponder && state.textIsPlainN
+        }, object: nil)
         let plainResult = XCTWaiter.wait(for: [plain], timeout: 10)
         retain(.plain)
         XCTAssertEqual(plainResult, .completed)

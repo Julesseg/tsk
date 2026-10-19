@@ -103,7 +103,7 @@ final class WidgetUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_WIDGET_DELETE_VIEW"] = "1"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(springboard.staticTexts["Tasks unavailable"].firstMatch.waitForExistence(timeout: 30), springboard.debugDescription)
         XCTAssertFalse(springboard.staticTexts[custom].exists)

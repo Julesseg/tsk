@@ -17,7 +17,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let app = launch()
         XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         capture("After empty workspace")
-        let create = app.buttons["new-task"]
+        let create = app.buttons["New task"]
         let settings = app.buttons["workspace-settings"]
         XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
         XCTAssertGreaterThan(create.frame.midX, app.frame.midX)
@@ -78,7 +78,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testSettingsRemainReachableAtLargestTextSize() {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
-        XCTAssertTrue(app.buttons["new-task"].isHittable)
+        XCTAssertTrue(app.buttons["New task"].isHittable)
         XCTAssertTrue(revealWorkspaceSetting("continuous-reminders-settings", app: app))
         capture("After settings at largest text size")
         XCTAssertTrue(app.buttons["continuous-reminders-settings"].isHittable)
@@ -90,7 +90,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(app.buttons["workspace-settings"], app: app)
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["new-task"].isHittable)
+        XCTAssertTrue(app.buttons["New task"].isHittable)
     }
 
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
@@ -121,8 +121,10 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
         let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
         let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
-        taskControlCoordinate(source, app: app, position: CGVector(dx: 0.96, dy: 0.5))
-            .press(forDuration: 1, thenDragTo: taskControlCoordinate(first, app: app, position: CGVector(dx: 0.96, dy: -0.3)))
+        let handle = source.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).firstMatch
+        XCTAssertTrue(handle.exists)
+        handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)))
         let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
@@ -149,12 +151,12 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(saved.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["close-views"], app: app)
         XCTAssertEqual(app.tabBars.buttons.count, 2)
-        XCTAssertTrue(app.buttons["new-task"].isHittable)
+        XCTAssertTrue(app.buttons["New task"].isHittable)
     }
 
     func testProjectsNavigateToTasksAndSettingsUseNeutralColors() {
         let app = launch()
-        tapTaskControl(app.buttons["new-task"], app: app)
+        tapTaskControl(app.buttons["New task"], app: app)
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         focusTaskText(description, app: app)
         description.typeText("Prepare launch")
@@ -232,8 +234,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
             tapTaskControl(app.tabBars.buttons[title], app: app)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
-            let heading = try XCTUnwrap(app.navigationBars.staticTexts.matching(NSPredicate(format: "label == %@", title))
+            let heading = try XCTUnwrap(app.navigationBars.staticTexts.matching(identifier: "workspace-title-text")
                 .allElementsBoundByIndex.first(where: { $0.isHittable }))
+            XCTAssertEqual(heading.label, title)
             XCTAssertGreaterThan(progress.frame.minX, heading.frame.maxX)
             XCTAssertEqual(progress.frame.midY, heading.frame.midY, accuracy: 12)
             XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
@@ -254,7 +257,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         app.launchArguments += arguments
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["workspace-settings"].waitForExistence(timeout: 5))
         return app
     }

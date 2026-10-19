@@ -47,7 +47,7 @@ final class TskDependencyUITests: XCTestCase {
         screenshot("Prerequisite completion clears only blocked reason", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.staticTexts["Planned dependent"].waitForExistence(timeout: 10))
         XCTAssertEqual(blockedReasons(app).count, 0)
@@ -62,7 +62,7 @@ final class TskDependencyUITests: XCTestCase {
         screenshot("Explicit dependency removal preserves planned task", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Today"].tap()
         app.staticTexts["Planned dependent"].tap()
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-task-")).firstMatch.exists)
@@ -71,8 +71,8 @@ final class TskDependencyUITests: XCTestCase {
     }
 
     private func captureTask(_ description: String, planned: Bool, waiting: Bool, app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()

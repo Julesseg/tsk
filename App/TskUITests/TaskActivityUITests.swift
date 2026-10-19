@@ -12,8 +12,8 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5)); description.typeText("Act on independent plans")
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
@@ -76,7 +76,7 @@ final class TaskActivityUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         XCTAssertFalse(row.exists)
     }
 

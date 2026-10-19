@@ -9,8 +9,8 @@ final class TskPlanningUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         enterDescription("Planned and due independently", app: app)
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
@@ -23,7 +23,7 @@ final class TskPlanningUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1792058400"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertTrue(app.staticTexts["Planned and due independently"].waitForExistence(timeout: 10))
         capture("Next day carried forward and overdue", app: app)
@@ -63,7 +63,7 @@ final class TskPlanningUITests: XCTestCase {
         capture("Completed task leaves Today immediately", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertFalse(app.staticTexts["Planned and due independently"].exists)
     }

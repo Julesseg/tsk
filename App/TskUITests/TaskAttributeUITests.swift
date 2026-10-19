@@ -12,7 +12,7 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         openDefinitions(app)
         XCTAssertTrue(app.staticTexts["No local attribute definitions"].exists)
         capture("Local definitions empty", app: app)
@@ -39,7 +39,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-attribute-definition"].waitForNonExistence(timeout: 5))
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         openDefinitions(app)
         for (name, type) in [("note", "String"), ("score", "Numeric"), ("review", "Date"), ("effort", "Duration"), ("reference", "UUID")] {
             let definition = app.buttons["attribute-definition-\(name)"]
@@ -66,8 +66,8 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
         app.launch()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = field("task-description", app: app)
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)

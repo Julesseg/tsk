@@ -82,7 +82,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
                 dismissPasswordBeforeSample(deadline)
                 guard !observedPassword, ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                return app.buttons["new-task"].isHittable && ProcessInfo.processInfo.systemUptime < deadline
+                return app.buttons["New task"].isHittable && ProcessInfo.processInfo.systemUptime < deadline
             }
             if sample() { return }
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
@@ -107,7 +107,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }
             XCTAssertTrue(passwordDialog.waitForNonExistence(timeout: 5))
         }
-        tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
+        tapTaskControl(app.buttons["New task"], app: app, beforeSample: dismissPasswordBeforeSample)
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         func waitForCaptureDescription() -> Bool {
             let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
@@ -132,7 +132,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }) else { return false }
             if description.exists { return ProcessInfo.processInfo.systemUptime < deadline }
             guard interrupted, ProcessInfo.processInfo.systemUptime < deadline else { return false }
-            tapTaskControl(app.buttons["new-task"], app: app, deadline: deadline)
+            tapTaskControl(app.buttons["New task"], app: app, deadline: deadline)
             return waitUntil { description.exists }
         }
         XCTAssertTrue(waitForCaptureDescription())

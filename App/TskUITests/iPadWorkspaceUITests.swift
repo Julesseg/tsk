@@ -56,8 +56,8 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testProjectTodayWaitingUpcomingAndPortraitKeepOneTask() throws {
         let app = launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let field = description(app)
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
@@ -120,7 +120,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         capture("iPad custom tab at accessibility text size", app: app)
         XCTAssertTrue(app.descendants(matching: .any)["workspace-accessibility-navigation"].firstMatch.exists)
         XCTAssertGreaterThan(app.tabBars.firstMatch.frame.midY, app.frame.midY)
-        app.buttons["new-task"].tap()
+        app.buttons["New task"].tap()
         let field = description(app)
         guard revealTaskElement(field, in: "task-editor-form", app: app) else { return }
         focusTaskText(field, app: app)

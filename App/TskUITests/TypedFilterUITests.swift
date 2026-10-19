@@ -12,8 +12,8 @@ final class TypedFilterUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
@@ -88,8 +88,8 @@ final class TypedFilterUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()

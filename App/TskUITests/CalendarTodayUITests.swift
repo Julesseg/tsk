@@ -14,7 +14,7 @@ import XCTest
             app.launchEnvironment.removeValue(forKey: "TSK_TEST_CALENDAR_FIXTURE")
             app.launchEnvironment["TSK_TEST_CALENDAR_CLEANUP"] = token
             app.launch()
-            XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
             app.terminate(); app.resetAuthorizationStatus(for: .calendar)
         }
         app.launch(); select(.today, app)
@@ -77,7 +77,7 @@ import XCTest
 
     private enum Selection { case today, unfinished }
     private func select(_ query: Selection, _ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         let title = query == .today ? "Today" : "All"
         app.tabBars.buttons[title].tap()
     }
@@ -92,7 +92,7 @@ import XCTest
         app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "calendar-event-", title)).firstMatch
     }
     private func createTask(_ title: String, _ app: XCUIApplication) {
-        app.buttons["new-task"].tap()
+        app.buttons["New task"].tap()
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
         tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)

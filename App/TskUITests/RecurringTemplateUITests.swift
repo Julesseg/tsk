@@ -139,7 +139,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         return app
     }
 

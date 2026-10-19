@@ -77,7 +77,7 @@ import XCTest
         return app
     }
     private func create(_ title: String, _ app: XCUIApplication) -> String {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20)); app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20)); app.buttons["New task"].tap()
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
         if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
