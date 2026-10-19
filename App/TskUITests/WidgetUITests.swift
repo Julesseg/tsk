@@ -59,7 +59,13 @@ final class WidgetUITests: XCTestCase {
             capture("Actual tsk provider cell in native widget gallery", springboard)
             provider.tap()
             tap(springboard, labels: ["Add Widget", " Add Widget"])
-            tap(springboard, labels: ["Done"])
+            let done = springboard.buttons["Done"].firstMatch
+            let installed = home.staticTexts[today].firstMatch
+            let installationFinished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                (done.exists && done.isHittable) || (!gallery.exists && installed.exists)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [installationFinished], timeout: 15), .completed)
+            if done.exists && done.isHittable { done.tap() }
         }
         let taskText = springboard.staticTexts[today].firstMatch
         let rendered = taskText.waitForExistence(timeout: 30)

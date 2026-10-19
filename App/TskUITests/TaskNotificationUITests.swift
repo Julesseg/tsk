@@ -12,15 +12,14 @@ final class TaskNotificationUITests: XCTestCase {
         let midnight = app.buttons["notification-fixture-midnight"]
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=true hour=9 minute=0", timeout: 15))
-        let toggle = app.switches["notification-midnight-enabled"]
-        reveal(toggle, in: app, towardsTop: true); tapNotificationSwitch(toggle, app: app)
+        setDateSwitch("notification-midnight-enabled", to: false, app: app, in: "notification-settings-form")
         let save = app.buttons["notification-save-preferences"]
-        reveal(save, in: app, towardsTop: true); tapTaskControl(save, app: app)
+        reveal(save, in: app, towardsTop: true); tapTaskControlAtCenter(save, app: app)
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=false", timeout: 15))
         capture("Disabled midnight replacement updates actual registration without changing task dates", app)
-        reveal(toggle, in: app, towardsTop: true); tapNotificationSwitch(toggle, app: app)
-        reveal(save, in: app, towardsTop: true); tapTaskControl(save, app: app)
+        setDateSwitch("notification-midnight-enabled", to: true, app: app, in: "notification-settings-form")
+        reveal(save, in: app, towardsTop: true); tapTaskControlAtCenter(save, app: app)
         let register = app.buttons["notification-fixture-register"]
         reveal(register, in: app)
         register.tap()
@@ -188,9 +187,6 @@ final class TaskNotificationUITests: XCTestCase {
     }
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, towardsTop: Bool = false) {
         revealTaskElement(element, in: "notification-settings-form", app: app, initialScrollUp: !towardsTop, maximumSteps: 12)
-    }
-    private func tapNotificationSwitch(_ element: XCUIElement, app: XCUIApplication) {
-        tapTaskControl(notificationSwitchControl(element), app: app)
     }
     private func notificationSwitchControl(_ element: XCUIElement) -> XCUIElement {
         let thumb = element.switches.firstMatch

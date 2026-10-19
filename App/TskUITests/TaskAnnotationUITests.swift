@@ -23,7 +23,7 @@ final class TaskAnnotationUITests: XCTestCase {
         func save(_ phase: String) throws {
             if let commands {
                 try commands.perform(phase) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
-            } else { app.buttons["save-annotation"].tap() }
+            } else { tapTaskControlAtCenter(app.buttons["save-annotation"], app: app) }
         }
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
