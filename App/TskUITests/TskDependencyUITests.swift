@@ -38,7 +38,7 @@ final class TskDependencyUITests: XCTestCase {
         screenshot("Cycle rejected without saving another link", app: app)
         app.buttons["Cancel"].tap()
         tap(app.buttons["complete-task"], in: app)
-        XCTAssertFalse(app.buttons["complete-task"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["complete-task"].waitForNonExistence(timeout: 2))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.swipeDown()
         app.swipeDown()

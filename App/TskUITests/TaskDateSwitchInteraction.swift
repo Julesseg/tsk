@@ -319,7 +319,7 @@ extension XCTestCase {
             return false
         }
         var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
-        let pinnedIDs: Set<String> = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
+        let pinnedIDs: Set<String> = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-action-banner", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
         for step in 0...maximumSteps {
             let application: any XCUIElementSnapshot
             do { application = try app.snapshot() }
