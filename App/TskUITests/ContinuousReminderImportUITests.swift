@@ -57,6 +57,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
         readEvidence(app, contains: "Changed source and newly recurring rule preserved")
         capture("Source edited after durable save stays intact and stops the attempt", app)
         app.navigationBars.buttons["Done"].tap()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 10))
         XCTAssertFalse(taskRow(named: "Copy fixture none", app: app).exists)
         XCTAssertTrue(app.buttons["continuous-reminders-attention"].exists)
