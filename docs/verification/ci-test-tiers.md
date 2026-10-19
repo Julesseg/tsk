@@ -13,6 +13,7 @@ does not create that server task.
 | Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
 | Full | All 55 declared methods | 45-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
+| Keyboard diagnostics | Existing 6-method subset | Same 6-method subset | Manual `ui_suite=keyboard` |
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
@@ -36,6 +37,13 @@ results and repeated persistence/error journeys remain in the full suite.
 Existing workflows enter their destinations through Settings. iPad-only methods still
 skip on iPhone. Source selectors live in `scripts/ui-test-selection.py`; its
 checks reject renamed selectors and empty UI selections.
+
+Keyboard diagnostics retain native command delivery, installed Share capture,
+Calendar failure capture, workspace creation, view ordering and automatic-sync
+failure recovery. This focused manual selection uses the smoke time limits and
+does not change PR or nightly coverage. Keyboard-dismissal admission requires a
+visible software keyboard, a control outside its occupied area, and two stable
+geometry samples within the existing 20-second control deadline.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.

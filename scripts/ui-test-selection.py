@@ -36,6 +36,14 @@ DIAGNOSTIC = (
     "ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory",
     "SpotlightUITests", "WidgetUITests",
 )
+KEYBOARD = (
+    "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
+    "WorkspaceSettingsUITests/testCreationPlacementAndEverySettingsDestination",
+    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
+    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "ShareCaptureUITests",
+    "AutomaticSynchronizationUITests",
+)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 
 
@@ -66,7 +74,9 @@ def selected_methods(filters):
 
 
 def selection(suite, family):
-    if suite == "diagnostic":
+    if suite == "keyboard":
+        tests = KEYBOARD
+    elif suite == "diagnostic":
         if family != "iPhone":
             raise ValueError("Diagnostic coverage requires iPhone")
         tests = DIAGNOSTIC
@@ -99,7 +109,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)

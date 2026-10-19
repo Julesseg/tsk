@@ -380,6 +380,56 @@ import Testing
                                                   elementFrame: CGRect(origin: CGPoint(x: CGFloat.infinity, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
         #expect(nonfinite.diagnostic.contains("inf"))
     }
+
+    @Test func keyboardDismissalRejectsTheObservedPendingLayoutBeforeOneStableAction() {
+        let clock = Clock()
+        let screen = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let keyboard = CGRect(x: 0, y: 589, width: 1376, height: 440)
+        var current = TaskControlReadinessSample(exists: true, enabled: true, hittable: true,
+            elementFrame: CGRect(x: 818.5, y: 775, width: 143.5, height: 22.5), appFrame: screen, keyboardFrames: [])
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: { current })
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .keyboardUnavailable)
+        current.keyboardFrames = [keyboard]
+        clock.now = 1
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .keyboardCoveringControl)
+        current.elementFrame = CGRect(x: 818.5, y: 503.5, width: 143.5, height: 22.5)
+        clock.now = 2
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .changingKeyboardLayout)
+        clock.now = 3
+        #expect(attempt.evaluate())
+        var actions = 0
+        #expect(attempt.finish(waitCompleted: true) { _ in actions += 1 })
+        #expect(actions == 1)
+    }
+
+    @Test func unavailableKeyboardAndInputAssistantCannotAdmitDismissal() {
+        for frames in [[], [.zero], [.infinite], [CGRect(x: 0, y: 900, width: 400, height: 300)],
+                       [CGRect(x: 0, y: 900, width: 400, height: 300), CGRect(x: 20, y: 530, width: 400, height: 300)],
+                       [CGRect(x: 20, y: 530, width: 400, height: 300), CGRect(x: 20, y: 60, width: 400, height: 50)]] as [[CGRect]] {
+            var current = sample()
+            current.keyboardFrames = frames
+            let attempt = TaskControlReadinessAttempt(now: { 0 }, sample: { current })
+            #expect(!attempt.evaluate())
+            #expect(!attempt.evaluate())
+            #expect(!attempt.finish(waitCompleted: true) { _ in Issue.record("A missing or covering keyboard must not admit dismissal") })
+        }
+    }
+
+    @Test func changingKeyboardLayoutCannotExtendTheOriginalDeadline() {
+        let clock = Clock()
+        var current = sample()
+        current.keyboardFrames = [CGRect(x: 20, y: 530, width: 400, height: 300)]
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: { current })
+        clock.now = 19
+        #expect(!attempt.evaluate())
+        clock.now = 20
+        #expect(!attempt.evaluate())
+        #expect(!attempt.finish(waitCompleted: true) { _ in Issue.record("Stable geometry after the deadline must not activate") })
+        #expect(attempt.failureReason == .deadlineExpired)
+    }
 }
 
 @Suite struct TaskSwitchValueProof {

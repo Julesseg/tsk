@@ -35,6 +35,13 @@ class SelectionTests(unittest.TestCase):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)
 
+    def test_keyboard_diagnostics_keep_existing_state_and_transport_checks_on_both_devices(self):
+        for family in ("iPhone", "iPad"):
+            selected = selection.selected_methods(selection.selection("keyboard", family))
+            self.assertEqual(len(selected), 6)
+            self.assertIn("TskUITests/CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable", selected)
+            self.assertIn("TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback", selected)
+
     def test_renamed_tests_fail_instead_of_silently_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):
             with self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
@@ -47,7 +54,7 @@ class SelectionTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("hid_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone")):
+        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad")):
             with self.subTest(suite=suite, family=family):
                 command = [
                     "xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",

@@ -11,7 +11,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [full, smoke]
+        options: [full, smoke, keyboard]
         required: true
         default: full
       diagnostic_only:
@@ -168,7 +168,7 @@ jobs:
         timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 45 }}
         working-directory: App
         env:
-          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
+          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'keyboard' && 'keyboard' || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
           UI_FAMILY: ${{ matrix.family }}
         run: |
           set -eo pipefail

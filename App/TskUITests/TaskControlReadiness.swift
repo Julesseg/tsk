@@ -8,6 +8,7 @@ enum TaskControlReadinessPolicy {
 enum TaskControlReadinessFailure: String {
     case missing, disabled, unhittable, unsampled, snapshotFailed, nonpositiveFrame, outsideApp
     case deadlineExpired, waiterIncomplete, alreadyFinished
+    case keyboardUnavailable, keyboardCoveringControl, changingKeyboardLayout
 }
 
 struct TaskControlReadinessGeometry {
@@ -23,6 +24,7 @@ struct TaskControlReadinessSample {
     var appFrame: CGRect?
     var appWindowFrames: [CGRect] = []
     var snapshotError: String?
+    var keyboardFrames: [CGRect]?
 
     var containmentFrame: CGRect? {
         guard let appFrame, appFrame.isEmpty, let elementFrame else { return appFrame }
@@ -40,13 +42,19 @@ struct TaskControlReadinessSample {
         guard let elementFrame, let containmentFrame else { return .unsampled }
         guard elementFrame.width > 0, elementFrame.height > 0 else { return .nonpositiveFrame }
         guard containmentFrame.contains(elementFrame) else { return .outsideApp }
+        if let keyboardFrames {
+            guard let keyboard = keyboardFrames.first, !keyboard.isEmpty, !keyboard.isInfinite,
+                  keyboard.intersects(containmentFrame) else { return .keyboardUnavailable }
+            let visible = keyboardFrames.filter { !$0.isEmpty && !$0.isInfinite && $0.intersects(containmentFrame) }
+            guard !visible.contains(where: { $0.intersects(elementFrame) }) else { return .keyboardCoveringControl }
+        }
         return nil
     }
 
     var diagnostic: String {
         func value<T>(_ field: T?) -> String { field.map { String(describing: $0) } ?? "null" }
         let contained = elementFrame.flatMap { frame in containmentFrame.map { $0.contains(frame) } }
-        return "exists=\(value(exists)) snapshotError=\(value(snapshotError)) enabled=\(value(enabled)) hittable=\(value(hittable)) elementFrame=\(value(elementFrame)) appFrame=\(value(appFrame)) appWindowFrames=\(appWindowFrames) containmentFrame=\(value(containmentFrame)) positiveWidth=\(value(elementFrame.map { $0.width > 0 })) positiveHeight=\(value(elementFrame.map { $0.height > 0 })) contained=\(value(contained)) sampleReason=\(failureReason?.rawValue ?? "ready")"
+        return "exists=\(value(exists)) snapshotError=\(value(snapshotError)) enabled=\(value(enabled)) hittable=\(value(hittable)) elementFrame=\(value(elementFrame)) appFrame=\(value(appFrame)) appWindowFrames=\(appWindowFrames) keyboardFrames=\(value(keyboardFrames)) containmentFrame=\(value(containmentFrame)) positiveWidth=\(value(elementFrame.map { $0.width > 0 })) positiveHeight=\(value(elementFrame.map { $0.height > 0 })) contained=\(value(contained)) sampleReason=\(failureReason?.rawValue ?? "ready")"
     }
 }
 
@@ -63,6 +71,7 @@ final class TaskControlReadinessAttempt {
     private var sampleCount = 0
     private var sampleStartedElapsed: TimeInterval?
     private var sampleElapsed: TimeInterval?
+    private var previousKeyboardGeometry: [CGRect]?
     private(set) var failureReason: TaskControlReadinessFailure? = .unsampled
 
     init(now: @escaping () -> TimeInterval, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, sample: @escaping () -> TaskControlReadinessSample) {
@@ -107,7 +116,14 @@ final class TaskControlReadinessAttempt {
         sampleCount += 1
         guard sampleCompleted < deadline else { failureReason = .deadlineExpired; return false }
         failureReason = current.failureReason
+        if failureReason != nil { previousKeyboardGeometry = nil }
         if failureReason == nil, let frame = current.elementFrame, let containmentFrame = current.containmentFrame {
+            if let keyboardFrames = current.keyboardFrames {
+                let geometry = [frame, containmentFrame] + keyboardFrames
+                let stable = previousKeyboardGeometry == geometry
+                previousKeyboardGeometry = geometry
+                guard stable else { failureReason = .changingKeyboardLayout; return false }
+            }
             accepted = TaskControlReadinessGeometry(elementFrame: frame, containmentFrame: containmentFrame)
         }
         return accepted != nil
