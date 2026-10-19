@@ -22,6 +22,26 @@ extension XCTestCase {
         attachment.name = "Owned Reminders authorization reset timeline \(stage)"; attachment.lifetime = .keepAlways; add(attachment)
     }
 
+    @MainActor func selectDoneTasks(_ app: XCUIApplication) {
+        let done = app.tabBars.buttons["Done"]
+        if done.exists { tapTaskControl(done, app: app); return }
+        if !app.collectionViews["views-list"].exists { openWorkspaceSetting("custom-views", app: app) }
+        let add = app.buttons["activate-completed"]
+        XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app))
+        if !add.isEnabled {
+            let remove = app.buttons["deactivate-projects"]
+            XCTAssertTrue(revealTaskElement(remove, in: "views-list", app: app))
+            tapTaskControl(remove, app: app)
+            XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app, initialScrollUp: false))
+        }
+        tapTaskControl(add, app: app)
+        let row = app.buttons["view-completed"]
+        XCTAssertTrue(revealTaskElement(row, in: "views-list", app: app))
+        tapTaskControl(row, app: app)
+        XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(done.isSelected)
+    }
+
     @MainActor func selectAllTasks(_ app: XCUIApplication) {
         let tab = app.tabBars.buttons["All"]
         guard tab.waitForExistence(timeout: 20) else {

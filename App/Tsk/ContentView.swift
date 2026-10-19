@@ -4,6 +4,8 @@ import TskNative
 import EventKit
 
 struct ContentView: View {
+    private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
+
     enum WorkspaceSetting {
         case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport, attributeDefinitions
         #if DEBUG && targetEnvironment(simulator)
@@ -79,6 +81,20 @@ struct ContentView: View {
         } else { $path }
     }
 
+    private var workspaceTabSelection: Binding<WorkspaceTab> {
+        Binding(get: { .view(store.selectedWorkspaceView) }, set: { tab in
+            switch tab {
+            case .view(let view): tabSelection.wrappedValue = view
+            case .capture: capture()
+            }
+        })
+    }
+
+    private var captureTabRole: TabRole {
+        if #available(iOS 27, *) { .prominent }
+        else { .search }
+    }
+
     private var navigationWorkspace: some View {
         Group {
             if !store.workspaceViewsLoaded && sidebarError == nil {
@@ -86,9 +102,9 @@ struct ContentView: View {
             } else if store.customView != nil && store.customView?.id == nil {
                 workspaceContent
             } else {
-                TabView(selection: tabSelection) {
+                TabView(selection: workspaceTabSelection) {
                     ForEach(store.workspaceViews.active) { view in
-                        Tab(view.title(in: store), systemImage: view.systemImage, value: view) {
+                        Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                             if view == store.selectedWorkspaceView {
                                 workspaceContent
                                     .environment(\.horizontalSizeClass, sizeClass)
@@ -96,6 +112,10 @@ struct ContentView: View {
                         }
                         .accessibilityIdentifier("tab-" + view.id)
                     }
+                    Tab("New task", systemImage: "plus", value: WorkspaceTab.capture, role: captureTabRole) {
+                        EmptyView()
+                    }
+                    .accessibilityIdentifier("new-task")
                 }
                 .tabViewStyle(.tabBarOnly)
                 // Keep the native tab bar at the bottom on iPad while retaining regular content columns.
@@ -113,17 +133,20 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
-            Button(action: capture) {
-                Image(systemName: "plus")
-                    .font(.title2)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .accessibilityLabel("New task")
-            .accessibilityIdentifier("new-task")
-            .padding()
+            if store.customView != nil && store.customView?.id == nil { captureButton.padding() }
         }
+    }
+
+    private var captureButton: some View {
+        Button(action: capture) {
+            Image(systemName: "plus")
+                .font(.title2)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("New task")
+        .accessibilityIdentifier("new-task")
     }
 
     @ViewBuilder private var tasksWorkspace: some View {

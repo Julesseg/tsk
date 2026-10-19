@@ -15,12 +15,16 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testCreationPlacementAndEverySettingsDestination() {
         let app = launch()
+        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         capture("After empty workspace")
         let create = app.buttons["new-task"]
         let settings = app.buttons["workspace-settings"]
         XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
         XCTAssertGreaterThan(create.frame.midX, app.frame.midX)
         XCTAssertGreaterThan(create.frame.midY, app.frame.maxY - app.frame.height * 0.2)
+        let lastView = app.tabBars.buttons["All"]
+        XCTAssertGreaterThan(create.frame.minX, lastView.frame.maxX)
+        XCTAssertEqual(create.frame.midY, lastView.frame.midY, accuracy: 2)
         XCTAssertGreaterThan(settings.frame.midX, app.frame.midX)
         XCTAssertLessThan(settings.frame.midY, app.frame.minY + app.frame.height * 0.2)
         XCTAssertFalse(app.buttons["workspace-more"].exists)
@@ -38,6 +42,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertEqual(field.value as? String, "Plan the week")
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Plan the week", app: app), timeout: 15))
+        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
+        XCTAssertFalse(create.isSelected)
         capture("After populated workspace")
         tapTaskControl(settings, app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
@@ -59,8 +65,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
         for (identifier, title) in destinations {
             openWorkspaceSetting(identifier, app: app)
             XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10), identifier)
+            if identifier == "custom-views" { capture("Views with four active tabs") }
             XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
-            tapTaskControl(app.buttons["Done"], app: app)
+            tapTaskControl(app.navigationBars[title].buttons["Done"], app: app)
             XCTAssertTrue(app.buttons["workspace-settings"].waitForExistence(timeout: 5))
         }
         tapTaskControl(create, app: app)
@@ -88,10 +95,10 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
         let app = launch()
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "Done"])
+        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "New task"])
         XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
         openWorkspaceSetting("custom-views", app: app)
-        capture("Views with five default active tabs")
+        capture("Views with four default active tabs")
         tapTaskControl(app.buttons["new-custom-view"], app: app)
         let name = app.textFields["custom-view-name"]
         focusTaskText(name, app: app)
@@ -105,7 +112,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let add = app.buttons["activate-custom-" + id]
         XCTAssertFalse(add.isEnabled)
         capture("Views inactive custom filter at tab capacity")
-        let remove = app.buttons["deactivate-completed"]
+        let remove = app.buttons["deactivate-unfinished"]
         XCTAssertTrue(revealTaskElement(remove, in: "views-list", app: app, initialScrollUp: false))
         tapTaskControl(remove, app: app)
         XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app))
@@ -130,7 +137,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["Done"].exists)
         capture("First active custom tab after relaunch")
         openWorkspaceSetting("custom-views", app: app)
-        for identifier in ["unfinished", "today", "upcoming", "projects"] {
+        for identifier in ["today", "upcoming", "projects"] {
             let button = app.buttons["deactivate-" + identifier]
             XCTAssertTrue(revealTaskElement(button, in: "views-list", app: app, initialScrollUp: false))
             tapTaskControl(button, app: app)
@@ -141,7 +148,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskMenuItem(app.buttons["Delete"], app: app)
         XCTAssertTrue(saved.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["close-views"], app: app)
-        XCTAssertEqual(app.tabBars.buttons.count, 1)
+        XCTAssertEqual(app.tabBars.buttons.count, 2)
         XCTAssertTrue(app.buttons["new-task"].isHittable)
     }
 

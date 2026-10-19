@@ -2,15 +2,15 @@ import Foundation
 import Testing
 @testable import TskCore
 
-@Test func workspaceViewsKeepFiveTabsAndRequireOne() throws {
+@Test func workspaceViewsKeepFourTabsAndRequireOne() throws {
     var views = WorkspaceViews(customIDs: [])
-    #expect(views.active == [.today, .upcoming, .projects, .unfinished, .completed])
+    #expect(views.active == [.today, .upcoming, .projects, .unfinished])
     let id = UUID()
     views.reconcile(customIDs: [id])
     #expect(throws: WorkspaceViewsError.limitReached) { try views.activate(.custom(id)) }
-    try views.deactivate(.completed)
+    try views.deactivate(.unfinished)
     try views.activate(.custom(id))
-    views.moveActive(from: IndexSet(integer: 4), to: 0)
+    views.moveActive(from: IndexSet(integer: 3), to: 0)
     #expect(views.active.first == .custom(id))
     for view in views.active.dropFirst() { try views.deactivate(view) }
     #expect(throws: WorkspaceViewsError.lastActiveView) { try views.deactivate(.custom(id)) }
@@ -21,8 +21,8 @@ import Testing
     var views = WorkspaceViews(customIDs: [first, second])
     try views.deactivate(.unfinished)
     try views.activate(.custom(first))
-    views.moveActive(from: IndexSet(integer: 4), to: 0)
-    views.moveInactive(from: IndexSet(integer: 2), to: 0)
+    views.moveActive(from: IndexSet(integer: 3), to: 0)
+    views.moveInactive(from: IndexSet(integer: 3), to: 0)
     let restored = try JSONDecoder().decode(WorkspaceViews.self, from: JSONEncoder().encode(views))
     #expect(restored == views)
     views.reconcile(customIDs: [second])
@@ -35,7 +35,7 @@ import Testing
 @Test func workspaceViewsRecoverWhenOnlyActiveCustomViewIsDeleted() throws {
     let id = UUID()
     var views = WorkspaceViews(customIDs: [id])
-    try views.deactivate(.completed)
+    try views.deactivate(.unfinished)
     try views.activate(.custom(id))
     for view in views.active.filter({ $0 != .custom(id) }) { try views.deactivate(view) }
     views.reconcile(customIDs: [])
@@ -44,11 +44,10 @@ import Testing
     #expect(throws: WorkspaceViewsError.unavailableView) { try views.activate(.custom(UUID())) }
 }
 
-@Test func workspaceViewsPreservePreviouslySavedDefaultOrder() throws {
-    var previous = WorkspaceViews(customIDs: [])
-    previous.moveActive(from: IndexSet(integer: 3), to: 0)
-    let data = try JSONEncoder().encode(previous)
+@Test func workspaceViewsPreserveSavedOrderAndMoveFifthViewToInactive() throws {
+    let data = Data(#"{"active":[{"unfinished":{}},{"today":{}},{"upcoming":{}},{"projects":{}},{"completed":{}}],"inactive":[]}"#.utf8)
     var restored = try JSONDecoder().decode(WorkspaceViews.self, from: data)
     restored.reconcile(customIDs: [])
-    #expect(restored.active == [.unfinished, .today, .upcoming, .projects, .completed])
+    #expect(restored.active == [.unfinished, .today, .upcoming, .projects])
+    #expect(restored.inactive == [.completed])
 }

@@ -126,7 +126,7 @@ final class TaskAttributeUITests: XCTestCase {
         scoreDefinition.swipeLeft()
         app.buttons["Remove definition"].tap()
         XCTAssertTrue(scoreDefinition.waitForNonExistence(timeout: 10))
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         app.buttons["Cancel"].tap()
         let storedScore = app.descendants(matching: .any).matching(identifier: "raw-attribute-score").firstMatch
         XCTAssertTrue(revealTaskElement(storedScore, in: "task-detail-form", app: app))

@@ -82,7 +82,7 @@ final class ReminderImportUITests: XCTestCase {
         permission(allow: false)
         XCTAssertTrue(app.staticTexts["reminders-error"].waitForExistence(timeout: 10))
         capture("Genuine denied Reminders permission", app)
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
         app.buttons["new-task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch

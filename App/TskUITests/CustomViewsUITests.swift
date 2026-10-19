@@ -63,7 +63,7 @@ final class CustomViewsUITests: XCTestCase {
         openSavedViewOptions(app)
         app.buttons["Delete"].tap()
         XCTAssertFalse(saved.waitForExistence(timeout: 2))
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         app.terminate()
         app.launch()
         openWorkspaceSetting("custom-views", app: app)

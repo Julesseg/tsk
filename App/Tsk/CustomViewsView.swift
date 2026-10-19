@@ -51,7 +51,7 @@ struct CustomViewsView: View {
                 } header: {
                     Text("Other views")
                 } footer: {
-                    Text("Add up to five active views. Use a custom view’s options to edit or delete its filter.")
+                    Text("Add up to four active views. Use a custom view’s options to edit or delete its filter.")
                 }
             }
             .environment(\.editMode, .constant(.active))

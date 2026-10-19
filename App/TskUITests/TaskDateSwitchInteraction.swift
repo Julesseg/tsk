@@ -14,7 +14,7 @@ extension XCTestCase {
         let add = app.buttons["activate-custom-" + id]
         if add.exists {
             if !add.isEnabled {
-                let remove = app.buttons["deactivate-completed"]
+                let remove = app.buttons["deactivate-unfinished"]
                 guard revealTaskElement(remove, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
                 tapTaskControl(remove, app: app, file: file, line: line)
             }

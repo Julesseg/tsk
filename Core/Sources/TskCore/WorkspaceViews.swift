@@ -32,7 +32,7 @@ public enum WorkspaceViewsError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .limitReached: "You can show up to five tabs. Remove an active view before adding another."
+        case .limitReached: "You can show up to four tabs. Remove an active view before adding another."
         case .lastActiveView: "Keep at least one active view."
         case .unavailableView: "This view is no longer available."
         }
@@ -40,7 +40,7 @@ public enum WorkspaceViewsError: Error, LocalizedError, Equatable {
 }
 
 public struct WorkspaceViews: Codable, Equatable, Sendable {
-    public static let maximumActive = 5
+    public static let maximumActive = 4
     public private(set) var active: [WorkspaceView]
     public private(set) var inactive: [WorkspaceView]
 

@@ -13,6 +13,8 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testInjectedKeyboardCaptureSelectionEditCompletionAndReopen() throws {
         let app = launch()
+        selectDoneTasks(app)
+        selectAllTasks(app)
         let commands = try TaskKeyboardCommand(.workspace, app: app)
         XCTAssertTrue(app.tabBars.buttons["All"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.otherElements["workspace-detail-empty"].exists || app.staticTexts["Select a task"].exists)
@@ -44,7 +46,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         app.terminate()
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Done"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Done"].tap()
+        selectDoneTasks(app)
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Keyboard task revised", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))

@@ -60,7 +60,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         secret.typeText("isolated-ui-test-secret")
         app.buttons["save-sync-connection"].tap()
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 10))
         capture("Automatic synchronization failure with local capture available", app)
         func dismissPasswordBeforeSample(_ deadline: TimeInterval) {
