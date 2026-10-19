@@ -37,19 +37,19 @@ extension XCTestCase {
     }
 
     @discardableResult
-    func revealWorkspaceSetting(_ identifier: String, app: XCUIApplication, initialScrollUp: Bool = true, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+    func revealWorkspaceSetting(_ identifier: String, app: XCUIApplication, initialScrollUp: Bool = true, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let settings = app.collectionViews["workspace-settings-list"]
         if !settings.exists {
             let button = app.buttons["workspace-settings"]
             XCTAssertTrue(button.waitForExistence(timeout: 15), file: file, line: line)
-            tapTaskControl(button, app: app, file: file, line: line)
+            tapTaskControl(button, app: app, beforeSample: beforeSample, file: file, line: line)
         }
         return revealTaskElement(app.buttons[identifier], in: "workspace-settings-list", app: app, initialScrollUp: initialScrollUp, file: file, line: line)
     }
 
-    func openWorkspaceSetting(_ identifier: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        guard revealWorkspaceSetting(identifier, app: app, file: file, line: line) else { return }
-        tapTaskControl(app.buttons[identifier], app: app, file: file, line: line)
+    func openWorkspaceSetting(_ identifier: String, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        guard revealWorkspaceSetting(identifier, app: app, beforeSample: beforeSample, file: file, line: line) else { return }
+        tapTaskControl(app.buttons[identifier], app: app, beforeSample: beforeSample, file: file, line: line)
     }
 
     func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {

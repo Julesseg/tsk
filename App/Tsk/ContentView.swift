@@ -182,6 +182,7 @@ struct ContentView: View {
             }
             .accessibilityIdentifier("projects-list")
             .navigationTitle("Projects")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 workspaceTitle("Projects")
                 settingsToolbar
@@ -347,6 +348,7 @@ struct ContentView: View {
     private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+            .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
@@ -369,10 +371,6 @@ struct ContentView: View {
         ToolbarItem(placement: .title) {
             WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
                 .font(.headline)
-        }
-        ToolbarItem(placement: .largeTitle) {
-            WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
-                .font(.largeTitle.bold())
         }
     }
 

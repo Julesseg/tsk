@@ -94,7 +94,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
     }
 
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
-        let app = launch()
+        let app = launch(animationsEnabled: true)
         XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "New task"])
         XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
         openWorkspaceSetting("custom-views", app: app)
@@ -124,7 +124,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let handle = source.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).firstMatch
         XCTAssertTrue(handle.exists)
         handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 1, thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)))
+            .press(forDuration: 1,
+                   thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)),
+                   withVelocity: .slow, thenHoldForDuration: 1)
         let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
@@ -216,6 +218,17 @@ final class WorkspaceSettingsUITests: XCTestCase {
         wait(for: [ready], timeout: 5)
         let port = try XCTUnwrap(server.port)
         let app = launch()
+        func dismissPassword(_ deadline: TimeInterval) {
+            for dialog in [app.alerts["Save Password?"], app.sheets["Save Password?"]] {
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return }
+                if dialog.exists {
+                    let notNow = dialog.buttons["Not Now"]
+                    guard notNow.exists, notNow.isHittable else { return }
+                    tapTaskControl(notNow, app: app, deadline: deadline)
+                    return
+                }
+            }
+        }
         openWorkspaceSetting("synchronization-settings", app: app)
         let fields = [
             (app.textFields["sync-server-url"], "http://127.0.0.1:\(port)"),
@@ -231,9 +244,11 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
         for title in ["Today", "Projects"] {
-            tapTaskControl(app.tabBars.buttons[title], app: app)
+            tapTaskControl(app.tabBars.buttons[title], app: app, beforeSample: dismissPassword)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
+            XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)
+            XCTAssertEqual(app.navigationBars.staticTexts.matching(identifier: "workspace-title-text").count, 1)
             let heading = try XCTUnwrap(app.navigationBars.staticTexts.matching(identifier: "workspace-title-text")
                 .allElementsBoundByIndex.first(where: { $0.isHittable }))
             XCTAssertEqual(heading.label, title)
@@ -247,13 +262,14 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.activityIndicators["workspace-sync-progress"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
-        openWorkspaceSetting("synchronization-settings", app: app)
+        openWorkspaceSetting("synchronization-settings", app: app, beforeSample: dismissPassword)
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["sync-now"].isEnabled)
     }
 
-    private func launch(arguments: [String] = []) -> XCUIApplication {
+    private func launch(arguments: [String] = [], animationsEnabled: Bool = false) -> XCUIApplication {
         let app = taskTestApplication()
+        if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
         app.launchArguments += arguments
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
