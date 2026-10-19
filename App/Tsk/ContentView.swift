@@ -182,7 +182,10 @@ struct ContentView: View {
             }
             .accessibilityIdentifier("projects-list")
             .navigationTitle("Projects")
-            .toolbar { settingsToolbar }
+            .toolbar {
+                workspaceTitle("Projects")
+                settingsToolbar
+            }
             .navigationDestination(for: TaskProjectSelection.self) { project in
                 taskList(selection: nil, title: project.projectName ?? "No project")
                     .onAppear { openProject(project) }
@@ -241,7 +244,9 @@ struct ContentView: View {
         .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) {
             CustomViewsView(store: store, select: { tabSelection.wrappedValue = $0 })
         }
-        .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
+        .sheet(isPresented: $isConfiguringSync) {
+            SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError)
+        }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
         .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
             TaskSettingsView(choose: chooseWorkspaceSetting)
@@ -345,17 +350,30 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar { if presentation != .columns || isProjectWorkspace { settingsToolbar } }
+            .toolbar {
+                workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+                if presentation != .columns || isProjectWorkspace { settingsToolbar }
+            }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
+    }
+
+    @ToolbarContentBuilder private func workspaceTitle(_ title: String) -> some ToolbarContent {
+        ToolbarItem(placement: .title) {
+            WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
+                .font(.headline)
+        }
+        ToolbarItem(placement: .largeTitle) {
+            WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
+                .font(.largeTitle.bold())
+        }
     }
 
     @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {

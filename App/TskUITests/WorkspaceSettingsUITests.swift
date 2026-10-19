@@ -122,7 +122,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
         let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
         taskControlCoordinate(source, app: app, position: CGVector(dx: 0.96, dy: 0.5))
-            .press(forDuration: 1, thenDragTo: taskControlCoordinate(first, app: app, position: CGVector(dx: 0.96, dy: 0.2)))
+            .press(forDuration: 1, thenDragTo: taskControlCoordinate(first, app: app, position: CGVector(dx: 0.96, dy: -0.3)))
         let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
@@ -205,6 +205,48 @@ final class WorkspaceSettingsUITests: XCTestCase {
         capture("Views dark")
         tapTaskControl(app.buttons["close-views"], app: app)
         XCUIDevice.shared.appearance = .light
+    }
+
+    func testSynchronizationProgressStaysBesideWorkspaceTitle() throws {
+        let ready = expectation(description: "Deferred synchronization server is listening")
+        let server = try DeferredSynchronizationServer(ready: ready)
+        defer { server.stop() }
+        wait(for: [ready], timeout: 5)
+        let port = try XCTUnwrap(server.port)
+        let app = launch()
+        openWorkspaceSetting("synchronization-settings", app: app)
+        let fields = [
+            (app.textFields["sync-server-url"], "http://127.0.0.1:\(port)"),
+            (app.textFields["sync-client-id"], UUID().uuidString),
+            (app.secureTextFields["sync-encryption-secret"], "isolated-progress-test")
+        ]
+        for (field, value) in fields {
+            focusTaskText(field, app: app)
+            field.typeText(value)
+        }
+        tapTaskControl(app.buttons["dismiss-sync-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-sync-connection"], app: app)
+        XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
+        tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
+        for title in ["Today", "Projects"] {
+            tapTaskControl(app.tabBars.buttons[title], app: app)
+            let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
+            XCTAssertTrue(progress.waitForExistence(timeout: 5))
+            let heading = try XCTUnwrap(app.navigationBars.staticTexts.matching(NSPredicate(format: "label == %@", title))
+                .allElementsBoundByIndex.first(where: { $0.isHittable }))
+            XCTAssertGreaterThan(progress.frame.minX, heading.frame.maxX)
+            XCTAssertEqual(progress.frame.midY, heading.frame.midY, accuracy: 12)
+            XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
+            XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
+            XCTAssertFalse(app.buttons["retry-task-sync"].exists)
+        }
+        server.finish()
+        XCTAssertTrue(app.activityIndicators["workspace-sync-progress"].waitForNonExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
+        XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
+        openWorkspaceSetting("synchronization-settings", app: app)
+        XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sync-now"].isEnabled)
     }
 
     private func launch(arguments: [String] = []) -> XCUIApplication {

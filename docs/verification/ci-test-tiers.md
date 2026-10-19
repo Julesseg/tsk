@@ -10,13 +10,16 @@ does not create that server task.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 12 methods | 9 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 54 declared methods | 44-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 55 declared methods | 45-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
-and Projects drill-down. Appearance captures require visual confirmation of the
+and Projects drill-down. Both also hold an actual HTTP synchronization request open
+to check title-adjacent progress and the absence of workspace synchronization footers,
+then return a server failure and check that its details remain in Settings.
+Appearance captures require visual confirmation of the
 rendered mode. The iPhone smoke selection
 checks capture/validation/cancel/reopen, durable
 editing/completion, real-server synchronization, annotation toolbar saves,

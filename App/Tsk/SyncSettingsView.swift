@@ -3,6 +3,7 @@ import SwiftUI
 struct SyncSettingsView: View {
     let synchronization: SynchronizationStore
     let tasks: TaskStore
+    var backgroundError: String?
     @Environment(\.dismiss) private var dismiss
     @State private var serverURL = ""
     @State private var clientID = ""
@@ -71,6 +72,9 @@ struct SyncSettingsView: View {
                     if synchronization.isSyncing { ProgressView("Contacting server") }
                     if let error = synchronization.error {
                         Text(error).foregroundStyle(.red).accessibilityIdentifier("sync-error")
+                    }
+                    if let backgroundError {
+                        Text(backgroundError).foregroundStyle(.secondary)
                     }
                 }
                 Section {

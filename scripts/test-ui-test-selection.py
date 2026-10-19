@@ -18,7 +18,7 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        for family, count in (("iPhone", 12), ("iPad", 9)):
+        for family, count in (("iPhone", 13), ("iPad", 10)):
             with self.subTest(family=family):
                 smoke = selection.selected_methods(selection.selection("smoke", family))
                 full = selection.selected_methods(selection.selection("full", family))
@@ -30,7 +30,7 @@ class SelectionTests(unittest.TestCase):
 
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 44)
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 45)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)
