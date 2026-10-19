@@ -87,13 +87,14 @@ final class SynchronizationUITests: XCTestCase {
         server.tap()
         server.typeText(serverURL)
         let client = app.textFields["sync-client-id"]
-        client.tap()
+        tapTaskControlAtCenter(client, app: app, requiresVisibleKeyboard: true)
         client.typeText(clientID)
         let encryption = app.secureTextFields["sync-encryption-secret"]
-        encryption.tap()
+        tapTaskControlAtCenter(encryption, app: app, requiresVisibleKeyboard: true)
         encryption.typeText(secret)
         if app.buttons["dismiss-sync-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-sync-keyboard"], app: app) }
-        app.buttons["save-sync-connection"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        tapTaskControlAtCenter(app.buttons["save-sync-connection"], app: app)
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: app.buttons["sync-now"])
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed)

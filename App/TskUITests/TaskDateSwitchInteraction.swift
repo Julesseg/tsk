@@ -5,6 +5,10 @@ enum TaskTextSelection {
     case commandA
 }
 
+private enum TaskControlKeyboardRequirement {
+    case none, dismissal, visible
+}
+
 @MainActor
 extension XCTestCase {
     func taskSnapshot(_ identifier: String, type: XCUIElement.ElementType? = nil, in root: any XCUIElementSnapshot) -> (any XCUIElementSnapshot)? {
@@ -155,8 +159,8 @@ extension XCTestCase {
         }
     }
 
-    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, requiresVisibleKeyboard: true, file: file, line: line) { _ in
+    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, requiresVisibleKeyboard: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { _ in
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
     }
@@ -169,7 +173,59 @@ extension XCTestCase {
         tapTaskButton(element, app: app, file: file, line: line)
     }
 
-    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, requiresVisibleKeyboard: Bool = false, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
+    func tapTaskPickerOption(_ label: String, options: [String], app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: TaskNativeMenuOptionGeometry?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            do {
+                let application = try app.snapshot()
+                var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
+                var candidates: [TaskNativeMenuOptionGeometry] = []
+                var matches = 0
+                while let (snapshot, ancestors) = pending.popLast() {
+                    let frames = ancestors + [snapshot.frame]
+                    if snapshot.elementType == .button, snapshot.label == label { matches += 1 }
+                    if snapshot.elementType == .collectionView {
+                        let choices = snapshot.children.filter { $0.elementType == .cell }.flatMap { cell in
+                            cell.children.filter { $0.elementType == .button }.map { (cell.frame, $0) }
+                        }
+                        if choices.map({ $0.1.label }) == options {
+                            for (rowFrame, button) in choices where button.label == label && button.isEnabled {
+                                candidates.append(TaskNativeMenuOptionGeometry(frame: button.frame, ancestorFrames: frames + [rowFrame]))
+                            }
+                        }
+                    }
+                    pending.append(contentsOf: snapshot.children.map { ($0, frames) })
+                }
+                lastSample = "matchingButtons=\(matches) matchingMenus=\(candidates.count) geometry=\(String(describing: candidates.first))"
+                guard ProcessInfo.processInfo.systemUptime < deadline, matches == 1, candidates.count == 1,
+                      let current = candidates.first, current.isVisible else { previous = nil; return false }
+                let stable = previous == current
+                previous = current
+                return stable
+            } catch {
+                lastSample = "snapshotError=\(error)"
+                previous = nil
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
+        }
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+            recordTaskInteraction(app, detail: "Native picker option has no stable visible menu row: \(label); \(lastSample)")
+            XCTFail("Native picker menu did not settle: \(label); \(lastSample)", file: file, line: line)
+            return
+        }
+        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, keyboardRequirement: TaskControlKeyboardRequirement = .none, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
         var lastSampleReads = "not sampled"
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, deadline: deadline, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
@@ -191,14 +247,14 @@ extension XCTestCase {
                 let application = try measured("app.snapshot") { try app.snapshot() }
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
-                if requiresVisibleKeyboard, snapshot.identifier.hasPrefix("dismiss-") {
+                if keyboardRequirement == .visible || keyboardRequirement == .dismissal && snapshot.identifier.hasPrefix("dismiss-") {
                     let keyboard = try? measured("keyboard.snapshot") { try app.keyboards.firstMatch.snapshot() }
                     sample.keyboardFrames = keyboard.map { [$0.frame] } ?? []
                     if let keyboard, !keyboard.frame.isEmpty,
                        let assistant = self.taskSnapshot("inputAssistantView", in: application) {
                         sample.keyboardFrames?.append(assistant.frame)
                     }
-                    print("Keyboard dismissal sample: id=\(snapshot.identifier) \(sample.diagnostic)")
+                    print("Keyboard layout sample: id=\(snapshot.identifier) \(sample.diagnostic)")
                 }
             } catch {
                 sample.snapshotError = String(describing: error)

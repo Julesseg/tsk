@@ -448,3 +448,34 @@ import Testing
         }
     }
 }
+
+@Suite struct TaskNativeMenuGeometryProof {
+    @Test func recordedPhoneAndPadMenuRowsAreInsideTheirVisiblePanels() {
+        for (window, panel, collection, row) in [
+            (CGRect(x: 0, y: 0, width: 440, height: 956), CGRect(x: 150, y: 354, width: 250, height: 188), CGRect(x: 150, y: 354, width: 250, height: 956), CGRect(x: 150, y: 406, width: 250, height: 42)),
+            (CGRect(x: 0, y: 0, width: 1376, height: 1032), CGRect(x: 722, y: 468, width: 224, height: 168), CGRect(x: 722, y: 468, width: 224, height: 1032), CGRect(x: 722, y: 514, width: 224, height: 38)),
+        ] {
+            #expect(TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: [window, panel, collection, row]).isVisible)
+        }
+    }
+
+    @Test func oversizedCollectionBoundsCannotAdmitAClippedMenuRow() {
+        let window = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let panel = CGRect(x: 722, y: 468, width: 224, height: 168)
+        let collection = CGRect(x: 722, y: 468, width: 224, height: 1032)
+        let hiddenRow = CGRect(x: 722, y: 640, width: 224, height: 38)
+        #expect(collection.contains(hiddenRow))
+        #expect(!TaskNativeMenuOptionGeometry(frame: hiddenRow, ancestorFrames: [window, panel, collection, hiddenRow]).isVisible)
+    }
+
+    @Test func missingInvalidAndOffWindowMenuGeometryIsRejected() {
+        let window = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let row = CGRect(x: 722, y: 514, width: 224, height: 38)
+        #expect(!TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: []).isVisible)
+        for invalid in [CGRect.zero, CGRect.null, CGRect.infinite, CGRect(x: CGFloat.nan, y: 0, width: 224, height: 38)] {
+            #expect(!TaskNativeMenuOptionGeometry(frame: invalid, ancestorFrames: [window]).isVisible)
+            #expect(!TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: [window, invalid]).isVisible)
+        }
+        #expect(!TaskNativeMenuOptionGeometry(frame: row.offsetBy(dx: 1376, dy: 0), ancestorFrames: [window]).isVisible)
+    }
+}

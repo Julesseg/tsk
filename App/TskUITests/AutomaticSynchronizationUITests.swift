@@ -53,12 +53,15 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         server.tap()
         server.typeText("http://127.0.0.1:1")
         let client = app.textFields["sync-client-id"]
-        client.tap()
+        tapTaskControlAtCenter(client, app: app, requiresVisibleKeyboard: true)
         client.typeText("6F88CFF9-4727-4699-8B5E-EE6D530498E4")
         let secret = app.secureTextFields["sync-encryption-secret"]
-        secret.tap()
+        tapTaskControlAtCenter(secret, app: app, requiresVisibleKeyboard: true)
         secret.typeText("isolated-ui-test-secret")
-        app.buttons["save-sync-connection"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-sync-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        tapTaskControlAtCenter(app.buttons["save-sync-connection"], app: app)
+        XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
         app.navigationBars.buttons["Done"].tap()
         XCTAssertFalse(app.staticTexts["task-sync-error"].exists)

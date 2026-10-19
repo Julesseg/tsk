@@ -16,6 +16,18 @@ struct TaskControlReadinessGeometry {
     let containmentFrame: CGRect
 }
 
+struct TaskNativeMenuOptionGeometry: Equatable {
+    let frame: CGRect
+    let ancestorFrames: [CGRect]
+
+    var isVisible: Bool {
+        func valid(_ frame: CGRect) -> Bool {
+            !frame.isNull && !frame.isInfinite && frame.minX.isFinite && frame.minY.isFinite && frame.maxX.isFinite && frame.maxY.isFinite && frame.width > 0 && frame.height > 0
+        }
+        return valid(frame) && !ancestorFrames.isEmpty && ancestorFrames.allSatisfy { valid($0) && $0.contains(frame) }
+    }
+}
+
 struct TaskControlReadinessSample {
     var exists: Bool?
     var enabled: Bool?

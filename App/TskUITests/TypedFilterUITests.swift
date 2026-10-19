@@ -35,7 +35,7 @@ final class TypedFilterUITests: XCTestCase {
         for (current, value) in [("high", "mid"), ("mid", "high")] {
             tapTaskControl(rating.staticTexts[current], app: app)
             let option = app.buttons[value]
-            tapTaskMenuItem(option, app: app)
+            tapTaskPickerOption(value, options: ["high", "mid", "low", "Unset"], app: app)
             XCTAssertTrue(option.waitForNonExistence(timeout: 5), "Rating menu did not dismiss after selecting \(value)")
             XCTAssertTrue(rating.staticTexts[value].exists, "Rating did not become \(value)")
         }
