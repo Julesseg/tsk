@@ -38,9 +38,14 @@ class SelectionTests(unittest.TestCase):
     def test_keyboard_diagnostics_keep_existing_state_and_transport_checks_on_both_devices(self):
         for family in ("iPhone", "iPad"):
             selected = selection.selected_methods(selection.selection("keyboard", family))
-            self.assertEqual(len(selected), 6)
+            self.assertEqual(len(selected), 11 if family == "iPhone" else 9)
             self.assertIn("TskUITests/CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable", selected)
             self.assertIn("TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback", selected)
+            self.assertIn("TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer", selected)
+            self.assertIn("TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations", selected)
+            self.assertIn("TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen", selected)
+            self.assertEqual("TskUITests/TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday" in selected, family == "iPhone")
+            self.assertEqual("TskUITests/TskUITests/testOrganizationProjectViewsAndListActionsPersist" in selected, family == "iPhone")
 
     def test_renamed_tests_fail_instead_of_silently_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):

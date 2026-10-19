@@ -2,6 +2,25 @@ import CoreGraphics
 import Testing
 
 @Suite struct TaskRevealScrollDirectionProof {
+    @Test func observedDependencyButtonMustClearForegroundTabBar() {
+        let visible = CGRect(x: 0, y: 0, width: 440, height: 956)
+        let button = CGRect(x: 20, y: 888.7, width: 400, height: 52)
+        let tabBar = CGRect(x: 0, y: 873, width: 440, height: 83)
+        let body = TaskRevealVisibleBody(visibleFrame: visible, top: 124, keyboardFrame: nil, bottomInsetFrame: nil, tabBarFrame: tabBar)
+        #expect(body.bottom == 865)
+        #expect(!body.contains(midY: button.midY))
+        var direction = TaskRevealScrollDirection(initialScrollUp: false)
+        let scrollUp = direction.update(targetMidY: button.midY, bottom: body.bottom)
+        #expect(scrollUp)
+        #expect(body.contains(frame: button.offsetBy(dx: 0, dy: -250)))
+        let modal = CGRect(x: 0, y: 72, width: 440, height: 720)
+        #expect(TaskRevealVisibleBody.lowerInsetFrame(tabBar, in: modal) == nil)
+        let keyboard = CGRect(x: 0, y: 653, width: 440, height: 245)
+        let inset = CGRect(x: 0, y: 620, width: 440, height: 36)
+        let editing = TaskRevealVisibleBody(visibleFrame: visible, top: 124, keyboardFrame: keyboard, bottomInsetFrame: inset, tabBarFrame: tabBar)
+        #expect(editing.bottom == 612)
+    }
+
     @Test func observedAppsRowMustClearFloatingSettingsSearchBeforeActivation() {
         let visible = CGRect(x: 0, y: 0, width: 440, height: 956)
         let apps = CGRect(x: 20, y: 833.666667, width: 400, height: 52)

@@ -106,8 +106,7 @@ final class TskUITests: XCTestCase {
         app.buttons["edit-task"].tap()
         let editedProject = app.textFields["task-project"]
         XCTAssertTrue(editedProject.waitForExistence(timeout: 5))
-        editedProject.doubleTap()
-        editedProject.typeText("Work.sub")
+        replaceTaskText(editedProject, with: "Work.sub", app: app)
         XCTAssertEqual(editedProject.value as? String, "Work.sub")
         app.buttons["task-priority"].tap()
         app.buttons["Low"].tap()

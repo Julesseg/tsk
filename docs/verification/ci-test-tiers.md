@@ -13,7 +13,7 @@ does not create that server task.
 | Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
 | Full | All 55 declared methods | 45-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
-| Keyboard diagnostics | Existing 6-method subset | Same 6-method subset | Manual `ui_suite=keyboard` |
+| Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
@@ -40,7 +40,9 @@ checks reject renamed selectors and empty UI selections.
 
 Keyboard diagnostics retain native command delivery, installed Share capture,
 Calendar failure capture, workspace creation, view ordering and automatic-sync
-failure recovery. This focused manual selection uses the smoke time limits and
+failure recovery. They also exercise annotation creation, real-server connection
+entry and typed rating menus on both families, plus dependency navigation and
+project text replacement on iPhone. This focused manual selection uses the smoke time limits and
 does not change PR or nightly coverage. Keyboard-dismissal admission requires a
 visible software keyboard, a control outside its occupied area, and two stable
 geometry samples within the existing 20-second control deadline.
@@ -48,6 +50,13 @@ Its distinct check names prevent the focused subset from satisfying the
 canonical XCUITest branch-protection checks.
 Its separate concurrency group allows diagnostics to run alongside full coverage;
 repeated keyboard dispatches replace only the earlier keyboard run.
+
+Native keyboard cases prepare the runner container in the background at case
+start, with a 30-second discovery cap. Each request still keeps its original
+12-second deadline and five-second dispatch reservation. A discovered path is
+only cached for its device, runner bundle and process after checking the exact
+owner, attempt and nonce request file; every subsequent request is checked too.
+Outstanding discovery children are cancelled, reaped and recorded on exit.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.

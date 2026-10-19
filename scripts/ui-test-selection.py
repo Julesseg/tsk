@@ -43,6 +43,13 @@ KEYBOARD = (
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
     "ShareCaptureUITests",
     "AutomaticSynchronizationUITests",
+    "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
+    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+)
+PHONE_KEYBOARD = (
+    "TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday",
+    "TskUITests/testOrganizationProjectViewsAndListActionsPersist",
 )
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 
@@ -75,7 +82,7 @@ def selected_methods(filters):
 
 def selection(suite, family):
     if suite == "keyboard":
-        tests = KEYBOARD
+        tests = KEYBOARD + (PHONE_KEYBOARD if family == "iPhone" else ())
     elif suite == "diagnostic":
         if family != "iPhone":
             raise ValueError("Diagnostic coverage requires iPhone")

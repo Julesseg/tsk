@@ -353,7 +353,11 @@ extension XCTestCase {
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
             let keyboardFrame = snapshots.first { $0.elementType == .keyboard }?.frame
             let insetFrame = bottomInset.flatMap { $0.exists ? $0.frame : nil }
-            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboardFrame, bottomInsetFrame: insetFrame)
+            let tabBarFrame = app.tabBars.allElementsBoundByIndex.compactMap { item -> CGRect? in
+                guard item.exists, item.isHittable else { return nil }
+                return TaskRevealVisibleBody.lowerInsetFrame(item.frame, in: visible)
+            }.min { $0.minY < $1.minY }
+            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboardFrame, bottomInsetFrame: insetFrame, tabBarFrame: tabBarFrame)
             let bottom = body.bottom
             guard visible.width > 0, bottom - top > 60 else { break }
             var targetMidY: CGFloat?

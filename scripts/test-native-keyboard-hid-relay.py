@@ -148,6 +148,53 @@ class ProtocolTests(unittest.TestCase):
 
 
 class RunTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pending_preparation_keeps_processing_abort_and_reaps_lookup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, stop = root / 'live.log', root / 'owned.sock', root / 'stop'
+            log.touch()
+            socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(root / 'relay.json'), stop_file=str(stop))
+            armed, started, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            observed = []
+            async def send(events):
+                observed.append(events)
+            async def lookup(udid, value, receipt, deadline):
+                entry = dict(status=None, reaped=False)
+                receipt.setdefault('containerLookups', []).append(entry)
+                started.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    entry.update(status=-9, reaped=True)
+                    cancelled.set()
+            original_save = relay.save_receipt
+            def save(path, value):
+                original_save(path, value)
+                if value['state'] == 'waiting':
+                    armed.set()
+            with mock.patch.object(relay, 'make_sender', return_value=send), mock.patch.object(relay, 'container_for', side_effect=lookup), mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay, 'save_receipt', side_effect=save):
+                task = asyncio.create_task(relay.run(args))
+                try:
+                    await asyncio.wait_for(armed.wait(), 1)
+                    with log.open('ab', buffering=0) as writer:
+                        writer.write(boundary(relay.CASE) + b'\n')
+                    await asyncio.wait_for(started.wait(), 1)
+                    with log.open('ab', buffering=0) as writer:
+                        writer.write(relay.ABORT + json.dumps(request()).encode() + b'\n')
+                    with self.assertRaisesRegex(ValueError, 'Runner aborted'):
+                        await asyncio.wait_for(task, 1)
+                finally:
+                    if not task.done():
+                        task.cancel()
+                        await asyncio.gather(task, return_exceptions=True)
+            self.assertTrue(cancelled.is_set())
+            self.assertEqual(observed, [])
+            receipt = json.loads((root / 'relay.json').read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertEqual(receipt['containerLookups'][0]['status'], -9)
+            self.assertTrue(receipt['containerLookups'][0]['reaped'])
+
     async def test_overlap_already_in_same_log_batch_cannot_receive_ack_or_dispatch(self):
         with tempfile.TemporaryDirectory() as directory:
             root=pathlib.Path(directory); log=root/'live.log'; log.touch(); socket=root/'owned.sock';socket.touch(); stop=root/'stop'
@@ -310,6 +357,142 @@ class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(processes[0].returncode)
         self.assertTrue(receipt['containerLookups'][0]['reaped'])
         self.assertEqual(receipt['containerLookups'][0]['failure'], 'ValueError')
+
+
+class RunnerContainerTests(unittest.IsolatedAsyncioTestCase):
+    def write_request(self, root, value):
+        location = root / 'Documents/TSKHID' / value['owner'] / value['attempt']
+        location.mkdir(parents=True, exist_ok=True)
+        (location / (value['request'] + '.request.json')).write_text(json.dumps(value))
+
+    async def test_slow_preparation_finishes_before_request_without_spending_its_dispatch_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            clock = 100.0
+            release = asyncio.Event()
+            async def lookup(*args, **kwargs):
+                await release.wait()
+                return root
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', side_effect=lookup) as discover, mock.patch.object(relay, 'time', SimpleNamespace(monotonic=lambda: clock, time=lambda: clock)):
+                await containers.start_case(relay.CASE)
+                clock += 9
+                release.set()
+                await containers.lookup
+                value = request()
+                value['expiresAt'] = clock + 12
+                self.write_request(root, value)
+                exchange = await containers.exchange(value, deadline=clock + 12)
+                exchange.close()
+                self.assertEqual(discover.call_args.kwargs['deadline'], 135)
+                self.assertEqual(discover.await_count, 1)
+
+    async def test_pending_preparation_cannot_extend_an_early_request_deadline(self):
+        cancelled = asyncio.Event()
+        async def lookup(*args, **kwargs):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        containers = relay.RunnerContainers('owned-udid', {})
+        self.addAsyncCleanup(containers.close)
+        with mock.patch.object(relay, 'container_for', side_effect=lookup), mock.patch.object(relay, 'time', SimpleNamespace(time=time.time, monotonic=lambda: 100.0)):
+            await containers.start_case(relay.CASE)
+            with self.assertRaises(TimeoutError):
+                await containers.exchange(request(), deadline=105.02)
+        self.assertTrue(cancelled.is_set())
+        self.assertEqual(containers.verified, {})
+
+    async def test_same_runner_reuses_verified_path_but_checks_each_case_request_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, return_value=root) as discover:
+                await containers.start_case(relay.CASE)
+                first = request()
+                self.write_request(root, first)
+                exchange = await containers.exchange(first, deadline=time.monotonic() + 12)
+                exchange.close()
+                second = request(relay.ANNOTATIONS, 'secondNoteCommandN')
+                second['attempt'] = str(uuid.uuid4())
+                self.write_request(root, second)
+                exchange = await containers.exchange(second, deadline=time.monotonic() + 12)
+                exchange.close()
+                second['request'] = str(uuid.uuid4())
+                second['owner'] = str(uuid.uuid4())
+                with self.assertRaises(FileNotFoundError):
+                    await containers.exchange(second, deadline=time.monotonic() + 12)
+                self.assertEqual(discover.await_count, 2)
+
+    async def test_changed_runner_pid_uses_fresh_case_discovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            old, new = root / 'old', root / 'new'
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[old, new]) as discover:
+                for pid, case, location in [(1234, relay.CASE, old), (1235, relay.ANNOTATIONS, new)]:
+                    await containers.start_case(case)
+                    value = request(case, next(iter(relay.CHORDS[case])))
+                    value['runnerPID'] = pid
+                    self.write_request(location, value)
+                    exchange = await containers.exchange(value, deadline=time.monotonic() + 12)
+                    exchange.close()
+                self.assertEqual(discover.await_count, 2)
+                self.assertEqual(containers.verified[('owned-udid', relay.RUNNER, 1235)], new)
+
+    async def test_missing_candidate_refreshes_only_within_original_request_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            stale, current = root / 'stale', root / 'current'
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            value = request()
+            self.write_request(current, value)
+            deadline = time.monotonic() + 12
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[stale, current]) as discover:
+                await containers.start_case(relay.CASE)
+                exchange = await containers.exchange(value, deadline=deadline)
+                exchange.close()
+                self.assertEqual(discover.await_count, 2)
+                self.assertEqual(discover.call_args.kwargs['deadline'], deadline)
+
+    async def test_mismatched_candidate_request_is_rejected_without_refresh_or_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            value = request()
+            self.write_request(root, dict(value, runnerPID=4321))
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, return_value=root) as discover:
+                await containers.start_case(relay.CASE)
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    await containers.exchange(value, deadline=time.monotonic() + 12)
+                self.assertEqual(discover.await_count, 1)
+                self.assertEqual(containers.verified, {})
+
+    async def test_cancelled_preparation_kills_and_reaps_discovery_child(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        started = asyncio.Event()
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', 'import time;time.sleep(60)', **kwargs)
+            processes.append(process)
+            started.set()
+            return process
+        receipt = {}
+        containers = relay.RunnerContainers('owned-udid', receipt)
+        self.addAsyncCleanup(containers.close)
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+            await containers.start_case(relay.CASE)
+            await asyncio.wait_for(started.wait(), 5)
+            await containers.close()
+        self.assertIsNotNone(processes[0].returncode)
+        self.assertTrue(receipt['containerLookups'][0]['reaped'])
+        self.assertEqual(receipt['containerLookups'][0]['failure'], 'CancelledError')
 
 
 class FileAndMappingTests(unittest.TestCase):
