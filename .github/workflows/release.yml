@@ -28,7 +28,7 @@ concurrency:
 jobs:
   build:
     name: Build signed .ipa
-    runs-on: macos-15
+    runs-on: xcode-27
     # Exposed so the deploy job can no-op when signing isn't configured yet.
     outputs:
       configured: ${{ steps.preflight.outputs.configured }}
@@ -55,11 +55,11 @@ jobs:
             echo "::notice title=Release skipped::Signing secrets not set — skipping the installable build. See README.md to enable it."
           fi
 
-      - name: Select latest stable Xcode
+      - name: Select Xcode 27
         if: steps.preflight.outputs.configured == 'true'
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: "27.0"
 
       # Import the distribution certificate into a throwaway keychain that lives
       # only for this run — the GitHub-hosted runner starts clean every time.
