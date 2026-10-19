@@ -12,12 +12,15 @@ final class TaskNotificationUITests: XCTestCase {
         let midnight = app.buttons["notification-fixture-midnight"]
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=true hour=9 minute=0", timeout: 15))
+        let toggle = app.switches["notification-midnight-enabled"]
+        reveal(toggle, in: app, towardsTop: true)
         setDateSwitch("notification-midnight-enabled", to: false, app: app, in: "notification-settings-form")
         let save = app.buttons["notification-save-preferences"]
         reveal(save, in: app, towardsTop: true); tapTaskControlAtCenter(save, app: app)
         reveal(midnight, in: app); midnight.tap()
         XCTAssertTrue(wait(app.staticTexts["notification-fixture-result"], prefix: "MIDNIGHT enabled=false", timeout: 15))
         capture("Disabled midnight replacement updates actual registration without changing task dates", app)
+        reveal(toggle, in: app, towardsTop: true)
         setDateSwitch("notification-midnight-enabled", to: true, app: app, in: "notification-settings-form")
         reveal(save, in: app, towardsTop: true); tapTaskControlAtCenter(save, app: app)
         let register = app.buttons["notification-fixture-register"]
