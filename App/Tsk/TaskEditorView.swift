@@ -43,7 +43,10 @@ struct TaskEditorView: View {
                 if focusedField != nil {
                     HStack {
                         Spacer()
-                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { focusedField = nil }
+                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") {
+                            TaskUIBoundaryDiagnostics.event("editor.keyboard.dismiss", details: ["focusedField": String(describing: focusedField)])
+                            focusedField = nil
+                        }
                             .accessibilityIdentifier("dismiss-editor-keyboard")
                     }
                     .padding(.horizontal)

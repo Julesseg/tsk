@@ -105,10 +105,9 @@ extension XCTestCase {
             let started = ProcessInfo.processInfo.systemUptime
             guard started < deadline else { return false }
             do {
-                let application = try app.snapshot()
-                guard let form = taskSnapshot(containerID, in: application),
-                      let snapshot = taskSnapshot(identifier, type: .switch, in: form) else {
-                    lastSample = "Switch absent from application snapshot"
+                let form = try app.collectionViews[containerID].firstMatch.snapshot()
+                guard let snapshot = taskSnapshot(identifier, type: .switch, in: form) else {
+                    lastSample = "Switch absent from form snapshot"
                     return false
                 }
                 let value = snapshot.value
@@ -157,9 +156,9 @@ extension XCTestCase {
     }
 
     func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, file: file, line: line) { geometry in
+        activateTaskControl(element, app: app, useApplicationFrame: true, file: file, line: line) { geometry in
             let frame = geometry.elementFrame
-            let appFrame = app.frame
+            let appFrame = geometry.containmentFrame
             app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
                 dx: frame.midX - appFrame.minX,
                 dy: frame.midY - appFrame.minY
@@ -175,7 +174,7 @@ extension XCTestCase {
         tapTaskButton(element, app: app, file: file, line: line)
     }
 
-    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, useApplicationFrame: Bool = false, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
         var lastSampleReads = "not sampled"
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, deadline: deadline, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
@@ -197,6 +196,27 @@ extension XCTestCase {
                 let application = try measured("app.snapshot") { try app.snapshot() }
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
+                if useApplicationFrame, snapshot.identifier.hasPrefix("dismiss-") {
+                    guard let visible = self.taskSnapshot(snapshot.identifier, type: snapshot.elementType, in: application) else {
+                        sample.snapshotError = "Keyboard dismissal control absent from application snapshot"
+                        return sample
+                    }
+                    sample.elementFrame = visible.frame
+                    if ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1" {
+                        let publicFrame = measured("element.frame") { element.frame }
+                        let dynamicPoint = measured("element.center") { element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).screenPoint }
+                        let metadata = "Keyboard dismissal geometry: id=\(snapshot.identifier) isolatedFrame=\(snapshot.frame) elementFrame=\(publicFrame) applicationDescendantFrame=\(visible.frame) applicationFrame=\(application.frame) dynamicCenter=\(dynamicPoint) requestedCenter=\(visible.frame.midX),\(visible.frame.midY)"
+                        print(metadata)
+                        let attachment = XCTAttachment(string: metadata)
+                        attachment.name = "Keyboard dismissal geometry"
+                        attachment.lifetime = .keepAlways
+                        self.add(attachment)
+                        let screenshot = XCTAttachment(screenshot: app.screenshot())
+                        screenshot.name = "Before keyboard dismissal"
+                        screenshot.lifetime = .keepAlways
+                        self.add(screenshot)
+                    }
+                }
             } catch {
                 sample.snapshotError = String(describing: error)
             }
