@@ -59,7 +59,11 @@ separate check names and a separate concurrency group. They do not change smoke,
 full or keyboard selections or satisfy canonical branch-protection checks.
 
 One owned relay process performs the fixed UP-only initialization and then arms
-the live log using the same sender. The owner allows 30 seconds from child launch
+the live log using the same client context. Client connection setup and the UP-only
+RPC share the initialization budget; later commands reuse that context instead of
+opening a client connection within each dispatch budget. Dispatch failure retains
+the existing UP-only cleanup before the context closes, with no command replay or
+added reconnect loop. The owner allows 30 seconds from child launch
 for initialization and 10 seconds from its recorded completion for arming.
 Sticky initialization proof survives the transition to waiting; both admissions
 validate the owned relay PID, companion PID, session token, device and socket.

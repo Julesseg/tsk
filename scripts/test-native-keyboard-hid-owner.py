@@ -298,7 +298,14 @@ class InitializationTests(unittest.IsolatedAsyncioTestCase):
     async def test_up_only_rpc_keeps_recovery_budget_and_separate_initialization_budget(self):
         releases = ((40, 'UP'), (227, 'UP'))
         send = mock.AsyncMock()
-        make_sender = mock.Mock(return_value=send)
+        closed = []
+        @contextlib.asynccontextmanager
+        async def connected():
+            try:
+                yield send
+            finally:
+                closed.append(True)
+        make_sender = mock.Mock(side_effect=lambda socket: connected())
         relay = SimpleNamespace(make_sender=make_sender, RELEASES=releases)
         spec = SimpleNamespace(loader=SimpleNamespace(exec_module=lambda module: None))
         socket = mock.Mock()
@@ -312,6 +319,7 @@ class InitializationTests(unittest.IsolatedAsyncioTestCase):
                 send.assert_awaited_with(((40, 'UP'), (227, 'UP')))
                 self.assertEqual(bounded.call_args.kwargs['timeout'], timeout)
         self.assertEqual(send.await_count, 2)
+        self.assertEqual(len(closed), 2)
         make_sender.assert_called_with(str(socket))
 
     async def test_cli_initialization_uses_thirty_seconds_and_recovery_still_uses_five(self):

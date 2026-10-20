@@ -416,7 +416,10 @@ async def release_only(socket, timeout=5, case_name=None, phase=None):
     relay = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(relay)
     events = relay.RELEASES if case_name is None and phase is None else relay.releases(relay.CHORDS[case_name][phase])
-    await asyncio.wait_for(relay.make_sender(str(socket))(events), timeout=timeout)
+    async def release():
+        async with relay.make_sender(str(socket)) as send:
+            await send(events)
+    await asyncio.wait_for(release(), timeout=timeout)
     print('Owned UP-only RPC completed ' + repr(events) + '; native key state remains unverified', flush=True)
 
 

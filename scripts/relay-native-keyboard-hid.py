@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from contextlib import AsyncExitStack, asynccontextmanager
 import importlib.metadata
 import json
 import logging
@@ -226,25 +227,30 @@ async def dispatch_chord(send, events=CHORD):
     except BaseException as error:
         cleanup = asyncio.create_task(asyncio.wait_for(send(releases(events)), timeout=5))
         try:
-            await asyncio.shield(cleanup)
+            while not cleanup.done():
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    continue
+            cleanup.result()
             error.add_note('HID UP cleanup RPC completed; native key state remains unverified')
         except BaseException as cleanup_error:
             error.add_note('HID UP cleanup unconfirmed: ' + repr(cleanup_error))
         raise
 
 
-def make_sender(socket):
+@asynccontextmanager
+async def make_sender(socket):
     if importlib.metadata.version('fb-idb') != '1.7.3':
         raise ValueError('Pinned fb-idb 1.7.3 is required')
     from idb.common.types import DomainSocketAddress, HIDDirection, HIDKey, HIDPress
     from idb.grpc.client import Client
 
-    async def send(events):
-        presses = [HIDPress(action=HIDKey(keycode=code), direction=getattr(HIDDirection, direction)) for code, direction in events]
-        async with Client.build(address=DomainSocketAddress(path=socket), logger=logging.getLogger('owned-native-hid'), exchange_metadata=False) as client:
+    async with Client.build(address=DomainSocketAddress(path=socket), logger=logging.getLogger('owned-native-hid'), exchange_metadata=False) as client:
+        async def send(events):
+            presses = [HIDPress(action=HIDKey(keycode=code), direction=getattr(HIDDirection, direction)) for code, direction in events]
             await client.send_events(presses)
-
-    return send
+        yield send
 
 
 def save_receipt(path, receipt):
@@ -414,11 +420,15 @@ async def run(args):
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, task.cancel)
     containers = RunnerContainers(args.udid, receipt)
+    connections = AsyncExitStack()
     try:
         if not stat.S_ISSOCK(pathlib.Path(args.socket).stat().st_mode):
             raise ValueError('Explicit companion address must be a Unix socket')
-        send = make_sender(args.socket)
-        await asyncio.wait_for(send(RELEASES), timeout=30)
+        async def initialize():
+            send = await connections.enter_async_context(make_sender(args.socket))
+            await send(RELEASES)
+            return send
+        send = await asyncio.wait_for(initialize(), timeout=30)
         receipt['initialization'] = dict(state='up_only_rpc_completed_native_assertions_required', events=RELEASES, completedMonotonic=time.monotonic())
         save_receipt(receipt_path, receipt)
         with ArmedLog(args.log, args.relay_token) as log:
@@ -493,8 +503,14 @@ async def run(args):
             receipt.update(state='failed', discoveryCleanupError=repr(error))
             raise
         finally:
-            loop.remove_signal_handler(signal.SIGTERM)
-            save_receipt(receipt_path, receipt)
+            try:
+                await asyncio.wait_for(connections.aclose(), timeout=5)
+            except BaseException as error:
+                receipt.update(state='failed', connectionCleanupError=repr(error))
+                raise
+            finally:
+                loop.remove_signal_handler(signal.SIGTERM)
+                save_receipt(receipt_path, receipt)
 
 
 def parse_args():
