@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import importlib.util
 import json
+import math
 import os
 import pathlib
 import signal
@@ -97,23 +98,39 @@ class Host:
                 raise TimeoutError('Owned companion socket exceeded 30 seconds')
             await asyncio.sleep(0.02)
 
-    async def wait_initialized(self, process):
-        status = await asyncio.wait_for(process.wait(), timeout=30)
-        if status:
-            raise RuntimeError('UP-only transport initialization failed with status ' + str(status))
-
-    async def wait_armed(self, path, relay, token, companion_pid):
-        deadline = time.monotonic() + 10
+    async def wait_relay(self, path, relay, binding, deadline, phase):
         while True:
-            receipt = read_receipt(path)
-            if receipt.get('state') == 'waiting':
-                if receipt.get('relayToken') != token or receipt.get('companionPID') != companion_pid or receipt.get('logStartOffset') != 0:
-                    raise ValueError('Relay waiting receipt does not match this owner')
-                return receipt
             if relay.returncode is not None:
-                raise RuntimeError('Fixed relay exited before arming')
+                raise RuntimeError('Owned relay exited before ' + phase)
             if time.monotonic() >= deadline:
-                raise TimeoutError('Relay arming exceeded 10 seconds')
+                raise TimeoutError('Relay ' + phase + ' exceeded its original deadline')
+            receipt = read_receipt(path)
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Relay ' + phase + ' exceeded its original deadline')
+            if receipt:
+                if any(receipt.get(key) != value for key, value in binding.items()):
+                    raise ValueError('Relay startup receipt does not match this owner')
+                if receipt.get('state') == 'failed':
+                    raise RuntimeError('Owned relay failed before ' + phase)
+                if receipt.get('state') not in ('preparing', 'waiting'):
+                    raise ValueError('Relay startup receipt has an unexpected state')
+                initialization = receipt.get('initialization', {})
+                if initialization:
+                    completed = initialization.get('completedMonotonic')
+                    if initialization.get('state') != 'up_only_rpc_completed_native_assertions_required' or initialization.get('events') != [[40, 'UP'], [227, 'UP']] or type(completed) not in (int, float) or not math.isfinite(completed) or not 0 < completed <= time.monotonic():
+                        raise ValueError('Relay initialization proof is invalid')
+                    if phase == 'initialization':
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError('Relay initialization exceeded its original deadline')
+                        return receipt
+                    if receipt.get('state') == 'waiting':
+                        if receipt.get('logStartOffset') != 0:
+                            raise ValueError('Relay waiting receipt has an unexpected log offset')
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError('Relay arming exceeded its original deadline')
+                        return receipt
+                elif receipt.get('state') == 'waiting':
+                    raise ValueError('Relay armed without UP-only initialization proof')
             await asyncio.sleep(0.01)
 
     async def stream(self, process, live, relay=None):
@@ -298,7 +315,7 @@ class Comparison:
         live.touch(exist_ok=False)
         relay_receipt = self.evidence / 'relay-receipt.json'
         stop_file = self.evidence / 'relay.stop'
-        companion = initialization = relay = tests = None
+        companion = relay = tests = None
         status = 70
         try:
             args = [str(self.tools / 'companion/idb_companion'), '--udid', self.udid, '--only', 'simulator', '--grpc-domain-sock', str(self.socket), '--terminate-offline', '1', '--log-hid-details', '1', '--log-level', 'debug']
@@ -306,17 +323,22 @@ class Comparison:
             self.receipt['companion'] = dict(pid=companion.pid, command=args)
             self.save()
             await self.host.wait_socket(self.socket, companion)
-            args = [str(self.tools / 'venv/bin/python'), str(self.scripts / 'with-native-keyboard-hid.py'), '--initialize-transport', '--socket', str(self.socket)]
-            initialization = await self.host.start(args, self.evidence / 'transport-initialization.log')
-            self.receipt['transportInitialization'] = dict(pid=initialization.pid, command=args, timeoutSeconds=30, events=[[40, 'UP'], [227, 'UP']], state='started')
-            self.save()
-            await self.host.wait_initialized(initialization)
-            self.receipt['transportInitialization']['state'] = 'up_only_rpc_completed_native_assertions_required'
-            self.save()
             args = [str(self.tools / 'venv/bin/python'), str(self.scripts / 'relay-native-keyboard-hid.py'), '--log', str(live), '--socket', str(self.socket), '--udid', self.udid, '--companion-pid', str(companion.pid), '--relay-token', self.token, '--receipt', str(relay_receipt), '--stop-file', str(stop_file)]
+            initialization_deadline = time.monotonic() + 30
             relay = await self.host.start(args, self.evidence / 'relay.log')
             self.receipt['relay'] = dict(pid=relay.pid, command=args)
-            self.receipt['armed'] = await self.host.wait_armed(relay_receipt, relay, self.token, companion.pid)
+            self.receipt['transportInitialization'] = dict(pid=relay.pid, timeoutSeconds=30, deadlineMonotonic=initialization_deadline, events=[[40, 'UP'], [227, 'UP']], state='started')
+            self.save()
+            binding = dict(udid=self.udid, socket=str(self.socket), companionPID=companion.pid, relayPID=relay.pid, relayToken=self.token)
+            initialized = await self.host.wait_relay(relay_receipt, relay, binding, initialization_deadline, 'initialization')
+            self.receipt['transportInitialization']['state'] = 'up_only_rpc_completed_native_assertions_required'
+            self.receipt['transportInitialization']['completedMonotonic'] = initialized['initialization']['completedMonotonic']
+            self.save()
+            arming_deadline = initialized['initialization']['completedMonotonic'] + 10
+            binding['initialization'] = initialized['initialization']
+            self.receipt['armed'] = await self.host.wait_relay(relay_receipt, relay, binding, arming_deadline, 'arming')
+            if companion.returncode is not None or relay.returncode is not None:
+                raise RuntimeError('Owned transport process exited before XCTest launch')
             environment = dict(os.environ, TEST_RUNNER_TSK_TEST_HID_RELAY_TOKEN=self.token, TEST_RUNNER_TSK_TEST_HID_DRIVER='1')
             self.receipt['runnerEnvironmentAdded'] = {'TEST_RUNNER_TSK_TEST_HID_RELAY_TOKEN': self.token, 'TEST_RUNNER_TSK_TEST_HID_DRIVER': '1'}
             self.save()
@@ -341,7 +363,7 @@ class Comparison:
             status = status or 70
             self.receipt['error'] = repr(error)
         finally:
-            cleanup_task = asyncio.create_task(self._cleanup(tests, relay, initialization, companion, live, relay_receipt, status))
+            cleanup_task = asyncio.create_task(self._cleanup(tests, relay, companion, live, relay_receipt, status))
             try:
                 status = await asyncio.shield(cleanup_task)
             except asyncio.CancelledError:
@@ -353,8 +375,8 @@ class Comparison:
                 self.save()
         return status
 
-    async def _cleanup(self, tests, relay, initialization, companion, live, relay_receipt, status):
-        for name, process in [('tests', tests), ('relay', relay), ('initialization', initialization), ('publicQuery', getattr(self.host, 'query_process', None))]:
+    async def _cleanup(self, tests, relay, companion, live, relay_receipt, status):
+        for name, process in [('tests', tests), ('relay', relay), ('publicQuery', getattr(self.host, 'query_process', None))]:
             if process is not None:
                 try:
                     self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')

@@ -6,6 +6,7 @@ import json
 import importlib.util
 import pathlib
 import tempfile
+import time
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -66,31 +67,30 @@ class FakeHost:
         self.evidence, self.fail, self.code = evidence, fail, code
         self.marked, self.complete, self.passed = marked, complete, passed
         self.events, self.environments = [], []
+        self.admissions = []
+        self.processes = {}
 
     async def start(self, command, log, environment=None, pipe=False):
         kind = 'companion' if command[0].endswith('idb_companion') else 'relay' if 'relay-native-keyboard-hid.py' in command[1] else 'initialization' if '--initialize-transport' in command else 'tests'
         self.events.append('start:' + kind)
         self.environments.append(environment)
-        return FakeProcess(kind, 100 + len(self.events))
+        process = FakeProcess(kind, 100 + len(self.events))
+        self.processes[kind] = process
+        return process
 
     async def wait_socket(self, socket, process):
         self.events.append('socket')
         if self.fail == 'socket':
             raise RuntimeError('companion unavailable')
 
-    async def wait_initialized(self, process):
-        self.events.append('initialized')
-        if self.fail == 'initialization':
-            raise RuntimeError('transport initialization failed')
-        if self.fail == 'initialization-cancel':
+    async def wait_relay(self, path, relay, binding, deadline, phase):
+        self.admissions.append((phase, deadline))
+        self.events.append('initialized' if phase == 'initialization' else 'armed')
+        if self.fail == phase or self.fail == 'armed' and phase == 'arming':
+            raise RuntimeError('relay unavailable during ' + phase)
+        if self.fail == phase + '-cancel':
             raise asyncio.CancelledError()
-        process.returncode = 0
-
-    async def wait_armed(self, path, relay, token, companion_pid):
-        self.events.append('armed')
-        if self.fail == 'armed':
-            raise RuntimeError('relay unavailable')
-        return dict(state='waiting', relayToken=token, companionPID=companion_pid, logStartOffset=0)
+        return dict(binding, state='waiting', logStartOffset=0, initialization=binding.get('initialization', dict(state='up_only_rpc_completed_native_assertions_required', events=[[40, 'UP'], [227, 'UP']], completedMonotonic=owner.time.monotonic())))
 
     async def stream(self, process, live, relay=None):
         self.events.append('stream')
@@ -139,25 +139,27 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
     async def test_waiting_precedes_test_start_nonce_forwarding_and_owned_cleanup(self):
         status, host, receipt = await self.run_case()
         self.assertEqual(status, 0)
-        self.assertLess(host.events.index('socket'), host.events.index('start:initialization'))
-        self.assertLess(host.events.index('initialized'), host.events.index('start:relay'))
+        self.assertLess(host.events.index('socket'), host.events.index('start:relay'))
+        self.assertLess(host.events.index('start:relay'), host.events.index('initialized'))
+        self.assertNotIn('start:initialization', host.events)
+        self.assertEqual(receipt['transportInitialization']['pid'], receipt['relay']['pid'])
         self.assertLess(host.events.index('armed'), host.events.index('start:tests'))
         self.assertEqual(receipt['transportInitialization']['events'], [[40, 'UP'], [227, 'UP']])
         self.assertEqual(receipt['transportInitialization']['timeoutSeconds'], 30)
         self.assertEqual(receipt['transportInitialization']['state'], 'up_only_rpc_completed_native_assertions_required')
         self.assertEqual(host.environments[-1]['TEST_RUNNER_TSK_TEST_HID_RELAY_TOKEN'], 'A2A514F2-FE63-40E1-9A42-B097CB8E9F23')
         self.assertEqual(host.environments[-1]['TEST_RUNNER_TSK_TEST_HID_DRIVER'], '1')
-        self.assertEqual(host.events[-4:], ['stop:tests', 'stop:relay', 'stop:initialization', 'stop:companion'])
+        self.assertEqual(host.events[-3:], ['stop:tests', 'stop:relay', 'stop:companion'])
         self.assertTrue(receipt['selectedOriginalCasesPassed'])
 
     async def test_socket_and_arm_failure_never_launch_test_and_reap_only_started_children(self):
-        for fail in ['socket', 'initialization', 'initialization-cancel', 'armed']:
+        for fail in ['socket', 'initialization', 'initialization-cancel', 'armed', 'arming-cancel']:
             status, host, _ = await self.run_case(fail=fail, marked=False, complete=False)
-            self.assertEqual(status, 130 if fail == 'initialization-cancel' else 70)
-            self.assertEqual('stop:initialization' in host.events, fail != 'socket')
+            self.assertEqual(status, 130 if fail.endswith('-cancel') else 70)
+            self.assertNotIn('stop:initialization', host.events)
             self.assertNotIn('start:tests', host.events)
             self.assertEqual(host.events[-1], 'stop:companion')
-            self.assertEqual('stop:relay' in host.events, fail == 'armed')
+            self.assertEqual('stop:relay' in host.events, fail != 'socket')
             self.assertNotIn('UP-only', host.events)
 
     async def test_test_failure_is_preserved_and_rpc_completion_is_not_public_pass(self):
@@ -182,7 +184,7 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
         status, host, receipt = await self.run_case(fail='group-cleanup')
         self.assertEqual(status, 70)
         self.assertIn('testsCleanupError', receipt)
-        self.assertEqual(host.events[-3:], ['stop:relay', 'stop:initialization', 'stop:companion'])
+        self.assertEqual(host.events[-2:], ['stop:relay', 'stop:companion'])
 
     async def test_unconfirmed_up_recovery_never_reports_success(self):
         status, host, receipt = await self.run_case(fail='recovery', complete=False)
@@ -192,35 +194,106 @@ class OwnershipTests(unittest.IsolatedAsyncioTestCase):
 
 
 class InitializationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_initialization_wait_is_bounded_and_nonzero_exit_cannot_arm(self):
+    async def test_same_child_has_thirty_seconds_to_initialize_and_ten_from_completion_to_arm(self):
+        with tempfile.TemporaryDirectory() as root:
+            evidence = pathlib.Path(root) / 'evidence'
+            host = FakeHost(evidence)
+            comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', pathlib.Path(root), evidence, pathlib.Path(root) / 'owned.sock', COMMAND, host=host)
+            with mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: 100)):
+                self.assertEqual(await comparison.run(), 0)
+            self.assertEqual(host.admissions, [('initialization', 130), ('arming', 110)])
+            self.assertEqual(set(host.processes), {'companion', 'relay', 'tests'})
+
+    async def test_exited_relay_or_companion_after_admission_never_launches_tests(self):
+        for name in ('relay', 'companion'):
+            with self.subTest(process=name), tempfile.TemporaryDirectory() as root:
+                evidence = pathlib.Path(root) / 'evidence'
+
+                class ExitedHost(FakeHost):
+                    async def wait_relay(self, path, relay, binding, deadline, phase):
+                        receipt = await super().wait_relay(path, relay, binding, deadline, phase)
+                        if phase == 'arming':
+                            self.processes[name].returncode = 0
+                        return receipt
+
+                host = ExitedHost(evidence)
+                comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', pathlib.Path(root), evidence, pathlib.Path(root) / 'owned.sock', COMMAND, host=host)
+                self.assertEqual(await comparison.run(), 70)
+                self.assertNotIn('start:tests', host.events)
+                self.assertEqual(host.events[-2:], ['stop:relay', 'stop:companion'])
+
+    async def test_waiting_receipt_preserves_initialization_when_parent_misses_the_transition(self):
         with tempfile.TemporaryDirectory() as root:
             host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
-            wait_for = asyncio.wait_for
-            for status in [0, 1]:
-                process = SimpleNamespace(wait=mock.AsyncMock(return_value=status))
-                with mock.patch.object(owner.asyncio, 'wait_for', wraps=wait_for) as bounded:
-                    if status:
-                        with self.assertRaisesRegex(RuntimeError, 'initialization failed'):
-                            await host.wait_initialized(process)
-                    else:
-                        await host.wait_initialized(process)
-                self.assertEqual(bounded.call_args.kwargs['timeout'], 30)
+            binding = dict(relayToken='owned', relayPID=123, companionPID=456, udid='device', socket='/tmp/owned.sock')
+            proof = dict(state='up_only_rpc_completed_native_assertions_required', events=[[40, 'UP'], [227, 'UP']], completedMonotonic=100)
+            receipt = dict(binding, state='waiting', initialization=proof, logStartOffset=0)
+            with mock.patch.object(owner, 'read_receipt', return_value=receipt), mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: 101)):
+                initialized = await host.wait_relay(path, SimpleNamespace(returncode=None), binding, 130, 'initialization')
+                armed = await host.wait_relay(path, SimpleNamespace(returncode=None), dict(binding, initialization=proof), 110, 'arming')
+            self.assertEqual(initialized, armed)
+            changed = dict(receipt, initialization=dict(proof, completedMonotonic=100.5))
+            with mock.patch.object(owner, 'read_receipt', return_value=changed), mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: 101)):
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    await host.wait_relay(path, SimpleNamespace(returncode=None), dict(binding, initialization=proof), 110, 'arming')
+
+    async def test_foreign_failed_exited_or_uninitialized_receipts_are_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            binding = dict(relayToken='owned', relayPID=123, companionPID=456, udid='device', socket='/tmp/owned.sock')
+            proof = dict(state='up_only_rpc_completed_native_assertions_required', events=[[40, 'UP'], [227, 'UP']], completedMonotonic=100)
+            valid = dict(binding, state='waiting', initialization=proof, logStartOffset=0)
+            rejected = [dict(valid, **{key: 'foreign'}) for key in binding]
+            rejected += [dict(valid, state='failed'), dict(valid, initialization={}), dict(valid, logStartOffset=1)]
+            rejected += [dict(valid, initialization=dict(proof, completedMonotonic=value)) for value in (True, float('nan'), float('inf'), 102)]
+            rejected += [dict(valid, initialization=dict(proof, events=[[40, 'DOWN'], [227, 'UP']]))]
+            for receipt in rejected:
+                with self.subTest(receipt=receipt), mock.patch.object(owner, 'read_receipt', return_value=receipt), mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: 101)):
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        await host.wait_relay(path, SimpleNamespace(returncode=None), binding, 110, 'arming')
+            for status in (0, 1):
+                with mock.patch.object(owner, 'read_receipt', return_value=valid):
+                    with self.assertRaisesRegex(RuntimeError, 'exited'):
+                        await host.wait_relay(path, SimpleNamespace(returncode=status), binding, time.monotonic() + 30, 'initialization')
+
+    async def test_startup_polling_and_late_receipt_cannot_reset_absolute_phase_deadlines(self):
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            binding = dict(relayToken='owned', relayPID=123)
+            proof = dict(state='up_only_rpc_completed_native_assertions_required', events=[[40, 'UP'], [227, 'UP']], completedMonotonic=100)
+            for phase, deadline, receipt in [('initialization', 130, {}), ('arming', 110, dict(binding, state='preparing', initialization=proof))]:
+                clock = 100
+                async def tick(seconds):
+                    nonlocal clock
+                    clock += 1
+                with self.subTest(phase=phase), mock.patch.object(owner, 'read_receipt', return_value=receipt), mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: clock)), mock.patch.object(owner.asyncio, 'sleep', side_effect=tick):
+                    with self.assertRaises(TimeoutError):
+                        await host.wait_relay(path, SimpleNamespace(returncode=None), binding, deadline, phase)
+                    self.assertEqual(clock, deadline)
+            clock = 100
+            def late(path):
+                nonlocal clock
+                clock = 131
+                return dict(binding, state='waiting', initialization=proof, logStartOffset=0)
+            with mock.patch.object(owner, 'read_receipt', side_effect=late), mock.patch.object(owner, 'time', SimpleNamespace(monotonic=lambda: clock)):
+                with self.assertRaises(TimeoutError):
+                    await host.wait_relay(path, SimpleNamespace(returncode=None), binding, 130, 'initialization')
 
     async def test_initialization_deadline_stops_owned_process_before_companion(self):
         with tempfile.TemporaryDirectory() as root:
             evidence = pathlib.Path(root) / 'evidence'
 
             class TimedOutHost(FakeHost):
-                async def wait_initialized(self, process):
+                async def wait_relay(self, path, relay, binding, deadline, phase):
                     raise TimeoutError('Transport initialization exceeded 30 seconds')
 
             host = TimedOutHost(evidence)
             comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', pathlib.Path(root), evidence, pathlib.Path(root) / 'owned.sock', COMMAND, host=host)
             self.assertEqual(await comparison.run(), 124)
-            self.assertNotIn('start:relay', host.events)
+            self.assertIn('start:relay', host.events)
             self.assertNotIn('start:tests', host.events)
-            self.assertEqual(host.events[-2:], ['stop:initialization', 'stop:companion'])
-            self.assertTrue(comparison.receipt['initializationCleanup']['reaped'])
+            self.assertEqual(host.events[-2:], ['stop:relay', 'stop:companion'])
+            self.assertTrue(comparison.receipt['relayCleanup']['reaped'])
 
     async def test_up_only_rpc_keeps_recovery_budget_and_separate_initialization_budget(self):
         releases = ((40, 'UP'), (227, 'UP'))
@@ -279,12 +352,12 @@ class CleanupCancellationTests(unittest.IsolatedAsyncioTestCase):
                     result = None
                 self.assertTrue(waiting_for_cleanup, 'Owner must await cleanup settlement after its first cancellation')
                 self.assertEqual(result, interrupt_status)
-                self.assertEqual(host.events[-5:], ['stop:tests', 'stop:relay', 'stop:initialization', 'UP-only', 'stop:companion'])
+                self.assertEqual(host.events[-4:], ['stop:tests', 'stop:relay', 'UP-only', 'stop:companion'])
                 receipt = json.loads((evidence / 'owner-receipt.json').read_text())
                 self.assertEqual(receipt['status'], interrupt_status)
                 self.assertTrue(receipt['testsCleanup']['reaped'])
                 self.assertTrue(receipt['relayCleanup']['reaped'])
-                self.assertTrue(receipt['initializationCleanup']['reaped'])
+                self.assertNotIn('initializationCleanup', receipt)
                 self.assertTrue(receipt['companionCleanup']['reaped'])
                 self.assertIn('upOnlyRecovery', receipt)
 

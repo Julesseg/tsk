@@ -58,6 +58,15 @@ They use the smoke time limits,
 separate check names and a separate concurrency group. They do not change smoke,
 full or keyboard selections or satisfy canonical branch-protection checks.
 
+One owned relay process performs the fixed UP-only initialization and then arms
+the live log using the same sender. The owner allows 30 seconds from child launch
+for initialization and 10 seconds from its recorded completion for arming.
+Sticky initialization proof survives the transition to waiting; both admissions
+validate the owned relay PID, companion PID, session token, device and socket.
+XCTest starts only after both phases succeed and both processes remain alive.
+UP-only initialization does not establish native input acceptance. Existing
+request, dispatch and recovery limits remain unchanged.
+
 Native keyboard cases prepare the runner container in the background at case
 start, with a 30-second discovery cap. Each request still keeps its original
 12-second deadline and five-second dispatch reservation. A discovered path is

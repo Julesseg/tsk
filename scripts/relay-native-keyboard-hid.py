@@ -408,7 +408,7 @@ async def run(args):
     with receipt_path.open('x'):
         pass
     protocol = Protocol(args.relay_token)
-    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayToken=args.relay_token, cases=protocol.cases, exchanges=[])
+    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayPID=os.getpid(), relayToken=args.relay_token, cases=protocol.cases, exchanges=[])
     save_receipt(receipt_path, receipt)
     task = asyncio.current_task()
     loop = asyncio.get_running_loop()
@@ -418,6 +418,9 @@ async def run(args):
         if not stat.S_ISSOCK(pathlib.Path(args.socket).stat().st_mode):
             raise ValueError('Explicit companion address must be a Unix socket')
         send = make_sender(args.socket)
+        await asyncio.wait_for(send(RELEASES), timeout=30)
+        receipt['initialization'] = dict(state='up_only_rpc_completed_native_assertions_required', events=RELEASES, completedMonotonic=time.monotonic())
+        save_receipt(receipt_path, receipt)
         with ArmedLog(args.log, args.relay_token) as log:
             receipt.update(state='waiting', logStartOffset=log.start_offset)
             save_receipt(receipt_path, receipt)
