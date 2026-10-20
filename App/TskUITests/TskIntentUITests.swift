@@ -6,12 +6,13 @@ final class TskIntentUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Captured through native intent"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["Captured through native intent"].waitForExistence(timeout: 20))
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_DESCRIPTION")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["Captured through native intent"].waitForExistence(timeout: 15))
-        app.buttons["task-shortcuts"].tap()
-        XCTAssertTrue(app.navigationBars["Shortcuts and Siri"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["task-shortcuts"].exists)
     }
 }

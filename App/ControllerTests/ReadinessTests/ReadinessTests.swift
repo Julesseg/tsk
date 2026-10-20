@@ -380,6 +380,56 @@ import Testing
                                                   elementFrame: CGRect(origin: CGPoint(x: CGFloat.infinity, y: 70), size: CGSize(width: 80, height: 30)), appFrame: appFrame)
         #expect(nonfinite.diagnostic.contains("inf"))
     }
+
+    @Test func keyboardDismissalRejectsTheObservedPendingLayoutBeforeOneStableAction() {
+        let clock = Clock()
+        let screen = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let keyboard = CGRect(x: 0, y: 589, width: 1376, height: 440)
+        var current = TaskControlReadinessSample(exists: true, enabled: true, hittable: true,
+            elementFrame: CGRect(x: 818.5, y: 775, width: 143.5, height: 22.5), appFrame: screen, keyboardFrames: [])
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: { current })
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .keyboardUnavailable)
+        current.keyboardFrames = [keyboard]
+        clock.now = 1
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .keyboardCoveringControl)
+        current.elementFrame = CGRect(x: 818.5, y: 503.5, width: 143.5, height: 22.5)
+        clock.now = 2
+        #expect(!attempt.evaluate())
+        #expect(attempt.failureReason == .changingKeyboardLayout)
+        clock.now = 3
+        #expect(attempt.evaluate())
+        var actions = 0
+        #expect(attempt.finish(waitCompleted: true) { _ in actions += 1 })
+        #expect(actions == 1)
+    }
+
+    @Test func unavailableKeyboardAndInputAssistantCannotAdmitDismissal() {
+        for frames in [[], [.zero], [.infinite], [CGRect(x: 0, y: 900, width: 400, height: 300)],
+                       [CGRect(x: 0, y: 900, width: 400, height: 300), CGRect(x: 20, y: 530, width: 400, height: 300)],
+                       [CGRect(x: 20, y: 530, width: 400, height: 300), CGRect(x: 20, y: 60, width: 400, height: 50)]] as [[CGRect]] {
+            var current = sample()
+            current.keyboardFrames = frames
+            let attempt = TaskControlReadinessAttempt(now: { 0 }, sample: { current })
+            #expect(!attempt.evaluate())
+            #expect(!attempt.evaluate())
+            #expect(!attempt.finish(waitCompleted: true) { _ in Issue.record("A missing or covering keyboard must not admit dismissal") })
+        }
+    }
+
+    @Test func changingKeyboardLayoutCannotExtendTheOriginalDeadline() {
+        let clock = Clock()
+        var current = sample()
+        current.keyboardFrames = [CGRect(x: 20, y: 530, width: 400, height: 300)]
+        let attempt = TaskControlReadinessAttempt(now: { clock.now }, sample: { current })
+        clock.now = 19
+        #expect(!attempt.evaluate())
+        clock.now = 20
+        #expect(!attempt.evaluate())
+        #expect(!attempt.finish(waitCompleted: true) { _ in Issue.record("Stable geometry after the deadline must not activate") })
+        #expect(attempt.failureReason == .deadlineExpired)
+    }
 }
 
 @Suite struct TaskSwitchValueProof {
@@ -396,5 +446,36 @@ import Testing
             #expect(!TaskSwitchValue.matches(value, enabled: false))
             #expect(!TaskSwitchValue.matches(value, enabled: true))
         }
+    }
+}
+
+@Suite struct TaskNativeMenuGeometryProof {
+    @Test func recordedPhoneAndPadMenuRowsAreInsideTheirVisiblePanels() {
+        for (window, panel, collection, row) in [
+            (CGRect(x: 0, y: 0, width: 440, height: 956), CGRect(x: 150, y: 354, width: 250, height: 188), CGRect(x: 150, y: 354, width: 250, height: 956), CGRect(x: 150, y: 406, width: 250, height: 42)),
+            (CGRect(x: 0, y: 0, width: 1376, height: 1032), CGRect(x: 722, y: 468, width: 224, height: 168), CGRect(x: 722, y: 468, width: 224, height: 1032), CGRect(x: 722, y: 514, width: 224, height: 38)),
+        ] {
+            #expect(TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: [window, panel, collection, row]).isVisible)
+        }
+    }
+
+    @Test func oversizedCollectionBoundsCannotAdmitAClippedMenuRow() {
+        let window = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let panel = CGRect(x: 722, y: 468, width: 224, height: 168)
+        let collection = CGRect(x: 722, y: 468, width: 224, height: 1032)
+        let hiddenRow = CGRect(x: 722, y: 640, width: 224, height: 38)
+        #expect(collection.contains(hiddenRow))
+        #expect(!TaskNativeMenuOptionGeometry(frame: hiddenRow, ancestorFrames: [window, panel, collection, hiddenRow]).isVisible)
+    }
+
+    @Test func missingInvalidAndOffWindowMenuGeometryIsRejected() {
+        let window = CGRect(x: 0, y: 0, width: 1376, height: 1032)
+        let row = CGRect(x: 722, y: 514, width: 224, height: 38)
+        #expect(!TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: []).isVisible)
+        for invalid in [CGRect.zero, CGRect.null, CGRect.infinite, CGRect(x: CGFloat.nan, y: 0, width: 224, height: 38)] {
+            #expect(!TaskNativeMenuOptionGeometry(frame: invalid, ancestorFrames: [window]).isVisible)
+            #expect(!TaskNativeMenuOptionGeometry(frame: row, ancestorFrames: [window, invalid]).isVisible)
+        }
+        #expect(!TaskNativeMenuOptionGeometry(frame: row.offsetBy(dx: 1376, dy: 0), ancestorFrames: [window]).isVisible)
     }
 }

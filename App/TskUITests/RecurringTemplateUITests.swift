@@ -41,6 +41,7 @@ final class RecurringTemplateUITests: XCTestCase {
         capture("Saved recurring template with explicit generator dependency", app)
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["No unfinished tasks"].waitForExistence(timeout: 10))
         openTemplates(app)
         XCTAssertTrue(app.staticTexts["Review recurring work"].waitForExistence(timeout: 10))
@@ -65,6 +66,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.tap()
@@ -76,7 +78,7 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 10))
         description.tap()
         description.typeText(" occurrence edit")
-        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         app.buttons["save-task"].tap()
         XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 10))
         XCTAssertTrue(app.staticTexts["task-detail-description"].label.contains("occurrence edit"))
@@ -94,6 +96,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertFalse(row.waitForExistence(timeout: 2))
         openTemplates(app)
         app.collectionViews["recurring-template-list"].buttons["recurring-template-" + parentID].tap()
@@ -118,6 +121,7 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.tap()
@@ -135,20 +139,18 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         return app
     }
 
     private func openTemplates(_ app: XCUIApplication) {
-        let button = app.buttons["recurring-templates"]
-        if !button.isHittable { XCTAssertTrue(revealTaskElement(button, in: "workspace-sidebar", app: app)) }
-        button.tap()
+        openWorkspaceSetting("recurring-templates", app: app)
         XCTAssertTrue(app.buttons["new-recurring-template"].waitForExistence(timeout: 10))
     }
 
     private func hideKeyboard(_ app: XCUIApplication) {
         let hide = app.buttons["dismiss-recurring-keyboard"]
-        if hide.exists { hide.tap() }
+        if hide.exists { tapTaskControlAtCenter(hide, app: app) }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

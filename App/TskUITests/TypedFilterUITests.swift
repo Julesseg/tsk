@@ -12,8 +12,8 @@ final class TypedFilterUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
@@ -35,14 +35,14 @@ final class TypedFilterUITests: XCTestCase {
         for (current, value) in [("high", "mid"), ("mid", "high")] {
             tapTaskControl(rating.staticTexts[current], app: app)
             let option = app.buttons[value]
-            tapTaskMenuItem(option, app: app)
+            tapTaskPickerOption(value, options: ["high", "mid", "low", "Unset"], app: app)
             XCTAssertTrue(option.waitForNonExistence(timeout: 5), "Rating menu did not dismiss after selecting \(value)")
             XCTAssertTrue(rating.staticTexts[value].exists, "Rating did not become \(value)")
         }
         tapTaskControl(app.buttons["save-advanced-attributes"], app: app)
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
         if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
-        openViews(app, isPad: isPad)
+        openViews(app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -55,6 +55,7 @@ final class TypedFilterUITests: XCTestCase {
         dismissKeyboard("dismiss-filter-keyboard", app: app)
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         XCTAssertTrue(app.buttons["save-custom-view"].waitForNonExistence(timeout: 10))
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(taskRow(named: "Typed view task", app: app).waitForExistence(timeout: 10))
         capture("Typed numeric and configured-order result", app: app)
         taskRow(named: "Typed view task", app: app).tap()
@@ -71,10 +72,10 @@ final class TypedFilterUITests: XCTestCase {
         capture("Valid numeric edit removes result from saved expression", app: app)
         app.terminate()
         app.launch()
-        openViews(app, isPad: isPad)
+        openViews(app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
-        saved.tap()
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("Typed definitions and saved filter after relaunch", app: app)
     }
@@ -87,8 +88,8 @@ final class TypedFilterUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
@@ -99,7 +100,7 @@ final class TypedFilterUITests: XCTestCase {
         app.buttons["Medium"].tap()
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(taskRow(named: "Computed urgency task", app: app).waitForExistence(timeout: 10))
-        openViews(app, isPad: isPad)
+        openViews(app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -115,6 +116,7 @@ final class TypedFilterUITests: XCTestCase {
         replaceExpression("urgency + 1 > 4.9 and +PENDING", app: app)
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         XCTAssertTrue(app.buttons["save-custom-view"].waitForNonExistence(timeout: 10))
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(taskRow(named: "Computed urgency task", app: app).waitForExistence(timeout: 10))
         capture("Default Float urgency arithmetic selects Medium priority", app: app)
         taskRow(named: "Computed urgency task", app: app).tap()
@@ -129,15 +131,16 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         app.terminate()
         app.launch()
-        openViews(app, isPad: isPad)
+        openViews(app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
-        saved.swipeLeft()
+        openSavedViewOptions(app)
         app.buttons["Edit"].firstMatch.tap()
         XCTAssertTrue(app.textViews["raw-filter-expression"].waitForExistence(timeout: 5))
         replaceExpression("(urgency + 1 > 2.7) and +PENDING", app: app)
         tapTaskControl(app.buttons["save-custom-view"], app: app)
         XCTAssertTrue(app.buttons["save-custom-view"].waitForNonExistence(timeout: 10))
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(taskRow(named: "Computed urgency task", app: app).waitForExistence(timeout: 10))
         capture("Edited arithmetic definition survives relaunch and updates membership", app: app)
         taskRow(named: "Computed urgency task", app: app).tap()
@@ -192,7 +195,7 @@ final class TypedFilterUITests: XCTestCase {
     }
 
     private func dismissKeyboard(_ identifier: String, app: XCUIApplication) {
-        tapTaskControl(app.buttons[identifier], app: app)
+        tapTaskControlAtCenter(app.buttons[identifier], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
@@ -202,10 +205,8 @@ final class TypedFilterUITests: XCTestCase {
         XCTAssertTrue(app.buttons["manage-attribute-definitions"].waitForExistence(timeout: 5))
     }
 
-    private func openViews(_ app: XCUIApplication, isPad: Bool) {
-        if isPad { XCTAssertTrue(revealTaskElement(app.buttons["custom-views"], in: "workspace-sidebar", app: app)) }
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+    private func openViews(_ app: XCUIApplication) {
+        openWorkspaceSetting("custom-views", app: app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

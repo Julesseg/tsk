@@ -10,6 +10,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Automation dates and completion"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 20))
         let row = taskRow(named: "Automation dates and completion", app: app)
         let id = try XCTUnwrap(UUID(uuidString: String(row.identifier.dropFirst(5)))).uuidString
@@ -19,7 +20,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_INTENT_ACTION"] = "planned"
         app.launchEnvironment["TSK_TEST_INTENT_DATE"] = "1792224000"
         app.launch()
-        choose("Upcoming", sidebar: "upcoming", app: app)
+        choose("Upcoming", app: app)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-planned-", id)).firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-deadline-", id)).firstMatch.exists)
         capture("Planned day changed through native intent", app)
@@ -27,23 +28,23 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_INTENT_ACTION"] = "deadline"
         app.launchEnvironment["TSK_TEST_INTENT_DATE"] = "1792314000"
         app.launch()
-        choose("Upcoming", sidebar: "upcoming", app: app)
+        choose("Upcoming", app: app)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-planned-", id)).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-deadline-", id)).firstMatch.exists)
         capture("Independent planned day and deadline from native intents", app)
         app.terminate()
         app.launchEnvironment["TSK_TEST_INTENT_ACTION"] = "complete"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
-        choose("Unfinished", sidebar: "unfinished", app: app)
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
+        choose("All", app: app)
         XCTAssertFalse(taskRow(named: "Automation dates and completion", app: app).exists)
-        choose("Completed", sidebar: "completed", app: app)
+        choose("Done", app: app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 10))
         capture("Native completion visible in completed tasks", app)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_ACTION")
         app.launch()
-        choose("Completed", sidebar: "completed", app: app)
+        choose("Done", app: app)
         XCTAssertTrue(taskRow(named: "Automation dates and completion", app: app).waitForExistence(timeout: 10))
     }
 
@@ -52,6 +53,7 @@ final class TaskAutomationUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Keep after rejected action"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Keep after rejected action", app: app).waitForExistence(timeout: 20))
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_DESCRIPTION")
@@ -63,13 +65,14 @@ final class TaskAutomationUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_ACTION")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Keep after rejected action", app: app).waitForExistence(timeout: 15))
     }
 
-    private func choose(_ title: String, sidebar: String, app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
-        if app.buttons["sidebar-view-" + sidebar].exists { app.buttons["sidebar-view-" + sidebar].tap() }
-        else { app.segmentedControls.buttons[title].tap() }
+    private func choose(_ title: String, app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
+        if title == "Done" { selectDoneTasks(app) }
+        else { app.tabBars.buttons[title].tap() }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from contextlib import AsyncExitStack, asynccontextmanager
 import importlib.metadata
 import json
 import logging
@@ -19,6 +20,7 @@ CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCom
 ANNOTATIONS = 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations'
 WORKSPACE = 'iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen'
 RUNNER = 'com.julesseguin.tsk.uitests.xctrunner'
+CONTAINER_PREPARATION_SECONDS = 30
 CHORD = ((227, 'DOWN'), (40, 'DOWN'), (40, 'UP'), (227, 'UP'))
 RELEASES = ((40, 'UP'), (227, 'UP'))
 
@@ -225,25 +227,30 @@ async def dispatch_chord(send, events=CHORD):
     except BaseException as error:
         cleanup = asyncio.create_task(asyncio.wait_for(send(releases(events)), timeout=5))
         try:
-            await asyncio.shield(cleanup)
+            while not cleanup.done():
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    continue
+            cleanup.result()
             error.add_note('HID UP cleanup RPC completed; native key state remains unverified')
         except BaseException as cleanup_error:
             error.add_note('HID UP cleanup unconfirmed: ' + repr(cleanup_error))
         raise
 
 
-def make_sender(socket):
+@asynccontextmanager
+async def make_sender(socket):
     if importlib.metadata.version('fb-idb') != '1.7.3':
         raise ValueError('Pinned fb-idb 1.7.3 is required')
     from idb.common.types import DomainSocketAddress, HIDDirection, HIDKey, HIDPress
     from idb.grpc.client import Client
 
-    async def send(events):
-        presses = [HIDPress(action=HIDKey(keycode=code), direction=getattr(HIDDirection, direction)) for code, direction in events]
-        async with Client.build(address=DomainSocketAddress(path=socket), logger=logging.getLogger('owned-native-hid'), exchange_metadata=False) as client:
+    async with Client.build(address=DomainSocketAddress(path=socket), logger=logging.getLogger('owned-native-hid'), exchange_metadata=False) as client:
+        async def send(events):
+            presses = [HIDPress(action=HIDKey(keycode=code), direction=getattr(HIDDirection, direction)) for code, direction in events]
             await client.send_events(presses)
-
-    return send
+        yield send
 
 
 def save_receipt(path, receipt):
@@ -345,29 +352,96 @@ async def container_for(udid, request, receipt, deadline):
         entry.update(status=process.returncode, reaped=True, finishedMonotonic=time.monotonic())
 
 
+class RunnerContainers:
+    def __init__(self, udid, receipt):
+        self.udid = udid
+        self.receipt = receipt
+        self.lookup = None
+        self.verified = {}
+
+    async def start_case(self, name):
+        await self.close()
+        if name in CHORDS:
+            self.lookup = asyncio.create_task(container_for(self.udid, None, self.receipt, deadline=time.monotonic() + CONTAINER_PREPARATION_SECONDS + 5))
+
+    async def close(self):
+        if self.lookup is not None:
+            task, self.lookup = self.lookup, None
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        if any(not entry.get('reaped') for entry in self.receipt.get('containerLookups', [])):
+            raise RuntimeError('Runner discovery child cleanup remains unconfirmed')
+
+    def open(self, container, request):
+        exchange = Exchange(container, request)
+        try:
+            exchange.verify(time.time())
+            return exchange
+        except BaseException:
+            exchange.close()
+            raise
+
+    async def exchange(self, request, deadline):
+        binding = (self.udid, request['runnerBundleID'], request['runnerPID'])
+        if binding in self.verified:
+            try:
+                return self.open(self.verified[binding], request)
+            except FileNotFoundError:
+                del self.verified[binding]
+        remaining = deadline - time.monotonic() - 5
+        if remaining <= 0:
+            raise ValueError('Runner discovery cannot consume the five-second dispatch reservation')
+        if self.lookup is None:
+            container = await container_for(self.udid, request, self.receipt, deadline=deadline)
+        else:
+            try:
+                container = await asyncio.wait_for(asyncio.shield(self.lookup), timeout=remaining)
+            except BaseException:
+                await self.close()
+                raise
+        try:
+            exchange = self.open(container, request)
+        except FileNotFoundError:
+            container = await container_for(self.udid, request, self.receipt, deadline=deadline)
+            exchange = self.open(container, request)
+        self.verified[binding] = container
+        return exchange
+
+
 async def run(args):
     receipt_path = pathlib.Path(args.receipt)
     with receipt_path.open('x'):
         pass
     protocol = Protocol(args.relay_token)
-    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayToken=args.relay_token, cases=protocol.cases, exchanges=[])
+    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayPID=os.getpid(), relayToken=args.relay_token, cases=protocol.cases, exchanges=[])
     save_receipt(receipt_path, receipt)
     task = asyncio.current_task()
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, task.cancel)
+    containers = RunnerContainers(args.udid, receipt)
+    connections = AsyncExitStack()
     try:
         if not stat.S_ISSOCK(pathlib.Path(args.socket).stat().st_mode):
             raise ValueError('Explicit companion address must be a Unix socket')
-        send = make_sender(args.socket)
+        async def initialize():
+            send = await connections.enter_async_context(make_sender(args.socket))
+            await send(RELEASES)
+            return send
+        send = await asyncio.wait_for(initialize(), timeout=30)
+        receipt['initialization'] = dict(state='up_only_rpc_completed_native_assertions_required', events=RELEASES, completedMonotonic=time.monotonic())
+        save_receipt(receipt_path, receipt)
         with ArmedLog(args.log, args.relay_token) as log:
             receipt.update(state='waiting', logStartOffset=log.start_offset)
             save_receipt(receipt_path, receipt)
-            containers = {}
             while True:
                 lines = log.poll()
                 while lines:
                     raw = lines.pop(0)
+                    previous_case = protocol.active
                     request = protocol.line(raw)
+                    if protocol.active != previous_case:
+                        await containers.start_case(protocol.active)
                     if request is None:
                         continue
                     for following in lines:
@@ -377,10 +451,7 @@ async def run(args):
                     if not 0 < remaining <= 12:
                         raise ValueError('Request is outside its original transport deadline')
                     deadline = time.monotonic() + remaining
-                    binding = (request['caseName'], request['attempt'])
-                    if binding not in containers:
-                        containers[binding] = await container_for(args.udid, request, receipt, deadline=deadline)
-                    exchange = Exchange(containers[binding], request)
+                    exchange = await containers.exchange(request, deadline)
                     try:
                         end = log.path.stat().st_size
                         while log.file.tell() < end:
@@ -426,7 +497,20 @@ async def run(args):
         save_receipt(receipt_path, receipt)
         raise
     finally:
-        loop.remove_signal_handler(signal.SIGTERM)
+        try:
+            await containers.close()
+        except BaseException as error:
+            receipt.update(state='failed', discoveryCleanupError=repr(error))
+            raise
+        finally:
+            try:
+                await asyncio.wait_for(connections.aclose(), timeout=5)
+            except BaseException as error:
+                receipt.update(state='failed', connectionCleanupError=repr(error))
+                raise
+            finally:
+                loop.remove_signal_handler(signal.SIGTERM)
+                save_receipt(receipt_path, receipt)
 
 
 def parse_args():

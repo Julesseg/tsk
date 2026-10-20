@@ -5,8 +5,66 @@ enum TaskTextSelection {
     case commandA
 }
 
+private enum TaskControlKeyboardRequirement {
+    case none, dismissal, visible
+}
+
 @MainActor
 extension XCTestCase {
+    func taskSnapshot(_ identifier: String, type: XCUIElement.ElementType? = nil, in root: any XCUIElementSnapshot) -> (any XCUIElementSnapshot)? {
+        var pending: [any XCUIElementSnapshot] = [root]
+        while let snapshot = pending.popLast() {
+            if snapshot.identifier == identifier, type == nil || snapshot.elementType == type { return snapshot }
+            pending.append(contentsOf: snapshot.children)
+        }
+        return nil
+    }
+
+    func activateSavedWorkspaceView(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
+        guard revealTaskElement(saved, in: "views-list", app: app, file: file, line: line) else { return }
+        let id = String(saved.identifier.dropFirst("saved-view-".count))
+        let add = app.buttons["activate-custom-" + id]
+        if add.exists {
+            if !add.isEnabled {
+                let remove = app.buttons["deactivate-unfinished"]
+                guard revealTaskElement(remove, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
+                tapTaskControl(remove, app: app, file: file, line: line)
+            }
+            guard revealTaskElement(add, in: "views-list", app: app, file: file, line: line) else { return }
+            tapTaskControl(add, app: app, file: file, line: line)
+        }
+        guard revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false, file: file, line: line) else { return }
+        let title = saved.label
+        tapTaskControl(saved, app: app, file: file, line: line)
+        XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 10), file: file, line: line)
+        let tab = app.tabBars.buttons[title]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(tab.isSelected, file: file, line: line)
+    }
+
+    func openSavedViewOptions(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let options = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "view-options-")).firstMatch
+        guard revealTaskElement(options, in: "views-list", app: app, file: file, line: line) else { return }
+        tapTaskControl(options, app: app, file: file, line: line)
+    }
+
+    @discardableResult
+    func revealWorkspaceSetting(_ identifier: String, app: XCUIApplication, initialScrollUp: Bool = true, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let settings = app.collectionViews["workspace-settings-list"]
+        if !settings.exists {
+            let button = app.buttons["workspace-settings"]
+            XCTAssertTrue(button.waitForExistence(timeout: 15), file: file, line: line)
+            tapTaskControl(button, app: app, beforeSample: beforeSample, file: file, line: line)
+        }
+        return revealTaskElement(app.buttons[identifier], in: "workspace-settings-list", app: app, initialScrollUp: initialScrollUp, file: file, line: line)
+    }
+
+    func openWorkspaceSetting(_ identifier: String, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        guard revealWorkspaceSetting(identifier, app: app, beforeSample: beforeSample, file: file, line: line) else { return }
+        tapTaskControl(app.buttons[identifier], app: app, beforeSample: beforeSample, file: file, line: line)
+    }
+
     func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let editor = app.collectionViews[editorID]
         let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !editor.exists && row.exists }, object: nil)
@@ -34,7 +92,7 @@ extension XCTestCase {
         let keyboardDone = app.buttons[keyboardDismissIdentifier]
         if app.keyboards.firstMatch.exists {
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
-            tapTaskControl(keyboardDone, app: app, file: file, line: line)
+            tapTaskControlAtCenter(keyboardDone, app: app, file: file, line: line)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)
         }
         let control = app.collectionViews[containerID].switches[identifier].firstMatch
@@ -43,7 +101,7 @@ extension XCTestCase {
             let thumb = control.switches.firstMatch
             let selected = thumb.exists ? thumb : control
             recordTaskSwitchInteraction(row: control, selected: selected, phase: "before", app: app)
-            tapTaskControl(selected, app: app, file: file, line: line)
+            tapTaskControlAtCenter(selected, app: app, file: file, line: line)
         }
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         var lastSample = "not sampled"
@@ -51,7 +109,11 @@ extension XCTestCase {
             let started = ProcessInfo.processInfo.systemUptime
             guard started < deadline else { return false }
             do {
-                let snapshot = try control.snapshot()
+                let form = try app.collectionViews[containerID].firstMatch.snapshot()
+                guard let snapshot = taskSnapshot(identifier, type: .switch, in: form) else {
+                    lastSample = "Switch absent from form snapshot"
+                    return false
+                }
                 let value = snapshot.value
                 let matches = TaskSwitchValue.matches(value, enabled: enabled)
                 let finished = ProcessInfo.processInfo.systemUptime
@@ -92,20 +154,78 @@ extension XCTestCase {
     }
 
     func tapTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.1)
+        activateTaskControl(element, app: app, deadline: deadline, beforeSample: beforeSample, file: file, line: line) { _ in
+            element.tap()
+        }
+    }
+
+    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, requiresVisibleKeyboard: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { _ in
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
     }
 
     func tapTaskButton(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, file: file, line: line) { element.tap() }
+        activateTaskControl(element, app: app, file: file, line: line) { _ in element.tap() }
     }
 
     func tapTaskMenuItem(_ element: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         tapTaskButton(element, app: app, file: file, line: line)
     }
 
-    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString, line: UInt, action: () -> Void) {
+    func tapTaskPickerOption(_ label: String, options: [String], app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: TaskNativeMenuOptionGeometry?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            do {
+                let application = try app.snapshot()
+                var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
+                var candidates: [TaskNativeMenuOptionGeometry] = []
+                var matches = 0
+                while let (snapshot, ancestors) = pending.popLast() {
+                    let frames = ancestors + [snapshot.frame]
+                    if snapshot.elementType == .button, snapshot.label == label { matches += 1 }
+                    if snapshot.elementType == .collectionView {
+                        let choices = snapshot.children.filter { $0.elementType == .cell }.flatMap { cell in
+                            cell.children.filter { $0.elementType == .button }.map { (cell.frame, $0) }
+                        }
+                        if choices.map({ $0.1.label }) == options {
+                            for (rowFrame, button) in choices where button.label == label && button.isEnabled {
+                                candidates.append(TaskNativeMenuOptionGeometry(frame: button.frame, ancestorFrames: frames + [rowFrame]))
+                            }
+                        }
+                    }
+                    pending.append(contentsOf: snapshot.children.map { ($0, frames) })
+                }
+                lastSample = "matchingButtons=\(matches) matchingMenus=\(candidates.count) geometry=\(String(describing: candidates.first))"
+                guard ProcessInfo.processInfo.systemUptime < deadline, matches == 1, candidates.count == 1,
+                      let current = candidates.first, current.isVisible else { previous = nil; return false }
+                let stable = previous == current
+                previous = current
+                return stable
+            } catch {
+                lastSample = "snapshotError=\(error)"
+                previous = nil
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
+        }
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+            recordTaskInteraction(app, detail: "Native picker option has no stable visible menu row: \(label); \(lastSample)")
+            XCTFail("Native picker menu did not settle: \(label); \(lastSample)", file: file, line: line)
+            return
+        }
+        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, keyboardRequirement: TaskControlKeyboardRequirement = .none, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
         var lastSampleReads = "not sampled"
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, deadline: deadline, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
@@ -127,6 +247,15 @@ extension XCTestCase {
                 let application = try measured("app.snapshot") { try app.snapshot() }
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
+                if keyboardRequirement == .visible || keyboardRequirement == .dismissal && snapshot.identifier.hasPrefix("dismiss-") {
+                    let keyboard = try? measured("keyboard.snapshot") { try app.keyboards.firstMatch.snapshot() }
+                    sample.keyboardFrames = keyboard.map { [$0.frame] } ?? []
+                    if let keyboard, !keyboard.frame.isEmpty,
+                       let assistant = self.taskSnapshot("inputAssistantView", in: application) {
+                        sample.keyboardFrames?.append(assistant.frame)
+                    }
+                    print("Keyboard layout sample: id=\(snapshot.identifier) \(sample.diagnostic)")
+                }
             } catch {
                 sample.snapshotError = String(describing: error)
             }
@@ -138,9 +267,7 @@ extension XCTestCase {
             result = XCTWaiter.wait(for: [ready], timeout: timeout)
             return result == .completed
         }
-        guard attempt.finish(waitCompleted: completed, perform: { _ in
-            action()
-        }) else {
+        guard attempt.finish(waitCompleted: completed, perform: action) else {
             let waiter = result.map { String(describing: $0) } ?? "not entered"
             recordTaskInteraction(app, detail: "Cannot activate \(element); waiter=\(waiter) \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]")
             XCTFail("Control has no valid visible hit area: \(element); \(attempt.diagnostic) lastSampleReads=[\(lastSampleReads)]", file: file, line: line)
@@ -211,28 +338,33 @@ extension XCTestCase {
             }
         }
         element.typeText(XCUIKeyboardKey.delete.rawValue)
-        let cleared = element.value as? String ?? ""
-        guard cleared.isEmpty || cleared == element.placeholderValue else {
+        guard assertTaskText(element, equals: "", file: file, line: line) else {
             recordTaskInteraction(app, detail: "Replacement did not clear \(element)")
-            XCTFail("Text replacement did not clear the previous value: \(cleared)", file: file, line: line)
             return
         }
         if !value.isEmpty { element.typeText(value) }
+        assertTaskText(element, equals: value, file: file, line: line)
+    }
+
+    @discardableResult
+    func assertTaskText(_ element: XCUIElement, equals value: String, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let deadline = ProcessInfo.processInfo.systemUptime + 5
-        func matchesReplacement() -> Bool {
+        func matchesValue() -> Bool {
             let current = element.value as? String ?? ""
             return current == value || value.isEmpty && current == element.placeholderValue
         }
-        var acknowledged = matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+        var acknowledged = matchesValue() && ProcessInfo.processInfo.systemUptime < deadline
         let remaining = deadline - ProcessInfo.processInfo.systemUptime
         if !acknowledged, remaining > 0 {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                ProcessInfo.processInfo.systemUptime < deadline && matchesReplacement() && ProcessInfo.processInfo.systemUptime < deadline
+                ProcessInfo.processInfo.systemUptime < deadline && matchesValue() && ProcessInfo.processInfo.systemUptime < deadline
             }, object: nil)
             acknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
         }
-        XCTAssertTrue(acknowledged, "Text replacement value did not settle within five seconds", file: file, line: line)
-        XCTAssertTrue((element.value as? String ?? "") == value || value.isEmpty && (element.value as? String) == element.placeholderValue, "Text replacement value differs", file: file, line: line)
+        XCTAssertTrue(acknowledged, "Text value did not settle within five seconds", file: file, line: line)
+        let matches = matchesValue()
+        XCTAssertTrue(matches, "Text value differs", file: file, line: line)
+        return acknowledged && matches
     }
 
     @discardableResult
@@ -248,7 +380,7 @@ extension XCTestCase {
             return false
         }
         var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)
-        let pinnedIDs: Set<String> = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
+        let pinnedIDs: Set<String> = ["continuous-reminders-status", "continuous-reminders-paused", "continuous-reminders-result", "continuous-reminders-error", "continuous-reminders-stop", "continuous-reminders-resume-fixture", "continuous-reminders-edit-fixture", "continuous-reminders-fixture-changed", "task-action-banner", "task-editor-error", "series-metadata-error", "transition-error", "annotation-editor-error", "advanced-attributes-error", "filter-error"]
         for step in 0...maximumSteps {
             let application: any XCUIElementSnapshot
             do { application = try app.snapshot() }
@@ -282,7 +414,11 @@ extension XCTestCase {
             let top = max(visible.minY, navigationBottom, pinnedBottom) + 8
             let keyboardFrame = snapshots.first { $0.elementType == .keyboard }?.frame
             let insetFrame = bottomInset.flatMap { $0.exists ? $0.frame : nil }
-            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboardFrame, bottomInsetFrame: insetFrame)
+            let tabBarFrame = app.tabBars.allElementsBoundByIndex.compactMap { item -> CGRect? in
+                guard item.exists, item.isHittable else { return nil }
+                return TaskRevealVisibleBody.lowerInsetFrame(item.frame, in: visible)
+            }.min { $0.minY < $1.minY }
+            let body = TaskRevealVisibleBody(visibleFrame: visible, top: top, keyboardFrame: keyboardFrame, bottomInsetFrame: insetFrame, tabBarFrame: tabBarFrame)
             let bottom = body.bottom
             guard visible.width > 0, bottom - top > 60 else { break }
             var targetMidY: CGFloat?

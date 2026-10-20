@@ -4,6 +4,7 @@ import re
 
 
 PHONE_SMOKE = (
+    "WorkspaceSettingsUITests",
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
     "TskUITests/testDescriptionEditAndCompletionPersistAcrossRelaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
@@ -14,11 +15,13 @@ PHONE_SMOKE = (
     "SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry",
 )
 PAD_SMOKE = (
+    "WorkspaceSettingsUITests",
     "iPadWorkspaceUITests",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
 )
 PAD_FULL = (
+    "WorkspaceSettingsUITests",
     "ShareCaptureUITests", "SynchronizationUITests", "iPadWorkspaceUITests",
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
@@ -32,6 +35,28 @@ DIAGNOSTIC = (
     "ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks",
     "ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory",
     "SpotlightUITests", "WidgetUITests",
+)
+KEYBOARD = (
+    "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
+    "WorkspaceSettingsUITests/testCreationPlacementAndEverySettingsDestination",
+    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
+    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "ShareCaptureUITests",
+    "AutomaticSynchronizationUITests",
+    "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
+    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+)
+PHONE_KEYBOARD = (
+    "TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday",
+    "TskUITests/testOrganizationProjectViewsAndListActionsPersist",
+)
+TEXT = (
+    "ShareCaptureUITests",
+    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
+    "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
+    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
 )
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 
@@ -63,7 +88,11 @@ def selected_methods(filters):
 
 
 def selection(suite, family):
-    if suite == "diagnostic":
+    if suite == "text":
+        tests = TEXT
+    elif suite == "keyboard":
+        tests = KEYBOARD + (PHONE_KEYBOARD if family == "iPhone" else ())
+    elif suite == "diagnostic":
         if family != "iPhone":
             raise ValueError("Diagnostic coverage requires iPhone")
         tests = DIAGNOSTIC
@@ -96,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)

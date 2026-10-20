@@ -35,7 +35,8 @@ struct ReminderImportView: View {
                             Button("View recurring templates") { isShowingTemplates = true }.accessibilityIdentifier("reminders-view-templates")
                         }
                         Button("View copied tasks") {
-                            store.customView = nil; store.projectSelection = .all; store.query = .unfinished
+                            if store.workspaceViews.active.contains(.unfinished) { store.selectWorkspaceView(.unfinished) }
+                            else { store.customView = CustomViewSelection(id: nil, name: "Copied tasks", expression: "status:pending") }
                             dismiss()
                         }.accessibilityIdentifier("reminders-view-tasks")
                     }

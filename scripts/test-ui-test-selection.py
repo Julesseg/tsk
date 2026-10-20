@@ -18,7 +18,7 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        for family, count in (("iPhone", 8), ("iPad", 5)):
+        for family, count in (("iPhone", 13), ("iPad", 10)):
             with self.subTest(family=family):
                 smoke = selection.selected_methods(selection.selection("smoke", family))
                 full = selection.selected_methods(selection.selection("full", family))
@@ -30,10 +30,22 @@ class SelectionTests(unittest.TestCase):
 
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 40)
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 45)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)
+
+    def test_keyboard_diagnostics_keep_existing_state_and_transport_checks_on_both_devices(self):
+        for family in ("iPhone", "iPad"):
+            selected = selection.selected_methods(selection.selection("keyboard", family))
+            self.assertEqual(len(selected), 11 if family == "iPhone" else 9)
+            self.assertIn("TskUITests/CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable", selected)
+            self.assertIn("TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback", selected)
+            self.assertIn("TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer", selected)
+            self.assertIn("TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations", selected)
+            self.assertIn("TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen", selected)
+            self.assertEqual("TskUITests/TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday" in selected, family == "iPhone")
+            self.assertEqual("TskUITests/TskUITests/testOrganizationProjectViewsAndListActionsPersist" in selected, family == "iPhone")
 
     def test_renamed_tests_fail_instead_of_silently_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):
@@ -43,11 +55,26 @@ class SelectionTests(unittest.TestCase):
             with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
                 selection.phases(filters)
 
+    def test_text_diagnostics_cover_editing_share_and_native_transport_without_sync(self):
+        for family in ("iPhone", "iPad"):
+            filters = selection.selection("text", family)
+            selected = selection.selected_methods(filters)
+            self.assertEqual(selected, {
+                "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+                "TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+                "TskUITests/TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
+                "TskUITests/SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
+                "TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+            })
+            self.assertLess(selected, selection.selected_methods(selection.selection("full", family)))
+            self.assertEqual(selection.phases(filters), ["share", "main"])
+            self.assertFalse(selection.requires_sync_peer(filters))
+
     def test_every_canonical_selection_retains_the_required_keyboard_transport_cases(self):
         spec = importlib.util.spec_from_file_location("hid_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone")):
+        for suite, family in (("smoke", "iPhone"), ("smoke", "iPad"), ("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad"), ("text", "iPhone"), ("text", "iPad")):
             with self.subTest(suite=suite, family=family):
                 command = [
                     "xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",

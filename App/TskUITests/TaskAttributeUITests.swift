@@ -12,7 +12,7 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         openDefinitions(app)
         XCTAssertTrue(app.staticTexts["No local attribute definitions"].exists)
         capture("Local definitions empty", app: app)
@@ -22,8 +22,8 @@ final class TaskAttributeUITests: XCTestCase {
             XCTAssertTrue(nameField.waitForExistence(timeout: 5))
             focusTaskText(nameField, app: app)
             nameField.typeText(name)
-            XCTAssertEqual(nameField.value as? String, name)
-            tapTaskControl(app.buttons["dismiss-definition-keyboard"], app: app)
+            assertTaskText(nameField, equals: name)
+            tapTaskControlAtCenter(app.buttons["dismiss-definition-keyboard"], app: app)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
             XCTAssertEqual(nameField.value as? String, name)
             app.buttons["attribute-definition-type"].tap()
@@ -39,7 +39,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-attribute-definition"].waitForNonExistence(timeout: 5))
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         openDefinitions(app)
         for (name, type) in [("note", "String"), ("score", "Numeric"), ("review", "Date"), ("effort", "Duration"), ("reference", "UUID")] {
             let definition = app.buttons["attribute-definition-\(name)"]
@@ -66,8 +66,8 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
         app.launch()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = field("task-description", app: app)
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
@@ -93,6 +93,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["save-advanced-attributes"].waitForNonExistence(timeout: 10))
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Task with local typed values", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Task with local typed values", app: app).tap()
         openAdvanced(app)
@@ -111,6 +112,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Task with local typed values")
         app.terminate()
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Task with local typed values", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Task with local typed values", app: app).tap()
         openAdvanced(app)
@@ -124,7 +126,7 @@ final class TaskAttributeUITests: XCTestCase {
         scoreDefinition.swipeLeft()
         app.buttons["Remove definition"].tap()
         XCTAssertTrue(scoreDefinition.waitForNonExistence(timeout: 10))
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         app.buttons["Cancel"].tap()
         let storedScore = app.descendants(matching: .any).matching(identifier: "raw-attribute-score").firstMatch
         XCTAssertTrue(revealTaskElement(storedScore, in: "task-detail-form", app: app))
@@ -133,11 +135,7 @@ final class TaskAttributeUITests: XCTestCase {
     }
 
     private func openDefinitions(_ app: XCUIApplication) {
-        let definitions = app.buttons["attribute-definitions"]
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(definitions, in: "workspace-sidebar", app: app))
-        } else { tapTaskControl(app.buttons["workspace-more"], app: app) }
-        tapTaskControl(definitions, app: app)
+        openWorkspaceSetting("attribute-definitions", app: app)
         XCTAssertTrue(app.buttons["new-attribute-definition"].waitForExistence(timeout: 5))
     }
 
@@ -157,7 +155,7 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(valueField, in: "advanced-attributes-form", app: app))
         replaceTaskText(valueField, with: value, app: app, selection: .commandA)
         let done = app.buttons["dismiss-attributes-keyboard"]
-        if done.exists { tapTaskControl(done, app: app) }
+        if done.exists { tapTaskControlAtCenter(done, app: app) }
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers advanced attributes")
         XCTAssertEqual(valueField.value as? String, value)
     }

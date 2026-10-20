@@ -76,7 +76,7 @@ final class ReminderRecurrenceUITests: XCTestCase {
             app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_RECURRING_FIXTURE")
             app.launchEnvironment["TSK_TEST_REMINDERS_CLEANUP"] = token
             app.launch()
-            XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
             app.terminate(); self.resetOwnedReminderAuthorization(app, token: token, stage: "recurring-after-cleanup")
             XCUIDevice.shared.orientation = .portrait
         }
@@ -85,16 +85,8 @@ final class ReminderRecurrenceUITests: XCTestCase {
     }
 
     private func open(_ identifier: String, app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(app.buttons[identifier], in: "workspace-sidebar", app: app))
-        } else if identifier != "recurring-templates" { app.buttons["workspace-more"].tap() }
-        let button = app.buttons[identifier]
-        guard button.waitForExistence(timeout: 5) else {
-            XCTFail("The requested task destination must be an actionable button: \(identifier)")
-            return
-        }
-        tapTaskMenuItem(button, app: app)
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        openWorkspaceSetting(identifier, app: app)
     }
 
     private func prepareAndSelect(_ token: String, in container: String, app: XCUIApplication) {

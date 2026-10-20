@@ -18,7 +18,7 @@ final class ReminderImportUITests: XCTestCase {
             app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
             app.launchEnvironment["TSK_TEST_REMINDERS_CLEANUP"] = token
             app.launch()
-            XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
             app.terminate()
             self.resetOwnedReminderAuthorization(app, token: token, stage: "ordinary-after-cleanup")
         }
@@ -33,7 +33,7 @@ final class ReminderImportUITests: XCTestCase {
         let project = app.textFields["reminders-project-" + listName]
         XCTAssertTrue(revealTaskElement(project, in: "reminders-import-form", app: app))
         project.tap(); project.typeKey("a", modifierFlags: .command); project.typeText("Fixture.Reminders")
-        app.buttons["dismiss-reminders-keyboard"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-reminders-keyboard"], app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["reminders-preview"], in: "reminders-import-form", app: app))
         app.buttons["reminders-preview"].tap()
         XCTAssertTrue(app.staticTexts["reminders-preview-count"].waitForExistence(timeout: 20))
@@ -63,6 +63,7 @@ final class ReminderImportUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_REMINDERS_FIXTURE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 15))
         taskRow(named: "Copy fixture H", app: app).tap()
         let notes = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Fixture notes")).firstMatch
@@ -81,25 +82,22 @@ final class ReminderImportUITests: XCTestCase {
         permission(allow: false)
         XCTAssertTrue(app.staticTexts["reminders-error"].waitForExistence(timeout: 10))
         capture("Genuine denied Reminders permission", app)
-        app.buttons["Done"].tap()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        app.navigationBars.buttons["Done"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task after denied Reminders access")
         XCTAssertEqual(description.value as? String, "Task after denied Reminders access")
-        tapTaskControl(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task after denied Reminders access", app: app), timeout: 10))
     }
 
     private func openImport(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(app.buttons["reminders-import"], in: "workspace-sidebar", app: app))
-        } else { app.buttons["workspace-more"].tap() }
-        tapTaskMenuItem(app.buttons["reminders-import"], app: app)
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        openWorkspaceSetting("reminders-import", app: app)
         XCTAssertTrue(app.buttons["reminders-access"].waitForExistence(timeout: 10))
     }
 

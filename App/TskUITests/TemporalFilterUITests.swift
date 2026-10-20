@@ -9,8 +9,8 @@ final class TemporalFilterUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792058400"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 10))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        app.buttons["New task"].tap()
         let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
@@ -18,7 +18,7 @@ final class TemporalFilterUITests: XCTestCase {
         setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.staticTexts["Relative deadline"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
@@ -30,9 +30,9 @@ final class TemporalFilterUITests: XCTestCase {
         expression.typeText("due:today and +READY")
         let done = app.buttons["dismiss-filter-keyboard"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
-        done.tap()
+        tapTaskControlAtCenter(done, app: app)
         app.buttons["save-custom-view"].tap()
-        XCTAssertTrue(app.buttons["active-custom-view"].waitForExistence(timeout: 10))
+        activateSavedWorkspaceView(app)
         XCTAssertTrue(app.staticTexts["Relative deadline"].exists)
         capture("Relative deadline and READY saved view", app: app)
         app.terminate()
@@ -57,12 +57,11 @@ final class TemporalFilterUITests: XCTestCase {
     }
 
     private func openSavedView(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["custom-views"].waitForExistence(timeout: 10))
-        app.buttons["custom-views"].tap()
+        openWorkspaceSetting("custom-views", app: app)
         let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertTrue(saved.label.contains("Ready today"))
-        saved.tap()
+        activateSavedWorkspaceView(app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

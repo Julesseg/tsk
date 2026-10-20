@@ -9,6 +9,9 @@ final class TaskStore {
     let directory: URL
     var tasks: [TaskRecord] = []
     var savedViews: [SavedTaskView] = []
+    var workspaceViews = WorkspaceViews(customIDs: [])
+    var selectedWorkspaceView: WorkspaceView = .unfinished
+    private(set) var workspaceViewsLoaded = false
     var attributeDefinitions: [TaskAttributeDefinition] = []
     var customView: CustomViewSelection?
     var allTasks: [TaskRecord] = []
@@ -25,6 +28,35 @@ final class TaskStore {
     private var reloadGeneration = 0
     var nextFilterEvaluation: Date?
     var filterRefreshGeneration = 0
+
+    func loadWorkspaceViews() throws {
+        if workspaceViewsLoaded {
+            workspaceViews.reconcile(customIDs: savedViews.map(\.id))
+        } else {
+            workspaceViews = try LocalWorkspaceViewStore(directory: directory).load(customIDs: savedViews.map(\.id))
+        }
+        if !workspaceViewsLoaded || !workspaceViews.active.contains(selectedWorkspaceView) {
+            selectWorkspaceView(workspaceViews.active[0])
+        }
+        workspaceViewsLoaded = true
+    }
+
+    func updateWorkspaceViews(_ change: (inout WorkspaceViews) throws -> Void) throws {
+        var updated = workspaceViews
+        try change(&updated)
+        try LocalWorkspaceViewStore(directory: directory).save(updated)
+        workspaceViews = updated
+        if !updated.active.contains(selectedWorkspaceView) { selectWorkspaceView(updated.active[0]) }
+    }
+
+    func selectWorkspaceView(_ view: WorkspaceView) {
+        selectedWorkspaceView = view
+        projectSelection = .all
+        customView = nil
+        if let query = view.query { self.query = query }
+        else if case .custom(let id) = view, let saved = savedViews.first(where: { $0.id == id }) { openView(saved) }
+        else { query = .unfinished }
+    }
 
     init() throws {
         let testName = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"]

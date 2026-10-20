@@ -12,11 +12,11 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
-        app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5)); description.typeText("Act on independent plans")
-        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
@@ -37,6 +37,7 @@ final class TaskActivityUITests: XCTestCase {
         XCTAssertTrue(waitForEnabledTaskControl(app.buttons["stop-task"], app: app, timeout: 10))
         capture("Task detail distinguishes activity from planned day and deadline", app)
         app.terminate(); app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Act on independent plans", app: app).waitForExistence(timeout: 15))
         waitForLabel("Active", on: taskRow(named: "Act on independent plans", app: app))
         taskRow(named: "Act on independent plans", app: app).tap()
@@ -59,6 +60,7 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20)); row.tap()
         XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
@@ -74,7 +76,7 @@ final class TaskActivityUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         XCTAssertFalse(row.exists)
     }
 
@@ -91,6 +93,7 @@ final class TaskActivityUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 20)); app.buttons["task-" + id].tap()
         XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
         XCTAssertTrue(app.staticTexts["task-action-banner"].waitForExistence(timeout: 10))

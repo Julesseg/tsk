@@ -59,7 +59,13 @@ final class WidgetUITests: XCTestCase {
             capture("Actual tsk provider cell in native widget gallery", springboard)
             provider.tap()
             tap(springboard, labels: ["Add Widget", " Add Widget"])
-            tap(springboard, labels: ["Done"])
+            let done = springboard.buttons["Done"].firstMatch
+            let installed = home.staticTexts[today].firstMatch
+            let installationFinished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                (done.exists && done.isHittable) || (!gallery.exists && installed.exists)
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [installationFinished], timeout: 15), .completed)
+            if done.exists && done.isHittable { done.tap() }
         }
         let taskText = springboard.staticTexts[today].firstMatch
         let rendered = taskText.waitForExistence(timeout: 30)
@@ -103,7 +109,7 @@ final class WidgetUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_WIDGET_DELETE_VIEW"] = "1"
         app.launch()
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(springboard.staticTexts["Tasks unavailable"].firstMatch.waitForExistence(timeout: 30), springboard.debugDescription)
         XCTAssertFalse(springboard.staticTexts[custom].exists)
@@ -111,13 +117,7 @@ final class WidgetUITests: XCTestCase {
     }
 
     private func chooseCompleted(_ app: XCUIApplication) {
-        if app.buttons["sidebar-view-completed"].exists { app.buttons["sidebar-view-completed"].tap() }
-        else {
-            let completed = app.segmentedControls["task-status-view"].buttons["Completed"]
-            tapTaskControl(completed, app: app)
-            let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in completed.exists && completed.isSelected }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
-        }
+        selectDoneTasks(app)
     }
 
     private func enterHomeEditing(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {

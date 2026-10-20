@@ -71,6 +71,7 @@ final class SeriesTransitionUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["task-" + movedID].waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["task-" + overdueID].exists)
         openTemplates(app)
@@ -89,9 +90,7 @@ final class SeriesTransitionUITests: XCTestCase {
     }
 
     private func openTemplates(_ app: XCUIApplication) {
-        let button = app.buttons["recurring-templates"]
-        if UIDevice.current.userInterfaceIdiom == .pad, !button.isHittable { XCTAssertTrue(revealTaskElement(button, in: "workspace-sidebar", app: app)) }
-        button.tap()
+        openWorkspaceSetting("recurring-templates", app: app)
         XCTAssertTrue(app.buttons["new-recurring-template"].waitForExistence(timeout: 10))
     }
     private func openEditor(_ app: XCUIApplication) {
@@ -104,7 +103,7 @@ final class SeriesTransitionUITests: XCTestCase {
         let field = app.textFields["transition-rule"]
         XCTAssertTrue(revealTaskElement(field, in: "series-transition-form", app: app))
         replaceTaskText(field, with: value, app: app)
-        if app.buttons["dismiss-transition-keyboard"].exists { app.buttons["dismiss-transition-keyboard"].tap() }
+        if app.buttons["dismiss-transition-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-transition-keyboard"], app: app) }
     }
     private func assertPreview(_ id: String, app: XCUIApplication) {
         XCTAssertTrue(app.buttons["save-series-transition"].waitForExistence(timeout: 10))

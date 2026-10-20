@@ -47,22 +47,24 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         }
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
-        XCTAssertTrue(app.buttons["synchronization-settings"].waitForExistence(timeout: 10))
-        app.buttons["synchronization-settings"].tap()
+        openWorkspaceSetting("synchronization-settings", app: app)
         let server = app.textFields["sync-server-url"]
         XCTAssertTrue(server.waitForExistence(timeout: 5))
         server.tap()
         server.typeText("http://127.0.0.1:1")
         let client = app.textFields["sync-client-id"]
-        client.tap()
+        tapTaskControlAtCenter(client, app: app, requiresVisibleKeyboard: true)
         client.typeText("6F88CFF9-4727-4699-8B5E-EE6D530498E4")
         let secret = app.secureTextFields["sync-encryption-secret"]
-        secret.tap()
+        tapTaskControlAtCenter(secret, app: app, requiresVisibleKeyboard: true)
         secret.typeText("isolated-ui-test-secret")
-        app.buttons["save-sync-connection"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-sync-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        tapTaskControlAtCenter(app.buttons["save-sync-connection"], app: app)
+        XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
-        app.buttons["Done"].tap()
-        XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Done"].tap()
+        XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
         capture("Automatic synchronization failure with local capture available", app)
         func dismissPasswordBeforeSample(_ deadline: TimeInterval) {
             guard !dismissedPassword, ProcessInfo.processInfo.systemUptime < deadline else { return }
@@ -83,7 +85,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
                 guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
                 dismissPasswordBeforeSample(deadline)
                 guard !observedPassword, ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                return app.buttons["new-task"].isHittable && ProcessInfo.processInfo.systemUptime < deadline
+                return app.buttons["New task"].isHittable && ProcessInfo.processInfo.systemUptime < deadline
             }
             if sample() { return }
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
@@ -108,7 +110,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }
             XCTAssertTrue(passwordDialog.waitForNonExistence(timeout: 5))
         }
-        tapTaskControl(app.buttons["new-task"], app: app, beforeSample: dismissPasswordBeforeSample)
+        tapTaskControl(app.buttons["New task"], app: app, beforeSample: dismissPasswordBeforeSample)
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         func waitForCaptureDescription() -> Bool {
             let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
@@ -133,7 +135,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             }) else { return false }
             if description.exists { return ProcessInfo.processInfo.systemUptime < deadline }
             guard interrupted, ProcessInfo.processInfo.systemUptime < deadline else { return false }
-            tapTaskControl(app.buttons["new-task"], app: app, deadline: deadline)
+            tapTaskControl(app.buttons["New task"], app: app, deadline: deadline)
             return waitUntil { description.exists }
         }
         XCTAssertTrue(waitForCaptureDescription())
@@ -159,21 +161,29 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
         XCTAssertTrue(app.buttons["dismiss-editor-keyboard"].waitForExistence(timeout: 5))
-        app.buttons["dismiss-editor-keyboard"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["save-task"].isHittable)
         app.buttons["save-task"].tap()
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Durable work while automatic sync fails", app: app), timeout: 10))
-        XCTAssertTrue(app.staticTexts["Durable work while automatic sync fails"].exists)
-        XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 20))
-        XCTAssertTrue(app.buttons["retry-task-sync"].exists)
+        XCTAssertTrue(taskRow(named: "Durable work while automatic sync fails", app: app).isHittable)
+        XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
+        XCTAssertFalse(app.buttons["retry-task-sync"].exists)
         capture("Saved locally despite automatic network failure", app)
-        app.buttons["retry-task-sync"].tap()
-        XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 20))
+        openWorkspaceSetting("synchronization-settings", app: app)
+        XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
+        app.buttons["sync-now"].tap()
+        XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
+        app.navigationBars["Synchronization"].buttons["Done"].tap()
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Durable work while automatic sync fails"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-sync-error"].waitForExistence(timeout: 20))
+        selectAllTasks(app)
+        let reopened = taskRow(named: "Durable work while automatic sync fails", app: app)
+        XCTAssertTrue(reopened.waitForExistence(timeout: 10))
+        XCTAssertTrue(reopened.isHittable)
+        XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
+        openWorkspaceSetting("synchronization-settings", app: app)
+        XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
         capture("App opening retries without losing local work", app)
     }
 

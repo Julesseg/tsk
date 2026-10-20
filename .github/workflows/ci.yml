@@ -11,7 +11,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [full, smoke]
+        options: [full, smoke, keyboard, text]
         required: true
         default: full
       diagnostic_only:
@@ -27,7 +27,7 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}', github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -71,9 +71,9 @@ jobs:
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
 
   app-ui-tests:
-    name: ${{ matrix.job-name }}
+    name: ${{ github.event_name == 'workflow_dispatch' && !inputs.diagnostic_only && (inputs.ui_suite == 'keyboard' && format('App · Keyboard diagnostics ({0})', matrix.family) || inputs.ui_suite == 'text' && format('App · Text diagnostics ({0})', matrix.family)) || matrix.job-name }}
     runs-on: xcode-27
-    timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 45 }}
+    timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 60 }}
     strategy:
       fail-fast: false
       matrix:
@@ -165,10 +165,10 @@ jobs:
           '
 
       - name: Run prebuilt UI tests
-        timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 30 }}
+        timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 45 }}
         working-directory: App
         env:
-          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
+          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && inputs.ui_suite || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
           UI_FAMILY: ${{ matrix.family }}
         run: |
           set -eo pipefail
@@ -208,7 +208,7 @@ jobs:
           xcrun simctl delete "${{ steps.sim.outputs.id }}"
 
       - name: Upload test results
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

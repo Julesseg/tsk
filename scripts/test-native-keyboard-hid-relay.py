@@ -1,6 +1,8 @@
 import importlib.util
 import asyncio
 import copy
+from contextlib import asynccontextmanager, contextmanager
+import sys
 import json
 import pathlib
 import tempfile
@@ -15,6 +17,20 @@ spec = importlib.util.spec_from_file_location('native_hid_relay', path)
 relay = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(relay)
 TOKEN = 'a2a514f2-fe63-40e1-9a42-b097cb8e9f23'
+
+
+@asynccontextmanager
+async def sender_context(send):
+    yield send
+
+
+@contextmanager
+def pinned_client(context):
+    build = mock.Mock(side_effect=lambda **kwargs: context())
+    types = SimpleNamespace(DomainSocketAddress=lambda path: ('unix', path), HIDDirection=SimpleNamespace(UP='up', DOWN='down'), HIDKey=lambda keycode: keycode, HIDPress=lambda action, direction: (action, direction))
+    modules = {'idb.common.types': types, 'idb.grpc.client': SimpleNamespace(Client=SimpleNamespace(build=build))}
+    with mock.patch.object(relay.importlib.metadata, 'version', return_value='1.7.3'), mock.patch.dict(sys.modules, modules):
+        yield build
 
 
 def request(case=relay.CASE, phase='commandReturn', sequence=0):
@@ -147,7 +163,334 @@ class ProtocolTests(unittest.TestCase):
             finally:exchange.close()
 
 
+class ClientConnectionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_one_client_context_spans_initialization_and_multiple_chords(self):
+        lifecycle = []
+        client = SimpleNamespace(send_events=mock.AsyncMock())
+        @asynccontextmanager
+        async def connection():
+            lifecycle.append('enter')
+            try:
+                yield client
+            finally:
+                lifecycle.append('close')
+        with pinned_client(connection) as build:
+            async with relay.make_sender('/tmp/owned.sock') as send:
+                await send(relay.RELEASES)
+                await relay.dispatch_chord(send)
+                await relay.dispatch_chord(send, relay.chord(17))
+                self.assertEqual(lifecycle, ['enter'])
+            self.assertEqual(lifecycle, ['enter', 'close'])
+        build.assert_called_once()
+        self.assertEqual(build.call_args.kwargs['address'], ('unix', '/tmp/owned.sock'))
+        self.assertFalse(build.call_args.kwargs['exchange_metadata'])
+        self.assertEqual([call.args[0] for call in client.send_events.await_args_list], [
+            [(40, 'up'), (227, 'up')],
+            [(227, 'down'), (40, 'down'), (40, 'up'), (227, 'up')],
+            [(227, 'down'), (17, 'down'), (17, 'up'), (227, 'up')],
+        ])
+
+    async def test_failed_or_cancelled_command_uses_same_client_for_up_cleanup_then_closes(self):
+        for error in (RuntimeError('send failed'), asyncio.CancelledError()):
+            with self.subTest(error=type(error).__name__):
+                observed = []
+                async def transmit(events):
+                    observed.append(events)
+                    if any(direction == 'down' for _, direction in events):
+                        raise error
+                client = SimpleNamespace(send_events=transmit)
+                @asynccontextmanager
+                async def connection():
+                    try:
+                        yield client
+                    finally:
+                        observed.append('closed')
+                with pinned_client(connection) as build:
+                    with self.assertRaises(type(error)):
+                        async with relay.make_sender('/tmp/owned.sock') as send:
+                            await send(relay.RELEASES)
+                            await relay.dispatch_chord(send)
+                build.assert_called_once()
+                self.assertEqual(observed, [
+                    [(40, 'up'), (227, 'up')],
+                    [(227, 'down'), (40, 'down'), (40, 'up'), (227, 'up')],
+                    [(40, 'up'), (227, 'up')],
+                    'closed',
+                ])
+
+    async def test_connection_entry_is_inside_initialization_deadline_and_closes_on_timeout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, receipt_path = root / 'live.log', root / 'owned.sock', root / 'relay.json'
+            log.touch(); socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(root / 'stop'))
+            lifecycle = []
+            client = SimpleNamespace(send_events=mock.AsyncMock())
+            @asynccontextmanager
+            async def connection():
+                lifecycle.append('connecting')
+                try:
+                    await asyncio.Event().wait()
+                    yield client
+                finally:
+                    lifecycle.append('closed')
+            wait_for = asyncio.wait_for
+            budgets = []
+            async def shortened(awaitable, timeout):
+                budgets.append(timeout)
+                return await wait_for(awaitable, timeout=0.01 if timeout == 30 else timeout)
+            with pinned_client(connection) as build, mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay.asyncio, 'wait_for', side_effect=shortened):
+                with self.assertRaises(TimeoutError):
+                    await relay.run(args)
+            build.assert_called_once()
+            self.assertEqual(budgets, [30, 5])
+            self.assertEqual(lifecycle, ['connecting', 'closed'])
+            client.send_events.assert_not_awaited()
+            receipt = json.loads(receipt_path.read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertNotIn('initialization', receipt)
+            self.assertNotIn('logStartOffset', receipt)
+
+    async def test_cancel_during_up_cleanup_settles_that_rpc_before_client_closure(self):
+        observed = []
+        started, release = asyncio.Event(), asyncio.Event()
+        async def transmit(events):
+            observed.append(events)
+            if any(direction == 'down' for _, direction in events):
+                raise RuntimeError('command failed')
+            if len(observed) == 3:
+                started.set()
+                await release.wait()
+                observed.append('cleanup complete')
+        @asynccontextmanager
+        async def connection():
+            try:
+                yield SimpleNamespace(send_events=transmit)
+            finally:
+                observed.append('closed')
+        async def dispatch():
+            async with relay.make_sender('/tmp/owned.sock') as send:
+                await send(relay.RELEASES)
+                await relay.dispatch_chord(send)
+        with pinned_client(connection) as build, mock.patch.object(relay.asyncio, 'wait_for', wraps=asyncio.wait_for) as bounded:
+            task = asyncio.create_task(dispatch())
+            try:
+                await asyncio.wait_for(started.wait(), 1)
+                task.cancel()
+                await asyncio.sleep(0)
+                self.assertFalse(task.done())
+                self.assertNotIn('closed', observed)
+                task.cancel()
+                await asyncio.sleep(0)
+                self.assertFalse(task.done())
+                release.set()
+                with self.assertRaisesRegex(RuntimeError, 'command failed'):
+                    await asyncio.wait_for(task, 1)
+            finally:
+                release.set()
+                await asyncio.gather(task, return_exceptions=True)
+        build.assert_called_once()
+        self.assertEqual([call.kwargs['timeout'] for call in bounded.call_args_list if call.kwargs.get('timeout') == 5], [5, 5])
+        self.assertEqual(observed, [
+            [(40, 'up'), (227, 'up')],
+            [(227, 'down'), (40, 'down'), (40, 'up'), (227, 'up')],
+            [(40, 'up'), (227, 'up')],
+            'cleanup complete',
+            'closed',
+        ])
+
+    async def test_client_closes_once_on_normal_stop_and_close_failure_cannot_report_completion(self):
+        for fails in (False, True):
+            with self.subTest(close_fails=fails), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                log, socket, receipt_path, stop = root / 'live.log', root / 'owned.sock', root / 'relay.json', root / 'stop'
+                log.touch(); socket.touch(); stop.touch()
+                args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(stop))
+                lifecycle = []
+                client = SimpleNamespace(send_events=mock.AsyncMock())
+                @asynccontextmanager
+                async def connection():
+                    lifecycle.append('enter')
+                    try:
+                        yield client
+                    finally:
+                        lifecycle.append('close')
+                        if fails:
+                            raise RuntimeError('connection closure failed')
+                with pinned_client(connection) as build, mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True):
+                    if fails:
+                        with self.assertRaisesRegex(RuntimeError, 'closure failed'):
+                            await relay.run(args)
+                    else:
+                        await relay.run(args)
+                build.assert_called_once()
+                self.assertEqual(lifecycle, ['enter', 'close'])
+                client.send_events.assert_awaited_once_with([(40, 'up'), (227, 'up')])
+                receipt = json.loads(receipt_path.read_text())
+                self.assertEqual(receipt['state'], 'failed' if fails else 'completed_native_assertions_required')
+                self.assertEqual('connectionCleanupError' in receipt, fails)
+                self.assertEqual(receipt['exchanges'], [])
+
+
 class RunTests(unittest.IsolatedAsyncioTestCase):
+    async def test_one_sender_initializes_only_up_then_arms_with_sticky_same_process_proof(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, stop, receipt_path = root / 'live.log', root / 'owned.sock', root / 'stop', root / 'relay.json'
+            log.touch(); socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(stop))
+            started, released, armed = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            observed = []
+            async def send(events):
+                observed.append(events)
+                started.set()
+                await released.wait()
+            original_save = relay.save_receipt
+            def save(path, value):
+                original_save(path, value)
+                if value['state'] == 'waiting':
+                    armed.set()
+            with mock.patch.object(relay, 'make_sender', return_value=sender_context(send)) as factory, mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay, 'save_receipt', side_effect=save):
+                task = asyncio.create_task(relay.run(args))
+                try:
+                    await asyncio.wait_for(started.wait(), 1)
+                    preparing = json.loads(receipt_path.read_text())
+                    self.assertEqual(preparing['state'], 'preparing')
+                    self.assertNotIn('initialization', preparing)
+                    self.assertNotIn('logStartOffset', preparing)
+                    self.assertEqual(observed, [relay.RELEASES])
+                    released.set()
+                    await asyncio.wait_for(armed.wait(), 1)
+                    waiting = json.loads(receipt_path.read_text())
+                    self.assertEqual(waiting['relayPID'], relay.os.getpid())
+                    self.assertEqual(waiting['logStartOffset'], 0)
+                    self.assertEqual(waiting['initialization']['events'], [[40, 'UP'], [227, 'UP']])
+                    self.assertEqual(waiting['initialization']['state'], 'up_only_rpc_completed_native_assertions_required')
+                    stop.touch()
+                    await asyncio.wait_for(task, 1)
+                finally:
+                    if not task.done():
+                        task.cancel()
+                        await asyncio.gather(task, return_exceptions=True)
+            factory.assert_called_once_with(str(socket))
+            final = json.loads(receipt_path.read_text())
+            self.assertEqual(final['initialization'], waiting['initialization'])
+            self.assertEqual(observed, [relay.RELEASES])
+
+    async def test_initialization_rpc_failure_or_cancellation_never_arms_or_sends_down(self):
+        for error in (RuntimeError('RPC failed'), asyncio.CancelledError(), TimeoutError()):
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                log, socket, stop, receipt_path = root / 'live.log', root / 'owned.sock', root / 'stop', root / 'relay.json'
+                log.touch(); socket.touch()
+                args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(stop))
+                send = mock.AsyncMock(side_effect=error)
+                lifecycle = []
+                @asynccontextmanager
+                async def connection():
+                    lifecycle.append('enter')
+                    try:
+                        yield SimpleNamespace(send_events=send)
+                    finally:
+                        lifecycle.append('close')
+                with pinned_client(connection) as build, mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True):
+                    with self.assertRaises(type(error)):
+                        await relay.run(args)
+                build.assert_called_once()
+                self.assertEqual(lifecycle, ['enter', 'close'])
+                send.assert_awaited_once_with([(40, 'up'), (227, 'up')])
+                receipt = json.loads(receipt_path.read_text())
+                self.assertEqual(receipt['state'], 'failed')
+                self.assertNotIn('initialization', receipt)
+                self.assertNotIn('logStartOffset', receipt)
+
+    async def test_failed_log_arming_retains_completed_initialization_without_acknowledgement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            socket, receipt_path = root / 'owned.sock', root / 'relay.json'
+            socket.touch()
+            args = SimpleNamespace(log=str(root / 'missing.log'), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(root / 'stop'))
+            send = mock.AsyncMock()
+            with mock.patch.object(relay, 'make_sender', return_value=sender_context(send)), mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True):
+                with self.assertRaises(FileNotFoundError):
+                    await relay.run(args)
+            send.assert_awaited_once_with(relay.RELEASES)
+            receipt = json.loads(receipt_path.read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertEqual(receipt['initialization']['events'], [[40, 'UP'], [227, 'UP']])
+            self.assertNotIn('logStartOffset', receipt)
+            self.assertEqual(receipt['exchanges'], [])
+
+    async def test_initialization_rpc_retains_thirty_second_cap_and_no_armed_receipt_on_timeout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, receipt_path = root / 'live.log', root / 'owned.sock', root / 'relay.json'
+            log.touch(); socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(root / 'stop'))
+            observed = []
+            wait_for = asyncio.wait_for
+            async def send(events):
+                observed.append(events)
+                await asyncio.Event().wait()
+            async def shortened(awaitable, timeout):
+                self.assertIn(timeout, (30, 5))
+                return await wait_for(awaitable, timeout=0.01 if timeout == 30 else timeout)
+            with mock.patch.object(relay, 'make_sender', return_value=sender_context(send)), mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay.asyncio, 'wait_for', side_effect=shortened):
+                with self.assertRaises(TimeoutError):
+                    await relay.run(args)
+            self.assertEqual(observed, [relay.RELEASES])
+            receipt = json.loads(receipt_path.read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertNotIn('initialization', receipt)
+            self.assertNotIn('logStartOffset', receipt)
+
+    async def test_pending_preparation_keeps_processing_abort_and_reaps_lookup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, stop = root / 'live.log', root / 'owned.sock', root / 'stop'
+            log.touch()
+            socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(root / 'relay.json'), stop_file=str(stop))
+            armed, started, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
+            observed = []
+            async def send(events):
+                observed.append(events)
+            async def lookup(udid, value, receipt, deadline):
+                entry = dict(status=None, reaped=False)
+                receipt.setdefault('containerLookups', []).append(entry)
+                started.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    entry.update(status=-9, reaped=True)
+                    cancelled.set()
+            original_save = relay.save_receipt
+            def save(path, value):
+                original_save(path, value)
+                if value['state'] == 'waiting':
+                    armed.set()
+            with mock.patch.object(relay, 'make_sender', return_value=sender_context(send)), mock.patch.object(relay, 'container_for', side_effect=lookup), mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay, 'save_receipt', side_effect=save):
+                task = asyncio.create_task(relay.run(args))
+                try:
+                    await asyncio.wait_for(armed.wait(), 1)
+                    with log.open('ab', buffering=0) as writer:
+                        writer.write(boundary(relay.CASE) + b'\n')
+                    await asyncio.wait_for(started.wait(), 1)
+                    with log.open('ab', buffering=0) as writer:
+                        writer.write(relay.ABORT + json.dumps(request()).encode() + b'\n')
+                    with self.assertRaisesRegex(ValueError, 'Runner aborted'):
+                        await asyncio.wait_for(task, 1)
+                finally:
+                    if not task.done():
+                        task.cancel()
+                        await asyncio.gather(task, return_exceptions=True)
+            self.assertTrue(cancelled.is_set())
+            self.assertEqual(observed, [relay.RELEASES])
+            receipt = json.loads((root / 'relay.json').read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertEqual(receipt['containerLookups'][0]['status'], -9)
+            self.assertTrue(receipt['containerLookups'][0]['reaped'])
+
     async def test_overlap_already_in_same_log_batch_cannot_receive_ack_or_dispatch(self):
         with tempfile.TemporaryDirectory() as directory:
             root=pathlib.Path(directory); log=root/'live.log'; log.touch(); socket=root/'owned.sock';socket.touch(); stop=root/'stop'
@@ -161,12 +504,12 @@ class RunTests(unittest.IsolatedAsyncioTestCase):
             def save(path,value):
                 original_save(path,value)
                 if value['state']=='waiting':armed.set()
-            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save):
+            with mock.patch.object(relay,'make_sender',return_value=sender_context(send)),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save):
                 task=asyncio.create_task(relay.run(args));await asyncio.wait_for(armed.wait(),1)
                 with log.open('ab',buffering=0) as writer:writer.write(boundary(relay.CASE)+b'\n'+marker(value)+marker(value))
                 stop.touch()
                 with self.assertRaises(ValueError):await asyncio.wait_for(task,1)
-            self.assertEqual(observed,[])
+            self.assertEqual(observed,[relay.RELEASES])
             self.assertFalse((location/(value['request']+'.ack.json')).exists())
 
 
@@ -188,12 +531,12 @@ class DispatchBudgetTests(unittest.IsolatedAsyncioTestCase):
                 original_save(path,receipt)
                 if receipt['state']=='waiting':armed.set()
                 if receipt['state']=='sending':clock+=persistence_seconds
-            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save),mock.patch.object(relay,'time',SimpleNamespace(time=lambda:100.0 if freeze_wall else clock,monotonic=lambda:clock)):
+            with mock.patch.object(relay,'make_sender',return_value=sender_context(send)),mock.patch.object(relay,'container_for',side_effect=lookup),mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save),mock.patch.object(relay,'time',SimpleNamespace(time=lambda:100.0 if freeze_wall else clock,monotonic=lambda:clock)):
                 task=asyncio.create_task(relay.run(args));await asyncio.wait_for(armed.wait(),1)
                 with log.open('ab',buffering=0) as writer:writer.write(boundary(relay.CASE)+b'\n'+marker(value))
                 stop.touch()
                 with self.assertRaises(ValueError):await asyncio.wait_for(task,1)
-            self.assertEqual(observed,[],'Expired transport budget must never dispatch DOWN')
+            self.assertEqual(observed,[relay.RELEASES],'Expired transport budget must never dispatch DOWN')
             self.assertFalse((location/(value['request']+'.ack.json')).exists())
 
     async def test_less_than_five_seconds_remaining_cannot_start_a_fresh_five_second_rpc(self):
@@ -215,7 +558,7 @@ class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
             observed=[]; armed=asyncio.Event(); sending=asyncio.Event(); release=asyncio.Event()
             async def send(events):
                 observed.append(events)
-                if len(observed)==1:
+                if len(observed)==2:
                     sending.set()
                     await release.wait()
             async def lookup(*args, **kwargs):return root
@@ -225,7 +568,7 @@ class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
                 if receipt['state']=='waiting':armed.set()
             def append(raw):
                 with log.open('ab',buffering=0) as writer:writer.write(raw+b'\n')
-            with mock.patch.object(relay,'make_sender',return_value=send),mock.patch.object(relay,'container_for',side_effect=lookup) as lookup_mock,mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save):
+            with mock.patch.object(relay,'make_sender',return_value=sender_context(send)),mock.patch.object(relay,'container_for',side_effect=lookup) as lookup_mock,mock.patch.object(relay.stat,'S_ISSOCK',return_value=True),mock.patch.object(relay,'save_receipt',side_effect=save):
                 task=asyncio.create_task(relay.run(args)); await asyncio.wait_for(armed.wait(),1)
                 try:
                     append(boundary(relay.ANNOTATIONS))
@@ -253,7 +596,7 @@ class AcknowledgementRunTests(unittest.IsolatedAsyncioTestCase):
             receipt=json.loads((root/'relay.json').read_text())
             self.assertEqual(receipt['state'],'completed_native_assertions_required')
             self.assertEqual(receipt['cases'][relay.ANNOTATIONS]['completed'],['secondNoteCommandN','secondNoteSave','editSelectAll','editedNoteSave'])
-            self.assertEqual(observed,[((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))])
+            self.assertEqual(observed,[relay.RELEASES,((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')),((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))])
             self.assertEqual(lookup_mock.await_count,1)
 
 
@@ -286,12 +629,166 @@ class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
             processes.append(process)
             return process
         receipt = {}
-        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+            clock.monotonic.return_value = 100.0
             with self.assertRaises(TimeoutError):
-                await relay.container_for('owned-udid', request(), receipt, deadline=time.monotonic()+5.1)
+                await relay.container_for('owned-udid', request(), receipt, deadline=105.1)
         self.assertIsNotNone(processes[0].returncode)
         self.assertTrue(receipt['containerLookups'][0]['reaped'])
         self.assertEqual(receipt['containerLookups'][0]['failure'], 'TimeoutError')
+
+    async def test_discovery_spawn_exhaustion_still_kills_and_reaps_the_child(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', 'import time;time.sleep(60)', **kwargs)
+            processes.append(process)
+            return process
+        receipt = {}
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+            clock.monotonic.side_effect = [100.0, 100.2, 100.2, 100.2]
+            with self.assertRaisesRegex(ValueError, 'before communication'):
+                await relay.container_for('owned-udid', request(), receipt, deadline=105.1)
+        self.assertIsNotNone(processes[0].returncode)
+        self.assertTrue(receipt['containerLookups'][0]['reaped'])
+        self.assertEqual(receipt['containerLookups'][0]['failure'], 'ValueError')
+
+
+class RunnerContainerTests(unittest.IsolatedAsyncioTestCase):
+    def write_request(self, root, value):
+        location = root / 'Documents/TSKHID' / value['owner'] / value['attempt']
+        location.mkdir(parents=True, exist_ok=True)
+        (location / (value['request'] + '.request.json')).write_text(json.dumps(value))
+
+    async def test_slow_preparation_finishes_before_request_without_spending_its_dispatch_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            clock = 100.0
+            release = asyncio.Event()
+            async def lookup(*args, **kwargs):
+                await release.wait()
+                return root
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', side_effect=lookup) as discover, mock.patch.object(relay, 'time', SimpleNamespace(monotonic=lambda: clock, time=lambda: clock)):
+                await containers.start_case(relay.CASE)
+                clock += 9
+                release.set()
+                await containers.lookup
+                value = request()
+                value['expiresAt'] = clock + 12
+                self.write_request(root, value)
+                exchange = await containers.exchange(value, deadline=clock + 12)
+                exchange.close()
+                self.assertEqual(discover.call_args.kwargs['deadline'], 135)
+                self.assertEqual(discover.await_count, 1)
+
+    async def test_pending_preparation_cannot_extend_an_early_request_deadline(self):
+        cancelled = asyncio.Event()
+        async def lookup(*args, **kwargs):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        containers = relay.RunnerContainers('owned-udid', {})
+        self.addAsyncCleanup(containers.close)
+        with mock.patch.object(relay, 'container_for', side_effect=lookup), mock.patch.object(relay, 'time', SimpleNamespace(time=time.time, monotonic=lambda: 100.0)):
+            await containers.start_case(relay.CASE)
+            with self.assertRaises(TimeoutError):
+                await containers.exchange(request(), deadline=105.02)
+        self.assertTrue(cancelled.is_set())
+        self.assertEqual(containers.verified, {})
+
+    async def test_same_runner_reuses_verified_path_but_checks_each_case_request_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, return_value=root) as discover:
+                await containers.start_case(relay.CASE)
+                first = request()
+                self.write_request(root, first)
+                exchange = await containers.exchange(first, deadline=time.monotonic() + 12)
+                exchange.close()
+                second = request(relay.ANNOTATIONS, 'secondNoteCommandN')
+                second['attempt'] = str(uuid.uuid4())
+                self.write_request(root, second)
+                exchange = await containers.exchange(second, deadline=time.monotonic() + 12)
+                exchange.close()
+                second['request'] = str(uuid.uuid4())
+                second['owner'] = str(uuid.uuid4())
+                with self.assertRaises(FileNotFoundError):
+                    await containers.exchange(second, deadline=time.monotonic() + 12)
+                self.assertEqual(discover.await_count, 2)
+
+    async def test_changed_runner_pid_uses_fresh_case_discovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            old, new = root / 'old', root / 'new'
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[old, new]) as discover:
+                for pid, case, location in [(1234, relay.CASE, old), (1235, relay.ANNOTATIONS, new)]:
+                    await containers.start_case(case)
+                    value = request(case, next(iter(relay.CHORDS[case])))
+                    value['runnerPID'] = pid
+                    self.write_request(location, value)
+                    exchange = await containers.exchange(value, deadline=time.monotonic() + 12)
+                    exchange.close()
+                self.assertEqual(discover.await_count, 2)
+                self.assertEqual(containers.verified[('owned-udid', relay.RUNNER, 1235)], new)
+
+    async def test_missing_candidate_refreshes_only_within_original_request_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            stale, current = root / 'stale', root / 'current'
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            value = request()
+            self.write_request(current, value)
+            deadline = time.monotonic() + 12
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[stale, current]) as discover:
+                await containers.start_case(relay.CASE)
+                exchange = await containers.exchange(value, deadline=deadline)
+                exchange.close()
+                self.assertEqual(discover.await_count, 2)
+                self.assertEqual(discover.call_args.kwargs['deadline'], deadline)
+
+    async def test_mismatched_candidate_request_is_rejected_without_refresh_or_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            value = request()
+            self.write_request(root, dict(value, runnerPID=4321))
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, return_value=root) as discover:
+                await containers.start_case(relay.CASE)
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    await containers.exchange(value, deadline=time.monotonic() + 12)
+                self.assertEqual(discover.await_count, 1)
+                self.assertEqual(containers.verified, {})
+
+    async def test_cancelled_preparation_kills_and_reaps_discovery_child(self):
+        import sys
+        create = asyncio.create_subprocess_exec
+        started = asyncio.Event()
+        processes = []
+        async def start(*args, **kwargs):
+            process = await create(sys.executable, '-c', 'import time;time.sleep(60)', **kwargs)
+            processes.append(process)
+            started.set()
+            return process
+        receipt = {}
+        containers = relay.RunnerContainers('owned-udid', receipt)
+        self.addAsyncCleanup(containers.close)
+        with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start):
+            await containers.start_case(relay.CASE)
+            await asyncio.wait_for(started.wait(), 5)
+            await containers.close()
+        self.assertIsNotNone(processes[0].returncode)
+        self.assertTrue(receipt['containerLookups'][0]['reaped'])
+        self.assertEqual(receipt['containerLookups'][0]['failure'], 'CancelledError')
 
 
 class FileAndMappingTests(unittest.TestCase):

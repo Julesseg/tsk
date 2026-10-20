@@ -4,20 +4,25 @@ import TskNative
 import EventKit
 
 struct ContentView: View {
-    private enum WorkspaceIntegration {
-        case spotlight, notifications, continuousReminders, remindersImport, attributeDefinitions
+    private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
+
+    enum WorkspaceSetting {
+        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport, attributeDefinitions
+        #if DEBUG && targetEnvironment(simulator)
+        case spotlightDiagnostics
+        #endif
     }
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var accessibleSidebarMinimum: CGFloat = 190
-    @ScaledMetric(relativeTo: .body) private var accessibleSidebarWidth: CGFloat = 220
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
     @State private var spotlight: SpotlightController
-    @State private var isShowingSpotlight = false
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var isShowingSpotlightDiagnostics = false
+    #endif
     @State private var calendar: TodayCalendarController
     @State private var notifications: TaskNotificationController
     @State private var isConfiguringNotifications = false
@@ -26,17 +31,18 @@ struct ContentView: View {
     @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
-    @State private var isShowingShortcuts = false
+    @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
     @State private var isDefiningAttributes = false
     @State private var isImportingReminders = false
-    @State private var isShowingWorkspaceMore = false
-    @State private var pendingWorkspaceIntegration: WorkspaceIntegration?
+    @State private var isShowingSettings = false
+    @State private var pendingWorkspaceSetting: WorkspaceSetting?
     @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
     @State private var sidebarError: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var projectPath = NavigationPath()
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
@@ -55,73 +61,163 @@ struct ContentView: View {
         return dynamicTypeSize.isAccessibilitySize ? .accessibilityColumns : .columns
     }
 
+    private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects && store.customView == nil }
+
+    private var tabSelection: Binding<WorkspaceView> {
+        Binding(get: { store.selectedWorkspaceView }, set: { view in
+            resetNavigation()
+            store.selectWorkspaceView(view)
+        })
+    }
+
+    private func resetNavigation() {
+        projectPath = NavigationPath()
+        selectedTaskID = nil
+        path = []
+    }
+
+    private var taskNavigationPath: Binding<[UUID]> {
+        if presentation == .accessibilityColumns {
+            Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
+        } else { $path }
+    }
+
+    private var workspaceTabSelection: Binding<WorkspaceTab> {
+        Binding(get: { .view(store.selectedWorkspaceView) }, set: { tab in
+            switch tab {
+            case .view(let view): tabSelection.wrappedValue = view
+            case .capture: capture()
+            }
+        })
+    }
+
+    private var captureTabRole: TabRole {
+        if #available(iOS 27, *) { .prominent }
+        else { .search }
+    }
+
     private var navigationWorkspace: some View {
         Group {
-            switch presentation {
-            case .columns: regularWorkspace
-            case .accessibilityColumns: accessibleWorkspace
-            case .compact: compactWorkspace
+            if !store.workspaceViewsLoaded && sidebarError == nil {
+                ProgressView("Loading views")
+            } else if store.customView != nil && store.customView?.id == nil {
+                workspaceContent
+            } else {
+                TabView(selection: workspaceTabSelection) {
+                    ForEach(tabsBeforeEditingViews ?? store.workspaceViews.active) { view in
+                        Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
+                            if view == store.selectedWorkspaceView {
+                                workspaceContent
+                                    .environment(\.horizontalSizeClass, sizeClass)
+                            }
+                        }
+                        .accessibilityIdentifier("tab-" + view.id)
+                    }
+                    Tab("New task", systemImage: "plus", value: WorkspaceTab.capture, role: captureTabRole) {
+                        EmptyView()
+                    }
+                    .accessibilityIdentifier("new-task")
+                }
+                .tabViewStyle(.tabBarOnly)
+                // Keep the native tab bar at the bottom on iPad while retaining regular content columns.
+                .environment(\.horizontalSizeClass, .compact)
             }
         }
     }
 
-    private var regularWorkspace: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            workspaceSidebar
-                .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-        } content: {
-            taskList(selection: $selectedTaskID)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 440)
-        } detail: {
-            selectedTaskDetail
+    private var workspaceContent: some View {
+        Group {
+            if isProjectWorkspace {
+                projectsWorkspace
+            } else {
+                tasksWorkspace
+            }
         }
-        .navigationSplitViewStyle(.balanced)
-        .accessibilityIdentifier("task-workspace")
+        .safeAreaInset(edge: .bottom, alignment: .trailing) {
+            if store.customView != nil && store.customView?.id == nil { captureButton.padding() }
+        }
     }
 
-    private var accessibleTaskPath: Binding<[UUID]> {
-        Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
+    private var captureButton: some View {
+        Button(action: capture) {
+            Image(systemName: "plus")
+                .font(.title2)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("New task")
+        .accessibilityIdentifier("new-task")
     }
 
-    private var accessibleWorkspace: some View {
-        GeometryReader { geometry in
-            let width = min(accessibleSidebarWidth, geometry.size.width * 0.45)
+    @ViewBuilder private var tasksWorkspace: some View {
+        if presentation == .columns {
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                workspaceSidebar
-                    .navigationSplitViewColumnWidth(min: min(accessibleSidebarMinimum, width), ideal: width, max: geometry.size.width / 2)
+                taskList(selection: $selectedTaskID)
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 360, max: 480)
             } detail: {
-                NavigationStack(path: accessibleTaskPath) {
-                    taskList(selection: $selectedTaskID)
-                        .navigationDestination(for: UUID.self) { id in taskDestination(id).id(id) }
-                }
-                .frame(minWidth: 0, maxWidth: .infinity)
-                .accessibilityIdentifier("workspace-accessibility-navigation")
+                selectedTaskDetail
             }
             .navigationSplitViewStyle(.balanced)
             .accessibilityIdentifier("task-workspace")
-        }
-    }
-
-    @ViewBuilder private var selectedTaskDetail: some View {
-        if let task = selectedTask {
-            TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                .id(task.id)
         } else {
-            ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
-                .accessibilityIdentifier("workspace-detail-empty")
+            NavigationStack(path: taskNavigationPath) {
+                taskList(selection: presentation == .accessibilityColumns ? $selectedTaskID : nil)
+                    .navigationDestination(for: UUID.self) { id in taskDestination(id) }
+            }
+            .accessibilityIdentifier("workspace-accessibility-navigation")
         }
     }
 
-    private var workspaceSidebar: some View {
-        TaskWorkspaceSidebar(store: store, openView: openView, openProject: openProject, customViews: { isChoosingCustomView = true }, synchronization: { isConfiguringSync = true }, shortcuts: { isShowingShortcuts = true }, recurring: { isShowingRecurring = true }, attributeDefinitions: { isDefiningAttributes = true }, reminders: { isImportingReminders = true }, continuousReminders: { isConfiguringContinuousReminders = true }, notifications: { isConfiguringNotifications = true }, spotlight: { isShowingSpotlight = true })
+    private var projectsWorkspace: some View {
+        NavigationStack(path: $projectPath) {
+            List {
+                projectLink("No project", selection: .unassigned)
+                ForEach(store.availableProjects.map { UTF8String($0) }) { project in
+                    projectLink(project.rawValue, selection: .project(project.rawValue))
+                }
+                if store.availableProjects.isEmpty {
+                    Text("Add a project when creating or editing a task.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityIdentifier("projects-list")
+            .navigationTitle("Projects")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                workspaceTitle("Projects")
+                settingsToolbar
+            }
+            .navigationDestination(for: TaskProjectSelection.self) { project in
+                taskList(selection: nil, title: project.projectName ?? "No project")
+                    .onAppear { openProject(project) }
+            }
+            .navigationDestination(for: UUID.self) { id in
+                taskDestination(id).onAppear { selectedTaskID = id }
+            }
+        }
+        .onChange(of: projectPath) { _, value in
+            if value.isEmpty { store.projectSelection = .all }
+            if value.count < 2 { selectedTaskID = nil }
+        }
     }
 
-    private var compactWorkspace: some View {
-        NavigationStack(path: $path) {
-            taskList(selection: nil)
-                .safeAreaInset(edge: .top) { compactViewPicker }
-                .navigationDestination(for: UUID.self) { id in taskDestination(id) }
+    private func projectLink(_ title: String, selection: TaskProjectSelection) -> some View {
+        NavigationLink(value: selection) { Label(title, systemImage: "folder") }
+            .accessibilityIdentifier("project-" + title)
+    }
+
+    private var selectedTaskDetail: some View {
+        Group {
+            if let task = selectedTask {
+                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+                    .id(task.id)
+            } else {
+                ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
+                    .accessibilityIdentifier("workspace-detail-empty")
+            }
         }
+        .toolbar { settingsToolbar }
     }
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
@@ -135,7 +231,9 @@ struct ContentView: View {
     private var integrationSheets: some View {
         navigationWorkspace
         .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
-        .sheet(isPresented: $isShowingSpotlight) { SpotlightStatusView(controller: spotlight).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "spotlight"]) } }
+        #if DEBUG && targetEnvironment(simulator)
+        .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
+        #endif
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
@@ -145,10 +243,22 @@ struct ContentView: View {
     private var editorSheets: some View {
         integrationSheets
         .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
-        .sheet(isPresented: $isChoosingCustomView, onDismiss: { Task { await loadSavedViews() } }) { CustomViewsView(store: store) }
-        .sheet(isPresented: $isConfiguringSync) { SyncSettingsView(synchronization: synchronization, tasks: store) }
+        .sheet(isPresented: $isChoosingCustomView, onDismiss: {
+            tabsBeforeEditingViews = nil
+            Task { await loadSavedViews() }
+        }) {
+            CustomViewsView(store: store, select: {
+                tabsBeforeEditingViews = nil
+                tabSelection.wrappedValue = $0
+            })
+        }
+        .sheet(isPresented: $isConfiguringSync) {
+            SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError)
+        }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
-        .sheet(isPresented: $isShowingShortcuts) { NavigationStack { TaskShortcutsView().toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { isShowingShortcuts = false } } } } }
+        .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
+            TaskSettingsView(choose: chooseWorkspaceSetting)
+        }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
     }
 
@@ -192,10 +302,11 @@ struct ContentView: View {
             if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
-        .onChange(of: path) { _, newPath in if presentation == .compact { selectedTaskID = newPath.last } }
+        .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
+        .onChange(of: path) { _, newPath in if presentation != .columns || isProjectWorkspace { selectedTaskID = newPath.last } }
         .onChange(of: presentation) { previous, current in
-            if previous == .compact { selectedTaskID = path.last ?? selectedTaskID }
-            path = current == .compact ? selectedTaskID.map { [$0] } ?? [] : []
+            if previous != .columns { selectedTaskID = path.last ?? selectedTaskID }
+            path = current != .columns ? selectedTaskID.map { [$0] } ?? [] : []
         }
     }
 
@@ -241,112 +352,81 @@ struct ContentView: View {
 
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
-    private func taskList(selection: Binding<UUID?>?) -> some View {
+    private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
-            .navigationTitle(store.customView?.name ?? "Tasks")
+            .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+            .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
             }
-            .toolbar { workspaceToolbar }
+            .toolbar {
+                workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+                if presentation != .columns || isProjectWorkspace { settingsToolbar }
+            }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = spotlight.status?.error ?? spotlight.error {
-                        Button { isShowingSpotlight = true } label: { Label("Spotlight needs attention: " + error, systemImage: "magnifyingglass") }.font(.footnote).padding().accessibilityIdentifier("spotlight-attention")
-                    }
-                    if spotlight.status?.pending == true {
-                        Button("Spotlight update pending. Tasks are saved.") { isShowingSpotlight = true }.font(.footnote).padding().accessibilityIdentifier("spotlight-pending")
-                    }
-                    SynchronizationStatusView(synchronization: synchronization, backgroundError: opportunities.backgroundError)
                     if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
     }
 
-    @ToolbarContentBuilder private var workspaceToolbar: some ToolbarContent {
-        if presentation == .compact {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                Button("Recurring templates", systemImage: "repeat") { isShowingRecurring = true }.accessibilityIdentifier("recurring-templates")
-                Button("Shortcuts and Siri", systemImage: "square.stack.3d.up") { isShowingShortcuts = true }.accessibilityIdentifier("task-shortcuts")
-                Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { isConfiguringSync = true }.accessibilityIdentifier("synchronization-settings")
-                Button("Custom views", systemImage: "line.3.horizontal.decrease") { isChoosingCustomView = true }.accessibilityIdentifier("custom-views")
+    @ToolbarContentBuilder private func workspaceTitle(_ title: String) -> some ToolbarContent {
+        ToolbarItem(placement: .title) {
+            WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
+                .font(.headline)
+        }
+    }
+
+    @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
+        if store.customView != nil && store.customView?.id == nil {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close filter", systemImage: "xmark") { tabSelection.wrappedValue = store.selectedWorkspaceView }
             }
         }
-        if presentation == .compact {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("More", systemImage: "ellipsis") {
-                    pendingWorkspaceIntegration = nil
-                    isShowingWorkspaceMore = true
-                }
-                .accessibilityIdentifier("workspace-more")
-                .popover(isPresented: $isShowingWorkspaceMore) { workspaceMorePopover }
-            }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                .accessibilityIdentifier("workspace-settings")
         }
-        ToolbarItem(placement: .primaryAction) {
-            Button("New task", systemImage: "plus", action: capture).accessibilityIdentifier("new-task")
-        }
-
     }
 
-    private var workspaceMorePopover: some View {
-        VStack(alignment: .leading) {
-            Button("Spotlight") { chooseWorkspaceIntegration(.spotlight) }.accessibilityIdentifier("spotlight-settings")
-            Button("Task notifications") { chooseWorkspaceIntegration(.notifications) }.accessibilityIdentifier("notification-settings")
-            Button("Move from Reminders automatically") { chooseWorkspaceIntegration(.continuousReminders) }.accessibilityIdentifier("continuous-reminders-settings")
-            Button("Copy from Reminders") { chooseWorkspaceIntegration(.remindersImport) }.accessibilityIdentifier("reminders-import")
-            Button("Attribute definitions") { chooseWorkspaceIntegration(.attributeDefinitions) }.accessibilityIdentifier("attribute-definitions")
-        }
-        .padding()
-        .presentationCompactAdaptation(.popover)
-        .onDisappear(perform: presentPendingWorkspaceIntegration)
+    private func chooseWorkspaceSetting(_ destination: WorkspaceSetting) {
+        guard isShowingSettings, pendingWorkspaceSetting == nil else { return }
+        pendingWorkspaceSetting = destination
+        isShowingSettings = false
     }
 
-    private func chooseWorkspaceIntegration(_ destination: WorkspaceIntegration) {
-        guard isShowingWorkspaceMore, pendingWorkspaceIntegration == nil else { return }
-        pendingWorkspaceIntegration = destination
-        isShowingWorkspaceMore = false
-    }
-
-    private func presentPendingWorkspaceIntegration() {
-        guard let destination = pendingWorkspaceIntegration else { return }
-        pendingWorkspaceIntegration = nil
+    private func presentPendingWorkspaceSetting() {
+        guard let destination = pendingWorkspaceSetting else { return }
+        pendingWorkspaceSetting = nil
         switch destination {
-        case .spotlight: requestIntegrationPresentation("spotlight", state: $isShowingSpotlight)
+        case .customViews: presentViews()
+        case .recurring: isShowingRecurring = true
+        case .synchronization: isConfiguringSync = true
         case .notifications:
-            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "workspace-menu"])
+            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "settings"])
             isConfiguringNotifications = true
         case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
         case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
         case .attributeDefinitions: requestIntegrationPresentation("attribute-definitions", state: $isDefiningAttributes)
+        #if DEBUG && targetEnvironment(simulator)
+        case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
+        #endif
         }
+    }
+
+    private func presentViews() {
+        tabsBeforeEditingViews = store.workspaceViews.active
+        isChoosingCustomView = true
     }
 
     private func requestIntegrationPresentation(_ destination: String, state: Binding<Bool>) {
         TaskUIBoundaryDiagnostics.event("workspace.menu.action-entry", details: ["destination": destination, "presented": String(state.wrappedValue)])
         state.wrappedValue = true
         TaskUIBoundaryDiagnostics.event("workspace.menu.state-assigned", details: ["destination": destination, "presented": String(state.wrappedValue)])
-    }
-
-    private var compactViewPicker: some View {
-        VStack(spacing: 8) {
-            if let view = store.customView {
-                Button { isChoosingCustomView = true } label: { Label(view.name, systemImage: "line.3.horizontal.decrease") }.accessibilityIdentifier("active-custom-view")
-                Button("Predefined views") { store.customView = nil }
-            } else {
-                ProjectPicker(store: store)
-                Picker("Task status", selection: $store.query) {
-                    Text("Today").tag(TaskQuery.today)
-                    Text("Upcoming").tag(TaskQuery.upcoming)
-                    Text("Unfinished").tag(TaskQuery.unfinished)
-                    Text("Completed").tag(TaskQuery.completed)
-                }
-                .pickerStyle(.segmented).padding(.horizontal).padding(.bottom, 8)
-                .accessibilityIdentifier("task-status-view")
-            }
-        }
     }
 
     private func errorBanner(_ error: String, retry: @escaping () -> Void) -> some View {
@@ -363,18 +443,18 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingWorkspaceMore, pendingWorkspaceIntegration == nil, !isConfiguringNotifications, !isShowingSpotlight, !isConfiguringSync, !isChoosingCustomView, !isShowingShortcuts, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        #if DEBUG && targetEnvironment(simulator)
+        guard !isShowingSpotlightDiagnostics else { return nil }
+        #endif
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.complete(id: task.id) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
-                switch presentation {
-                case .columns: break
-                case .accessibilityColumns: selectedTaskID = task.id
-                case .compact: path = [task.id]
-                }
+                if isProjectWorkspace { projectPath.append(task.id) }
+                else if presentation != .columns { path = [task.id] }
             } },
             openView: openView,
             refresh: { Task { await store.reload() } }
@@ -382,23 +462,27 @@ struct ContentView: View {
     }
 
     private func capture() {
-        if store.customView == nil { store.query = .unfinished }
+        if store.customView == nil, store.selectedWorkspaceView != .projects, store.workspaceViews.active.contains(.unfinished) {
+            tabSelection.wrappedValue = .unfinished
+        }
         isCapturing = true
     }
 
     private func openView(_ query: TaskQuery) {
-        store.customView = nil
-        store.query = query
+        guard let view = WorkspaceView.defaults.first(where: { $0.query == query }) else { return }
+        guard store.workspaceViews.active.contains(view) else { presentViews(); return }
+        tabSelection.wrappedValue = view
     }
 
     private func openProject(_ project: TaskProjectSelection) {
-        store.customView = nil
+        guard isProjectWorkspace else { return }
+        store.query = .unfinished
         store.projectSelection = project
     }
 
     private func moveSelection(_ movement: TaskSelectionMovement) {
         selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if presentation == .compact, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
+        if presentation != .columns, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {

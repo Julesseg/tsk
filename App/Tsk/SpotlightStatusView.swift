@@ -2,6 +2,7 @@ import SwiftUI
 import TskCore
 import TskNative
 
+#if DEBUG && targetEnvironment(simulator)
 struct SpotlightStatusView: View {
     @Environment(\.dismiss) private var dismiss
     let controller: SpotlightController
@@ -39,6 +40,8 @@ struct SpotlightStatusView: View {
         }
     }
 }
+
+#endif
 
 struct SpotlightRequest: Identifiable {
     let id = UUID()

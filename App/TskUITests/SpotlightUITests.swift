@@ -11,7 +11,7 @@ import XCTest
         let id = create(title, app)
         openSettings(app)
         query(app, id: id, present: true, expectedIndexedCount: 1)
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         try systemSearch(title, app)
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, title)
@@ -20,7 +20,7 @@ import XCTest
         capture("Real Spotlight lookup tap opens exact persisted UUID", app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app, initialScrollUp: false))
         app.buttons["complete-task"].tap()
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         openSettings(app); query(app, id: id, present: false, expectedIndexedCount: 0)
         capture("Confirmed local completion removes actual indexed UUID", app)
     }
@@ -36,7 +36,7 @@ import XCTest
         app.buttons["spotlight-stale-fixture"].tap()
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 60))
         XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual stale fixture entry indexed"))
-        app.buttons["Done"].tap()
+        app.navigationBars.buttons["Done"].tap()
         try systemSearch("tsk stale " + token, app)
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "spotlight-task-unavailable").firstMatch.waitForExistence(timeout: 20))
         XCTAssertFalse(app.staticTexts["task-detail-description"].exists)
@@ -77,20 +77,17 @@ import XCTest
         return app
     }
     private func create(_ title: String, _ app: XCUIApplication) -> String {
-        XCTAssertTrue(app.buttons["new-task"].waitForExistence(timeout: 20)); app.buttons["new-task"].tap()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20)); app.buttons["New task"].tap()
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
-        if app.buttons["dismiss-editor-keyboard"].exists { app.buttons["dismiss-editor-keyboard"].tap() }
+        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
         app.buttons["save-task"].tap()
         let row = taskRow(named: title, app: app)
         XCTAssertTrue(waitForTaskSave(app, row: row, timeout: 20))
         return String(row.identifier.dropFirst("task-".count))
     }
     private func openSettings(_ app: XCUIApplication) {
-        if app.collectionViews["workspace-sidebar"].exists {
-            XCTAssertTrue(revealTaskElement(app.buttons["spotlight-settings"], in: "workspace-sidebar", app: app))
-        } else { app.buttons["workspace-more"].tap() }
-        tapTaskMenuItem(app.buttons["spotlight-settings"], app: app)
+        openWorkspaceSetting("spotlight-diagnostics", app: app)
         XCTAssertTrue(app.buttons["spotlight-query"].waitForExistence(timeout: 10))
     }
     private func query(_ app: XCUIApplication, id: String, present: Bool, expectedIndexedCount: Int? = nil) {
@@ -143,7 +140,9 @@ import XCTest
             XCTFail("Actual Home screen icons must be available before opening system Search")
             return
         }
-        springboard.swipeDown()
+        let search = springboard.otherElements["spotlight-pill"].firstMatch
+        if search.exists { tapTaskControl(search, app: springboard) }
+        else { springboard.swipeDown() }
         capture("Actual system Search surface before first-run handling", springboard)
         let education = springboard.buttons["Continue"].firstMatch
         if education.exists && education.isHittable {
@@ -153,7 +152,7 @@ import XCTest
         let spotlight = XCUIApplication(bundleIdentifier: "com.apple.Spotlight")
         let owners = [("com.apple.springboard", springboard), ("com.apple.Spotlight", spotlight)]
         func readySearch() -> (owner: XCUIApplication, field: XCUIElement)? {
-            for (_, owner) in owners {
+            for (_, owner) in owners where owner.state == .runningForeground {
                 let field = owner.searchFields.firstMatch
                 if field.exists && field.isEnabled && field.isHittable { return (owner, field) }
                 let textField = owner.textFields["SpotlightSearchField"].firstMatch
