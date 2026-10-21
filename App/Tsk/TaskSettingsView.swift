@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskSettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    let calendarPreferences: CalendarOverviewPreferences
     let choose: (ContentView.WorkspaceSetting) -> Void
 
     var body: some View {
@@ -16,6 +17,11 @@ struct TaskSettingsView: View {
                         .accessibilityIdentifier("attribute-definitions")
                 }
                 Section("Integrations") {
+                    NavigationLink {
+                        CalendarDisplaySettingsView(preferences: calendarPreferences)
+                    } label: {
+                        Label("Calendar", systemImage: "calendar")
+                    }.accessibilityIdentifier("calendar-display-settings")
                     Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { choose(.synchronization) }
                         .accessibilityIdentifier("synchronization-settings")
                     Button("Task notifications", systemImage: "bell") { choose(.notifications) }

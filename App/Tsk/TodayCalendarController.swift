@@ -4,6 +4,7 @@ import TskCore
 import TskNative
 
 @MainActor @Observable final class TodayCalendarController {
+    let preferences = CalendarOverviewPreferences.shared
     let manager: TaskManager
     let source: any CalendarEventSource
     private(set) var snapshot: TodayCalendarSnapshot?

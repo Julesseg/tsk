@@ -1,5 +1,9 @@
 #if canImport(EventKit)
 import Foundation
+import CoreGraphics
+#if os(macOS)
+import AppKit
+#endif
 @preconcurrency import EventKit
 import TskCore
 
@@ -117,10 +121,22 @@ public actor EventKitCalendarSource: CalendarEventSource {
         }
     }
 
+    nonisolated static func calendarColor(_ color: CGColor?) -> CalendarColor? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let converted = color?.converted(to: space, intent: .defaultIntent, options: nil),
+              let values = converted.components, values.count == 4 else { return nil }
+        return CalendarColor(red: Double(values[0]), green: Double(values[1]), blue: Double(values[2]), alpha: Double(values[3]))
+    }
+
     nonisolated static func snapshot(_ event: EKEvent) throws -> CalendarEventSnapshot {
         guard let calendar = event.calendar, let start = event.startDate, let end = event.endDate,
               let identity = event.eventIdentifier, !identity.isEmpty else { throw CalendarReadError.invalidEvent }
-        return CalendarEventSnapshot(calendarID: calendar.calendarIdentifier, eventID: identity, title: event.title ?? "", calendarTitle: calendar.title, location: event.location, start: start, end: end, isAllDay: event.isAllDay, isCanceled: event.status == .canceled)
+        #if os(macOS)
+        let color = calendarColor(calendar.color?.cgColor)
+        #else
+        let color = calendarColor(calendar.cgColor)
+        #endif
+        return CalendarEventSnapshot(calendarID: calendar.calendarIdentifier, eventID: identity, title: event.title ?? "", calendarTitle: calendar.title, location: event.location, start: start, end: end, isAllDay: event.isAllDay, isCanceled: event.status == .canceled, color: color)
     }
 }
 #endif

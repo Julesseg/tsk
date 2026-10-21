@@ -30,7 +30,7 @@ actor CalendarPresentationFixture: CalendarEventSource {
         if shouldFail { shouldFail = false; throw CocoaError(.fileReadUnknown) }
         if state == .empty { return [] }
         func event(_ id: String, _ title: String, start: Date, end: Date, allDay: Bool = false) -> CalendarEventSnapshot {
-            CalendarEventSnapshot(calendarID: "presentation", eventID: id, title: title, calendarTitle: "Hidden calendar name", location: "Hidden event location", start: start, end: end, isAllDay: allDay)
+            CalendarEventSnapshot(calendarID: "presentation", eventID: id, title: title, calendarTitle: "Hidden calendar name", location: "Hidden event location", start: start, end: end, isAllDay: allDay, color: id == "instant" ? nil : id == "timed" ? CalendarColor(red: 0.9, green: 0.4, blue: 0.1) : CalendarColor(red: 0.2, green: 0.6, blue: 0.8))
         }
         var events = [
             event("all-day", "Team offsite", start: window.start, end: window.end, allDay: true),

@@ -16,10 +16,22 @@ public struct CalendarEventIdentity: Hashable, Sendable {
     public let occurrenceStart: Date
 }
 
+public struct CalendarColor: Equatable, Sendable {
+    public let red: Double
+    public let green: Double
+    public let blue: Double
+    public let alpha: Double
+    public init?(red: Double, green: Double, blue: Double, alpha: Double = 1) {
+        guard [red, green, blue, alpha].allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { return nil }
+        self.red = red; self.green = green; self.blue = blue; self.alpha = alpha
+    }
+}
+
 public struct CalendarEventSnapshot: Equatable, Sendable, Identifiable {
     public let calendarID: String
     public let eventID: String
     public let title: String
+    public let color: CalendarColor?
     public let calendarTitle: String
     public let location: String?
     public let start: Date
@@ -28,14 +40,14 @@ public struct CalendarEventSnapshot: Equatable, Sendable, Identifiable {
     public let isCanceled: Bool
     public var id: CalendarEventIdentity { CalendarEventIdentity(calendarID: UTF8String(calendarID), eventID: UTF8String(eventID), occurrenceStart: start) }
 
-    public init(calendarID: String, eventID: String, title: String, calendarTitle: String, location: String? = nil, start: Date, end: Date, isAllDay: Bool = false, isCanceled: Bool = false) {
+    public init(calendarID: String, eventID: String, title: String, calendarTitle: String, location: String? = nil, start: Date, end: Date, isAllDay: Bool = false, isCanceled: Bool = false, color: CalendarColor? = nil) {
         self.calendarID = calendarID; self.eventID = eventID; self.title = title; self.calendarTitle = calendarTitle; self.location = location
-        self.start = start; self.end = end; self.isAllDay = isAllDay; self.isCanceled = isCanceled
+        self.start = start; self.end = end; self.isAllDay = isAllDay; self.isCanceled = isCanceled; self.color = color
     }
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id && lhs.title.matchesBytes(rhs.title) && lhs.calendarTitle.matchesBytes(rhs.calendarTitle)
             && lhs.location.map { UTF8String($0) } == rhs.location.map { UTF8String($0) }
-            && lhs.end == rhs.end && lhs.isAllDay == rhs.isAllDay && lhs.isCanceled == rhs.isCanceled
+            && lhs.end == rhs.end && lhs.isAllDay == rhs.isAllDay && lhs.isCanceled == rhs.isCanceled && lhs.color == rhs.color
     }
 }
 

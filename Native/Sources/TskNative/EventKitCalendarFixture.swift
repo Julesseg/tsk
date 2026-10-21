@@ -1,5 +1,6 @@
 #if DEBUG && canImport(EventKit) && targetEnvironment(simulator)
 import Foundation
+import CoreGraphics
 @preconcurrency import EventKit
 import TskCore
 
@@ -17,6 +18,7 @@ import TskCore
             }
             let calendar = EKCalendar(for: .event, eventStore: store)
             calendar.title = name(token); calendar.source = local
+            calendar.cgColor = CGColor(srgbRed: 0.2, green: 0.6, blue: 0.8, alpha: 1)
             try store.saveCalendar(calendar, commit: true)
             func add(_ title: String, _ start: Date, _ end: Date, allDay: Bool = false) throws {
                 let event = EKEvent(eventStore: store)
@@ -29,6 +31,7 @@ import TskCore
             try add("Calendar fixture boundary excluded", day.start.addingTimeInterval(-7200), day.start)
             try add("Calendar fixture tomorrow excluded", day.end, day.end.addingTimeInterval(3600))
             evidence["sourceType"] = local.sourceType.rawValue
+            evidence["calendarColorBefore"] = EventKitCalendarSource.calendarColor(calendar.cgColor).map { [$0.red, $0.green, $0.blue, $0.alpha] }
             evidence["storedBeforeDisplay"] = summaries(store: store, calendar: calendar, day: day)
             try write(evidence, token: token)
         } catch {
@@ -52,6 +55,15 @@ import TskCore
         guard owned.count >= 3, owned.contains(where: { $0.title == "Calendar fixture all day" && $0.isAllDay }),
               owned.contains(where: { $0.title == "Calendar fixture timed" }), owned.contains(where: { $0.title == "Calendar fixture spanning" }),
               !owned.contains(where: { $0.title.contains("excluded") }) else { throw NSError(domain: "tsk.CalendarFixture", code: 3, userInfo: [NSLocalizedDescriptionKey: "Actual Calendar Today display did not match stored fixture boundaries."]) }
+        let color = EventKitCalendarSource.calendarColor(calendar.cgColor)
+        let afterColor = color.map { [$0.red, $0.green, $0.blue, $0.alpha] }
+        evidence["calendarColorAfter"] = afterColor
+        evidence["displayedCalendarColors"] = owned.compactMap { $0.color.map { [$0.red, $0.green, $0.blue, $0.alpha] } }
+        try write(evidence, token: token)
+        guard let color, let beforeColor = evidence["calendarColorBefore"] as? [Double], let afterColor,
+              beforeColor.count == afterColor.count, zip(beforeColor, afterColor).allSatisfy({ abs($0 - $1) < 0.000001 }),
+              owned.allSatisfy({ $0.color == color }) else { throw NSError(domain: "tsk.CalendarFixture", code: 4, userInfo: [NSLocalizedDescriptionKey: "Calendar colors did not match the unchanged source color."]) }
+        evidence["calendarColorMatched"] = true
         evidence["storedAfterDisplay"] = after
         evidence["displayed"] = owned.map { ["title": $0.title, "id": $0.eventID, "start": $0.start.timeIntervalSince1970, "end": $0.end.timeIntervalSince1970, "allDay": $0.isAllDay] as [String: Any] }
         evidence["readOnlyVerified"] = true

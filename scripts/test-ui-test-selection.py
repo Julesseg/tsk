@@ -31,8 +31,8 @@ class SelectionTests(unittest.TestCase):
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         pad = selection.selected_methods(selection.selection("full", "iPad"))
-        self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 49)
+        self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 50)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)

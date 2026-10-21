@@ -15,7 +15,7 @@ struct TodayCalendarSection: View {
                     if let error = snapshot.readError {
                         failureRow(error)
                     } else {
-                        ForEach(snapshot.events) { event in TodayCalendarRow(value: event, timeZone: snapshot.timeZone) }
+                        TodayCalendarOverview(snapshot: snapshot, hours: calendar.preferences.hours)
                     }
                 } else {
                     Button("Enable Calendar") {
@@ -63,7 +63,7 @@ struct TodayCalendarSection: View {
     }
 }
 
-private struct TodayCalendarRow: View {
+struct TodayCalendarRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let value: TodayCalendarEvent
     let timeZone: TimeZone
@@ -71,15 +71,18 @@ private struct TodayCalendarRow: View {
     var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 2) { time; title }
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) { calendarDot; time }
+                    title
+                }
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: 12) { time; title }
+                HStack(alignment: .firstTextBaseline, spacing: 8) { calendarDot; time; title }
             }
         }
         .font(.footnote)
         .listRowSeparator(.hidden)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("calendar-event-\(Data((value.event.calendarID + "\u{0}" + value.event.eventID + "\u{0}" + String(value.event.start.timeIntervalSince1970)).utf8).base64EncodedString())")
+        .accessibilityIdentifier("calendar-event-\(value.accessibilityEventID)")
     }
 
     private var title: some View {
@@ -88,18 +91,29 @@ private struct TodayCalendarRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var calendarDot: some View {
+        Circle().fill(value.event.color?.swiftUIColor ?? .secondary)
+            .frame(width: 4, height: 4).accessibilityHidden(true)
+    }
+
     private var time: some View {
         Text(timeDescription).font(.caption).foregroundStyle(.secondary)
             .monospacedDigit().fixedSize(horizontal: false, vertical: true)
             .layoutPriority(1)
     }
 
-    private var timeDescription: String {
-        if value.event.isAllDay { return "All day" }
+    private var timeDescription: String { value.calendarTimeDescription(timeZone: timeZone) }
+}
+
+extension TodayCalendarEvent {
+    var accessibilityEventID: String { Data((event.calendarID + "\u{0}" + event.eventID + "\u{0}" + String(event.start.timeIntervalSince1970)).utf8).base64EncodedString() }
+
+    func calendarTimeDescription(timeZone: TimeZone) -> String {
+        if event.isAllDay { return "All day" }
         var format = Date.FormatStyle(date: .omitted, time: .shortened)
         format.timeZone = timeZone
-        if value.isInstant { return value.visibleStart.formatted(format) }
-        let end = value.endsAtDayBoundary ? "midnight" : value.visibleEnd.formatted(format)
-        return "\(value.visibleStart.formatted(format)) – \(end)"
+        if isInstant { return visibleStart.formatted(format) }
+        let end = endsAtDayBoundary ? "midnight" : visibleEnd.formatted(format)
+        return "\(visibleStart.formatted(format)) – \(end)"
     }
 }
