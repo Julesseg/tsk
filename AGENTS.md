@@ -61,8 +61,10 @@ CI verify it.
 #### CI is the canonical UI gate (background, not a decision to revisit)
 
 The iPhone `App · XCUITest (macOS)` and iPad checks run focused smoke coverage
-on every PR. All Core and Native tests remain mandatory. Full UI coverage runs
-nightly and through manual dispatch. Read `docs/verification/ci-test-tiers.md`
+on PRs with non-documentation changes, alongside all Core and Native tests.
+Documentation-only PRs and pushes use lightweight checks without test builds.
+Full UI coverage runs nightly and through manual dispatch. Read
+`docs/verification/ci-test-tiers.md`
 when changing CI coverage or verifying a workflow outside the smoke selection.
 You **never** need to run the UI suite locally as a precondition for implementing
 an issue.
