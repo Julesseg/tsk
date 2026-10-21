@@ -31,8 +31,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Test routing
+    runs-on: ubuntu-24.04
+    outputs:
+      run_tests: ${{ steps.route.outputs.run_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify test routing
+        run: python3 scripts/test-ci-test-routing.py
+      - name: Classify changed paths
+        id: route
+        run: python3 scripts/ci-test-routing.py
+
   core-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -45,7 +61,8 @@ jobs:
         run: swift test
 
   native-tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+    needs: changes
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -71,26 +88,34 @@ jobs:
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
 
   app-ui-tests:
+    needs: changes
     name: ${{ github.event_name == 'workflow_dispatch' && !inputs.diagnostic_only && (inputs.ui_suite == 'keyboard' && format('App · Keyboard diagnostics ({0})', matrix.family) || inputs.ui_suite == 'text' && format('App · Text diagnostics ({0})', matrix.family)) || matrix.job-name }}
-    runs-on: xcode-27
+    runs-on: ${{ needs.changes.outputs.run_tests == 'true' && 'xcode-27' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 60 }}
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"}]') }}
     steps:
+      - name: Documentation-only change
+        if: ${{ needs.changes.outputs.run_tests == 'false' }}
+        run: echo 'Documentation-only change; no Xcode runner, build or simulator required.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
 
       - name: Select Xcode 27
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "27.0"
 
       - uses: actions/setup-python@v5
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         with:
           python-version: "3.12"
 
       - name: Verify owned native keyboard transport boundaries
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: |
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-native-keyboard-hid-installer.py
@@ -99,11 +124,14 @@ jobs:
           python3 scripts/test-native-keyboard-boundary-cleanup.py
 
       - name: Install pinned native keyboard transport
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
 
       - uses: dtolnay/rust-toolchain@1.99.0
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
 
       - name: Check out pinned real TaskChampion sync server
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         uses: actions/checkout@v4
         with:
           repository: GothenburgBitFactory/taskchampion-sync-server
@@ -112,31 +140,38 @@ jobs:
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@v2
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         with:
           workspaces: |
             Native/Bridge
             .build/sync-server
 
       - name: Build pinned TaskChampion for iOS Simulator
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: scripts/build-native.sh simulator
 
       - name: Build the real isolated synchronization fixture and independent peer
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: |
           cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
           scripts/build-native.sh host
           swift build --package-path Native --product tsk-native-probe
 
       - name: Run Calendar controller regressions
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         timeout-minutes: 5
         run: TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib" swift test --package-path App/ControllerTests
 
       - name: Validate target-specific release profile rules
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: python3 scripts/test-provisioning-profiles.py
 
       - name: Toolchain versions
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: xcodebuild -version
 
       - name: Build UI test products
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         timeout-minutes: 20
         working-directory: App
         run: |
@@ -148,6 +183,7 @@ jobs:
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
 
       - name: Resolve an available ${{ matrix.family }} simulator
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         env:
           DEVICE_FAMILY: ${{ matrix.family }}
         id: sim
@@ -165,6 +201,7 @@ jobs:
           '
 
       - name: Run prebuilt UI tests
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 45 }}
         working-directory: App
         env:
@@ -199,16 +236,17 @@ jobs:
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
 
       - name: Verify simulator intent metadata and shared storage entitlement
+        if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
 
       - name: Remove owned isolated simulator
-        if: ${{ always() && steps.sim.outputs.id != '' }}
+        if: ${{ needs.changes.outputs.run_tests == 'true' && always() && steps.sim.outputs.id != '' }}
         run: |
           xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
           xcrun simctl delete "${{ steps.sim.outputs.id }}"
 
       - name: Upload test results
-        if: ${{ always() }}
+        if: ${{ needs.changes.outputs.run_tests == 'true' && always() }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

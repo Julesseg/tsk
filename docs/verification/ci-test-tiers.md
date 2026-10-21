@@ -1,12 +1,33 @@
 # CI test tiers
 
-Pull requests and pushes to `main` run all Core and persistent Native tests,
-plus focused UI smoke coverage on both device families. Existing check names
-stay unchanged for branch protection. The UI runner builds once per lane and
-reuses that build, simulator and synchronization fixture. An independent peer
+Pull requests and pushes to `main` with non-documentation changes run all Core
+and persistent Native tests, plus focused UI smoke coverage on both device
+families. Existing check names stay unchanged for branch protection. The UI
+runner builds once per lane and reuses that build, simulator and synchronization
+fixture. An independent peer
 verifies the uploaded UI task whenever the real-server synchronization scenario
 is selected. The iPad smoke selection exercises workspace/keyboard behavior and
 does not create that server task.
+
+A lightweight Linux job classifies the complete pull-request diff from its merge
+base, or the before/after range for a push. Documentation-only changes skip Core
+and Native jobs; the iPhone/iPad check names still run on Linux and report the
+skip without allocating an Xcode runner, building products or booting simulators.
+The workflow itself is never filtered out, so its check contexts still appear.
+The routing regressions run even for documentation-only changes.
+
+The documentation allowlist is root Markdown files, nested `README.md` files,
+root `LICENSE`/`LICENSE.txt`, and documentation/text/image/PDF files under `docs/`
+(`.md`, `.txt`, `.rst`, `.adoc`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`,
+`.pdf`). Unknown paths, mixed changes and executable examples run normal tests.
+Renames inspect both old and new paths, so moving source into documentation does
+not skip tests. Empty diffs, missing comparison commits and classification errors
+also run tests. Nightly, manual and unrecognized event types always run tests,
+including explicit smoke and diagnostic dispatches.
+
+The installable Release workflow already ignores Markdown and `docs/` changes;
+it also ignores the root license files so those documentation-only changes do
+not allocate a signing/build runner.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
