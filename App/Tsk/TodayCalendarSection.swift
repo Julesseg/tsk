@@ -76,6 +76,8 @@ private struct TodayCalendarRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) { time; title }
             }
         }
+        .font(.footnote)
+        .listRowSeparator(.hidden)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("calendar-event-\(Data((value.event.calendarID + "\u{0}" + value.event.eventID + "\u{0}" + String(value.event.start.timeIntervalSince1970)).utf8).base64EncodedString())")
     }
@@ -87,7 +89,7 @@ private struct TodayCalendarRow: View {
     }
 
     private var time: some View {
-        Text(timeDescription).font(.subheadline).foregroundStyle(.secondary)
+        Text(timeDescription).font(.caption).foregroundStyle(.secondary)
             .monospacedDigit().fixedSize(horizontal: false, vertical: true)
             .layoutPriority(1)
     }
