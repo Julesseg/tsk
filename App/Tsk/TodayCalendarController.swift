@@ -19,8 +19,10 @@ import TskNative
 
     init(manager: TaskManager, source: any CalendarEventSource = EventKitCalendarSource()) {
         self.manager = manager
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_READ_FAILURE"] == "1" {
+        #if DEBUG && targetEnvironment(simulator)
+        if let fixture = CalendarPresentationFixture(environment: ProcessInfo.processInfo.environment) {
+            self.source = fixture
+        } else if ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_READ_FAILURE"] == "1" {
             self.source = FailingCalendarFixtureSource(source: source)
         } else { self.source = source }
         #else

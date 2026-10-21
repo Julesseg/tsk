@@ -32,7 +32,7 @@ not allocate a signing/build runner.
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 55 declared methods | 45-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Full | All 59 declared methods | 49-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
@@ -52,6 +52,12 @@ capture/edit/completion/reopen, adaptive landscape/portrait views, custom views
 at accessibility text sizes, modal annotation commands and native text input.
 Share runs first only when selected; the iPad smoke lane skips its separate
 launch and host-fixture installation.
+
+Compact Calendar presentation, access controls and Retry recovery run on both device
+families in the full suite, including populated light/dark and largest-text
+captures, empty Calendar/tasks and many-event scrolling. Controlled Calendar
+sources establish presentation; actual EventKit authorization and read-only
+local-source checks remain separate CalendarTodayUITests.
 
 Native task actions, exhaustive typed attributes and filters, recurrence, Reminders copy/move and
 permission changes, notification delivery/revocation, stale/peer Spotlight
