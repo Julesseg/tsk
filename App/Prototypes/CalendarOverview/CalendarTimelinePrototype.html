@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsk · Calendar timeline prototype</title>
+<style>
+:root { color-scheme:light; --page:#e8e8ed; --surface:#f2f2f7; --card:#fff; --text:#18181b; --secondary:#85858b; --subtle:#b8b8bd; --accent:#9a714d; --wash:#f1e9e0; --task:#dddde2; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; padding:22px 14px 112px; }
+body.dark { color-scheme:dark; --page:#101012; --surface:#000; --card:#1c1c1e; --text:#f5f5f7; --secondary:#99999f; --subtle:#56565c; --accent:#cca581; --wash:#302820; --task:#38383b; }
+button,select { font:inherit; color:inherit; }
+button { cursor:pointer; }
+.lab { max-width:860px; margin:auto; }
+.intro { max-width:630px; margin:0 auto 18px; }
+.eyebrow { color:var(--secondary); text-transform:uppercase; letter-spacing:.13em; font-size:10px; font-weight:700; }
+h1 { font-size:23px; letter-spacing:-.6px; line-height:1.15; margin:8px 0; }
+.intro p { color:var(--secondary); font-size:13px; margin:8px 0; }
+.controls { display:flex; gap:8px; flex-wrap:wrap; margin:15px 0; }
+.controls label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--secondary); }
+select,.theme { background:var(--card); border:0; border-radius:9px; padding:8px 10px; font-size:12px; }
+.stage { display:grid; grid-template-columns:minmax(0,430px) minmax(180px,270px); align-items:start; justify-content:center; gap:26px; }
+.phone { min-width:0; border-radius:35px; overflow:hidden; background:var(--surface); box-shadow:0 10px 50px #0000000c; border:1px solid var(--subtle); }
+.status { display:flex; justify-content:space-between; padding:17px 27px 12px; font-weight:600; font-size:14px; }
+.status small { letter-spacing:2px; font-size:11px; }
+.header { display:flex; justify-content:space-between; align-items:center; padding:16px 23px 24px; }
+.header strong { font-size:24px; letter-spacing:-.5px; }
+.settings { display:grid; place-items:center; font-size:24px; background:var(--card); border-radius:50%; width:40px; height:40px; color:var(--text); }
+.calendar { margin:0 17px; min-width:0; }
+.calendar.blank { display:none; }
+.small { font-size:11px; color:var(--secondary); }
+.context { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--secondary); margin:0 0 10px; }
+.dot { width:4px; height:4px; border-radius:50%; background:var(--secondary); flex-shrink:0; }
+.quiet { background:var(--card); border-radius:22px; padding:3px 16px; }
+.event-row { display:flex; align-items:baseline; gap:12px; padding:12px 0; font-size:13px; min-height:44px; }
+.event-row time { font-size:12px; color:var(--secondary); font-variant-numeric:tabular-nums; flex:0 0 94px; }
+.event-row span { flex:1; min-width:0; }
+.day-strip { padding-top:2px; }
+.day-strip .context { margin-bottom:13px; }
+.day-scroll { overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; }
+.day-canvas { position:relative; width:720px; height:101px; }
+.hours { display:flex; justify-content:space-between; color:var(--secondary); font-size:10px; height:20px; font-variant-numeric:tabular-nums; }
+.hour-grid { position:absolute; inset:23px 0 0; background:repeating-linear-gradient(to right,transparent 0,transparent 71px,var(--task) 71px,var(--task) 72px); opacity:.3; pointer-events:none; }
+.day-event { border:0; text-align:left; cursor:pointer; position:absolute; border-radius:7px; background:var(--wash); color:var(--accent); font-size:11px; padding:7px 9px; height:31px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.day-event.secondary { background:var(--card); color:var(--secondary); height:25px; padding-top:4px; }
+.now-line { position:absolute; top:17px; bottom:0; width:1px; background:var(--accent); z-index:2; }
+.now-line:before { content:""; display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); transform:translate(-2px,-2px); }
+.day-detail { font-size:12px; margin-top:9px; min-height:34px; } .day-detail time { color:var(--secondary); font-size:10px; display:block; }
+.legend { display:flex; justify-content:space-between; margin-top:8px; color:var(--secondary); font-size:10px; }
+.focus { display:grid; grid-template-columns:1.1fr 1fr; gap:17px; padding:3px 0 1px; }
+.focus-label { text-transform:uppercase; letter-spacing:.08em; color:var(--secondary); font-size:9px; font-weight:600; margin:0 0 9px; }
+.focus-title { font-size:14px; line-height:1.3; margin:0 0 5px; }
+.focus time { color:var(--secondary); font-size:11px; font-variant-numeric:tabular-nums; }
+.progress { background:var(--task); border-radius:3px; height:3px; margin-top:14px; }
+.progress span { display:block; height:100%; width:35%; background:var(--accent); border-radius:3px; }
+.next-list { display:flex; flex-direction:column; gap:12px; }
+.next-item { display:flex; gap:8px; font-size:12px; line-height:1.3; }
+.next-item time { width:32px; flex-shrink:0; padding-top:1px; }
+.focus-context { display:flex; align-items:center; gap:6px; color:var(--secondary); font-size:10px; margin:15px 0 0; }
+.agenda-scroll { overflow-x:auto; scrollbar-width:none; padding:2px 0 8px; }
+.agenda-rail { display:flex; width:max-content; padding:0 0 3px; }
+.agenda-stop { position:relative; width:141px; padding:0 16px 0 0; }
+.agenda-stop:before { content:""; position:absolute; top:24px; width:100%; height:1px; background:var(--task); }
+.agenda-stop:last-child:before { width:0; }
+.agenda-stop time { display:block; color:var(--secondary); font-size:10px; margin-bottom:12px; font-variant-numeric:tabular-nums; }
+.rail-dot { position:relative; display:block; width:6px; height:6px; border:1px solid var(--secondary); background:var(--surface); border-radius:50%; margin-bottom:11px; }
+.agenda-stop.active .rail-dot { background:var(--accent); border-color:var(--accent); }
+.agenda-stop strong { display:block; font-size:12px; font-weight:400; line-height:1.3; }
+.agenda-stop small { font-size:10px; color:var(--secondary); display:block; margin-top:4px; }
+.tasks { margin:24px 17px 0; }
+.task-heading { font-size:15px; font-weight:600; color:var(--secondary); margin:0 0 10px 16px; }
+.task-card { background:var(--card); border-radius:22px; padding:2px 16px; }
+.task { display:flex; align-items:center; gap:11px; padding:15px 0; min-height:67px; }
+.task+.task { border-top:1px solid var(--task); }
+.check { width:18px; height:18px; border:1.3px solid var(--subtle); border-radius:6px; flex-shrink:0; }
+.task-title { font-size:16px; }
+.task small { display:block; color:var(--secondary); font-size:12px; margin-top:2px; }
+.task-chevron { margin-left:auto; color:var(--subtle); }
+.tab-bar { display:flex; justify-content:space-around; gap:5px; padding:15px 16px 21px; margin-top:110px; color:var(--secondary); font-size:10px; }
+.tab-bar span { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.tab-bar b { font-size:20px; font-weight:400; }
+.tab-bar .selected { color:#1785bd; }
+.notes { padding-top:24px; }
+.notes h2 { font-size:17px; letter-spacing:-.3px; margin:0 0 10px; }
+.notes p { color:var(--secondary); font-size:13px; margin:0 0 14px; }
+.readout { font-variant-numeric:tabular-nums; border-top:1px solid var(--subtle); padding-top:13px; font-size:11px; color:var(--secondary); }
+.readout div { margin:5px 0; }
+.switcher { position:fixed; z-index:10; bottom:max(15px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); display:flex; align-items:center; padding:5px; background:#242428; color:#fff; border:1px solid #ffffff20; border-radius:50px; box-shadow:0 6px 30px #0003; width:min(330px,calc(100% - 28px)); }
+.switcher button { background:none; color:inherit; border:0; width:44px; height:44px; border-radius:50%; font-size:21px; }
+.switcher button:active { background:#ffffff20; }
+.switcher output { text-align:center; flex:1; font-size:12px; font-weight:600; }
+.switcher output small { display:block; font-size:9px; font-weight:400; color:#aaaab1; }
+@media(max-width:700px) { body { padding:15px 12px 104px; } .stage { display:block; } .phone { max-width:430px; margin:auto; border-radius:27px; } .notes { max-width:430px; margin:auto; padding:18px 5px 0; } .intro { max-width:430px; } .intro h1 { font-size:21px; } .header { padding-top:10px; } .tab-bar { margin-top:68px; } }
+</style>
+</head>
+<body>
+<main class="lab">
+<header class="intro">
+<div class="eyebrow">tsk / throwaway design prototype</div>
+<h1>A quieter Calendar, above your tasks.</h1>
+<p>Four variants of Today: the smaller, divider-free current iteration and three horizontal timeline ideas. Switch with the bottom arrows or ← →.</p>
+<div class="controls">
+<label>Day <select id="scenario"><option value="normal">Usual day</option><option value="busy">Overlapping events</option><option value="empty">No events</option></select></label>
+<label>Time <select id="clock"><option value="10.35">10:21 · during review</option><option value="11.5">11:30 · between events</option><option value="18">18:00 · after events</option></select></label>
+<button class="theme" id="theme" type="button">Dark appearance</button>
+</div>
+</header>
+<div class="stage">
+<section class="phone" aria-label="Today design illustration">
+<div class="status"><span>9:41</span><small>● ▰</small></div>
+<div class="header"><strong>Today</strong><span class="settings" aria-label="Settings illustration">⚙</span></div>
+<div id="calendar" class="calendar"></div>
+<section class="tasks">
+<h2 class="task-heading">Tasks · Today</h2>
+<div class="task-card">
+<div class="task"><i class="check"></i><div><div class="task-title">Prepare the release</div><small>Planned 16 Oct</small></div><span class="task-chevron">›</span></div>
+<div class="task"><i class="check"></i><div><div class="task-title">Send the final proposal</div><small>Work</small></div><span class="task-chevron">›</span></div>
+<div class="task"><i class="check"></i><div><div class="task-title">Book the train</div></div><span class="task-chevron">›</span></div>
+</div>
+</section>
+<div class="tab-bar"><span class="selected"><b>☼</b>Today</span><span><b>◷</b>Upcoming</span><span><b>▱</b>Projects</span><span><b>☷</b>All</span><span><b>＋</b>New task</span></div>
+</section>
+<aside class="notes">
+<div class="eyebrow" id="variant-key"></div><h2 id="variant-title"></h2>
+<p id="variant-description"></p><p id="tradeoff"></p>
+<div class="readout" aria-live="polite" id="readout"></div>
+<p style="font-size:11px;margin-top:17px">Browser illustrations with shared sample data. A mirrors the updated native row styling; the other options are proposals. Calendar stays display-only. No accounts or tasks are changed.</p>
+</aside>
+</div>
+</main>
+<nav class="switcher" aria-label="Prototype variant"><button id="prev" aria-label="Previous variant">←</button><output id="variant-label"></output><button id="next" aria-label="Next variant">→</button></nav>
+<script>
+const variants = [
+ {key:'A',name:'Quiet rows',description:'The current iteration: smaller event titles and times, no dividers. Every event stays in the list above tasks.',tradeoff:'All titles are visible immediately. The section still grows with the number of events.'},
+ {key:'B',name:'Day strip',description:'A time-scaled horizontal strip. Duration becomes width; overlapping events occupy separate lanes. Swipe along the day.',tradeoff:'Makes gaps and collisions visible. Tap an event to read its full title below the strip. The extra row trades a little height for legible detail.'},
+ {key:'C',name:'Now + next',description:'An active event and its progress sit beside the next two events. A separate small line keeps all-day context visible.',tradeoff:'Only current and imminent events are visible. Past events and later events beyond the next two stay out of this view.'},
+ {key:'D',name:'Agenda rail',description:'A horizontal sequence of event stops, each with a time and title. Swipe sideways to follow the day without adding vertical rows.',tradeoff:'Gives titles more space than a time-scaled strip. Equal spacing shows order rather than the size of gaps.'}
+];
+const baseEvents=[{title:'Morning planning',start:9,end:9.5},{title:'Design review with the product team',start:10,end:11},{title:'Lunch with Maya',start:12,end:13},{title:'Project catch-up',start:15,end:15.5}];
+const overlaps=[{title:'Customer call',start:10.25,end:10.75},{title:'Prototype handoff',start:10.5,end:11.25},{title:'Team check-in',start:14,end:14.5}];
+let variant=new URLSearchParams(location.search).get('variant') || 'A';
+if(!variants.some(v=>v.key===variant)) variant='A';
+const scenario=document.querySelector('#scenario'), clock=document.querySelector('#clock');
+const calendar=document.querySelector('#calendar');
+const time=n=>`${String(Math.floor(n)).padStart(2,'0')}:${String(Math.round(n%1*60)).padStart(2,'0')}`;
+const range=e=>`${time(e.start)} – ${time(e.end)}`;
+const context='<div class="context"><span class="dot"></span><span>All day · Team offsite</span></div>';
+const title=e=>e.title.replaceAll('&','&amp;').replaceAll('"','&quot;');
+function VariantA(events,now) {
+ return `<div class="quiet"><div class="event-row"><time>All day</time><span>Team offsite</span></div>${events.map(e=>`<div class="event-row"><time>${range(e)}</time><span>${e.title}</span></div>`).join('')}</div>`;
+}
+function VariantB(events,now) {
+ const laneEnds=[];
+ const bars=events.map((e,index)=>{
+   let lane=laneEnds.findIndex(end=>end<=e.start);
+   if(lane<0) lane=laneEnds.length;
+   laneEnds[lane]=e.end;
+   return `<button type="button" data-event="${index}" class="day-event ${lane ? 'secondary':''}" style="left:${(e.start-8)*72}px;top:${25+lane*34}px;width:${Math.max((e.end-e.start)*72-3,20)}px" title="${title(e)} · ${range(e)}" aria-label="${title(e)} · ${range(e)}">${e.title}</button>`;
+ }).join('');
+ return `<div class="day-strip">${context}<div class="day-scroll" id="day-scroll"><div class="day-canvas" style="height:${30+Math.max(laneEnds.length,1)*34}px"><div class="hours">${Array.from({length:11},(_,i)=>`<span>${i+8}</span>`).join('')}</div><div class="hour-grid"></div>${bars}<div class="now-line" style="left:${(now-8)*72}px"></div></div></div><div class="legend"><span>${time(now)} now</span><span>8–18h · swipe →</span></div><div class="day-detail" id="day-detail">Tap a block for event details</div></div>`;
+}
+function VariantC(events,now) {
+ const active=events.filter(e=>e.start<=now && e.end>now);
+ const current=active[0];
+ const next=events.filter(e=>e.start>now).slice(0,2);
+ const progress=current ? Math.round((now-current.start)/(current.end-current.start)*100):0;
+ return `<div class="focus"><div><div class="focus-label">${current ? 'Now' : 'Space to focus'}</div><div class="focus-title">${current ? current.title : next.length ? 'No event right now' : 'Calendar clear'}</div><time>${current ? range(current) : next.length ? `Until ${time(next[0].start)}` : 'For the rest of today'}</time>${current ? `<div class="progress"><span style="width:${progress}%"></span></div>`:''}</div><div><div class="focus-label">Up next</div><div class="next-list">${next.length ? next.map(e=>`<div class="next-item"><time>${time(e.start)}</time><span>${e.title}</span></div>`).join('') : '<span class="small">Nothing else today</span>'}</div></div></div><div class="focus-context"><span class="dot"></span>Team offsite · all day${active.length>1 ? ` · ${active.length} overlapping now`:''}</div>`;
+}
+function VariantD(events,now) {
+ return `${context}<div class="agenda-scroll"><div class="agenda-rail">${events.map(e=>`<div class="agenda-stop ${e.start<=now && e.end>now ? 'active':''}" ${e.start<=now && e.end>now ? 'data-current="true"':''}><time>${time(e.start)}</time><span class="rail-dot"></span><strong>${e.title}</strong><small>${Math.round((e.end-e.start)*60)} min${e.end<=now?' · earlier':''}</small></div>`).join('')}</div></div>`;
+}
+function render() {
+ const current=variants.find(v=>v.key===variant);
+ const events=scenario.value==='empty' ? [] : [...baseEvents,...(scenario.value==='busy'? overlaps:[])].sort((a,b)=>a.start-b.start);
+ const now=Number(clock.value);
+ calendar.classList.toggle('blank',!events.length);
+ calendar.innerHTML=events.length ? ({A:VariantA,B:VariantB,C:VariantC,D:VariantD}[variant])(events,now) : '';
+ document.querySelector('#variant-key').textContent=`Variant ${variant} · ${variant==='A'?'current iteration':'timeline proposal'}`;
+ document.querySelector('#variant-title').textContent=current.name;
+ document.querySelector('#variant-description').textContent=current.description;
+ document.querySelector('#tradeoff').textContent=current.tradeoff;
+ document.querySelector('#variant-label').innerHTML=`${variant} · ${current.name}<small>${variants.findIndex(v=>v.key===variant)+1} / 4</small>`;
+ document.querySelector('#readout').innerHTML=`<div>${scenario.options[scenario.selectedIndex].text} · ${time(now)}</div><div>${events.length} timed events · ${events.length ? '1':'0'} all-day event</div><div>Calendar height: <span id="height"></span> px · same task list</div><details><summary>Shared sample events</summary>${events.map(e=>`<div>${range(e)} · ${e.title}</div>`).join('')}${events.length ? '<div>All day · Team offsite</div>':''}</details>`;
+ if(variant==='B' && events.length) document.querySelector('#day-scroll').scrollLeft=Math.max(0,(now-9.2)*72);
+ if(variant==='D' && events.length) {
+  const currentStop=calendar.querySelector('[data-current]');
+  if(currentStop) calendar.querySelector('.agenda-scroll').scrollLeft=currentStop.offsetLeft-calendar.querySelector('.agenda-rail').offsetLeft;
+ }
+ requestAnimationFrame(()=>document.querySelector('#height').textContent=Math.round(calendar.getBoundingClientRect().height));
+}
+function switchVariant(delta) {
+ variant=variants[(variants.findIndex(v=>v.key===variant)+delta+variants.length)%variants.length].key;
+ const url=new URL(location.href);url.searchParams.set('variant',variant);history.replaceState(null,'',url);
+ render();
+}
+document.querySelector('#prev').onclick=()=>switchVariant(-1);
+document.querySelector('#next').onclick=()=>switchVariant(1);
+document.addEventListener('keydown',e=>{
+ if(e.target.closest('input,textarea,select,[contenteditable]')) return;
+ if(e.key==='ArrowLeft'||e.key==='ArrowRight') { e.preventDefault();switchVariant(e.key==='ArrowLeft'?-1:1); }
+});
+calendar.addEventListener('click',e=>{
+ const button=e.target.closest('[data-event]');
+ if(!button) return;
+ const events=[...baseEvents,...(scenario.value==='busy'?overlaps:[])].sort((a,b)=>a.start-b.start);
+ const event=events[Number(button.dataset.event)];
+ document.querySelector('#day-detail').innerHTML=`${event.title}<time>${range(event)}</time>`;
+});
+scenario.onchange=render;clock.onchange=render;
+document.querySelector('#theme').onclick=()=>{
+ document.body.classList.toggle('dark');
+ document.querySelector('#theme').textContent=document.body.classList.contains('dark')?'Light appearance':'Dark appearance';
+ render();
+};
+window.addEventListener('resize',render);
+render();
+</script>
+</body>
+</html>
