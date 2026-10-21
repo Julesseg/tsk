@@ -24,7 +24,7 @@ An expression that selects tasks according to Taskwarrior's filtering language.
 A task created in tsk from an Apple reminder.
 
 **Planned day**:
-The day on which the user intends to work on a task, distinct from its deadline.
+An organizational date expressing the day on which the user intends to work on a task, distinct from its deadline.
 _Avoid_: Deadline as a synonym for planned day
 
 **Deadline**:
