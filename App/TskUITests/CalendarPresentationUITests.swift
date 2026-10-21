@@ -156,7 +156,7 @@ import XCTest
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = state
         if hasTask {
-            let record: [String: Any] = ["id": UUID().uuidString, "attributes": [["key": "description", "value": "Prepare the release"], ["key": "status", "value": "pending"], ["key": "scheduled", "value": "1792108800"]]]
+            let record: [String: Any] = ["id": replica, "attributes": [["key": "description", "value": "Prepare the release"], ["key": "status", "value": "pending"], ["key": "scheduled", "value": "1792108800"]]]
             app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: [record]), as: UTF8.self)
         }
         if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
