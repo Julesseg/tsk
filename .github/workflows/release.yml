@@ -8,6 +8,8 @@ on:
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
+      - 'LICENSE'
+      - 'LICENSE.txt'
 
 # The only project-specific values in this workflow. APP_NAME must match the
 # Xcode project/scheme on disk; BUNDLE_ID must match PRODUCT_BUNDLE_IDENTIFIER

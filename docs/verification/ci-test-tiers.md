@@ -25,6 +25,10 @@ not skip tests. Empty diffs, missing comparison commits and classification error
 also run tests. Nightly, manual and unrecognized event types always run tests,
 including explicit smoke and diagnostic dispatches.
 
+The installable Release workflow already ignores Markdown and `docs/` changes;
+it also ignores the root license files so those documentation-only changes do
+not allocate a signing/build runner.
+
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
