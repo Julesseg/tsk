@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 extension XCTestCase {
     @MainActor func taskTestApplication() -> XCUIApplication {
@@ -6,6 +7,19 @@ extension XCTestCase {
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
         return app
+    }
+
+    @MainActor func workspaceTab(_ title: String, app: XCUIApplication) -> XCUIElement {
+        if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons[title] }
+        return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "tab-", title)).firstMatch
+    }
+
+    @MainActor func workspaceTabs(in app: XCUIApplication) -> [XCUIElement] {
+        if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons.allElementsBoundByIndex }
+        var seen: Set<String> = []
+        return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-")).allElementsBoundByIndex.filter {
+            seen.insert($0.identifier).inserted
+        }
     }
 
     @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {
@@ -23,7 +37,7 @@ extension XCTestCase {
     }
 
     @MainActor func selectDoneTasks(_ app: XCUIApplication) {
-        let done = app.tabBars.buttons["Done"]
+        let done = workspaceTab("Done", app: app)
         if done.exists { tapTaskControl(done, app: app); return }
         if !app.collectionViews["views-list"].exists { openWorkspaceSetting("custom-views", app: app) }
         let add = app.buttons["activate-completed"]
@@ -43,7 +57,7 @@ extension XCTestCase {
     }
 
     @MainActor func selectAllTasks(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["All"]
+        let tab = workspaceTab("All", app: app)
         guard tab.waitForExistence(timeout: 20) else {
             XCTFail("The All tab must be available before reviewing unfinished tasks")
             return

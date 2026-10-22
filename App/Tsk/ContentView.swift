@@ -59,7 +59,6 @@ struct ContentView: View {
     }
 
     init(store: TaskStore) {
-        store.allowsUnfavoritedSelection = UIDevice.current.userInterfaceIdiom == .pad
         _prefersSidebar = State(initialValue: Self.navigationDefaults.bool(forKey: "prefers-sidebar"))
         _store = State(initialValue: store)
         _spotlight = State(initialValue: SpotlightController(store: store))
@@ -157,7 +156,6 @@ struct ContentView: View {
                 Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                     iPadContent
                 }
-                .defaultVisibility(.hidden, for: .sidebar)
                 .accessibilityIdentifier("tab-" + view.id)
             }
             TabSection("Predefined views") {
@@ -624,6 +622,8 @@ private struct WorkspacePlacementObserver: ViewModifier {
     let changed: (TabBarPlacement?) -> Void
 
     func body(content: Content) -> some View {
-        content.onChange(of: placement, initial: true) { _, placement in changed(placement) }
+        content.onChange(of: placement, initial: true) { _, placement in
+            Task { @MainActor in changed(placement) }
+        }
     }
 }

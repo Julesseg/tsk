@@ -18,21 +18,21 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        for family, count in (("iPhone", 13), ("iPad", 10)):
+        for family, count in (("iPhone", 13), ("iPad", 11)):
             with self.subTest(family=family):
                 smoke = selection.selected_methods(selection.selection("smoke", family))
                 full = selection.selected_methods(selection.selection("full", family))
                 self.assertEqual(len(smoke), count)
                 self.assertLess(smoke, full)
         pad = selection.selected_methods(selection.selection("smoke", "iPad"))
-        self.assertEqual(sum("/iPadWorkspaceUITests/" in test for test in pad), 3)
+        self.assertEqual(sum("/iPadWorkspaceUITests/" in test for test in pad), 4)
         self.assertTrue(any(test.endswith("/testIndependentNativeTextViewRecognizesPlainAndCommandKeys") for test in pad))
 
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 50)
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 51)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)

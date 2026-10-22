@@ -27,7 +27,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
             XCTAssertFalse(app.tabBars.buttons["New task"].exists)
         } else {
             XCTAssertGreaterThan(create.frame.midY, app.frame.maxY - app.frame.height * 0.2)
-            let lastView = app.tabBars.buttons["All"]
+            let lastView = workspaceTab("All", app: app)
             XCTAssertGreaterThan(create.frame.minX, lastView.frame.maxX)
             XCTAssertEqual(create.frame.midY, lastView.frame.midY, accuracy: 2)
         }
@@ -102,8 +102,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
         let app = launch(animationsEnabled: true)
         let hasCaptureTab = UIDevice.current.userInterfaceIdiom != .pad
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All"] + (hasCaptureTab ? ["New task"] : []))
-        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertEqual(workspaceTabs(in: app).map(\.label), ["Today", "Upcoming", "Projects", "All"] + (hasCaptureTab ? ["New task"] : []))
+        XCTAssertTrue(workspaceTab("Today", app: app).isSelected)
         openWorkspaceSetting("custom-views", app: app)
         capture("Views with four default active tabs")
         tapTaskControl(app.buttons["new-custom-view"], app: app)
@@ -140,12 +140,12 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(app.buttons["close-views"], app: app)
         app.terminate()
         app.launch()
-        let custom = app.tabBars.buttons["All local tasks"]
+        let custom = workspaceTab("All local tasks", app: app)
         XCTAssertTrue(custom.waitForExistence(timeout: 15))
         XCTAssertTrue(custom.isSelected)
-        XCTAssertEqual(app.tabBars.buttons.element(boundBy: 0).label, "All local tasks")
-        XCTAssertEqual(app.tabBars.buttons.count, hasCaptureTab ? 5 : 4)
-        XCTAssertFalse(app.tabBars.buttons["Done"].exists)
+        XCTAssertEqual(workspaceTabs(in: app)[0].label, "All local tasks")
+        XCTAssertEqual(workspaceTabs(in: app).count, hasCaptureTab ? 5 : 4)
+        XCTAssertFalse(workspaceTab("Done", app: app).exists)
         capture("First active custom tab after relaunch")
         openWorkspaceSetting("custom-views", app: app)
         for identifier in ["today", "upcoming", "projects"] {
@@ -159,7 +159,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskMenuItem(app.buttons["Delete"], app: app)
         XCTAssertTrue(saved.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["close-views"], app: app)
-        XCTAssertEqual(app.tabBars.buttons.count, hasCaptureTab ? 2 : 1)
+        XCTAssertEqual(workspaceTabs(in: app).count, hasCaptureTab ? 2 : 1)
         XCTAssertTrue(app.buttons["New task"].isHittable)
     }
 
@@ -175,7 +175,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Prepare launch", app: app), timeout: 15))
-        tapTaskControl(app.tabBars.buttons["Projects"], app: app)
+        tapTaskControl(workspaceTab("Projects", app: app), app: app)
         XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 10))
         capture("Projects list")
         tapTaskControl(app.buttons["project-Launch"], app: app)
@@ -251,7 +251,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
         for title in ["Today", "Projects"] {
-            tapTaskControl(app.tabBars.buttons[title], app: app, beforeSample: dismissPassword)
+            tapTaskControl(workspaceTab(title, app: app), app: app, beforeSample: dismissPassword)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
             XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)

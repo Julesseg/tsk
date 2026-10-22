@@ -70,7 +70,7 @@ final class TskWaitingUITests: XCTestCase {
     }
 
     private func selectToday(_ app: XCUIApplication) {
-        app.tabBars.buttons["Today"].tap()
+        workspaceTab("Today", app: app).tap()
     }
 
     private func waitingReasons(_ app: XCUIApplication) -> XCUIElementQuery {

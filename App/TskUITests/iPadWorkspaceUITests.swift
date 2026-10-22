@@ -13,7 +13,7 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     func testAdaptiveNavigationCatalogAndSidebarPreference() throws {
         let app = launch()
-        let today = app.tabBars.buttons["Today"]
+        let today = workspaceTab("Today", app: app)
         XCTAssertTrue(today.waitForExistence(timeout: 15))
         XCTAssertLessThan(today.frame.midY, app.frame.midY)
         XCTAssertFalse(app.tabBars.buttons["New task"].exists)
@@ -23,7 +23,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         tapTaskControl(app.buttons["workspace-views"], app: app)
         tapTaskMenuItem(app.buttons["open-view-completed"], app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Done")
-        XCTAssertFalse(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertFalse(workspaceTab("Today", app: app).isSelected)
         tapTaskControl(app.buttons["workspace-views"], app: app)
         XCTAssertEqual(app.buttons["open-view-completed"].value as? String, "1")
         capture("iPad Views shows unfavorited current view", app: app)
@@ -51,7 +51,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let id = String(saved.identifier.dropFirst("saved-view-".count))
         XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
         tapTaskControl(app.buttons["close-views"], app: app)
-        let sidebar = app.buttons["Show Sidebar"]
+        let sidebar = app.buttons["ToggleSideBar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(sidebar, app: app)
         XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 5))
@@ -66,11 +66,13 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(custom.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(custom, app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
-        let close = app.buttons["Hide Sidebar"]
+        let close = app.buttons["ToggleSideBar"]
         XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(close, app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
-        XCTAssertFalse(app.tabBars.buttons.allElementsBoundByIndex.contains(where: \.isSelected))
+        for title in ["Today", "Upcoming", "Projects", "All"] {
+            XCTAssertFalse(workspaceTab(title, app: app).isSelected)
+        }
         capture("iPad unfavorited custom view after sidebar closes", app: app)
         XCUIDevice.shared.orientation = .portrait
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
@@ -91,7 +93,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         tapTaskControl(app.buttons["sidebar-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
-        let hideSidebar = app.buttons["Hide Sidebar"]
+        let hideSidebar = app.buttons["ToggleSideBar"]
         XCTAssertTrue(hideSidebar.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(hideSidebar, app: app)
         XCTAssertTrue(today.waitForExistence(timeout: 5))
@@ -106,7 +108,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         selectDoneTasks(app)
         selectAllTasks(app)
         let commands = try TaskKeyboardCommand(.workspace, app: app)
-        XCTAssertTrue(app.tabBars.buttons["All"].waitForExistence(timeout: 10))
+        XCTAssertTrue(workspaceTab("All", app: app).waitForExistence(timeout: 10))
         XCTAssertTrue(app.otherElements["workspace-detail-empty"].exists || app.staticTexts["Select a task"].exists)
         capture("iPad landscape empty workspace", app: app)
         try commands.perform("capture") { app.typeKey("n", modifierFlags: .command) }
@@ -135,7 +137,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         capture("iPad completed view from injected command", app: app)
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Done"].waitForExistence(timeout: 10))
+        XCTAssertTrue(workspaceTab("Done", app: app).waitForExistence(timeout: 10))
         selectDoneTasks(app)
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Keyboard task revised", app: app).tap()
@@ -161,13 +163,13 @@ final class iPadWorkspaceUITests: XCTestCase {
         setDateSwitch("deadline-enabled", to: true, app: app)
         setDateSwitch("waiting-date-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
-        app.tabBars.buttons["Projects"].tap()
+        workspaceTab("Projects", app: app).tap()
         XCTAssertTrue(app.buttons["project-Workspace"].waitForExistence(timeout: 10))
         capture("iPad Projects list", app: app)
         app.buttons["project-Workspace"].tap()
         XCTAssertTrue(taskRow(named: "Adaptive planned task", app: app).waitForExistence(timeout: 10))
         capture("iPad project task list", app: app)
-        app.tabBars.buttons["Today"].tap()
+        workspaceTab("Today", app: app).tap()
         XCTAssertTrue(taskRow(named: "Adaptive planned task", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Adaptive planned task", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
@@ -179,8 +181,8 @@ final class iPadWorkspaceUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Upcoming"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Upcoming"].tap()
+        XCTAssertTrue(workspaceTab("Upcoming", app: app).waitForExistence(timeout: 10))
+        workspaceTab("Upcoming", app: app).tap()
         let planned = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-planned-")).firstMatch
         let deadline = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-deadline-")).firstMatch
         XCTAssertTrue(planned.waitForExistence(timeout: 10))
@@ -209,7 +211,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("iPad custom tab at accessibility text size", app: app)
         XCTAssertTrue(app.descendants(matching: .any)["workspace-accessibility-navigation"].firstMatch.exists)
-        XCTAssertLessThan(app.tabBars.firstMatch.frame.midY, app.frame.midY)
+        XCTAssertLessThan(workspaceTab("All local tasks", app: app).frame.midY, app.frame.midY)
         app.buttons["New task"].tap()
         let field = description(app)
         guard revealTaskElement(field, in: "task-editor-form", app: app) else { return }
@@ -239,7 +241,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let returned = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in revised.exists && revised.isHittable && !app.buttons["edit-task"].exists }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 10), .completed)
         XCTAssertEqual(revised.identifier, identity)
-        XCTAssertTrue(app.tabBars.buttons["All local tasks"].isSelected)
+        XCTAssertTrue(workspaceTab("All local tasks", app: app).isSelected)
         capture("iPad largest text returns to the same task and custom view", app: app)
     }
 
