@@ -252,6 +252,11 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
         for title in ["Today", "Projects"] {
             tapTaskControl(workspaceTab(title, app: app), app: app, beforeSample: dismissPassword)
+            let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let headings = app.navigationBars.staticTexts.matching(identifier: "workspace-title-text")
+                return headings.count == 1 && headings.firstMatch.label == title
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
             XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)

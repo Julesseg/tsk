@@ -494,6 +494,12 @@ struct ContentView: View {
             Section("Predefined views") {
                 ForEach(WorkspaceView.defaults) { view in viewMenuItem(view) }
             }
+            Section("Projects") {
+                projectMenuItem("No project", selection: .unassigned)
+                ForEach(store.availableProjects.map { UTF8String($0) }) { project in
+                    projectMenuItem(project.rawValue, selection: .project(project.rawValue))
+                }
+            }
             if !store.savedViews.isEmpty {
                 Section("Custom views") {
                     ForEach(store.savedViews) { view in viewMenuItem(.custom(view.id)) }
@@ -513,6 +519,14 @@ struct ContentView: View {
             } else { Label(view.title(in: store), systemImage: view.systemImage) }
         }
         .accessibilityIdentifier("open-view-" + view.id)
+    }
+
+    private func projectMenuItem(_ title: String, selection: TaskProjectSelection) -> some View {
+        Button { workspaceTabSelection.wrappedValue = .project(selection) } label: {
+            if store.selectedWorkspaceView == .projects && store.projectSelection == selection {
+                Label(title, systemImage: "checkmark")
+            } else { Label(title, systemImage: "folder") }
+        }
     }
 
     private func chooseWorkspaceSetting(_ destination: WorkspaceSetting) {

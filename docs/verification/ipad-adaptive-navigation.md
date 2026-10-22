@@ -2,7 +2,9 @@
 
 The iPad workspace uses SwiftUI's native sidebar-adaptable TabView. Favorites
 retain their existing local persistence and order; the complete sidebar catalog
-and Views menu can select unfavorited views without changing favorites. The
+and Views menu can select unfavorited views without changing favorites. Exact
+project links and No project are available in both navigation presentations;
+the Views menu checks the current direct project as well as saved/custom views. The
 regular tab/sidebar preference is local to the device. Compact presentation does
 not write that preference.
 

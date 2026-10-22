@@ -22,6 +22,19 @@ extension XCTestCase {
         }
     }
 
+    @MainActor func workspaceMenuView(_ title: String, app: XCUIApplication) -> XCUIElement {
+        app.collectionViews.containing(.button, identifier: "manage-favorite-views").buttons[title].firstMatch
+    }
+
+    @MainActor func openWorkspaceMenuView(_ title: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        tapTaskMenuItem(workspaceMenuView(title, app: app), app: app, file: file, line: line)
+        let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let heading = app.staticTexts.matching(identifier: "workspace-title-text").firstMatch
+            return !app.buttons["manage-favorite-views"].exists && heading.exists && heading.label == title
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+    }
+
     @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {
         guard ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", UUID(uuidString: token) != nil else {
             XCTFail("Reminders authorization timeline requires the owned isolated fixture")
