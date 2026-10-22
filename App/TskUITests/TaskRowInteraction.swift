@@ -27,6 +27,28 @@ extension XCTestCase {
     }
 
     @MainActor func openWorkspaceMenuView(_ title: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl(title, app: app, file: file, line: line) else { return }
+        let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let heading = app.staticTexts.matching(identifier: "workspace-title-text").firstMatch
+            return !app.buttons["manage-favorite-views"].exists && heading.exists && heading.label == title
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor func openWorkspaceFavorites(app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl("Manage favorites", app: app, file: file, line: line) else { return }
+        let favorites = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.buttons["manage-favorite-views"].exists && app.collectionViews["views-list"].exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [favorites], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor func openWorkspaceViews(app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl("Views", identifier: "workspace-views", app: app, file: file, line: line) else { return }
+        XCTAssertTrue(app.buttons["manage-favorite-views"].waitForExistence(timeout: 10), app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor private func activateWorkspaceControl(_ title: String, identifier: String? = nil, app: XCUIApplication, file: StaticString, line: UInt) -> Bool {
         let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         var previous: TaskNativeMenuOptionGeometry?
         var lastSample = "not sampled"
@@ -39,7 +61,8 @@ extension XCTestCase {
                 while let (snapshot, ancestors, inViewsMenu) = pending.popLast() {
                     let frames = ancestors + [snapshot.frame]
                     let containsViewsMenu = inViewsMenu || snapshot.elementType == .collectionView && taskSnapshot("manage-favorite-views", type: .button, in: snapshot) != nil
-                    if containsViewsMenu, snapshot.elementType == .button, snapshot.label == title, snapshot.isEnabled {
+                    let matches = identifier.map { snapshot.identifier == $0 } ?? (containsViewsMenu && snapshot.label == title)
+                    if matches, snapshot.elementType == .button, snapshot.isEnabled {
                         candidates.append(TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: ancestors))
                     }
                     pending.append(contentsOf: snapshot.children.map { ($0, frames, containsViewsMenu) })
@@ -62,15 +85,12 @@ extension XCTestCase {
             ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
         }
         guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
-            XCTFail("Views menu row did not settle: \(title); \(lastSample); \(app.debugDescription)", file: file, line: line)
-            return
+            XCTFail("Workspace control did not settle: \(title); \(lastSample); \(app.debugDescription)", file: file, line: line)
+            return false
         }
-        workspaceMenuView(title, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let heading = app.staticTexts.matching(identifier: "workspace-title-text").firstMatch
-            return !app.buttons["manage-favorite-views"].exists && heading.exists && heading.label == title
-        }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+        let control = identifier.map { app.buttons[$0] } ?? workspaceMenuView(title, app: app)
+        control.tap()
+        return true
     }
 
     @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {

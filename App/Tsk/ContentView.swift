@@ -425,8 +425,19 @@ struct ContentView: View {
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
     private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
-        TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
-            .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+        let contentTitle = title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store)
+        let compactProject = isPad && presentation == .compact && title != nil
+        return TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
+            .navigationTitle(compactProject ? "" : contentTitle)
+            .safeAreaInset(edge: .top, alignment: .leading) {
+                if compactProject {
+                    WorkspaceTitleView(title: contentTitle, isSyncing: synchronization.isSyncing)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
                 if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
@@ -447,9 +458,11 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private func workspaceTitle(_ title: String) -> some ToolbarContent {
-        ToolbarItem(placement: .title) {
-            WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
-                .font(.headline)
+        if !(isPad && presentation == .compact && currentProjectTab != nil) {
+            ToolbarItem(placement: .title) {
+                WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
+                    .font(.headline)
+            }
         }
     }
 

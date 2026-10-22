@@ -13,8 +13,10 @@ The shell owns stable native tabs and a unique SwiftUI hosting controller for
 each root, group and catalog entry. This follows the public
 [`tabs`](https://developer.apple.com/documentation/uikit/uitabbarcontroller/tabs)
 contract, including a non-nil controller for every root group. Host ownership
-survives content changes between task columns and compact navigation. The inherited keyboard router crosses the hosting boundary; UIKit traits
-provide each host’s system environment. Removed catalog entries release their cached tabs and controllers.
+survives content changes between task columns and compact navigation. The
+inherited keyboard router crosses the hosting boundary; UIKit traits provide
+each host’s system environment. Removed catalog entries release their cached
+tabs and controllers.
 
 The SwiftUI adaptive shell reproduced two failures on the iPadOS 27.0 simulator:
 a nil-item exception during catalog flattening and an invalid selected-controller
@@ -33,6 +35,15 @@ placement, so native customization cannot create a second favorite collection.
 Native project identifiers encode exact UTF-8 bytes; titles and navigation retain
 the original project names.
 
+On iPadOS 27.0, UIKit could automatically select a sidebar group during live
+compact adaptation even with that filter, leaving the selected current controller
+outside its compact child collection. A control run without catalog groups
+retained both content and the correct selected indicator. The shell therefore
+removes cached catalog groups from the native root collection at resize start,
+before compact trait adoption, and restores them after regular traits return.
+Compact navigation keeps the complete catalog in Views. Cached tabs and hosts
+retain their identity across this change in root membership.
+
 ## Regular presentation during live resizing
 
 The native window can temporarily switch between top tabs and sidebar before its
@@ -46,6 +57,11 @@ using Apple's documented KVO support and restores the regular preference after
 resizing ends and regular traits arrive. Observation follows the visible shell
 lifecycle; stale scene/geometry events cannot overwrite a newer transition.
 Preference callbacks run outside SwiftUI representable updates.
+
+Compact direct-project content places its heading and sync indicator below the
+navigation bar. This leaves room for the native back button, Views, capture and
+Settings while keeping exact project context visible. Other workspace titles
+retain their toolbar placement.
 
 ## Runtime verification
 
