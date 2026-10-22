@@ -11,8 +11,15 @@ struct UpcomingTaskList: View {
             List(selection: selection) {
                 ForEach(store.upcomingDays) { group in
                     Section {
-                        ForEach(group.entries) { entry in
-                            TaskListRow(task: entry.task, store: store, edit: edit, dateRole: entry.role,
+                        ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                            if index == 0 || group.entries[index - 1].role != entry.role {
+                                Text(entry.role == .planned ? "Planned work" : "Deadlines")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 2, trailing: 12))
+                                    .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                            }
+                            TaskListRow(task: entry.task, store: store, edit: edit,
                                         rowIdentifier: "upcoming-\(entry.role.rawValue)-\(Int(entry.date.timeIntervalSince1970))-\(entry.task.id.uuidString)")
                                 .id(entry.id)
                         }
@@ -20,6 +27,7 @@ struct UpcomingTaskList: View {
                         Text(group.day, format: .dateTime.weekday(.wide).day().month().year())
                             .accessibilityIdentifier("upcoming-day-\(Int(group.day.timeIntervalSince1970))")
                     }
+                    .listSectionSeparator(.hidden)
                 }
             }
             .accessibilityIdentifier("upcoming-list")

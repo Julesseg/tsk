@@ -28,6 +28,14 @@ import XCTest
             let row = app.buttons["task-" + ordinaryID]
             XCTAssertTrue(row.waitForExistence(timeout: 15))
             XCTAssertTrue(row.label.contains(title))
+            XCTAssertTrue(row.label.contains("Release"))
+            XCTAssertTrue(row.label.contains("Due Today"))
+            for hidden in ["Active", "Waiting", "Blocked by", "Deadline", "Generated occurrence", "Planned work"] {
+                XCTAssertFalse(row.label.contains(hidden))
+            }
+            let circle = app.buttons["complete-task-row-" + ordinaryID]
+            let list = app.collectionViews["task-list"]
+            XCTAssertLessThanOrEqual(circle.frame.minX - list.frame.minX, 12)
             capture("Today " + mode, app)
             row.tap()
             let reason = app.collectionViews["task-detail-form"].staticTexts["task-blocked-reason-" + ordinaryID]
@@ -77,13 +85,13 @@ import XCTest
         XCTAssertTrue(circle.waitForExistence(timeout: 5))
         XCTAssertTrue(circle.isHittable)
         let label = planned.firstMatch.label
-        XCTAssertTrue(label.contains("Deadline"))
-        XCTAssertTrue(label.contains("Active"))
-        XCTAssertTrue(label.contains("Waiting"))
-        XCTAssertTrue(label.contains("Blocked by 2 tasks"))
-        XCTAssertFalse(label.contains("First prerequisite"))
-        XCTAssertTrue(label.contains("Planned work"))
-        XCTAssertFalse(label.contains("Planned day"))
+        XCTAssertTrue(label.contains("Due Tomorrow"))
+        XCTAssertTrue(label.contains("Release"))
+        for hidden in ["Deadline", "Active", "Waiting", "Blocked by", "First prerequisite", "Planned work", "Planned day"] {
+            XCTAssertFalse(label.contains(hidden))
+        }
+        XCTAssertTrue(app.staticTexts["Planned work"].exists)
+        XCTAssertTrue(app.staticTexts["Deadlines"].exists)
         planned.firstMatch.swipeLeft()
         XCTAssertFalse(app.buttons["Complete"].exists)
         XCTAssertTrue(app.buttons["Edit"].exists)

@@ -6,6 +6,11 @@ public extension TaskRecord {
     var waitUntil: Date? { dateAttribute("wait") }
     var startedAt: Date? { dateAttribute("start") }
 
+    func deadlineDayOffset(relativeTo today: Date, calendar: Calendar = .autoupdatingCurrent) -> Int? {
+        guard let deadline else { return nil }
+        return calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: calendar.startOfDay(for: deadline)).day
+    }
+
     func isInToday(at now: Date, calendar: Calendar) -> Bool {
         guard status == "pending", let day = calendar.dateInterval(of: .day, for: now) else { return false }
         return [plannedDate, deadline].compactMap { $0 }.contains { $0 < day.end }

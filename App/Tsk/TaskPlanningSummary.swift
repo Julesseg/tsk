@@ -31,10 +31,24 @@ struct TaskPlanningSummary: View {
 
 struct TaskPlanningCaption: View {
     let task: TaskRecord
+    let today: Date
+
     var body: some View {
-        if let date = task.deadline {
-            Text("Deadline \(date, format: .dateTime.day().month().hour().minute())")
+        if let offset = task.deadlineDayOffset(relativeTo: today) {
+            Text("\(Image(systemName: "flag")) \(label(offset))")
                 .font(.caption).foregroundStyle(.secondary)
+                .accessibilityLabel("Due \(label(offset))")
+                .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
+        }
+    }
+
+    private func label(_ offset: Int) -> String {
+        switch offset {
+        case -1: "Yesterday"
+        case 0: "Today"
+        case 1: "Tomorrow"
+        case ..<0: "\(-offset) days ago"
+        default: "In \(offset) days"
         }
     }
 }

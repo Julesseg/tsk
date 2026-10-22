@@ -18,6 +18,8 @@ struct TaskListView: View {
                             else if store.tasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
                             ForEach(store.tasks) { task in TaskListRow(task: task, store: store, edit: edit) }
                         }
+                        .listSectionSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     }.accessibilityIdentifier("task-list")
                         .refreshable { await store.reload(); await calendar.refresh() }
                         .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
@@ -45,6 +47,9 @@ struct TaskListView: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.horizontal, 0, for: .scrollContent)
         .overlay { if store.isLoading && store.tasks.isEmpty { ProgressView() } }
     }
 
@@ -62,46 +67,21 @@ struct TaskListView: View {
 struct TaskListLabel: View {
     let task: TaskRecord
     let store: TaskStore
-    var dateRole: TaskDateRole?
-    @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.description)
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
-            if !context.isEmpty {
-                Text(context).font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(textSize.isAccessibilitySize ? nil : 1)
+            if !task.project.isEmpty {
+                Text(task.project).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) { status }.fixedSize(horizontal: true, vertical: false)
-                VStack(alignment: .leading, spacing: 4) { status }
-            }
-            if dateRole == .planned {
-                Label("Planned work", systemImage: "calendar")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            TaskPlanningCaption(task: task)
-            if task.status != "pending" || task.isRecurring {
-                Text(task.recurrenceInspection.map { $0.kind == .template ? "Recurring template" : $0.kind == .occurrence ? task.status == "completed" ? "Completed occurrence" : "Generated occurrence" : "Recurrence data · read only" } ?? task.status.capitalized)
-                    .font(.caption).foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 60)) { _ in
+                TaskPlanningCaption(task: task, today: store.currentDate)
             }
         }
         .padding(.vertical, 2)
-    }
-
-    private var context: String {
-        ([task.project].filter { !$0.isEmpty } + task.tags.prefix(2).map { "#" + $0 } + (task.tags.count > 2 ? ["+\(task.tags.count - 2) tags"] : [])).joined(separator: " · ")
-    }
-
-    @ViewBuilder private var status: some View {
-        if task.isActive {
-            Text("\(Image(systemName: "play.circle.fill")) \(task.status == "pending" ? "Active" : "Saved start marker")")
-                .font(.caption).foregroundStyle(.secondary)
-                .accessibilityIdentifier("task-activity-\(task.id.uuidString)")
-        }
-        TaskAvailabilityView(task: task, store: store)
     }
 }
 
@@ -109,7 +89,6 @@ struct TaskListRow: View {
     let task: TaskRecord
     let store: TaskStore
     let edit: (TaskRecord) -> Void
-    var dateRole: TaskDateRole?
     var rowIdentifier: String?
 
     var body: some View {
@@ -129,10 +108,13 @@ struct TaskListRow: View {
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
             }
             NavigationLink(value: task.id) {
-                TaskListLabel(task: task, store: store, dateRole: dateRole)
+                TaskListLabel(task: task, store: store)
             }
             .accessibilityIdentifier(rowIdentifier ?? "task-\(task.id.uuidString)")
         }
+        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 12))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .tag(task.id)
         .contextMenu {
             TaskActivityButton(task: task, store: store)
