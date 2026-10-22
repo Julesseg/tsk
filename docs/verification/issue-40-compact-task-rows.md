@@ -6,7 +6,7 @@ project and a flag followed by a deadline relative to today. Project and
 deadline share one metadata line, with the deadline right aligned. Today has
 no task-section title. Rows use plain
 list styling, no separators or colored backgrounds, and horizontal insets of
-8 points leading and 12 trailing. Descriptions wrap without a fixed height.
+8 points leading and 12 trailing. Descriptions use the smaller Dynamic Type subheadline font and wrap without a fixed height.
 
 The deadline uses local calendar-day boundaries: Yesterday, Today, Tomorrow,
 N days ago or In N days. Core tests cover midnight and daylight-saving changes;
@@ -16,7 +16,7 @@ Planned work and Deadlines labels outside the task rows. Full dates, tags,
 activity, availability reasons and diagnostics remain in task detail.
 
 A separate completion button has a 44-point minimum target and grows with
-Dynamic Type. It calls the existing `TaskStore.complete` operation. The label
+Dynamic Type. It calls `TaskStore.completeFromList`, which immediately saves through the existing `TaskStore.complete` operation. The label
 opens detail; context menus retain valid Start/Stop, Edit and Complete actions.
 Trailing swipes offer Edit only. There is no completion Undo. Filtering,
 ordering, recurrence generation and stored task attributes are unchanged.
@@ -56,8 +56,8 @@ sync or Spotlight configuration is absent.
 
 The PR records final test results, source revision and the local HTML report.
 
-Host verification after rebasing onto `a632410`: Core 161 passed; Native 131
-passed and 44 skipped; controller packages 47 Swift Testing and 6 XCTest
+Host verification after rebasing onto `a632410`: Core 161 passed; Native
+175-test run passed with external integrations and two fixture probes skipped; controller packages 51 Swift Testing and 6 XCTest
 passed; UI selection routing 14 passed. Native included the independent probe.
 Both Standards and Spec reviews reported zero findings.
 
@@ -77,13 +77,48 @@ The notification-preferences capture journey checks permission/preferences
 remain available and the review/registration controls are absent, across both
 device families and all appearance/text-size modes.
 
-Final canonical runs passed all four `TaskPresentationUITests` methods on
-each device, including notification preferences and the complete row matrix.
-Results: `/tmp/tsk-issue40-alerts-after-phone.xcresult` and
-`/tmp/tsk-issue40-alerts-after-pad.xcresult`. The matching notification baseline
-journey passed on both devices. Owned simulators were shut down.
+The notification-preferences journey previously passed on both families at
+`56e184c`; its captures are reused because this refinement does not alter that
+screen. The latest row matrix and occurrence journeys passed on each family:
+`/tmp/tsk-issue40-motion-phone-matrix.xcresult` and
+`/tmp/tsk-issue40-motion-pad-matrix.xcresult`. These still captures preceded the
+animation-only modifier correction; title, layout and checked-state behavior
+are identical. The corrected completion journey passed on each family:
+`/tmp/tsk-issue40-motion-v4-phone.xcresult` and
+`/tmp/tsk-issue40-motion-v4-pad.xcresult`. Both owned simulators were shut down;
+no simulator remained booted and Simulator was quit.
 
-Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T110848Z.html` (4,993,277 bytes; 104 captures).
-All 14 sections and 104 images loaded at 390 × 844 in Chrome. Enlargement
-opened and closed correctly; production source is `56e184c`. Embedded WebP
-quality is 70 to keep every capture within the 5 MB delivery limit.
+## Checked completion and collapse
+
+Canonical task mutation, reload and sync continue immediately. A presentation
+controller retains each completed row's original snapshot, placement and view
+context through those reloads. After a successful save it displays a checked
+circle and struck-through title for one second. If the canonical result no
+longer includes the task, a 280 ms animation scales the content and row height
+together toward the vertical center before releasing the snapshot. Upcoming
+retains and collapses both appearances together. Reduce Motion keeps the
+one-second feedback and skips the collapse animation. Tasks still matching a
+view remain visible, while failed completion releases the hold immediately.
+Circle, context-menu and workspace keyboard completion share this behavior.
+
+Four controller tests use real TaskChampion mutations and an injected clock:
+reload retention across both Upcoming roles; independent consecutive
+completions with stable neighbor placement; genuine occurrence failure; and a
+completed task that still matches its view. The first ordering implementation
+failed when an earlier held row disappeared, then passed after placement used
+neighbor identities. Core 161 passed; Native 175-test run passed with external integrations and two fixture probes skipped;
+controllers 51 Swift Testing plus 6 XCTest passed; UI routing 14 passed.
+Standards and Spec reviews reported zero findings.
+
+Genuine simulator recordings confirmed the one-second checked feedback and
+centered collapse on both device families. An earlier recording exposed
+unscaled text during native List height animation; one AnimatableModifier now
+interpolates scale and height together. The corrected signed arm64 simulator
+build succeeded. The report embeds trimmed normal-speed WebM recordings,
+rotating the iPad recording to match its actual landscape orientation.
+
+Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T135909Z.html`
+(4,998,379 bytes; 106 captures and two recordings). All 14 sections and 106
+images loaded at 390 × 844 in Chrome. Enlargement and both recordings were
+verified. Production source is `2d09853`; WebP quality is 65 to preserve every
+capture within the 5 MB delivery limit.
