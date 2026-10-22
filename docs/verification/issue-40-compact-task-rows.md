@@ -82,3 +82,8 @@ each device, including notification preferences and the complete row matrix.
 Results: `/tmp/tsk-issue40-alerts-after-phone.xcresult` and
 `/tmp/tsk-issue40-alerts-after-pad.xcresult`. The matching notification baseline
 journey passed on both devices. Owned simulators were shut down.
+
+Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T110848Z.html` (4,993,277 bytes; 104 captures).
+All 14 sections and 104 images loaded at 390 × 844 in Chrome. Enlargement
+opened and closed correctly; production source is `56e184c`. Embedded WebP
+quality is 70 to keep every capture within the 5 MB delivery limit.
