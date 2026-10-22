@@ -122,3 +122,27 @@ Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-imple
 images loaded at 390 × 844 in Chrome. Enlargement and both recordings were
 verified. Production source is `2d09853`; WebP quality is 65 to preserve every
 capture within the 5 MB delivery limit.
+
+## Title-only row alignment
+
+Rows with neither a project nor a deadline use centered vertical HStack
+alignment, placing the title beside the center of the completion circle.
+Rows with either metadata field retain their existing top alignment. The
+shared row applies this consistently in Today, Upcoming, project and custom
+views, including wrapped titles and Dynamic Type. Completion feedback and
+collapse remain unchanged.
+
+The signed arm64 simulator build and canonical populated-row matrix passed on
+both iPhone and iPad, covering light/dark and default/accessibility XXXL text.
+Results: `/tmp/tsk-issue40-center-phone.xcresult` and
+`/tmp/tsk-issue40-center-pad.xcresult`. The matched captures show single-line
+and wrapped title-only rows aligned with their completion circles. Both
+Standards and Spec reviews reported zero findings. No business logic changed;
+host suites were not repeated for this layout-only refinement. Both simulators
+were shut down by the test runner; none remained booted.
+
+Alignment report on this Mac:
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T141934Z.html`
+(3,584,282 bytes; 80 captures). All ten sections were expanded and enlargement
+opened and closed at 390 × 844. Production source is `9503280`. The previous
+report retains the unchanged completion-animation and notification evidence.
