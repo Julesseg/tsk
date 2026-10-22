@@ -15,6 +15,7 @@ struct ContentView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
@@ -356,9 +357,6 @@ struct ContentView: View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .bottom) {
-                if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
-            }
             .toolbar {
                 workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
                 if presentation != .columns || isProjectWorkspace { settingsToolbar }
@@ -439,7 +437,7 @@ struct ContentView: View {
 
     private var selectedTask: TaskRecord? { store.allTasks.first { $0.id == selectedTaskID } }
     private var navigationRows: [TaskRecord] {
-        store.customView == nil && store.query == .upcoming ? store.upcomingDays.flatMap(\.entries).map(\.task) : store.tasks
+        store.customView == nil && store.query == .upcoming ? store.upcomingDays.flatMap(\.entries).map(\.task) : store.visibleTasks
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
@@ -450,7 +448,7 @@ struct ContentView: View {
         return TaskWorkspaceActions(
             capture: capture,
             edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
-            complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.complete(id: task.id) } } : nil },
+            complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
                 if isProjectWorkspace { projectPath.append(task.id) }

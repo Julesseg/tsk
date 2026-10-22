@@ -11,50 +11,23 @@ struct UpcomingTaskList: View {
             List(selection: selection) {
                 ForEach(store.upcomingDays) { group in
                     Section {
-                        ForEach(group.entries) { entry in
-                            NavigationLink(value: entry.task.id) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(entry.task.description)
-                                    if let project = entry.task.attributes["project"], !project.isEmpty {
-                                        Text(project).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    HStack {
-                                        Label(entry.role == .planned ? "Planned work" : "Deadline", systemImage: entry.role == .planned ? "calendar" : "flag")
-                                        if entry.role == .deadline {
-                                            Text(entry.date, format: .dateTime.hour().minute())
-                                        }
-                                    }
-                                    .font(.caption).foregroundStyle(.secondary)
-                                    TaskActivityCaption(task: entry.task)
-                                    TaskAvailabilityView(task: entry.task, store: store)
-                                    if entry.task.isRecurring {
-                                        Text(entry.task.isOccurrence ? "Generated occurrence" : "Recurring template").font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
+                        ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                            if index == 0 || group.entries[index - 1].role != entry.role {
+                                Text(entry.role == .planned ? "Planned work" : "Deadlines")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                    .accessibilityAddTraits(.isHeader)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 2, trailing: 12))
+                                    .listRowSeparator(.hidden).listRowBackground(Color.clear)
                             }
-                            .tag(entry.task.id)
-                            .accessibilityIdentifier("upcoming-\(entry.role.rawValue)-\(Int(entry.date.timeIntervalSince1970))-\(entry.task.id.uuidString)")
-                            .contextMenu { TaskActivityButton(task: entry.task, store: store) }
-                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                TaskActivityButton(task: entry.task, store: store).tint(.orange)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                if entry.task.canComplete {
-                                    Button(entry.task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") {
-                                        Task { _ = await store.complete(id: entry.task.id) }
-                                    }
-                                    .tint(.green).disabled(store.isSaving)
-                                }
-                                if entry.task.canEdit {
-                                    Button(entry.task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(entry.task) }
-                                        .disabled(store.isSaving)
-                                }
-                            }
+                            TaskListRow(task: entry.task, store: store, edit: edit,
+                                        rowIdentifier: "upcoming-\(entry.role.rawValue)-\(Int(entry.date.timeIntervalSince1970))-\(entry.task.id.uuidString)")
+                                .id(entry.id)
                         }
                     } header: {
                         Text(group.day, format: .dateTime.weekday(.wide).day().month().year())
                             .accessibilityIdentifier("upcoming-day-\(Int(group.day.timeIntervalSince1970))")
                     }
+                    .listSectionSeparator(.hidden)
                 }
             }
             .accessibilityIdentifier("upcoming-list")

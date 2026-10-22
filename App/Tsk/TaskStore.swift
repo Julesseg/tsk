@@ -24,7 +24,12 @@ final class TaskStore {
     var isLoading = false
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
-    var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: tasks, at: currentDate) }
+    let completionFeedback = TaskCompletionFeedback()
+    var completionContext: TaskCompletionFeedback.Context {
+        .init(query: query, project: projectSelection, customViewID: customView?.id, filter: customView.map { UTF8String($0.expression) })
+    }
+    var visibleTasks: [TaskRecord] { completionFeedback.visibleTasks(tasks, context: completionContext) }
+    var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: visibleTasks, at: currentDate) }
     private var reloadGeneration = 0
     var nextFilterEvaluation: Date?
     var filterRefreshGeneration = 0
@@ -173,6 +178,14 @@ final class TaskStore {
 
     func complete(id: UUID) async -> TaskRecord? {
         await perform { try await $0.complete(id: id) }
+    }
+
+    func completeFromList(id: UUID, animated: Bool = true) async -> TaskRecord? {
+        guard !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
+        let context = completionContext
+        return await completionFeedback.complete(task: task, visibleTasks: visibleTasks, context: context, animated: animated,
+            shouldRemove: { self.completionContext == context && !self.tasks.contains { $0.id == id } },
+            operation: { await self.complete(id: id) })
     }
 
     func perform(_ action: @Sendable (TaskManager) async throws -> TaskRecord) async -> TaskRecord? {

@@ -32,7 +32,8 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPad"))), 50)
+        self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
+        self.assertEqual(len(pad), 54)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)

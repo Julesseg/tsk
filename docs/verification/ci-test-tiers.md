@@ -32,10 +32,14 @@ not allocate a signing/build runner.
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 60 declared methods | 50-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Full | All 64 declared methods | 54-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
+
+Full coverage on both families includes compact task rows, completion circles,
+occurrence failure feedback and light/dark accessibility captures
+(`TaskPresentationUITests`).
 
 Both device families check workspace control placement, every Settings destination,
 Settings at the largest accessibility text size, persisted tab ordering and capacity,
