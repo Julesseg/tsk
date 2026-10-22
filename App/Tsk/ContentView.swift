@@ -257,7 +257,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
         .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
-            TaskSettingsView(choose: chooseWorkspaceSetting)
+            TaskSettingsView(calendar: calendar, choose: chooseWorkspaceSetting)
         }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
     }

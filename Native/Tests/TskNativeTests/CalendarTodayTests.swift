@@ -50,3 +50,16 @@ func eventKitCalendarSnapshotValidationRunsOffMainActorWithoutRequestingAccess()
     }.value
 }
 #endif
+
+#if canImport(EventKit)
+import CoreGraphics
+
+@Test func calendarSourceCarriesSRGBAndGrayscaleColorsWithoutRequiringPermission() throws {
+    let color = try #require(EventKitCalendarSource.calendarColor(CGColor(srgbRed: 0.2, green: 0.4, blue: 0.8, alpha: 0.6)))
+    #expect(abs(color.red - 0.2) < 0.00001 && abs(color.green - 0.4) < 0.00001 && abs(color.blue - 0.8) < 0.00001)
+    #expect(abs(color.alpha - 0.6) < 0.00001)
+    let gray = try #require(EventKitCalendarSource.calendarColor(CGColor(gray: 0.5, alpha: 1)))
+    #expect(abs(gray.red - gray.green) < 0.00001 && abs(gray.green - gray.blue) < 0.00001)
+    #expect(EventKitCalendarSource.calendarColor(nil) == nil)
+}
+#endif

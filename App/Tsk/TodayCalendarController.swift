@@ -4,6 +4,7 @@ import TskCore
 import TskNative
 
 @MainActor @Observable final class TodayCalendarController {
+    let preferences = CalendarOverviewPreferences.shared
     let manager: TaskManager
     let source: any CalendarEventSource
     private(set) var snapshot: TodayCalendarSnapshot?
@@ -19,8 +20,10 @@ import TskNative
 
     init(manager: TaskManager, source: any CalendarEventSource = EventKitCalendarSource()) {
         self.manager = manager
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_READ_FAILURE"] == "1" {
+        #if DEBUG && targetEnvironment(simulator)
+        if let fixture = CalendarPresentationFixture(environment: ProcessInfo.processInfo.environment) {
+            self.source = fixture
+        } else if ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_READ_FAILURE"] == "1" {
             self.source = FailingCalendarFixtureSource(source: source)
         } else { self.source = source }
         #else
@@ -35,6 +38,11 @@ import TskNative
         }
         guard requestingAccess else { await refreshSnapshot(); return }
         if await refreshAccessPhase() { await refresh() }
+    }
+
+    func refreshAuthorization() async {
+        let authorization = await source.authorization()
+        if snapshot == nil || snapshot?.authorization != authorization { await refresh() }
     }
 
     private func refreshAccessPhase() async -> Bool {
