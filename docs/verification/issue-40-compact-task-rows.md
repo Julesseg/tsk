@@ -63,3 +63,7 @@ Final canonical runs passed five iPhone tests (presentation matrix, ordinary
 and occurrence completion, activity, waiting) and three iPad presentation /
 completion tests. Results: `/tmp/tsk-issue40-refined-phone-final.xcresult` and
 `/tmp/tsk-issue40-refined-pad-final.xcresult`. Owned simulators were shut down.
+
+Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T101929Z.html` (4,670,378 bytes; 88 captures).
+All captures loaded at 390 × 844 in Chrome; image enlargement opened and
+dismissed correctly. After captures use production source `98c6909`.
