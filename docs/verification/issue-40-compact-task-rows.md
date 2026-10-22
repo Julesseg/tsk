@@ -178,10 +178,10 @@ shut down; no simulator remained booted and Simulator was quit. Standards and
 Spec reviews found no material issues.
 
 The user rejected scaled-content removal and requested stationary content
-covered from top and bottom. Three throwaway browser motion variants are
-provided for selection: hard cover before reflow, hard cover with early reflow,
-and soft cover before reflow. None has been promoted; production retains the
-prior collapse until the user selects the replacement. Prototype source is
+covered from top and bottom. Three throwaway browser motion variants were
+provided: hard cover before reflow, hard cover with early reflow, and soft
+cover before reflow. The user subsequently selected C, soft cover before
+reflow; the implementation and verification are recorded below. Prototype source is
 isolated in `/tmp/tsk-completion-motion-prototype` on
 `prototype/task-completion-motion-40`, outside the production PR.
 
@@ -193,3 +193,44 @@ normal playback speed and stop before the old collapse; the iPad clip crops
 to the sidebar. The report was checked at 390 × 844, including variant
 switching, Replay, slow motion, all four native sections, enlargement and both
 recordings. Physical touch and VoiceOver remain unverified.
+
+
+## Selected C: stationary soft cover, then close gap
+
+Production source `ba6c5df` replaces content scaling with a centered soft mask.
+After the native SF Symbols tick settles for 400 ms and the one-second checked
+hold finishes, the visible region closes from top and bottom over 420 ms. Its
+edges feather by up to six points. Text and icons remain stationary and
+unscaled; the underlying list background is revealed. Only after the content
+is hidden does the empty row gap close over 240 ms. Both Upcoming appearances
+share the phases. Reduce Motion keeps checked feedback and removes the row
+without the animated cover or gap closure.
+
+The real-TaskChampion controller test first failed against the previous
+280 ms collapse, then passed with explicit covering and collapsing phases.
+The full controller suite passed: 51 Swift Testing and 6 XCTest. The signed
+arm64 simulator build passed. Standards and Spec reviews found no material
+issues.
+
+Canonical iPhone and iPad each passed two focused methods covering ordinary
+completion, both Upcoming appearances, durable Done read-back, recurrence
+scope, genuine failure feedback and sibling preservation. Results:
+`/tmp/tsk-issue40-soft-cover-phone.xcresult` and
+`/tmp/tsk-issue40-soft-cover-pad.xcresult`. Genuine native recordings show
+stationary content throughout the soft cover, followed by gap closure. Both
+owned simulators were shut down; none remained booted and Simulator was quit.
+
+All three prototypes and the C verdict are archived on
+[`prototype/task-completion-motion-40`](https://github.com/Julesseg/tsk/tree/prototype/task-completion-motion-40/App/Prototypes/TaskCompletion)
+at `7342e74`, linked from issue #40. Prototype code is outside this PR.
+
+Final focused report on this Mac:
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T161721Z-soft-cover.html`
+(673,057 bytes; 16 native captures and four normal-speed before/after
+clips). The before source is `98f4ac3`. Sampled removal frames illustrate the
+motion phases rather than equal elapsed times. iPad clips crop to the sidebar.
+All eight sections and 16 images loaded at 390 × 844. Enlargement opened
+and closed; all four clips played, advanced past one second, and were paused.
+The previous reports retain the unchanged light/dark, Dynamic Type and
+notification-settings evidence. Selected C was recorded in light/default
+text; physical input, VoiceOver and system delivery were not reverified.
