@@ -10,7 +10,7 @@ final class TaskCompletionFeedback {
         var customViewID: UUID?
         var filter: UTF8String?
     }
-    enum Phase { case saving, checked, collapsing }
+    enum Phase { case saving, checked, covering, collapsing }
     private struct Entry {
         let task: TaskRecord
         let index: Int
@@ -58,8 +58,12 @@ final class TaskCompletionFeedback {
             if animated { try await pause(.milliseconds(400)) }
             try await pause(.seconds(1))
             if shouldRemove() {
+                if animated {
+                    entries[task.id]?.phase = .covering
+                    try await pause(.milliseconds(420))
+                }
                 entries[task.id]?.phase = .collapsing
-                if animated { try await pause(.milliseconds(280)) }
+                if animated { try await pause(.milliseconds(240)) }
             }
         } catch {}
         return saved
