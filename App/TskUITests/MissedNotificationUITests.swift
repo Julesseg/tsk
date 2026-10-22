@@ -48,8 +48,6 @@ final class MissedNotificationUITests: XCTestCase {
             XCTAssertTrue(toggle.waitForExistence(timeout: 10), settings.debugDescription)
             if toggle.value as? String == "0" { toggle.tap() }
             app.activate()
-            let retry = app.buttons["notification-retry"]
-            reveal(retry, in: app); retry.tap()
         }
         XCTAssertTrue(wait(app.staticTexts["notification-permission"], prefix: "Notifications allowed", timeout: 15), app.debugDescription)
     }

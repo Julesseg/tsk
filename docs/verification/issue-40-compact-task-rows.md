@@ -2,7 +2,9 @@
 
 Today, Upcoming, project and custom lists share `TaskListRow`. The user's
 refinement replaces the original compact summaries with only the description,
-project and a flag followed by a deadline relative to today. Rows use plain
+project and a flag followed by a deadline relative to today. Project and
+deadline share one metadata line, with the deadline right aligned. Today has
+no task-section title. Rows use plain
 list styling, no separators or colored backgrounds, and horizontal insets of
 8 points leading and 12 trailing. Descriptions wrap without a fixed height.
 
@@ -35,8 +37,10 @@ and deadline dates and an opaque attribute. Calendar is injected empty.
   mask produces a genuine failure, visible feedback and a retained occurrence.
 - Activity and waiting regressions check state in detail while rows stay minimal.
 
-Baseline captures use `83ff10c4b252101d2510f0e019f9e7a4876525f6` plus the new
-test file only. Devices, fixtures, appearance, text size and navigation match.
+Row baseline captures use `83ff10c4` (app UI unchanged in `a632410`).
+Notification-settings baseline captures use isolated `209aafe` with test-only
+instrumentation; its notification UI is unchanged from main. The initial
+missing-circle check used `83ff10c4`. Devices, fixtures, appearance, text size and navigation match.
 The fixed clock changes between Today and Upcoming to exercise both views.
 The original completion journey failed at its missing circle before the fix.
 The custom view is created at normal text size and reopened across modes,
@@ -45,9 +49,7 @@ keeping unrelated large-text editor keyboard focus out of the row matrix.
 ## Verification limits
 
 Simulator evidence covers the exercised app paths. Physical touch, VoiceOver,
-account behavior and distribution provisioning were not verified. The existing
-Review task alerts control can overlay lower content at accessibility XXXL
-in both revisions; long rows require scrolling. Matched completed-history
+account behavior and distribution provisioning were not verified. Long rows can require scrolling. Matched completed-history
 captures are omitted explicitly, while persistence and circle absence are
 asserted at runtime. External Native tests remain skipped where Taskwarrior,
 sync or Spotlight configuration is absent.
@@ -59,11 +61,24 @@ passed and 44 skipped; controller packages 47 Swift Testing and 6 XCTest
 passed; UI selection routing 14 passed. Native included the independent probe.
 Both Standards and Spec reviews reported zero findings.
 
-Final canonical runs passed five iPhone tests (presentation matrix, ordinary
-and occurrence completion, activity, waiting) and three iPad presentation /
-completion tests. Results: `/tmp/tsk-issue40-refined-phone-final.xcresult` and
-`/tmp/tsk-issue40-refined-pad-final.xcresult`. Owned simulators were shut down.
 
-Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T101929Z.html` (4,670,378 bytes; 88 captures).
-All captures loaded at 390 × 844 in Chrome; image enlargement opened and
-dismissed correctly. After captures use production source `98c6909`.
+## Alert-review removal
+
+The review banner, attention-state aggregator, registration diagnostics and
+manual retry workflow are removed. Notification settings retain permission,
+midnight alert-time preferences and ordinary operation errors. Automatic
+foreground/task-change reconciliation, scheduled delivery and missed-alert
+processing remain unchanged in Core/Native. The controller keeps authorization
+rather than exposing the diagnostic report to the UI. The real missed-alert
+UI journey now checks automatic foreground permission refresh without a retry
+button. Debug fixture controls remain gated to isolated simulator verification.
+
+The notification-preferences capture journey checks permission/preferences
+remain available and the review/registration controls are absent, across both
+device families and all appearance/text-size modes.
+
+Final canonical runs passed all four `TaskPresentationUITests` methods on
+each device, including notification preferences and the complete row matrix.
+Results: `/tmp/tsk-issue40-alerts-after-phone.xcresult` and
+`/tmp/tsk-issue40-alerts-after-pad.xcresult`. The matching notification baseline
+journey passed on both devices. Owned simulators were shut down.

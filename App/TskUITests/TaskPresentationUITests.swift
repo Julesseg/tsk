@@ -30,6 +30,8 @@ import XCTest
             XCTAssertTrue(row.label.contains(title))
             XCTAssertTrue(row.label.contains("Release"))
             XCTAssertTrue(row.label.contains("Due Today"))
+            XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
+            XCTAssertFalse(app.buttons["notification-attention"].exists)
             for hidden in ["Active", "Waiting", "Blocked by", "Deadline", "Generated occurrence", "Planned work"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }
@@ -69,6 +71,24 @@ import XCTest
             }
             XCTAssertTrue(row.waitForExistence(timeout: 10))
             capture("Custom " + mode, app)
+            app.terminate()
+        }
+    }
+
+    func testTaskNotificationPreferencesStayAvailableWithoutAlertReview() throws {
+        let replica = UUID().uuidString
+        for (appearance, largeText) in [("light", false), ("dark", false), ("light", true), ("dark", true)] {
+            XCUIDevice.shared.appearance = appearance == "dark" ? .dark : .light
+            let app = try launch(largeText: largeText, now: "1792234800", replica: replica)
+            XCTAssertFalse(app.buttons["notification-attention"].exists)
+            openWorkspaceSetting("notification-settings", app: app)
+            XCTAssertTrue(app.staticTexts["notification-permission"].waitForExistence(timeout: 15))
+            XCTAssertTrue(revealTaskElement(app.switches["notification-midnight-enabled"], in: "notification-settings-form", app: app))
+            let save = app.buttons["notification-save-preferences"]
+            XCTAssertTrue(revealTaskElement(save, in: "notification-settings-form", app: app))
+            capture("Notification preferences " + appearance + (largeText ? " accessibility XXXL" : ""), app)
+            XCTAssertFalse(app.staticTexts["Registration"].exists)
+            XCTAssertFalse(app.buttons["notification-retry"].exists)
             app.terminate()
         }
     }

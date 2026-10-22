@@ -356,9 +356,6 @@ struct ContentView: View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .bottom) {
-                if notifications.needsAttention { Button("Review task alerts") { isConfiguringNotifications = true }.padding().accessibilityIdentifier("notification-attention") }
-            }
             .toolbar {
                 workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
                 if presentation != .columns || isProjectWorkspace { settingsToolbar }

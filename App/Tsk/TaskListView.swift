@@ -13,7 +13,7 @@ struct TaskListView: View {
                 ScrollViewReader { proxy in
                     List(selection: selection) {
                         TodayCalendarSection(calendar: calendar)
-                        Section("Tasks · Today") {
+                        Section {
                             if let error = store.error, store.tasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
                             else if store.tasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
                             ForEach(store.tasks) { task in TaskListRow(task: task, store: store, edit: edit) }
@@ -73,12 +73,19 @@ struct TaskListLabel: View {
             Text(task.description)
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
-            if !task.project.isEmpty {
-                Text(task.project).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            TimelineView(.periodic(from: .now, by: 60)) { _ in
-                TaskPlanningCaption(task: task, today: store.currentDate)
+            if !task.project.isEmpty || task.deadline != nil {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if !task.project.isEmpty {
+                        Text(task.project).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    TimelineView(.periodic(from: .now, by: 60)) { _ in
+                        TaskPlanningCaption(task: task, today: store.currentDate)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .layoutPriority(1)
+                }
             }
         }
         .padding(.vertical, 2)

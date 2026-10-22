@@ -7,14 +7,11 @@ import TskNative
 final class TaskNotificationController {
     let store: TaskStore
     var preferences = TaskNotificationPreferences()
-    var report: TaskNotificationReport?
+    var authorization: TaskNotificationAuthorization?
     var error: String?
     var isWorking = false
     private var queued = false
     init(store: TaskStore) { self.store = store }
-    var needsAttention: Bool {
-        !(report?.retryableMissed?.isEmpty ?? true) || !(report?.uncertainMissed?.isEmpty ?? true) || error != nil || !(report?.errors.isEmpty ?? true) || !(report?.unscheduled.isEmpty ?? true) || !(report?.invalidTaskIDs.isEmpty ?? true)
-    }
     func observe() async {
         do {
             for try await _ in await store.manager.changeUpdates() {
@@ -30,9 +27,9 @@ final class TaskNotificationController {
         repeat {
             queued = false
             do {
-                report = try await TaskNotificationEffect.reconcile(manager: store.manager, directory: store.directory)
+                authorization = try await TaskNotificationEffect.reconcile(manager: store.manager, directory: store.directory).authorization
                 preferences = try await store.manager.notificationState(using: LocalTaskNotificationStore(directory: store.directory)).preferences
-                error = try TaskNotificationEffect.warning(directory: store.directory)
+                error = nil
             } catch { self.error = error.localizedDescription }
         } while queued && !Task.isCancelled
     }
