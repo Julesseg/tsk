@@ -14,9 +14,9 @@ struct TaskListView: View {
                     List(selection: selection) {
                         TodayCalendarSection(calendar: calendar)
                         Section {
-                            if let error = store.error, store.tasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                            else if store.tasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
-                            ForEach(store.tasks) { task in TaskListRow(task: task, store: store, edit: edit) }
+                            if let error = store.error, store.visibleTasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
+                            else if store.visibleTasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
+                            ForEach(store.visibleTasks) { task in TaskListRow(task: task, store: store, edit: edit) }
                         }
                         .listSectionSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -24,20 +24,20 @@ struct TaskListView: View {
                         .refreshable { await store.reload(); await calendar.refresh() }
                         .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                 }
-            } else if let error = store.error, store.tasks.isEmpty {
+            } else if let error = store.error, store.visibleTasks.isEmpty {
                 ContentUnavailableView {
                     Label("Tasks unavailable", systemImage: "exclamationmark.triangle")
                 } description: { Text(error) } actions: {
                     Button("Retry") { Task { await store.reload() } }
                 }
-            } else if store.tasks.isEmpty {
+            } else if store.visibleTasks.isEmpty {
                 ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(store.customView != nil ? "Edit the filter or choose another view to find tasks." : "Capture a task to get started. Saved tasks stay on this device when you're offline."))
             } else if store.customView == nil && store.query == .upcoming {
                 UpcomingTaskList(store: store, selection: selection, edit: edit)
             } else {
                 ScrollViewReader { proxy in
                     List(selection: selection) {
-                        ForEach(store.tasks) { task in
+                        ForEach(store.visibleTasks) { task in
                             TaskListRow(task: task, store: store, edit: edit)
                         }
                     }
@@ -47,10 +47,11 @@ struct TaskListView: View {
                 }
             }
         }
+        .environment(\.defaultMinListRowHeight, 0)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.horizontal, 0, for: .scrollContent)
-        .overlay { if store.isLoading && store.tasks.isEmpty { ProgressView() } }
+        .overlay { if store.isLoading && store.visibleTasks.isEmpty { ProgressView() } }
     }
 
     private var emptyTitle: String {
@@ -67,11 +68,14 @@ struct TaskListView: View {
 struct TaskListLabel: View {
     let task: TaskRecord
     let store: TaskStore
+    var isCompleted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.description)
-                .foregroundStyle(.primary)
+                .font(.subheadline)
+                .strikethrough(isCompleted)
+                .foregroundStyle(isCompleted ? .secondary : .primary)
                 .fixedSize(horizontal: false, vertical: true)
             if !task.project.isEmpty || task.deadline != nil {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -97,46 +101,76 @@ struct TaskListRow: View {
     let store: TaskStore
     let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var naturalHeight: CGFloat = 0
+    private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
+    private var checked: Bool { phase == .checked || phase == .collapsing }
+    private var heightFraction: CGFloat { phase == .collapsing ? 0 : 1 }
 
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
             if task.canComplete {
                 Button {
-                    Task { _ = await store.complete(id: task.id) }
+                    Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
                 } label: {
-                    Image(systemName: "circle")
+                    Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                         .font(.title2).foregroundStyle(.secondary)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .disabled(store.isSaving)
+                .disabled(store.isSaving || phase != nil)
                 .accessibilityLabel("\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
+                .accessibilityValue(checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
             }
             NavigationLink(value: task.id) {
-                TaskListLabel(task: task, store: store)
+                TaskListLabel(task: task, store: store, isCompleted: checked)
             }
+            .disabled(phase != nil)
             .accessibilityIdentifier(rowIdentifier ?? "task-\(task.id.uuidString)")
         }
-        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 12))
+        .padding(.vertical, 8)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if phase != .collapsing || naturalHeight == 0 { naturalHeight = $0 } }
+        .modifier(TaskRowCollapse(fraction: heightFraction, height: naturalHeight))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: heightFraction)
+        .accessibilityHidden(phase == .collapsing)
+        .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 12))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .tag(task.id)
         .contextMenu {
-            TaskActivityButton(task: task, store: store)
-            if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
+            TaskActivityButton(task: task, store: store).disabled(phase != nil)
+            if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving || phase != nil) }
             if task.canComplete {
-                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }.disabled(store.isSaving)
+                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } }.disabled(store.isSaving || phase != nil)
             }
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            TaskActivityButton(task: task, store: store).tint(.orange)
+            TaskActivityButton(task: task, store: store).tint(.orange).disabled(phase != nil)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if task.canEdit {
-                Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
+                Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving || phase != nil)
             }
         }
+    }
+}
+
+private nonisolated struct TaskRowCollapse: AnimatableModifier {
+    var fraction: CGFloat
+    let height: CGFloat
+
+    var animatableData: CGFloat {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(x: 1, y: fraction, anchor: .center)
+            .frame(height: height > 0 ? height * fraction : nil)
+            .clipped()
     }
 }

@@ -120,9 +120,16 @@ import XCTest
         app.tabBars.buttons["Upcoming"].tap()
         XCTAssertTrue(circle.waitForExistence(timeout: 10))
         capture("Visible completion before action", app)
+        let tappedAt = Date().timeIntervalSince1970
         circle.tap()
+        let checked = app.buttons.matching(NSPredicate(format: "identifier == %@ AND value == %@", "complete-task-row-" + ordinaryID, "Completed")).firstMatch
+        XCTAssertTrue(checked.waitForExistence(timeout: 5))
+        let checkedAt = Date().timeIntervalSince1970
+        capture("Checked task remains visible before collapse", app)
         XCTAssertTrue(planned.firstMatch.waitForNonExistence(timeout: 15))
         XCTAssertFalse(deadline.firstMatch.exists)
+        let timing = XCTAttachment(string: "tapEpoch=\(tappedAt)\ncheckedObservedEpoch=\(checkedAt)\nremovedObservedEpoch=\(Date().timeIntervalSince1970)")
+        timing.name = "Task completion timing"; timing.lifetime = .keepAlways; add(timing)
         capture("Completion removes both Upcoming appearances", app)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
