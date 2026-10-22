@@ -108,7 +108,7 @@ struct TaskListRow: View {
     private var heightFraction: CGFloat { phase == .collapsing ? 0 : 1 }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 4) {
+        HStack(alignment: task.project.isEmpty && task.deadline == nil ? .center : .top, spacing: 4) {
             if task.canComplete {
                 Button {
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
