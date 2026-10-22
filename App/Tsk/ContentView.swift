@@ -4,7 +4,7 @@ import TskNative
 import EventKit
 
 struct ContentView: View {
-    private enum WorkspaceTab: Hashable { case view(WorkspaceView), catalog(WorkspaceView), project(TaskProjectSelection), capture }
+    private enum WorkspaceTab: Hashable { case view(WorkspaceView), catalog(WorkspaceView), project(TaskProjectSelection), current, capture }
 
     enum WorkspaceSetting {
         case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport, attributeDefinitions
@@ -80,6 +80,7 @@ struct ContentView: View {
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
             if isPad {
+                if columnVisibility != .all { columnVisibility = .all }
                 let hasUnsavedFilter = store.customView != nil && store.customView?.id == nil
                 guard view != store.selectedWorkspaceView || store.projectSelection != .all || hasUnsavedFilter else { return }
             }
@@ -102,11 +103,8 @@ struct ContentView: View {
 
     private var workspaceTabSelection: Binding<WorkspaceTab> {
         Binding(get: {
-            if isPad, store.selectedWorkspaceView == .projects, store.projectSelection != .all {
-                return .project(store.projectSelection)
-            }
-            let view = store.selectedWorkspaceView
-            return isPad && !favoriteViews.contains(view) ? .catalog(view) : .view(view)
+            if isPad, needsCurrentTab { return .current }
+            return .view(store.selectedWorkspaceView)
         }, set: { tab in
             switch tab {
             case .view(let view), .catalog(let view): tabSelection.wrappedValue = view
@@ -114,12 +112,21 @@ struct ContentView: View {
                 tabSelection.wrappedValue = .projects
                 openProject(project)
                 projectPath.append(project)
+            case .current: break
             case .capture: capture()
             }
         })
     }
 
     private var favoriteViews: [WorkspaceView] { tabsBeforeEditingViews ?? store.workspaceViews.active }
+
+    private var currentProjectTab: TaskProjectSelection? {
+        isProjectWorkspace && store.projectSelection != .all ? store.projectSelection : nil
+    }
+
+    private var needsCurrentTab: Bool {
+        currentProjectTab != nil || !favoriteViews.contains(store.selectedWorkspaceView)
+    }
 
     private var captureTabRole: TabRole {
         if #available(iOS 27, *) { .prominent }
@@ -153,65 +160,41 @@ struct ContentView: View {
         .tabViewStyle(.tabBarOnly)
     }
 
-    private var iPadNavigation: some View {
-        TabView(selection: workspaceTabSelection) {
-            ForEach(favoriteViews) { view in
-                Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
-                    iPadContent
-                }
-                .customizationID(view.id)
-                .accessibilityIdentifier("tab-" + view.id)
-            }
-            TabSection("Predefined views") {
-                ForEach(WorkspaceView.defaults.filter { $0 != .projects }) { view in
-                    Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.catalog(view)) { iPadContent }
-                        .accessibilityIdentifier("sidebar-view-" + view.id)
-                }
-            }
-            .tabPlacement(.sidebarOnly)
-            TabSection("Projects") {
-                Tab("All projects", systemImage: "folder", value: WorkspaceTab.catalog(.projects)) { iPadContent }
-                    .accessibilityIdentifier("sidebar-view-projects")
-                Tab("No project", systemImage: "folder", value: WorkspaceTab.project(.unassigned)) { iPadContent }
-                    .accessibilityIdentifier("sidebar-project-unassigned")
-                ForEach(store.availableProjects.map { UTF8String($0) }) { project in
-                    Tab(project.rawValue, systemImage: "folder", value: WorkspaceTab.project(.project(project.rawValue))) { iPadContent }
-                        .accessibilityIdentifier("sidebar-project-" + project.rawValue)
-                }
-            }
-            .tabPlacement(.sidebarOnly)
-            if !store.savedViews.isEmpty {
-                TabSection("Custom views") {
-                    ForEach(store.savedViews) { saved in
-                        Tab(saved.name, systemImage: "line.3.horizontal.decrease", value: WorkspaceTab.catalog(.custom(saved.id))) { iPadContent }
-                            .accessibilityIdentifier("sidebar-view-custom-" + saved.id.uuidString)
-                    }
-                }
-                .tabPlacement(.sidebarOnly)
-            }
-        }
-        .tabViewStyle(.sidebarAdaptable)
-        .defaultAdaptableTabBarPlacement(prefersSidebar ? .sidebar : .tabBar)
-        .tabViewSidebarBottomBar {
-            Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .accessibilityIdentifier("sidebar-settings")
-        }
+    private func nativeItem(_ view: WorkspaceView, catalog: Bool = false, title: String? = nil) -> NativeWorkspaceNavigation.Item {
+        NativeWorkspaceNavigation.Item(id: catalog ? "catalog-" + view.id : view.id,
+            title: title ?? view.title(in: store), image: view.systemImage,
+            accessibilityIdentifier: (catalog ? "sidebar-view-" : "tab-") + view.id,
+            select: { workspaceTabSelection.wrappedValue = catalog ? .catalog(view) : .view(view) })
     }
 
-    private var iPadContent: some View {
-        workspaceContent
-            .background(CompactWorkspaceTabs(identifiers: favoriteViews.map(\.id)).frame(width: 0, height: 0))
-            .modifier(WorkspacePlacementObserver { placement in
-                guard sizeClass == .regular else { return }
-                guard placement == .sidebar || placement == .topBar else { return }
-                let isSidebar = placement == .sidebar
+    private func nativeProjectItem(_ project: TaskProjectSelection) -> NativeWorkspaceNavigation.Item {
+        NativeWorkspaceNavigation.Item(id: project.projectName.map { "catalog-project-name-" + Data($0.utf8).base64EncodedString() } ?? "catalog-project-none",
+            title: project.projectName ?? "No project", image: "folder",
+            accessibilityIdentifier: "sidebar-project-" + (project.projectName ?? "unassigned"),
+            select: { workspaceTabSelection.wrappedValue = .project(project) })
+    }
+
+    private var iPadNavigation: some View {
+        let favorites = favoriteViews.map { nativeItem($0) }
+        let current = needsCurrentTab ? NativeWorkspaceNavigation.Item(id: "current-workspace",
+            title: currentProjectTab.map { $0.projectName ?? "No project" } ?? store.selectedWorkspaceView.title(in: store),
+            image: currentProjectTab != nil ? "folder" : store.selectedWorkspaceView.systemImage,
+            accessibilityIdentifier: "current-workspace", select: {}) : nil
+        let predefined = NativeWorkspaceNavigation.Section(id: "predefined-catalog", title: "Predefined views",
+            items: WorkspaceView.defaults.filter { $0 != .projects }.map { nativeItem($0, catalog: true) })
+        let projects = NativeWorkspaceNavigation.Section(id: "projects-catalog", title: "Projects",
+            items: [nativeItem(.projects, catalog: true, title: "All projects"), nativeProjectItem(.unassigned)] + store.availableProjects.map { nativeProjectItem(.project($0)) })
+        let custom = NativeWorkspaceNavigation.Section(id: "custom-catalog", title: "Custom views",
+            items: store.savedViews.map { nativeItem(.custom($0.id), catalog: true) })
+        return NativeWorkspaceNavigation(favorites: favorites, current: current,
+            sections: [predefined, projects] + (custom.items.isEmpty ? [] : [custom]),
+            selection: current?.id ?? store.selectedWorkspaceView.id, content: AnyView(workspaceContent),
+            prefersSidebar: prefersSidebar, presentationChanged: { isSidebar in
                 if prefersSidebar != isSidebar {
                     prefersSidebar = isSidebar
                     Self.navigationDefaults.set(isSidebar, forKey: "prefers-sidebar")
                 }
-            })
+            }, settings: { isShowingSettings = true })
     }
 
     private var workspaceContent: some View {
@@ -635,15 +618,4 @@ private struct TaskListSelection: Equatable {
 
 private enum TaskWorkspacePresentation: Equatable {
     case columns, accessibilityColumns, compact
-}
-
-private struct WorkspacePlacementObserver: ViewModifier {
-    @Environment(\.tabBarPlacement) private var placement
-    let changed: (TabBarPlacement?) -> Void
-
-    func body(content: Content) -> some View {
-        content.onChange(of: placement) { _, placement in
-            Task { @MainActor in changed(placement) }
-        }
-    }
 }

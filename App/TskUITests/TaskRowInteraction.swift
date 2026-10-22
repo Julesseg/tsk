@@ -27,7 +27,45 @@ extension XCTestCase {
     }
 
     @MainActor func openWorkspaceMenuView(_ title: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        tapTaskMenuItem(workspaceMenuView(title, app: app), app: app, file: file, line: line)
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: TaskNativeMenuOptionGeometry?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            do {
+                let application = try app.snapshot()
+                var pending: [(any XCUIElementSnapshot, [CGRect], Bool)] = application.children.map { ($0, [], false) }
+                var candidates: [TaskNativeMenuOptionGeometry] = []
+                while let (snapshot, ancestors, inViewsMenu) = pending.popLast() {
+                    let frames = ancestors + [snapshot.frame]
+                    let containsViewsMenu = inViewsMenu || snapshot.elementType == .collectionView && taskSnapshot("manage-favorite-views", type: .button, in: snapshot) != nil
+                    if containsViewsMenu, snapshot.elementType == .button, snapshot.label == title, snapshot.isEnabled {
+                        candidates.append(TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: ancestors))
+                    }
+                    pending.append(contentsOf: snapshot.children.map { ($0, frames, containsViewsMenu) })
+                }
+                lastSample = "matchingRows=\(candidates.count) geometry=\(String(describing: candidates.first))"
+                guard candidates.count == 1, let current = candidates.first, current.isVisible else { previous = nil; return false }
+                let stable = previous == current
+                previous = current
+                return stable
+            } catch {
+                lastSample = "snapshotError=\(error)"
+                previous = nil
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
+        }
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+            XCTFail("Views menu row did not settle: \(title); \(lastSample); \(app.debugDescription)", file: file, line: line)
+            return
+        }
+        workspaceMenuView(title, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let heading = app.staticTexts.matching(identifier: "workspace-title-text").firstMatch
             return !app.buttons["manage-favorite-views"].exists && heading.exists && heading.label == title

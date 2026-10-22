@@ -15,11 +15,13 @@ final class iPadWorkspaceUITests: XCTestCase {
         let app = launch()
         XCTAssertTrue(workspaceTab("Today", app: app).waitForExistence(timeout: 15))
         let initial = app.windows.firstMatch.frame
+        recordWindowGeometry("compact initial", app: app)
         let compactTarget = CGPoint(x: 500, y: initial.maxY - 100)
         let regularTarget = CGPoint(x: initial.maxX - 8, y: initial.maxY - 8)
         resizeWindow(app, toward: compactTarget)
         waitForCompactTabs(app)
         let compact = app.windows.firstMatch.frame
+        recordWindowGeometry("empty Today compact", app: app)
         XCTAssertLessThan(compact.width, initial.width / 2)
         XCTAssertEqual(app.tabBars.buttons.count, 4)
         XCTAssertTrue(workspaceTab("Today", app: app).isSelected)
@@ -31,7 +33,8 @@ final class iPadWorkspaceUITests: XCTestCase {
             let tab = self.workspaceTab("Today", app: app)
             return tab.exists && tab.frame.midY < app.windows.firstMatch.frame.midY && !app.tabBars.firstMatch.exists
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [regular], timeout: 10), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [regular], timeout: 10), .completed, app.debugDescription)
+        recordWindowGeometry("empty Today expanded", app: app)
         tapTaskControl(app.buttons["workspace-views"], app: app)
         tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
         tapTaskControl(app.buttons["new-custom-view"], app: app)
@@ -54,15 +57,24 @@ final class iPadWorkspaceUITests: XCTestCase {
         resizeWindow(app, toward: compactTarget)
         waitForCompactTabs(app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Compact tasks")
-        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        XCTAssertEqual(app.tabBars.buttons.count, 5)
+        XCTAssertTrue(app.tabBars.buttons["Compact tasks"].isSelected)
         for title in ["Today", "Upcoming", "Projects", "All"] {
             XCTAssertFalse(workspaceTab(title, app: app).isSelected)
         }
+        recordWindowGeometry("custom compact", app: app)
         capture("iPad compact unfavorited custom view", app: app)
         tapTaskControl(app.buttons["workspace-views"], app: app)
         XCTAssertTrue(workspaceMenuView("Compact tasks", app: app).images["checkmark"].exists)
         capture("iPad compact Views retains selected custom view", app: app)
+        openWorkspaceMenuView("All", app: app)
+        XCTAssertTrue(workspaceTab("All", app: app).isSelected)
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        XCTAssertFalse(app.buttons["current-workspace"].exists)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
         openWorkspaceMenuView("Compact tasks", app: app)
+        XCTAssertEqual(app.tabBars.buttons.count, 5)
+        XCTAssertTrue(app.tabBars.buttons["Compact tasks"].isSelected)
         tapTaskControl(app.buttons["New task"], app: app)
         XCTAssertTrue(description(app).waitForExistence(timeout: 5))
         capture("iPad compact toolbar capture", app: app)
@@ -75,6 +87,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         tapTaskControl(app.buttons["sidebar-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
+        recordWindowGeometry("custom expanded", app: app)
         capture("iPad live sidebar recovery after compact resizing", app: app)
         tapTaskControl(app.buttons["workspace-views"], app: app)
         tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
@@ -85,6 +98,15 @@ final class iPadWorkspaceUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 15))
         capture("iPad regular preference retained after compact relaunch", app: app)
+    }
+
+    private func recordWindowGeometry(_ stage: String, app: XCUIApplication) {
+        let geometry = "stage=\(stage) app=\(app.frame) window=\(app.windows.firstMatch.frame) orientation=\(XCUIDevice.shared.orientation.rawValue)"
+        print("Owned iPad geometry: \(geometry)")
+        let attachment = XCTAttachment(string: geometry)
+        attachment.name = "iPad window geometry " + stage
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func resizeWindow(_ app: XCUIApplication, toward target: CGPoint) {
@@ -165,6 +187,27 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Workspace")
         XCTAssertEqual(workspaceTabs(in: app).map(\.label), ["Today", "Upcoming", "Projects", "All"])
         capture("iPad direct project opened from Views", app: app)
+        let projectWindow = app.windows.firstMatch.frame
+        resizeWindow(app, toward: CGPoint(x: 500, y: projectWindow.maxY - 100))
+        waitForCompactTabs(app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Workspace")
+        XCTAssertTrue(app.tabBars.buttons["Workspace"].isSelected)
+        XCTAssertTrue(taskRow(named: "Direct project task", app: app).exists)
+        for title in ["Today", "Upcoming", "Projects", "All"] {
+            XCTAssertFalse(workspaceTab(title, app: app).isSelected)
+        }
+        recordWindowGeometry("direct project compact", app: app)
+        capture("iPad compact direct project keeps exact tasks", app: app)
+        resizeWindow(app, toward: CGPoint(x: projectWindow.maxX - 8, y: projectWindow.maxY - 8))
+        let projectExpanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.workspaceTab("Today", app: app).exists && !app.tabBars.firstMatch.exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [projectExpanded], timeout: 10), .completed, app.debugDescription)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Workspace")
+        XCTAssertTrue(taskRow(named: "Direct project task", app: app).exists)
+        XCTAssertFalse(app.buttons["sidebar-settings"].exists)
+        recordWindowGeometry("direct project expanded", app: app)
+        capture("iPad expanded direct project keeps exact tasks", app: app)
         tapTaskControl(sidebar, app: app)
         let custom = app.descendants(matching: .any).matching(identifier: "sidebar-view-custom-" + id).firstMatch
         XCTAssertTrue(custom.waitForExistence(timeout: 5), app.debugDescription)
@@ -356,6 +399,20 @@ final class iPadWorkspaceUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchArguments = arguments
         app.launch()
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+        let display = XCUIApplication(bundleIdentifier: "com.apple.springboard").frame
+        let screen = CGRect(x: 0, y: 0, width: max(display.width, display.height), height: min(display.width, display.height))
+        let initial = app.windows.firstMatch.frame
+        print("Owned iPad window fixture before normalization: display=\(display) landscapeScreen=\(screen) initial=\(initial)")
+        if initial.width < screen.width * 0.9 || initial.height < screen.height * 0.9 {
+            resizeWindow(app, toward: CGPoint(x: screen.maxX - 8, y: screen.maxY - 8))
+            let regularWindow = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let window = app.windows.firstMatch.frame
+                return window.width > screen.width * 0.9 && window.height > screen.height * 0.9
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [regularWindow], timeout: 10), .completed, app.debugDescription)
+        }
+        print("Owned iPad window fixture: screen=\(screen) initial=\(initial) regular=\(app.windows.firstMatch.frame)")
         return app
     }
 

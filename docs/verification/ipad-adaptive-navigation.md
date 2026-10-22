@@ -1,41 +1,63 @@
 # Native iPad adaptive navigation
 
-The iPad workspace uses SwiftUI's native sidebar-adaptable TabView. Favorites
-retain their existing local persistence and order; the complete sidebar catalog
-and Views menu can select unfavorited views without changing favorites. Exact
-project links and No project are available in both navigation presentations;
-the Views menu checks the current direct project as well as saved/custom views. The
-regular tab/sidebar preference is local to the device. Compact presentation does
-not write that preference.
+The iPad workspace uses UIKit's native sidebar-adaptable `UITabBarController`,
+with SwiftUI workspace content. Favorites retain their local persistence and
+order; the complete sidebar catalog and Views menu select unfavorited views
+without changing favorites. Exact project links and No project are available in
+both presentations. The Views menu checks the current direct project and saved
+view. The regular tab/sidebar preference is local to the device.
 
-## Compact native tab filter
+## Native containment and compact tabs
 
-The sidebar catalog also participates in UIKit's default compact tab collection,
-which produced a More tab and a nil-item exception inside
-`UITabBarController._tabs_rebuildTabBarItemsAnimated` during live expansion on the
-iPadOS 27.0 simulator. Removing placement observation did not prevent the crash;
-the previous bottom-only navigation passed the same resize sequence.
+The shell owns stable native tabs and a unique SwiftUI hosting controller for
+each root, group and catalog entry. This follows the public
+[`tabs`](https://developer.apple.com/documentation/uikit/uitabbarcontroller/tabs)
+contract, including a non-nil controller for every root group. Host ownership
+survives content changes between task columns and compact navigation. The inherited keyboard router crosses the hosting boundary; UIKit traits
+provide each host’s system environment. Removed catalog entries release their cached tabs and controllers.
 
-Favorites have stable SwiftUI customization IDs. A small UIKit ancestor adapter
-applies the public
+The SwiftUI adaptive shell reproduced two failures on the iPadOS 27.0 simulator:
+a nil-item exception during catalog flattening and an invalid selected-controller
+exception when resizing with an unfavorited current destination. An inactive
+favorite also remained visually selected while different content was open.
+The owned native shell uses explicit controller factories and selection instead
+of relying on that generated containment.
+
+The public
 [`compactTabIdentifiers`](https://developer.apple.com/documentation/uikit/uitabbarcontroller/compacttabidentifiers)
-filter so the native compact bar contains only favorite root tabs. Apple's default
-is nil, which includes all tabs. Runtime diagnostics confirmed the native root IDs
-match the supplied favorite IDs. The adapter applies configuration after lifecycle
-attachment and only changes the native property when its value differs. It does
-not replace the native sidebar, tabs, selection delegate or project behavior.
+filter limits the compact bar to favorite roots plus a temporary native current
+tab when needed. The current tab disappears on choosing a favorite; it does not
+change favorite membership, order or the four-favorite limit. Favorite/current
+tabs use fixed placement, and catalog groups and leaves use sidebar-only
+placement, so native customization cannot create a second favorite collection.
+Native project identifiers encode exact UTF-8 bytes; titles and navigation retain
+the original project names.
+
+## Regular presentation during live resizing
+
+The native window can temporarily switch between top tabs and sidebar before its
+size class changes. Persisting those intermediate placements changed the regular
+preference during a corner drag. The native sidebar delegate captures the event's
+public scene
+[`isInteractivelyResizing`](https://developer.apple.com/documentation/uikit/uiwindowscene/geometry/isinteractivelyresizing)
+state before recording presentation changes. It observes
+[`effectiveGeometry`](https://developer.apple.com/documentation/uikit/uiwindowscene/effectivegeometry)
+using Apple's documented KVO support and restores the regular preference after
+resizing ends and regular traits arrive. Observation follows the visible shell
+lifecycle; stale scene/geometry events cannot overwrite a newer transition.
+Preference callbacks run outside SwiftUI representable updates.
 
 ## Runtime verification
 
-Canonical iPad XCUITest covers initial top tabs, complete sidebar/project access,
+Canonical iPad XCUITest covers initial top tabs, full sidebar/project access,
 unfavorited custom selection, menu checkmarks, favorite capacity/order, Settings,
 regular presentation after relaunch, largest accessibility text, keyboard commands
-and actual window resizing. The compact journey checks an empty Today window and
-an unfavorited custom view, upper-toolbar capture, unchanged favorites and a live
-Settings interaction after expansion. Frozen screenshots alone do not establish
-successful recovery from a layout transition.
+and real window resizing. The compact journey checks empty Today and an
+unfavorited custom view, toolbar capture, unchanged favorites, selected native
+indicators and a live Settings interaction after expansion. Frozen screenshots
+alone do not establish successful recovery from a layout transition.
 
 Run `WorkspaceSettingsUITests` and `iPadWorkspaceUITests` through
-`scripts/run-ui-tests.sh` on the owned iPad simulator. The shared Settings journeys
+`scripts/run-ui-tests.sh` on the owned iPad simulator. Shared Settings journeys
 also cover iPhone navigation. Source/build checks do not establish physical
 keyboard delivery, hardware behavior, account services or distribution.
