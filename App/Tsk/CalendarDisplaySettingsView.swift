@@ -3,10 +3,38 @@ import TskCore
 
 struct CalendarDisplaySettingsView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let preferences: CalendarOverviewPreferences
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    let calendar: TodayCalendarController
+    private var preferences: CalendarOverviewPreferences { calendar.preferences }
 
     var body: some View {
         Form {
+            if let snapshot = calendar.snapshot {
+                if snapshot.authorization != .fullAccess {
+                    Section("Access") {
+                        Button("Enable Calendar") {
+                            if snapshot.authorization == .denied || snapshot.authorization == .restricted {
+                                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                            } else {
+                                Task { await calendar.refresh(requestingAccess: true) }
+                            }
+                        }
+                        .accessibilityIdentifier("calendar-request-access")
+                        .accessibilityHint(snapshot.readError ?? "Show today's Calendar events. Calendar access is managed in Settings.")
+                        .disabled(calendar.isLoading)
+                    }
+                } else if let error = snapshot.readError {
+                    Section {
+                        Text("Calendar unavailable").foregroundStyle(.secondary)
+                            .accessibilityIdentifier("calendar-read-error")
+                        Button("Retry") { Task { await calendar.refresh() } }
+                            .accessibilityIdentifier("calendar-refresh")
+                            .accessibilityHint(error)
+                            .disabled(calendar.isLoading)
+                    }
+                }
+            }
             Section {
                 Stepper(value: Binding(get: { preferences.hours.startHour }, set: {
                     preferences.hours = CalendarDisplayHours(startHour: $0, endHour: preferences.hours.endHour)
@@ -30,6 +58,10 @@ struct CalendarDisplaySettingsView: View {
         }
         .navigationTitle("Calendar")
         .accessibilityIdentifier("calendar-display-settings-form")
+        .task { await calendar.refreshAuthorization() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await calendar.refreshAuthorization() } }
+        }
     }
 
     private func hour(_ value: Int) -> String { String(format: "%02d:00", value) }

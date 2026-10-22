@@ -3,51 +3,16 @@ import TskCore
 import TskNative
 
 struct TodayCalendarSection: View {
-    @Environment(\.openURL) private var openURL
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let calendar: TodayCalendarController
 
     var body: some View {
         if let snapshot = calendar.snapshot,
-           snapshot.authorization != .fullAccess || snapshot.readError != nil || !snapshot.events.isEmpty {
+           snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.events.isEmpty {
             Section {
-                if snapshot.authorization == .fullAccess {
-                    if let error = snapshot.readError {
-                        failureRow(error)
-                    } else {
-                        TodayCalendarOverview(snapshot: snapshot, hours: calendar.preferences.hours)
-                    }
-                } else {
-                    Button("Enable Calendar") {
-                        if snapshot.authorization == .denied || snapshot.authorization == .restricted {
-                            if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                        } else {
-                            Task { await calendar.refresh(requestingAccess: true) }
-                        }
-                    }
-                    .font(.subheadline)
-                    .accessibilityIdentifier("calendar-request-access")
-                    .accessibilityHint(snapshot.readError ?? "Show today's Calendar events. Calendar access is managed in Settings.")
-                    .disabled(calendar.isLoading)
-                }
+                TodayCalendarOverview(snapshot: snapshot, hours: calendar.preferences.hours)
                 fixtureControls
             }
         }
-    }
-
-    private func failureRow(_ error: String) -> some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-            : AnyLayout(HStackLayout(spacing: 12))
-        return layout {
-            Text("Calendar unavailable").foregroundStyle(.secondary).accessibilityIdentifier("calendar-read-error")
-            if !dynamicTypeSize.isAccessibilitySize { Spacer() }
-            Button("Retry") { Task { await calendar.refresh() } }
-                .fixedSize()
-                .accessibilityIdentifier("calendar-refresh")
-                .accessibilityHint(error)
-                .disabled(calendar.isLoading)
-        }.font(.subheadline)
     }
 
     @ViewBuilder private var fixtureControls: some View {

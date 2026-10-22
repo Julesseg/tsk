@@ -18,8 +18,11 @@ import XCTest
             app.terminate(); app.resetAuthorizationStatus(for: .calendar)
         }
         app.launch(); select(.today, app)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
+        assertCalendarHidden(app)
+        openCalendarSettings(app)
         app.buttons["calendar-request-access"].tap(); permission(allow: true)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForNonExistence(timeout: 20))
+        closeCalendarSettings(app)
         let timed = event("Calendar fixture timed", app)
         XCTAssertTrue(revealTaskElement(timed, in: "task-list", app: app), app.staticTexts["calendar-fixture-error"].label)
         XCTAssertTrue(event("Calendar fixture all day", app).exists)
@@ -42,23 +45,32 @@ import XCTest
         app.terminate(); app.resetAuthorizationStatus(for: .calendar)
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_CALENDAR_FIXTURE")
         app.launch(); select(.today, app)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
+        assertCalendarHidden(app)
         XCTAssertFalse(event("Calendar fixture timed", app).exists)
+        openCalendarSettings(app)
         app.buttons["calendar-request-access"].tap(); permission(allow: false)
         XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["calendar-request-access"].label, "Enable Calendar")
-        capture("Actual Calendar permission revoked and denied with no stale events", app)
+        capture("Actual Calendar denial managed in Settings", app)
+        closeCalendarSettings(app)
+        assertCalendarHidden(app)
+        capture("Actual Calendar permission revoked and denied with no Calendar area", app)
+        openCalendarSettings(app)
         app.buttons["calendar-request-access"].tap()
         XCTAssertTrue(XCUIApplication(bundleIdentifier: "com.apple.Preferences").wait(for: .runningForeground, timeout: 10))
         app.activate()
         XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 10))
+        closeCalendarSettings(app)
+        assertCalendarHidden(app)
         createTask("Task after Calendar denial", app)
         XCTAssertTrue(taskRow(named: "Task after Calendar denial", app: app).waitForExistence(timeout: 15))
         app.terminate(); app.resetAuthorizationStatus(for: .calendar)
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_CALENDAR_CLEANUP")
         app.launch(); select(.today, app)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
+        assertCalendarHidden(app)
+        openCalendarSettings(app)
         app.buttons["calendar-request-access"].tap(); permission(allow: true)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForNonExistence(timeout: 20))
+        closeCalendarSettings(app)
         select(.unfinished, app)
     }
 
@@ -68,17 +80,43 @@ import XCTest
         app.resetAuthorizationStatus(for: .calendar)
         defer { app.terminate(); app.resetAuthorizationStatus(for: .calendar) }
         app.launch(); select(.today, app)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 15))
+        assertCalendarHidden(app)
+        openCalendarSettings(app)
         app.buttons["calendar-request-access"].tap(); permission(allow: true)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForNonExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["calendar-read-error"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["calendar-read-error"].label, "Calendar unavailable")
         XCTAssertEqual(app.buttons["calendar-refresh"].label, "Retry")
-        capture("Injected protocol read failure; ordinary task controls remain available", app)
+        capture("Injected protocol read failure is managed in Settings", app)
+        closeCalendarSettings(app)
+        assertCalendarHidden(app)
+        capture("Injected protocol read failure hides Calendar; ordinary task controls remain available", app)
         createTask("Calendar failure task", app)
         let row = taskRow(named: "Calendar failure task", app: app)
         XCTAssertTrue(row.waitForExistence(timeout: 15)); row.tap()
         XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 10))
         app.buttons["complete-task"].tap()
+    }
+
+    private func assertCalendarHidden(_ app: XCUIApplication) {
+        XCTAssertTrue(app.staticTexts["Tasks · Today"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["calendar-request-access"].exists)
+        XCTAssertFalse(app.buttons["calendar-refresh"].exists)
+        XCTAssertFalse(app.staticTexts["calendar-read-error"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'calendar-event-'")).firstMatch.exists)
+    }
+
+    private func openCalendarSettings(_ app: XCUIApplication) {
+        tapTaskControl(app.buttons["workspace-settings"], app: app)
+        let calendar = app.buttons["calendar-display-settings"]
+        XCTAssertTrue(revealTaskElement(calendar, in: "workspace-settings-list", app: app, requireFullVisibility: true))
+        tapTaskControl(calendar, app: app)
+        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 10))
+    }
+
+    private func closeCalendarSettings(_ app: XCUIApplication) {
+        tapTaskControl(app.navigationBars["Calendar"].buttons.firstMatch, app: app)
+        tapTaskControl(app.buttons["close-workspace-settings"], app: app)
     }
 
     private enum Selection { case today, unfinished }

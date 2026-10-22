@@ -40,6 +40,11 @@ import TskNative
         if await refreshAccessPhase() { await refresh() }
     }
 
+    func refreshAuthorization() async {
+        let authorization = await source.authorization()
+        if snapshot == nil || snapshot?.authorization != authorization { await refresh() }
+    }
+
     private func refreshAccessPhase() async -> Bool {
         accessRefreshInProgress = true
         defer {

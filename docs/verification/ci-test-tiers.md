@@ -53,7 +53,7 @@ at accessibility text sizes, modal annotation commands and native text input.
 Share runs first only when selected; the iPad smoke lane skips its separate
 launch and host-fixture installation.
 
-Compact Calendar presentation, access controls and Retry recovery run on both device
+Calendar presentation, hidden missing-access/read-error states, and Settings access/Retry recovery run on both device
 families in the full suite, including populated light/dark and largest-text
 captures, saved start/end hours, source-calendar colors, empty Calendar/tasks and many-event scrolling. Controlled Calendar
 sources establish presentation; actual EventKit authorization and read-only

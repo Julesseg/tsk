@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TaskSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    let calendarPreferences: CalendarOverviewPreferences
+    let calendar: TodayCalendarController
     let choose: (ContentView.WorkspaceSetting) -> Void
 
     var body: some View {
@@ -18,7 +18,7 @@ struct TaskSettingsView: View {
                 }
                 Section("Integrations") {
                     NavigationLink {
-                        CalendarDisplaySettingsView(preferences: calendarPreferences)
+                        CalendarDisplaySettingsView(calendar: calendar)
                     } label: {
                         Label("Calendar", systemImage: "calendar")
                     }.accessibilityIdentifier("calendar-display-settings")
