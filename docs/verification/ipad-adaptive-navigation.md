@@ -77,3 +77,51 @@ Run `WorkspaceSettingsUITests` and `iPadWorkspaceUITests` through
 `scripts/run-ui-tests.sh` on the owned iPad simulator. Shared Settings journeys
 also cover iPhone navigation. Source/build checks do not establish physical
 keyboard delivery, hardware behavior, account services or distribution.
+
+## Verification record — 2026-10-22
+
+The final app source is `951670e`. The clean canonical adaptive
+navigation journey passed in 126.769 seconds, including direct project selection,
+actual compact/regular resizing, portrait Views access, unchanged favorite
+capacity and both presentation preferences after relaunch. The compact journey
+passed in 88.973 seconds, including an unfavorited current view, the last favorite,
+capture/cancel, live Settings after expansion and the preference after relaunch.
+Returned app frames were 1376 × 1032 → 375 × 940.5 → 1376 × 1032 points; the
+portrait app/window was 1032 × 1376. These are actual system window transitions.
+The compact run used the same app source before the final test-only portrait
+Views-opener change; that opener is not called by the compact journey.
+
+All 161 Core tests and the UI-selection/CI-routing regressions (14 and 12 tests)
+passed. The five shared iPhone workspace/Settings journeys passed at `75ad178`;
+later production changes are confined to iPad navigation.
+
+Seven final iPad regression journeys passed: capture/all Settings destinations,
+project navigation/appearance, largest-text Settings, title-adjacent sync
+progress, favorite capacity/order/relaunch, custom views at accessibility text
+sizes, and project/Today/Waiting/Upcoming/portrait task identity. Six passed in
+`proposed-native-broad-final.xcresult`; the favorite journey passed separately in
+91.017 seconds after the test-only `eb8b90a` change reacquired cells after the
+successful native drag. The gesture, relative-order check, five-second deadline
+and relaunch assertions were retained. Original failures remain in the evidence
+directory rather than being represented as passing runs.
+
+The single local HTML report contains 103 captures, including all planned
+baseline/proposed pairs, and measures 2,896,993 bytes:
+`~/.local/share/ui-reports/tsk/integrate-spec-53/20261022T135500Z.html`.
+At 390 × 844, all 103 images decoded, no horizontal overflow occurred, pairs
+remained adjacent in one column, and enlargement, scrolling and click-to-close
+worked. Original screenshots, result bundles and logs remain in
+`/tmp/tsk-spec53-evidence`. Sync progress passed runtime assertions but has no
+matched screenshot attachments. New sidebar/Views interfaces have proposed-only
+captures alongside surrounding baseline/proposed workspaces.
+
+Only the unblocked #55 slice of #53 is included. #56–#58 remain blocked on
+unmerged #44/#45; their main canvas, inline capture and edit-navigation behavior
+is not claimed by the existing task-detail and capture-sheet evidence.
+
+Local injected Cmd-Return did not reach the editor save handler on either the
+untouched `a632410` baseline or the proposed app. Cmd-N opened capture. Canonical
+CI HID results are separate acceptance evidence. Physical keyboard/touch,
+VoiceOver, account services and distribution were not exercised. The local
+simulator TaskChampion library was reused after confirming matching bridge
+sources and lockfile; the fresh native build remains a CI check.
