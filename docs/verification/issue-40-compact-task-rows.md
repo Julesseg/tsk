@@ -146,3 +146,50 @@ Alignment report on this Mac:
 (3,584,282 bytes; 80 captures). All ten sections were expanded and enlargement
 opened and closed at 390 × 844. Production source is `9503280`. The previous
 report retains the unchanged completion-animation and notification evidence.
+
+## Animated checkmark and local saving feedback
+
+Source `98f4ac3` removes the shared saving flag from completion-circle disabled
+styling. Only the task's own feedback phase supplies that styling. Shared
+saving still blocks pointer hits, and TaskStore's admission guard continues
+to serialize mutations. Other tasks keep their normal titles and circles.
+
+The circle-to-checkmark change uses native SF Symbols Replace at speed 3.
+Animated completion allows 400 ms for that transition to settle, then retains
+the existing one-second checked hold. Reduce Motion skips the symbol animation
+and settling delay. Controller tests verify both durations and retention
+through reload; all 51 Swift Testing and 6 XCTest controller tests passed.
+The canonical checked-state UI assertion now samples immediately before its
+fallback wait, avoiding a one-second first poll that missed the brief state.
+
+A temporary native rendering probe used the real TaskListRow and TaskStore,
+with a two-second hold in TaskStore.perform before a genuine scratch
+TaskChampion completion. It failed on the unrelated circle's disabled state
+before the fix, then passed on both iPhone and iPad. Captures show grey sibling
+circles before and normal blue sibling circles after. Probe scaffolding was
+removed from the production source. The matched iPad saving baseline was not
+captured; that comparison is explicitly unverified in the report.
+
+The final signed simulator build and canonical completion/persistence journey
+passed on both families: `/tmp/tsk-issue40-tick-final-phone.xcresult` and
+`/tmp/tsk-issue40-tick-final-pad.xcresult`. Genuine recordings confirm the quick
+native tick followed by a visible checked hold. Both owned simulators were
+shut down; no simulator remained booted and Simulator was quit. Standards and
+Spec reviews found no material issues.
+
+The user rejected scaled-content removal and requested stationary content
+covered from top and bottom. Three throwaway browser motion variants are
+provided for selection: hard cover before reflow, hard cover with early reflow,
+and soft cover before reflow. None has been promoted; production retains the
+prior collapse until the user selects the replacement. Prototype source is
+isolated in `/tmp/tsk-completion-motion-prototype` on
+`prototype/task-completion-motion-40`, outside the production PR.
+
+Interactive prototype and native evidence on this Mac:
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T150505Z-completion-prototypes.html`
+(286,687 bytes; three replayable variants, ten native captures and two native
+clips). The browser check is labeled illustrative. Native recordings use
+normal playback speed and stop before the old collapse; the iPad clip crops
+to the sidebar. The report was checked at 390 × 844, including variant
+switching, Replay, slow motion, all four native sections, enlargement and both
+recordings. Physical touch and VoiceOver remain unverified.
