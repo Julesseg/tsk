@@ -102,7 +102,7 @@ struct CustomViewsView: View {
             .accessibilityLabel((active ? "Remove " : "Add ") + view.title(in: store))
             .accessibilityIdentifier((active ? "deactivate-" : "activate-") + view.id)
             Button {
-                if active {
+                if active || store.allowsUnfavoritedSelection {
                     select(view)
                     dismiss()
                 } else if case .custom(let id) = view, let saved = store.savedViews.first(where: { $0.id == id }) {

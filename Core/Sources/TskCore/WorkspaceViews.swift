@@ -59,6 +59,11 @@ public struct WorkspaceViews: Codable, Equatable, Sendable {
         if active.isEmpty, !inactive.isEmpty { active = [inactive.removeFirst()] }
     }
 
+    public func selection(retaining view: WorkspaceView?) -> WorkspaceView {
+        if let view, (active + inactive).contains(view) { return view }
+        return active[0]
+    }
+
     public mutating func activate(_ view: WorkspaceView) throws {
         guard let index = inactive.firstIndex(of: view) else { throw WorkspaceViewsError.unavailableView }
         guard active.count < Self.maximumActive else { throw WorkspaceViewsError.limitReached }

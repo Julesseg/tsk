@@ -51,3 +51,14 @@ import Testing
     #expect(restored.active == [.unfinished, .today, .upcoming, .projects])
     #expect(restored.inactive == [.completed])
 }
+
+@Test func workspaceViewsKeepUnfavoritedSelectionUntilItIsDeleted() throws {
+    let id = UUID()
+    var views = WorkspaceViews(customIDs: [id])
+    #expect(views.selection(retaining: .custom(id)) == .custom(id))
+    #expect(views.selection(retaining: .completed) == .completed)
+    #expect(views.active == [.today, .upcoming, .projects, .unfinished])
+    views.reconcile(customIDs: [])
+    #expect(views.selection(retaining: .custom(id)) == .today)
+    #expect(views.selection(retaining: nil) == .today)
+}

@@ -11,6 +11,96 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
 
+    func testAdaptiveNavigationCatalogAndSidebarPreference() throws {
+        let app = launch()
+        let today = app.tabBars.buttons["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 15))
+        XCTAssertLessThan(today.frame.midY, app.frame.midY)
+        XCTAssertFalse(app.tabBars.buttons["New task"].exists)
+        XCTAssertLessThan(app.buttons["New task"].frame.midY, app.frame.midY)
+        XCTAssertTrue(app.buttons["workspace-views"].isHittable)
+        capture("iPad initial native top tabs", app: app)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        tapTaskMenuItem(app.buttons["open-view-completed"], app: app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Done")
+        XCTAssertFalse(app.tabBars.buttons["Today"].isSelected)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        XCTAssertEqual(app.buttons["open-view-completed"].value as? String, "1")
+        capture("iPad Views shows unfavorited current view", app: app)
+        tapTaskMenuItem(app.buttons["open-view-today"], app: app)
+        tapTaskControl(app.buttons["New task"], app: app)
+        let taskTitle = description(app)
+        focusTaskText(taskTitle, app: app)
+        taskTitle.typeText("Direct project task")
+        let project = app.textFields["task-project"]
+        focusTaskText(project, app: app)
+        project.typeText("Workspace")
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-task"], app: app)
+        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Direct project task", app: app), timeout: 15))
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
+        tapTaskControl(app.buttons["new-custom-view"], app: app)
+        let name = app.textFields["custom-view-name"]
+        focusTaskText(name, app: app)
+        name.typeText("Sidebar tasks")
+        tapTaskControlAtCenter(app.buttons["dismiss-filter-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-custom-view"], app: app)
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
+        XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app))
+        let id = String(saved.identifier.dropFirst("saved-view-".count))
+        XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
+        tapTaskControl(app.buttons["close-views"], app: app)
+        let sidebar = app.buttons["Show Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5), app.debugDescription)
+        tapTaskControl(sidebar, app: app)
+        XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 5))
+        capture("iPad native sidebar complete catalog", app: app)
+        let directProject = app.buttons["sidebar-project-Workspace"]
+        XCTAssertTrue(directProject.waitForExistence(timeout: 5), app.debugDescription)
+        tapTaskControl(directProject, app: app)
+        XCTAssertTrue(taskRow(named: "Direct project task", app: app).waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Workspace")
+        capture("iPad sidebar direct project", app: app)
+        let custom = app.buttons["sidebar-view-custom-" + id]
+        XCTAssertTrue(custom.waitForExistence(timeout: 5), app.debugDescription)
+        tapTaskControl(custom, app: app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
+        let close = app.buttons["Hide Sidebar"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
+        tapTaskControl(close, app: app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
+        XCTAssertFalse(app.tabBars.buttons.allElementsBoundByIndex.contains(where: \.isSelected))
+        capture("iPad unfavorited custom view after sidebar closes", app: app)
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        XCTAssertEqual(app.buttons["open-view-custom-" + id].value as? String, "1")
+        capture("iPad portrait unfavorited custom Views checkmark", app: app)
+        tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
+        XCTAssertTrue(revealTaskElement(app.buttons["activate-custom-" + id], in: "views-list", app: app))
+        XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
+        capture("iPad unchanged favorites after browsing custom view", app: app)
+        tapTaskControl(app.buttons["close-views"], app: app)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        tapTaskControl(sidebar, app: app)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 15))
+        capture("iPad sidebar preference restored", app: app)
+        tapTaskControl(app.buttons["sidebar-settings"], app: app)
+        XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
+        tapTaskControl(app.buttons["close-workspace-settings"], app: app)
+        let hideSidebar = app.buttons["Hide Sidebar"]
+        XCTAssertTrue(hideSidebar.waitForExistence(timeout: 5), app.debugDescription)
+        tapTaskControl(hideSidebar, app: app)
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(today.waitForExistence(timeout: 15))
+        XCTAssertLessThan(today.frame.midY, app.frame.midY)
+    }
+
     func testInjectedKeyboardCaptureSelectionEditCompletionAndReopen() throws {
         let app = launch()
         selectDoneTasks(app)
@@ -119,7 +209,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("iPad custom tab at accessibility text size", app: app)
         XCTAssertTrue(app.descendants(matching: .any)["workspace-accessibility-navigation"].firstMatch.exists)
-        XCTAssertGreaterThan(app.tabBars.firstMatch.frame.midY, app.frame.midY)
+        XCTAssertLessThan(app.tabBars.firstMatch.frame.midY, app.frame.midY)
         app.buttons["New task"].tap()
         let field = description(app)
         guard revealTaskElement(field, in: "task-editor-form", app: app) else { return }
@@ -155,6 +245,7 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     private func launch(arguments: [String] = []) -> XCUIApplication {
         let app = taskTestApplication()
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchArguments = arguments
