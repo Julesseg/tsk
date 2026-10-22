@@ -38,7 +38,7 @@ extension XCTestCase {
         let title = saved.label
         tapTaskControl(saved, app: app, file: file, line: line)
         XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 10), file: file, line: line)
-        let tab = app.tabBars.buttons[title]
+        let tab = workspaceTab(title, app: app)
         XCTAssertTrue(tab.waitForExistence(timeout: 10), file: file, line: line)
         XCTAssertTrue(tab.isSelected, file: file, line: line)
     }

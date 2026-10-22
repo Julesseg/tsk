@@ -72,7 +72,7 @@ final class TaskAutomationUITests: XCTestCase {
     private func choose(_ title: String, app: XCUIApplication) {
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
         if title == "Done" { selectDoneTasks(app) }
-        else { app.tabBars.buttons[title].tap() }
+        else { workspaceTab(title, app: app).tap() }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

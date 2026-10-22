@@ -10,7 +10,7 @@ final class TskUpcomingUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
-        app.tabBars.buttons["Upcoming"].tap()
+        workspaceTab("Upcoming", app: app).tap()
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 5))
         capture("Upcoming empty", app: app)
         app.buttons["New task"].tap()
@@ -70,7 +70,7 @@ final class TskUpcomingUITests: XCTestCase {
     }
 
     private func selectUpcoming(_ app: XCUIApplication) {
-        app.tabBars.buttons["Upcoming"].tap()
+        workspaceTab("Upcoming", app: app).tap()
     }
 
     private func plannedRows(_ app: XCUIApplication) -> XCUIElementQuery {

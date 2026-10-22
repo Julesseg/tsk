@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 extension XCTestCase {
     @MainActor func taskTestApplication() -> XCUIApplication {
@@ -6,6 +7,90 @@ extension XCTestCase {
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
         return app
+    }
+
+    @MainActor func workspaceTab(_ title: String, app: XCUIApplication) -> XCUIElement {
+        if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons[title] }
+        return app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "tab-", title)).firstMatch
+    }
+
+    @MainActor func workspaceTabs(in app: XCUIApplication) -> [XCUIElement] {
+        if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons.allElementsBoundByIndex }
+        var seen: Set<String> = []
+        return app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-")).allElementsBoundByIndex.filter {
+            seen.insert($0.identifier).inserted
+        }
+    }
+
+    @MainActor func workspaceMenuView(_ title: String, app: XCUIApplication) -> XCUIElement {
+        app.collectionViews.containing(.button, identifier: "manage-favorite-views").buttons[title].firstMatch
+    }
+
+    @MainActor func openWorkspaceMenuView(_ title: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl(title, app: app, file: file, line: line) else { return }
+        let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let heading = app.staticTexts.matching(identifier: "workspace-title-text").firstMatch
+            return !app.buttons["manage-favorite-views"].exists && heading.exists && heading.label == title
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor func openWorkspaceFavorites(app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl("Manage favorites", app: app, file: file, line: line) else { return }
+        let favorites = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !app.buttons["manage-favorite-views"].exists && app.collectionViews["views-list"].exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [favorites], timeout: 10), .completed, app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor func openWorkspaceViews(app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        guard activateWorkspaceControl("Views", identifier: "workspace-views", app: app, file: file, line: line) else { return }
+        XCTAssertTrue(app.buttons["manage-favorite-views"].waitForExistence(timeout: 10), app.debugDescription, file: file, line: line)
+    }
+
+    @MainActor private func activateWorkspaceControl(_ title: String, identifier: String? = nil, app: XCUIApplication, file: StaticString, line: UInt) -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: TaskNativeMenuOptionGeometry?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            do {
+                let application = try app.snapshot()
+                var pending: [(any XCUIElementSnapshot, [CGRect], Bool)] = application.children.map { ($0, [], false) }
+                var candidates: [TaskNativeMenuOptionGeometry] = []
+                while let (snapshot, ancestors, inViewsMenu) = pending.popLast() {
+                    let frames = ancestors + [snapshot.frame]
+                    let containsViewsMenu = inViewsMenu || snapshot.elementType == .collectionView && taskSnapshot("manage-favorite-views", type: .button, in: snapshot) != nil
+                    let matches = identifier.map { snapshot.identifier == $0 } ?? (containsViewsMenu && snapshot.label == title)
+                    if matches, snapshot.elementType == .button, snapshot.isEnabled {
+                        candidates.append(TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: ancestors))
+                    }
+                    pending.append(contentsOf: snapshot.children.map { ($0, frames, containsViewsMenu) })
+                }
+                lastSample = "matchingRows=\(candidates.count) geometry=\(String(describing: candidates.first))"
+                guard candidates.count == 1, let current = candidates.first, current.isVisible else { previous = nil; return false }
+                let stable = previous == current
+                previous = current
+                return stable
+            } catch {
+                lastSample = "snapshotError=\(error)"
+                previous = nil
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
+        }
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+            XCTFail("Workspace control did not settle: \(title); \(lastSample); \(app.debugDescription)", file: file, line: line)
+            return false
+        }
+        let control = identifier.map { app.buttons[$0] } ?? workspaceMenuView(title, app: app)
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        return true
     }
 
     @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {
@@ -23,7 +108,7 @@ extension XCTestCase {
     }
 
     @MainActor func selectDoneTasks(_ app: XCUIApplication) {
-        let done = app.tabBars.buttons["Done"]
+        let done = workspaceTab("Done", app: app)
         if done.exists { tapTaskControl(done, app: app); return }
         if !app.collectionViews["views-list"].exists { openWorkspaceSetting("custom-views", app: app) }
         let add = app.buttons["activate-completed"]
@@ -43,7 +128,7 @@ extension XCTestCase {
     }
 
     @MainActor func selectAllTasks(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["All"]
+        let tab = workspaceTab("All", app: app)
         guard tab.waitForExistence(timeout: 20) else {
             XCTFail("The All tab must be available before reviewing unfinished tasks")
             return

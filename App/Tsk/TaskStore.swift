@@ -10,6 +10,7 @@ final class TaskStore {
     var tasks: [TaskRecord] = []
     var savedViews: [SavedTaskView] = []
     var workspaceViews = WorkspaceViews(customIDs: [])
+    var allowsUnfavoritedSelection = false
     var selectedWorkspaceView: WorkspaceView = .unfinished
     private(set) var workspaceViewsLoaded = false
     var attributeDefinitions: [TaskAttributeDefinition] = []
@@ -35,9 +36,9 @@ final class TaskStore {
         } else {
             workspaceViews = try LocalWorkspaceViewStore(directory: directory).load(customIDs: savedViews.map(\.id))
         }
-        if !workspaceViewsLoaded || !workspaceViews.active.contains(selectedWorkspaceView) {
-            selectWorkspaceView(workspaceViews.active[0])
-        }
+        let retained = workspaceViewsLoaded && (allowsUnfavoritedSelection || workspaceViews.active.contains(selectedWorkspaceView)) ? selectedWorkspaceView : nil
+        let selection = workspaceViews.selection(retaining: retained)
+        if !workspaceViewsLoaded || selection != selectedWorkspaceView { selectWorkspaceView(selection) }
         workspaceViewsLoaded = true
     }
 
@@ -46,7 +47,9 @@ final class TaskStore {
         try change(&updated)
         try LocalWorkspaceViewStore(directory: directory).save(updated)
         workspaceViews = updated
-        if !updated.active.contains(selectedWorkspaceView) { selectWorkspaceView(updated.active[0]) }
+        let retained = allowsUnfavoritedSelection || updated.active.contains(selectedWorkspaceView) ? selectedWorkspaceView : nil
+        let selection = updated.selection(retaining: retained)
+        if selection != selectedWorkspaceView { selectWorkspaceView(selection) }
     }
 
     func selectWorkspaceView(_ view: WorkspaceView) {

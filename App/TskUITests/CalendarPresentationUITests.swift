@@ -189,7 +189,7 @@ import XCTest
         if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["Today"].tap()
+        workspaceTab("Today", app: app).tap()
         return app
     }
 

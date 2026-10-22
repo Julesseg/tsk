@@ -45,7 +45,7 @@ final class TskPlanningUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertFalse(app.staticTexts["Planned and due independently"].waitForExistence(timeout: 2))
         capture("Rescheduled beyond Today with deadline removed", app: app)
-        app.tabBars.buttons["All"].tap()
+        workspaceTab("All", app: app).tap()
         XCTAssertTrue(app.staticTexts["Planned and due independently"].waitForExistence(timeout: 10))
         taskRow(named: "Planned and due independently", app: app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
@@ -69,7 +69,7 @@ final class TskPlanningUITests: XCTestCase {
     }
 
     private func selectToday(_ app: XCUIApplication) {
-        app.tabBars.buttons["Today"].tap()
+        workspaceTab("Today", app: app).tap()
     }
 
     private func enterDescription(_ text: String, app: XCUIApplication) {

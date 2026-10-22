@@ -21,10 +21,16 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let settings = app.buttons["workspace-settings"]
         XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
         XCTAssertGreaterThan(create.frame.midX, app.frame.midX)
-        XCTAssertGreaterThan(create.frame.midY, app.frame.maxY - app.frame.height * 0.2)
-        let lastView = app.tabBars.buttons["All"]
-        XCTAssertGreaterThan(create.frame.minX, lastView.frame.maxX)
-        XCTAssertEqual(create.frame.midY, lastView.frame.midY, accuracy: 2)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCTAssertLessThan(create.frame.midY, app.frame.minY + app.frame.height * 0.2)
+            XCTAssertTrue(app.buttons["workspace-views"].isHittable)
+            XCTAssertFalse(app.tabBars.buttons["New task"].exists)
+        } else {
+            XCTAssertGreaterThan(create.frame.midY, app.frame.maxY - app.frame.height * 0.2)
+            let lastView = workspaceTab("All", app: app)
+            XCTAssertGreaterThan(create.frame.minX, lastView.frame.maxX)
+            XCTAssertEqual(create.frame.midY, lastView.frame.midY, accuracy: 2)
+        }
         XCTAssertGreaterThan(settings.frame.midX, app.frame.midX)
         XCTAssertLessThan(settings.frame.midY, app.frame.minY + app.frame.height * 0.2)
         XCTAssertFalse(app.buttons["workspace-more"].exists)
@@ -95,8 +101,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
         let app = launch(animationsEnabled: true)
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "New task"])
-        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        let hasCaptureTab = UIDevice.current.userInterfaceIdiom != .pad
+        XCTAssertEqual(workspaceTabs(in: app).map(\.label), ["Today", "Upcoming", "Projects", "All"] + (hasCaptureTab ? ["New task"] : []))
+        XCTAssertTrue(workspaceTab("Today", app: app).isSelected)
         openWorkspaceSetting("custom-views", app: app)
         capture("Views with four default active tabs")
         tapTaskControl(app.buttons["new-custom-view"], app: app)
@@ -119,7 +126,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(add.isEnabled)
         tapTaskControl(add, app: app)
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
-        let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
+        let savedIdentifier = saved.identifier
+        let source = app.collectionViews["views-list"].cells.containing(.button, identifier: savedIdentifier).firstMatch
         let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
         let handle = source.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).firstMatch
         XCTAssertTrue(handle.exists)
@@ -127,18 +135,23 @@ final class WorkspaceSettingsUITests: XCTestCase {
             .press(forDuration: 1,
                    thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)),
                    withVelocity: .slow, thenHoldForDuration: 1)
-        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
+        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let list = app.collectionViews["views-list"]
+            let moved = list.cells.containing(.button, identifier: savedIdentifier).firstMatch
+            let today = list.cells.containing(.button, identifier: "view-today").firstMatch
+            return moved.exists && today.exists && moved.frame.minY < today.frame.minY
+        }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
         tapTaskControl(app.buttons["close-views"], app: app)
         app.terminate()
         app.launch()
-        let custom = app.tabBars.buttons["All local tasks"]
+        let custom = workspaceTab("All local tasks", app: app)
         XCTAssertTrue(custom.waitForExistence(timeout: 15))
         XCTAssertTrue(custom.isSelected)
-        XCTAssertEqual(app.tabBars.buttons.element(boundBy: 0).label, "All local tasks")
-        XCTAssertEqual(app.tabBars.buttons.count, 5)
-        XCTAssertFalse(app.tabBars.buttons["Done"].exists)
+        XCTAssertEqual(workspaceTabs(in: app)[0].label, "All local tasks")
+        XCTAssertEqual(workspaceTabs(in: app).count, hasCaptureTab ? 5 : 4)
+        XCTAssertFalse(workspaceTab("Done", app: app).exists)
         capture("First active custom tab after relaunch")
         openWorkspaceSetting("custom-views", app: app)
         for identifier in ["today", "upcoming", "projects"] {
@@ -152,7 +165,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskMenuItem(app.buttons["Delete"], app: app)
         XCTAssertTrue(saved.waitForNonExistence(timeout: 5))
         tapTaskControl(app.buttons["close-views"], app: app)
-        XCTAssertEqual(app.tabBars.buttons.count, 2)
+        XCTAssertEqual(workspaceTabs(in: app).count, hasCaptureTab ? 2 : 1)
         XCTAssertTrue(app.buttons["New task"].isHittable)
     }
 
@@ -168,7 +181,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Prepare launch", app: app), timeout: 15))
-        tapTaskControl(app.tabBars.buttons["Projects"], app: app)
+        tapTaskControl(workspaceTab("Projects", app: app), app: app)
         XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 10))
         capture("Projects list")
         tapTaskControl(app.buttons["project-Launch"], app: app)
@@ -244,7 +257,12 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
         for title in ["Today", "Projects"] {
-            tapTaskControl(app.tabBars.buttons[title], app: app, beforeSample: dismissPassword)
+            tapTaskControl(workspaceTab(title, app: app), app: app, beforeSample: dismissPassword)
+            let destination = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let headings = app.navigationBars.staticTexts.matching(identifier: "workspace-title-text")
+                return headings.count == 1 && headings.firstMatch.label == title
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [destination], timeout: 10), .completed, app.debugDescription)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
             XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)
@@ -272,6 +290,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
 
     private func launch(arguments: [String] = [], animationsEnabled: Bool = false) -> XCUIApplication {
         let app = taskTestApplication()
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
         app.launchArguments += arguments
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString

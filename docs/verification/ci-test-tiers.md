@@ -31,8 +31,8 @@ not allocate a signing/build runner.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 60 declared methods | 50-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Smoke | 13 methods | 12 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 62 declared methods | 52-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
@@ -50,6 +50,14 @@ native keyboard input, installed Share capture, installed widget behavior and
 actual Spotlight opening/completion. The iPad selection checks keyboard-driven
 capture/edit/completion/reopen, adaptive landscape/portrait views, custom views
 at accessibility text sizes, modal annotation commands and native text input.
+The iPad adaptive-navigation journey checks initial top tabs, the complete sidebar
+catalog and direct project links, unfavorited custom-view selection after closing
+the sidebar and rotating, favorite capacity, and the tab/sidebar preference after
+relaunch. A second iPad journey drags the actual system window corner into compact
+width, checks native bottom tabs and toolbar capture, then expands and interacts
+with the live sidebar again. It verifies an unfavorited custom view and the regular
+presentation preference survive compact adaptation. Physical keyboard delivery
+remains separate acceptance evidence.
 Share runs first only when selected; the iPad smoke lane skips its separate
 launch and host-fixture installation.
 

@@ -123,7 +123,7 @@ import XCTest
     private func select(_ query: Selection, _ app: XCUIApplication) {
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         let title = query == .today ? "Today" : "All"
-        app.tabBars.buttons[title].tap()
+        workspaceTab(title, app: app).tap()
     }
     private func configuredApp(_ token: String) -> XCUIApplication {
         let app = taskTestApplication()
