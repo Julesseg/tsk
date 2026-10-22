@@ -74,8 +74,10 @@ active work, errors and accessibility sizes remain understandable. Verify with
 Core tests where behavior changes and canonical iPhone/iPad XCUITest plus
 matched baseline/proposed captures using realistic populated fixtures.
 
-Scope excludes task ordering/filter changes, recurrence behavior, replacement
-of workspace/tab navigation and a new visual theme.
+The original audit scope excludes task ordering/filter changes, recurrence
+behavior, replacement of workspace/tab navigation and a new visual theme.
+The [iPad layout follow-up](#ipad-layout-follow-up-2026-10-22) reopens iPad
+navigation separately.
 
 ### 2. Expand the task row into its editor
 
@@ -279,10 +281,11 @@ retry consequences visible at Reminders move decisions. Recurrence: simplify
 everyday wording but preserve occurrence/series distinctions and mandatory
 affected-task previews.
 
-Accepted: tab navigation is fine and remains unchanged. Focus this effort on
-task presentation, capture, editing, completion, scheduling and editing multiple
-tasks. Integration settings and recurrence-help cleanup are deferred proposals,
-not part of the agreed focus.
+Accepted in the original audit: tab navigation remains unchanged. The
+[iPad layout follow-up](#ipad-layout-follow-up-2026-10-22) supersedes that
+constraint for iPad. The original effort focuses on task presentation, capture,
+editing, completion, scheduling and editing multiple tasks. Integration settings
+and recurrence-help cleanup are deferred proposals, not part of the agreed focus.
 
 ## Constraints carried forward
 
@@ -304,3 +307,92 @@ are the implementation proposal; the app has not yet been changed.
 The glossary classifies Planned day as organizational. [ADR-0004](adr/0004-edit-tasks-in-the-current-list.md)
 records the deliberate choice of in-list morphing over native navigation/sheets
 and its layout, focus and gesture trade-offs.
+
+## iPad layout follow-up (2026-10-22)
+
+Status: design decisions accepted and the existing test seams confirmed.
+The full specification is published as
+[Spec: Clear iPad workspace with native adaptive navigation (#53)](https://github.com/Julesseg/tsk/issues/53).
+Implementation ticket granularity and blocking edges still await approval.
+No application changes have been implemented by this follow-up.
+
+Accepted: use native adaptive iPad navigation, with a top tab bar that can
+switch into a sidebar and bottom tabs in compact windows. This supersedes the
+original audit's decision to leave iPad tab navigation unchanged. The current
+source forces compact horizontal size class on the tab container to keep its
+bar at the bottom; that behavior must give way to the native adaptive layout.
+
+Accepted: the selected task view, including Today, Upcoming and project task
+lists, occupies the main content area. Editing expands the task within that
+list, following ADR-0004. Remove the reserved task-detail column so the task
+list becomes the primary workspace instead of occupying a narrow leading
+column beside task detail or an empty selection prompt.
+
+Accepted: initially show the top tab bar on iPad. Let the user switch to the
+sidebar and remember that presentation preference.
+
+Accepted: the sidebar exposes all predefined and saved custom views. The top
+tab bar contains the user's chosen favorites. The current four-active-view
+model must not make other views inaccessible from the sidebar.
+
+Accepted: center task rows within a comfortable reading width, with generous
+margins in large windows. Adapt that width to the available window and text
+size while keeping the task list in the main content area.
+
+Accepted: place New task (+) in the upper-right toolbar in wide iPad layouts.
+
+Accepted: group predefined views, an expandable Projects section with direct
+project links, and saved custom views in the sidebar. Put Settings at the
+bottom.
+
+Accepted: retain up to four favorite tabs. Provide a Views toolbar menu for
+opening any other view and managing favorites, including in compact iPad
+windows. Opening a view and managing favorites are distinct actions.
+
+Accepted: choosing another view saves valid edits and then navigates. Invalid
+input or save failure keeps the current editor open with its draft and an
+actionable error. An open parameter picker closes first, following the existing
+dismissal rule; switching views requires a subsequent action. Existing blank
+new-draft dismissal rules continue to apply.
+
+Accepted: resizing, rotation and switching between tab and sidebar presentation
+preserve the selected view/project, scroll position and open draft without
+triggering a save. Preserve editing context in memory; this does not reopen the
+earlier decision against draft persistence after process termination.
+
+Accepted: a selected view outside favorites remains open when the sidebar
+closes. Show its name as the content title and a checkmark in the Views menu;
+opening it does not automatically add a favorite.
+
+Accepted: when Projects shows the project-name overview rather than a task
+list, New task opens All and inserts an expanded draft with no project or
+planned day assigned. This is an explicit exception to the original audit's
+rule against switching views for capture because no task list is open. Within
+a specific project, capture stays in that task list and inherits the project.
+Existing capture defaults continue to apply to other task lists.
+
+Accepted: New task remains an upper-right toolbar action throughout iPad
+layouts, including compact windows with bottom tabs.
+
+This navigation redesign is scoped to iPad. The earlier audit's shared task
+presentation and in-list editing decisions continue to apply to both device
+families. Preserve the existing iPhone navigation while integrating this work.
+
+### Verification planned for this follow-up
+
+Use matched baseline/proposed captures from canonical iPad runtime journeys:
+populated Today with Calendar, Upcoming, project and custom task lists; top
+tabs and the full sidebar; the Views menu and favorite management; inline
+capture/editing; empty lists; and largest accessibility text. Include landscape,
+portrait and compact window layouts. Verify reading width, reachable toolbars,
+and the absence of a reserved detail column. Keep iPhone regression captures
+with the matching existing navigation states. Deliver the comparisons in a
+single HTML UI report following the ui-report skill.
+
+Exercise view changes during valid edits, invalid edits and save failures;
+picker-first dismissal; and preservation of draft, selection and scroll context
+across presentation/window changes. Update tests that currently require bottom
+iPad tabs or task-detail navigation. Keyboard commands and focus must remain
+usable; physical keyboard and live window-resizing acceptance remain separate
+from injected simulator events. These are future acceptance checks, not
+verification already performed by this design interview.

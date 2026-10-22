@@ -17,6 +17,9 @@ A task view supplied by tsk, such as Today, Upcoming, or a view by project.
 **Custom view**:
 A task view defined by the user's Taskwarrior filter.
 
+**Favorite view**:
+A task view chosen by the user for quick access. Other task views remain available without becoming favorites.
+
 **Taskwarrior filter**:
 An expression that selects tasks according to Taskwarrior's filtering language.
 
