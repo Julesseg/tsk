@@ -67,6 +67,11 @@ coordinates while the row geometry uses window coordinates. Native keyboard
 command delivery is a separate canonical HID CI gate. Local controller/Native
 host suites were not run because this checkout has no host bridge library;
 Core and simulator verification do not substitute for those CI checks.
+The local `XCUIElement.typeKey` fallback failed at
+`iPadWorkspaceUITests.swift:28`: Command-Return did not dismiss the existing
+new-task capture, before the inline edit journey began. Its canonical HID
+CI result remains pending; the overall iPad result bundle therefore contains
+five passing row-editing methods and this one failing keyboard method.
 
 ## Recorded local results
 
@@ -82,3 +87,18 @@ The existing iPhone durable edit/completion journey also passed in
 Both standards and issue-spec reviews have no remaining findings in the
 canonical fullscreen paths. The window-coordinate limitation above remains
 an explicit acceptance gap.
+
+## UI report
+
+App source: `e91c88ab05aae391976fef2c687e3286c0bc5507`.
+Signed base source: `d3c14fe3be2d8cef07ce63d75c835a7e9a128ebf`.
+
+Local report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-and-implement-with-pr-issue-41/20261022/report.html`
+
+Measured size: 3,040,316 bytes. It contains 78 screenshots
+(including labelled iPad readability crops) and four actual animation excerpts.
+Chrome verification at a 390-pixel inner viewport decoded all 78 images,
+opened all 30 sections, reported a 390-pixel document width, and verified
+image enlargement. Full native captures and recordings remain source evidence
+under `/tmp/tsk-41-evidence`; the report is the single deliverable HTML file.
+Both simulators booted for verification were shut down.
