@@ -89,7 +89,7 @@ extension XCTestCase {
             return false
         }
         let control = identifier.map { app.buttons[$0] } ?? workspaceMenuView(title, app: app)
-        control.tap()
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         return true
     }
 

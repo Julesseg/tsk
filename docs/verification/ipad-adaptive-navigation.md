@@ -135,3 +135,13 @@ types; the adaptive journey also checks favorite order with the sidebar open.
 The 14 UI-selection and 12 CI-routing checks passed after this test-only fix.
 New-head canonical UI results remain pending. The earlier local Cmd-Return
 limitation does not negate the passing CI native keyboard result.
+
+At `dbec144`, the previously failing Upcoming journey passed. Two scoped Views
+actions failed during XCTest activation-point calculation for visible popup rows.
+The helper now sends one coordinate-center touch after the same unique enabled
+match, full ancestor containment, two stable geometry samples and deadline.
+Popup dismissal and exact destination assertions are unchanged. Both canonical
+resize journeys passed locally with this test-only change (142.707 and 91.705
+seconds); `menu-input-critical.xcresult` retains the results. App code is unchanged.
+This verifies the exercised touch route, not VoiceOver activation. Fresh smoke
+and full CI remain required for the new head.
