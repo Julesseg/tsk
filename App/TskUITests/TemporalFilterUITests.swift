@@ -17,7 +17,7 @@ final class TemporalFilterUITests: XCTestCase {
         description.typeText("Relative deadline")
         setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["Relative deadline"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Relative deadline", app: app).waitForExistence(timeout: 10))
         openWorkspaceSetting("custom-views", app: app)
         app.buttons["new-custom-view"].tap()
         let name = app.textFields["custom-view-name"]
@@ -33,7 +33,7 @@ final class TemporalFilterUITests: XCTestCase {
         tapTaskControlAtCenter(done, app: app)
         app.buttons["save-custom-view"].tap()
         activateSavedWorkspaceView(app)
-        XCTAssertTrue(app.staticTexts["Relative deadline"].exists)
+        XCTAssertTrue(taskRow(named: "Relative deadline", app: app).exists)
         capture("Relative deadline and READY saved view", app: app)
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
@@ -45,8 +45,8 @@ final class TemporalFilterUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792058400"
         app.launch()
         openSavedView(app)
-        XCTAssertTrue(app.staticTexts["Relative deadline"].waitForExistence(timeout: 10))
-        app.staticTexts["Relative deadline"].tap()
+        XCTAssertTrue(taskRow(named: "Relative deadline", app: app).waitForExistence(timeout: 10))
+        openTaskInformation(taskRow(named: "Relative deadline", app: app), app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         app.buttons["complete-task"].tap()
         XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 10))

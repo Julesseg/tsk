@@ -69,7 +69,7 @@ final class RecurringTemplateUITests: XCTestCase {
         selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.tap()
+        openTaskInformation(row, app: app)
         XCTAssertTrue(app.staticTexts["occurrence-only-explanation"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons["edit-task"].label, "Edit occurrence")
         capture("Actual generator occurrence offers occurrence-only actions", app)
@@ -124,7 +124,7 @@ final class RecurringTemplateUITests: XCTestCase {
         selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.tap()
+        openTaskInformation(row, app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         app.buttons["complete-task"].tap()
         XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))

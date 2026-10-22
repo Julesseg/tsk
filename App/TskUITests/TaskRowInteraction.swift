@@ -56,3 +56,16 @@ extension XCTestCase {
         return app.buttons.matching(predicate).firstMatch
     }
 }
+
+extension XCTestCase {
+    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication) {
+        tapTaskControl(row, app: app)
+        let information = app.buttons["task-row-information"]
+        if information.waitForExistence(timeout: 2) {
+            let editor = app.scrollViews["task-row-editor"]
+            if !information.isHittable { editor.swipeUp() }
+            tapTaskControl(information, app: app)
+            XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
+        }
+    }
+}

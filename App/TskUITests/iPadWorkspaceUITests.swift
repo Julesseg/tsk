@@ -26,18 +26,29 @@ final class iPadWorkspaceUITests: XCTestCase {
         field.typeText("Keyboard task")
         try commands.perform("saveNew") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         XCTAssertTrue(field.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(taskRow(named: "Keyboard task", app: app).waitForExistence(timeout: 10))
+        let capturedRow = taskRow(named: "Keyboard task", app: app)
+        XCTAssertTrue(capturedRow.waitForExistence(timeout: 10))
+        capturedRow.tap()
+        XCTAssertTrue(app.buttons["row-planned-day"].waitForExistence(timeout: 5))
+        app.buttons["row-planned-day"].tap()
+        app.buttons["plan-tomorrow"].tap()
+        app.buttons["collapse-task-row"].tap()
+        XCTAssertTrue(description(app).waitForNonExistence(timeout: 10))
+        app.tabBars.buttons["Upcoming"].tap()
+        let upcomingRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "upcoming-planned-", "Keyboard task")).firstMatch
+        XCTAssertTrue(upcomingRow.waitForExistence(timeout: 10))
         try commands.perform("select") { app.typeKey(XCUIKeyboardKey.downArrow, modifierFlags: .command) }
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad selected task with simultaneous tabs list and detail", app: app)
         try commands.perform("edit") { app.typeKey("e", modifierFlags: .command) }
         XCTAssertTrue(description(app).waitForExistence(timeout: 5))
-        description(app).typeText(" revised")
-        capture("iPad native editor sheet", app: app)
+        replaceTaskText(description(app), with: "Keyboard task revised", app: app)
+        capture("iPad in-list editor after keyboard command", app: app)
         let editedField = description(app)
         try commands.perform("saveEdit") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         XCTAssertTrue(editedField.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
+        let revisedUpcomingRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "upcoming-planned-", "Keyboard task revised")).firstMatch
+        XCTAssertTrue(revisedUpcomingRow.waitForExistence(timeout: 10))
         try commands.perform("complete") { app.typeKey(XCUIKeyboardKey.return, modifierFlags: [.command, .shift]) }
         XCTAssertTrue(app.buttons["complete-task"].waitForNonExistence(timeout: 10))
         try commands.perform("completedView") { app.typeKey("4", modifierFlags: .command) }
@@ -48,7 +59,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons["Done"].waitForExistence(timeout: 10))
         selectDoneTasks(app)
         XCTAssertTrue(taskRow(named: "Keyboard task revised", app: app).waitForExistence(timeout: 10))
-        taskRow(named: "Keyboard task revised", app: app).tap()
+        openTaskInformation(taskRow(named: "Keyboard task revised", app: app), app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["complete-task"].exists)
         capture("iPad completed task after persistent reopen", app: app)
@@ -79,7 +90,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         capture("iPad project task list", app: app)
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(taskRow(named: "Adaptive planned task", app: app).waitForExistence(timeout: 10))
-        taskRow(named: "Adaptive planned task", app: app).tap()
+        openTaskInformation(taskRow(named: "Adaptive planned task", app: app), app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad project Today waiting task and detail", app: app)
         XCUIDevice.shared.orientation = .portrait
@@ -96,7 +107,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(planned.waitForExistence(timeout: 10))
         XCTAssertTrue(deadline.exists)
         XCTAssertEqual(planned.identifier.suffix(36), deadline.identifier.suffix(36))
-        planned.tap()
+        openTaskInformation(planned, app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         capture("iPad Upcoming shared identity with detail", app: app)
     }
@@ -130,7 +141,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let row = taskRow(named: "Accessible task", app: app)
         guard waitForTaskSave(app, row: row, timeout: 15) else { return }
         let identity = row.identifier
-        tapTaskControl(row, app: app)
+        openTaskInformation(row, app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Accessible task")
         capture("iPad largest text opens the same task in sequential detail", app: app)
@@ -163,7 +174,7 @@ final class iPadWorkspaceUITests: XCTestCase {
     }
 
     private func description(_ app: XCUIApplication) -> XCUIElement {
-        app.collectionViews["task-editor-form"].textFields["task-description"].firstMatch
+        app.textFields["task-description"].firstMatch
     }
 
     private func capture(_ name: String, app: XCUIApplication) {
