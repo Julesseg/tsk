@@ -6,6 +6,7 @@ struct TaskListView: View {
     let selection: Binding<UUID?>?
     let calendar: TodayCalendarController
     let edit: (TaskRecord) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -47,6 +48,7 @@ struct TaskListView: View {
                 }
             }
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.completionFeedback.removingIDs(context: store.completionContext))
         .environment(\.defaultMinListRowHeight, 0)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -102,11 +104,9 @@ struct TaskListRow: View {
     let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var naturalHeight: CGFloat = 0
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
-    private var heightFraction: CGFloat { phase == .collapsing ? 0 : 1 }
 
     var body: some View {
         HStack(alignment: task.project.isEmpty && task.deadline == nil ? .center : .top, spacing: 4) {
@@ -136,10 +136,16 @@ struct TaskListRow: View {
         }
         .padding(.vertical, 8)
         .fixedSize(horizontal: false, vertical: true)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if phase != .collapsing || naturalHeight == 0 { naturalHeight = $0 } }
-        .modifier(TaskRowRemoval(visibility: visibility, gap: heightFraction, height: naturalHeight))
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)
+                Rectangle().fill(.white)
+                LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .bottom).frame(height: 6)
+            }
+            .padding(.horizontal, -12)
+            .scaleEffect(x: 1, y: visibility)
+        }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.42), value: visibility)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: heightFraction)
         .accessibilityHidden(phase == .collapsing)
         .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 12))
         .listRowSeparator(.hidden)
@@ -160,36 +166,5 @@ struct TaskListRow: View {
                 Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving || phase != nil)
             }
         }
-    }
-}
-
-private nonisolated struct TaskRowRemoval: AnimatableModifier {
-    var visibility: CGFloat
-    var gap: CGFloat
-    let height: CGFloat
-
-    var animatableData: AnimatablePair<CGFloat, CGFloat> {
-        get { AnimatablePair(visibility, gap) }
-        set { visibility = newValue.first; gap = newValue.second }
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .mask {
-                GeometryReader { geometry in
-                    let visibleHeight = geometry.size.height * visibility
-                    let feather = min(6 * (1 - visibility), visibleHeight / 2) / max(visibleHeight, 1)
-                    LinearGradient(stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .white, location: feather),
-                        .init(color: .white, location: 1 - feather),
-                        .init(color: .clear, location: 1)
-                    ], startPoint: .top, endPoint: .bottom)
-                    .frame(width: geometry.size.width, height: visibleHeight)
-                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                }
-            }
-            .frame(height: height > 0 ? height * gap : nil, alignment: .top)
-            .clipped()
     }
 }

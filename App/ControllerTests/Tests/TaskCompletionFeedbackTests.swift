@@ -18,7 +18,7 @@ import TskNative
     func advance() { sleepers.removeFirst().resume() }
 }
 
-@MainActor @Test func completedUpcomingTaskSurvivesReloadUntilCheckedPauseAndCollapseFinish() async throws {
+@MainActor @Test func completedUpcomingTaskSurvivesReloadThroughCoverBeforeListRemoval() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let now = Date(timeIntervalSince1970: 1792144800)
@@ -55,7 +55,7 @@ import TskNative
     clock.advance()
     try #require(await pauses.next() == .milliseconds(240))
     #expect(feedback.phase(for: task.id, context: context) == .collapsing)
-    #expect(feedback.visibleTasks(latest, context: context) == [task])
+    #expect(feedback.visibleTasks(latest, context: context).isEmpty)
     clock.advance()
     #expect(await completing.value?.status == "completed")
     #expect(feedback.visibleTasks(latest, context: context).isEmpty)

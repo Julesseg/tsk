@@ -31,8 +31,12 @@ final class TaskCompletionFeedback {
         return entry.phase
     }
 
+    func removingIDs(context: Context) -> [UUID] {
+        entries.filter { $0.value.context == context && $0.value.phase == .collapsing }.keys.sorted { $0.uuidString < $1.uuidString }
+    }
+
     func visibleTasks(_ latest: [TaskRecord], context: Context) -> [TaskRecord] {
-        let retained = entries.values.filter { $0.context == context }.sorted {
+        let retained = entries.values.filter { $0.context == context && $0.phase != .collapsing }.sorted {
             $0.index == $1.index ? $0.task.id.uuidString < $1.task.id.uuidString : $0.index < $1.index
         }
         let ids = Set(retained.map { $0.task.id })
