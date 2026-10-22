@@ -32,10 +32,6 @@ struct TaskPlanningSummary: View {
 struct TaskPlanningCaption: View {
     let task: TaskRecord
     var body: some View {
-        if let date = task.plannedDate {
-            Text("Planned \(date, format: .dateTime.day().month())")
-                .font(.caption).foregroundStyle(.secondary)
-        }
         if let date = task.deadline {
             Text("Deadline \(date, format: .dateTime.day().month().hour().minute())")
                 .font(.caption).foregroundStyle(.secondary)

@@ -54,9 +54,9 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(plannedRows(app).firstMatch.waitForExistence(timeout: 10))
         XCTAssertEqual(dayHeaders(app).count, 2)
         XCTAssertEqual(deadlineRows(app).count, 1)
-        plannedRows(app).firstMatch.swipeLeft()
-        XCTAssertTrue(app.buttons["Complete"].waitForExistence(timeout: 5))
-        app.buttons["Complete"].tap()
+        let completion = app.buttons.matching(identifier: "complete-task-row-" + String(plannedIdentity)).firstMatch
+        XCTAssertTrue(completion.waitForExistence(timeout: 5))
+        completion.tap()
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
         capture("Upcoming completion removes all task appearances", app: app)
         app.terminate()

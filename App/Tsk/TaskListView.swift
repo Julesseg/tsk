@@ -62,14 +62,27 @@ struct TaskListView: View {
 struct TaskListLabel: View {
     let task: TaskRecord
     let store: TaskStore
+    var dateRole: TaskDateRole?
+    @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(task.description)
-            if !task.project.isEmpty { Text(task.project).font(.caption).foregroundStyle(.secondary) }
-            TaskActivityCaption(task: task)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !context.isEmpty {
+                Text(context).font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(textSize.isAccessibilitySize ? nil : 1)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) { status }.fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 4) { status }
+            }
+            if dateRole == .planned {
+                Label("Planned work", systemImage: "calendar")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             TaskPlanningCaption(task: task)
-            TaskAvailabilityView(task: task, store: store)
             if task.status != "pending" || task.isRecurring {
                 Text(task.recurrenceInspection.map { $0.kind == .template ? "Recurring template" : $0.kind == .occurrence ? task.status == "completed" ? "Completed occurrence" : "Generated occurrence" : "Recurrence data · read only" } ?? task.status.capitalized)
                     .font(.caption).foregroundStyle(.secondary)
@@ -77,18 +90,50 @@ struct TaskListLabel: View {
         }
         .padding(.vertical, 2)
     }
+
+    private var context: String {
+        ([task.project].filter { !$0.isEmpty } + task.tags.prefix(2).map { "#" + $0 } + (task.tags.count > 2 ? ["+\(task.tags.count - 2) tags"] : [])).joined(separator: " · ")
+    }
+
+    @ViewBuilder private var status: some View {
+        if task.isActive {
+            Text("\(Image(systemName: "play.circle.fill")) \(task.status == "pending" ? "Active" : "Saved start marker")")
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("task-activity-\(task.id.uuidString)")
+        }
+        TaskAvailabilityView(task: task, store: store)
+    }
 }
 
 struct TaskListRow: View {
     let task: TaskRecord
     let store: TaskStore
     let edit: (TaskRecord) -> Void
+    var dateRole: TaskDateRole?
+    var rowIdentifier: String?
+
     var body: some View {
-        NavigationLink(value: task.id) {
-            TaskListLabel(task: task, store: store)
+        HStack(alignment: .top, spacing: 4) {
+            if task.canComplete {
+                Button {
+                    Task { _ = await store.complete(id: task.id) }
+                } label: {
+                    Image(systemName: "circle")
+                        .font(.title2).foregroundStyle(.secondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(store.isSaving)
+                .accessibilityLabel("\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
+                .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
+            }
+            NavigationLink(value: task.id) {
+                TaskListLabel(task: task, store: store, dateRole: dateRole)
+            }
+            .accessibilityIdentifier(rowIdentifier ?? "task-\(task.id.uuidString)")
         }
         .tag(task.id)
-        .accessibilityIdentifier("task-\(task.id.uuidString)")
         .contextMenu {
             TaskActivityButton(task: task, store: store)
             if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving) }
@@ -99,11 +144,7 @@ struct TaskListRow: View {
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             TaskActivityButton(task: task, store: store).tint(.orange)
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            if task.canComplete {
-                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.complete(id: task.id) } }
-                    .tint(.green).disabled(store.isSaving)
-            }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if task.canEdit {
                 Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { edit(task) }.disabled(store.isSaving)
             }

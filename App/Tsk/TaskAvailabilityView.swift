@@ -13,9 +13,29 @@ struct TaskAvailabilityView: View {
                 if isDetail {
                     Section("Availability") { reasons(availability) }
                 } else {
-                    reasons(availability).font(.caption).foregroundStyle(.secondary)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) { compactReasons(availability) }.fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 4) { compactReasons(availability) }
+                    }.font(.caption).foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+
+    @ViewBuilder private func compactReasons(_ availability: TaskAvailability) -> some View {
+        ForEach(Array(availability.reasons.enumerated()), id: \.offset) { item in
+            switch item.element {
+            case .waiting:
+                Text("\(Image(systemName: "clock")) Waiting")
+                    .accessibilityIdentifier("task-waiting-reason-\(task.id.uuidString)")
+            case .blocked(let prerequisites):
+                Text("\(Image(systemName: "lock")) Blocked by \(prerequisites.count) \(prerequisites.count == 1 ? "task" : "tasks")")
+                    .accessibilityIdentifier("task-blocked-reason-\(task.id.uuidString)")
+            }
+        }
+        if !availability.diagnostics.isEmpty {
+            Text("\(Image(systemName: "exclamationmark.triangle")) Dependency issue")
+                .accessibilityHint("Open task to review dependency issues")
         }
     }
 
