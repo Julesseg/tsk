@@ -126,7 +126,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(add.isEnabled)
         tapTaskControl(add, app: app)
         XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
-        let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
+        let savedIdentifier = saved.identifier
+        let source = app.collectionViews["views-list"].cells.containing(.button, identifier: savedIdentifier).firstMatch
         let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
         let handle = source.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).firstMatch
         XCTAssertTrue(handle.exists)
@@ -134,7 +135,12 @@ final class WorkspaceSettingsUITests: XCTestCase {
             .press(forDuration: 1,
                    thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)),
                    withVelocity: .slow, thenHoldForDuration: 1)
-        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
+        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let list = app.collectionViews["views-list"]
+            let moved = list.cells.containing(.button, identifier: savedIdentifier).firstMatch
+            let today = list.cells.containing(.button, identifier: "view-today").firstMatch
+            return moved.exists && today.exists && moved.frame.minY < today.frame.minY
+        }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
         capture("Views reordered custom tab first")
         tapTaskControl(app.buttons["close-views"], app: app)
