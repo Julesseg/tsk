@@ -234,3 +234,101 @@ and closed; all four clips played, advanced past one second, and were paused.
 The previous reports retain the unchanged light/dark, Dynamic Type and
 notification-settings evidence. Selected C was recorded in light/default
 text; physical input, VoiceOver and system delivery were not reverified.
+
+## Soft-cover pacing diagnosis
+
+The user rejected the simplified native removal alternatives and asked to
+retain the stationary soft cover. Those alternatives and the rejection are
+archived outside this PR on `prototype/native-completion-options-40` at
+`70a8d3c`, linked from issue #40. They are not the implementation below.
+
+The original custom AnimatableModifier recalculated gradient geometry and
+explicit row height during animation. A temporary simulator probe used the
+real TaskListView, TaskListRow, TaskStore and scratch TaskChampion storage:
+five sequential completions with 40 tasks. Main-thread CADisplayLink callbacks
+requested at 60 Hz were generally 16.7 ms during cover, so callback timing alone did not catch
+the reported stepping. Actual modifier updates and recorded-pixel movement
+advanced about every 33 ms. Repeating with eight tasks reproduced this
+pattern; large-list storage or remote sync was not necessary to expose it.
+
+The fix animates a fixed soft mask with SwiftUI's scale transform. Only the
+mask scales; text and icons stay stationary. It removes custom per-frame
+geometry, height measurement and row-height interpolation. Retained snapshots
+leave the visible collection only after the 420 ms cover is complete; native
+List removal closes the hidden gap over 240 ms. Animation is keyed to the
+completion IDs entering the removal phase, scoped to the active view. The
+native SF Symbols tick, 400 ms settling delay, one-second checked hold,
+failure handling and Reduce Motion path remain.
+
+The calibrated pixel check uses actual recording frame timestamps and the
+changing grayscale mass of the second row's mid-cover region. Phase samples
+only bound the search window; MP4 creation time has coarse precision and is
+not used to claim exact phase alignment. At a median movement-step threshold
+of 24 ms, all five baseline completions fail and all five optimized
+completions pass:
+
+| Completion | Baseline median step (ms) | Optimized median step (ms) |
+| --- | --- | --- |
+| 1 | 33.333 | 16.667 |
+| 2 | 33.333 | 16.667 |
+| 3 | 33.333 | 16.666 |
+| 4 | 31.667 | 16.666 |
+| 5 | 31.667 | 16.667 |
+
+The largest sampled optimized mid-cover step was 20.0 ms, versus 36.667 ms
+before. This is simulator visible-cover cadence, not app-wide FPS or physical
+phone performance. In the clean recorded candidate, covering callbacks had
+p95 16.72 ms and max 32.15 ms; gap closure had p95 30.92 ms and max 35.22 ms.
+Neither had callback gaps above 50 ms. Cold work around the first checked
+feedback still reached 69.17 ms; the change does not establish a fix for all
+possible hitches. No build, video decoding or host tests ran during this
+final quantitative capture. An earlier overlapping timing trial was discarded.
+Instruments Hitches was unavailable on this simulator and supplied no hitch
+proof. Remote-sync traffic and physical-device pacing remain unverified.
+
+The real-TaskChampion controller test was changed before the fix to require
+removal from both Upcoming appearances at the collapsing phase. It failed
+against the old retained-row implementation, then passed with native List
+removal. The full controller suite passed: 51 Swift Testing and 6 XCTest.
+The clean signed simulator build passed. Standards and Spec reviews found
+no material issues. All temporary probe gates and sampling code were removed
+from production before canonical UI verification.
+
+Local diagnostic source, scripts and JSON are retained on this Mac at
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/completion-pacing-diagnostics-20261022`.
+The pixel checker is calibrated to this fixture and recording ROI; it is not
+a portable CI performance test. Its original commands are
+`python3 /tmp/check_tsk_cover_pacing.py baseline-2` (red) and
+`python3 /tmp/check_tsk_cover_pacing.py fixed-warm-recorded` (green).
+
+Source `8b428e5` passed three canonical XCUITest methods on each family:
+`testVisibleCompletionRemovesEveryUpcomingAppearanceAndPersists`,
+`testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope`, and
+`testMatchedPopulatedTaskListsAcrossAppearanceAndAccessibilityText`.
+These cover durable completion, both Upcoming appearances, genuine failure
+and sibling scope, and Today/Upcoming/project/custom/detail in light/dark
+and default/accessibility XXXL text. Results:
+`/tmp/tsk-completion-smooth-phone-retry.xcresult` and
+`/tmp/tsk-completion-smooth-pad-retry.xcresult`.
+
+The initial local UI runs were interrupted when the Mac exhausted disk space;
+those results were discarded. Task-owned generated build caches were cleared
+and the checks rerun successfully one simulator at a time. Both owned
+simulators were shut down; none remained booted and Simulator was quit.
+The old SHA `0ee84d2` separately exhausted three iPad CI retries on HID relay
+and settings accessibility-query failures, with seven other checks passing.
+That stop and the need for runner/accessibility investigation were recorded
+on PR #59; no unrelated tests or CI configuration were changed.
+
+Final local report on this Mac:
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T183745Z-smooth-soft-cover.html`
+(4,314,405 bytes; 100 matched native captures and two normal-speed clips).
+All 50 sections were opened at 390 × 844, including the final sidebar crops
+for readable default-text iPad rows. Image enlargement opened and closed.
+Both recordings played, advanced past one second, and were paused. The clips
+are encoded at 60 fps without motion interpolation to preserve the captured
+before/after cadence. The pixel measurements use the original recording PTS,
+not the re-encoded report clips. Static baselines are `9503280`; completion
+baselines are `ba6c5df`. Diagnostic fixture UUID ordering differs between
+motion recordings. Quantitative iPad pacing, a new native Reduce Motion
+recording, physical input and full remote sync remain outside this evidence.
