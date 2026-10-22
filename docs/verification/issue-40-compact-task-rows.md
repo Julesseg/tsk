@@ -69,9 +69,11 @@ each device after the minimum-target sizing and swipe-reset corrections:
 `/tmp/tsk-issue40-after-pad-v2-final.xcresult`. The earlier seven-method iPhone
 run also passed activity, planning, project and Upcoming regression journeys.
 
-Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T092100Z.html` (4,750,967 bytes; 88 captures).
+Local visual report: `/Users/julesseguin/.local/share/ui-reports/tsk/label-implement-issue-40/20261022T092100Z.html` (4,752,575 bytes; 88 captures).
 All captures rendered in a 390 × 844 Chrome viewport, and image enlargement
 opened and dismissed correctly. The existing Review task alerts control can
 overlay lower content at accessibility XXXL in both revisions; long rows
 require scrolling. Matched completed-history captures are omitted explicitly
 in the report, while Done read-back and circle absence passed at runtime.
+
+The after captures identify production-code commit `ae8f7eb` in their captions.
