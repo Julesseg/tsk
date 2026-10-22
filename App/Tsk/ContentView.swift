@@ -44,7 +44,6 @@ struct ContentView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var projectPath = NavigationPath()
     @State private var prefersSidebar: Bool
-    @State private var sidebarPresented = false
 
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
@@ -80,6 +79,10 @@ struct ContentView: View {
 
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
+            if isPad {
+                let hasUnsavedFilter = store.customView != nil && store.customView?.id == nil
+                guard view != store.selectedWorkspaceView || store.projectSelection != .all || hasUnsavedFilter else { return }
+            }
             resetNavigation()
             store.selectWorkspaceView(view)
         })
@@ -103,7 +106,7 @@ struct ContentView: View {
                 return .project(store.projectSelection)
             }
             let view = store.selectedWorkspaceView
-            return isPad && (sidebarPresented || !favoriteViews.contains(view)) ? .catalog(view) : .view(view)
+            return isPad && !favoriteViews.contains(view) ? .catalog(view) : .view(view)
         }, set: { tab in
             switch tab {
             case .view(let view), .catalog(let view): tabSelection.wrappedValue = view
@@ -156,6 +159,7 @@ struct ContentView: View {
                 Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                     iPadContent
                 }
+                .customizationID(view.id)
                 .accessibilityIdentifier("tab-" + view.id)
             }
             TabSection("Predefined views") {
@@ -198,12 +202,15 @@ struct ContentView: View {
 
     private var iPadContent: some View {
         workspaceContent
+            .background(CompactWorkspaceTabs(identifiers: favoriteViews.map(\.id)).frame(width: 0, height: 0))
             .modifier(WorkspacePlacementObserver { placement in
-                if sizeClass != .regular || placement == .bottomBar { sidebarPresented = false; return }
+                guard sizeClass == .regular else { return }
                 guard placement == .sidebar || placement == .topBar else { return }
-                sidebarPresented = placement == .sidebar
-                prefersSidebar = sidebarPresented
-                Self.navigationDefaults.set(prefersSidebar, forKey: "prefers-sidebar")
+                let isSidebar = placement == .sidebar
+                if prefersSidebar != isSidebar {
+                    prefersSidebar = isSidebar
+                    Self.navigationDefaults.set(isSidebar, forKey: "prefers-sidebar")
+                }
             })
     }
 
@@ -505,7 +512,6 @@ struct ContentView: View {
                 Label(view.title(in: store), systemImage: "checkmark")
             } else { Label(view.title(in: store), systemImage: view.systemImage) }
         }
-        .accessibilityValue(store.selectedWorkspaceView == view && store.projectSelection == .all ? "1" : "0")
         .accessibilityIdentifier("open-view-" + view.id)
     }
 
@@ -622,7 +628,7 @@ private struct WorkspacePlacementObserver: ViewModifier {
     let changed: (TabBarPlacement?) -> Void
 
     func body(content: Content) -> some View {
-        content.onChange(of: placement, initial: true) { _, placement in
+        content.onChange(of: placement) { _, placement in
             Task { @MainActor in changed(placement) }
         }
     }

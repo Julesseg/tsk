@@ -11,6 +11,96 @@ final class iPadWorkspaceUITests: XCTestCase {
 
     override func tearDownWithError() throws { XCUIDevice.shared.orientation = .portrait }
 
+    func testCompactWindowKeepsUnfavoritedViewAndRegularPreference() throws {
+        let app = launch()
+        XCTAssertTrue(workspaceTab("Today", app: app).waitForExistence(timeout: 15))
+        let initial = app.windows.firstMatch.frame
+        let compactTarget = CGPoint(x: 500, y: initial.maxY - 100)
+        let regularTarget = CGPoint(x: initial.maxX - 8, y: initial.maxY - 8)
+        resizeWindow(app, toward: compactTarget)
+        waitForCompactTabs(app)
+        let compact = app.windows.firstMatch.frame
+        XCTAssertLessThan(compact.width, initial.width / 2)
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        XCTAssertTrue(workspaceTab("Today", app: app).isSelected)
+        XCTAssertLessThan(app.buttons["New task"].frame.midY, compact.midY)
+        XCTAssertTrue(app.buttons["workspace-views"].isHittable)
+        capture("iPad compact empty Today native tabs", app: app)
+        resizeWindow(app, toward: regularTarget)
+        let regular = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let tab = self.workspaceTab("Today", app: app)
+            return tab.exists && tab.frame.midY < app.windows.firstMatch.frame.midY && !app.tabBars.firstMatch.exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [regular], timeout: 10), .completed)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
+        tapTaskControl(app.buttons["new-custom-view"], app: app)
+        let name = app.textFields["custom-view-name"]
+        focusTaskText(name, app: app)
+        name.typeText("Compact tasks")
+        tapTaskControlAtCenter(app.buttons["dismiss-filter-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-custom-view"], app: app)
+        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
+        XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app))
+        let id = String(saved.identifier.dropFirst("saved-view-".count))
+        XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
+        tapTaskControl(app.buttons["close-views"], app: app)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        tapTaskMenuItem(app.collectionViews.buttons["Compact tasks"].firstMatch, app: app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Compact tasks")
+        let sidebarToggle = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["ToggleSideBar", "ToggleSidebar"])).firstMatch
+        tapTaskControl(sidebarToggle, app: app)
+        XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 5))
+        resizeWindow(app, toward: compactTarget)
+        waitForCompactTabs(app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Compact tasks")
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        for title in ["Today", "Upcoming", "Projects", "All"] {
+            XCTAssertFalse(workspaceTab(title, app: app).isSelected)
+        }
+        capture("iPad compact unfavorited custom view", app: app)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        XCTAssertTrue(app.collectionViews.buttons["Compact tasks"].firstMatch.images["checkmark"].exists)
+        capture("iPad compact Views retains selected custom view", app: app)
+        tapTaskMenuItem(app.collectionViews.buttons["Compact tasks"].firstMatch, app: app)
+        tapTaskControl(app.buttons["New task"], app: app)
+        XCTAssertTrue(description(app).waitForExistence(timeout: 5))
+        capture("iPad compact toolbar capture", app: app)
+        tapTaskControl(app.buttons["Cancel"], app: app)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Compact tasks")
+        resizeWindow(app, toward: regularTarget)
+        XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(app.windows.firstMatch.frame.width, compact.width)
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Compact tasks")
+        tapTaskControl(app.buttons["sidebar-settings"], app: app)
+        XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
+        tapTaskControl(app.buttons["close-workspace-settings"], app: app)
+        capture("iPad live sidebar recovery after compact resizing", app: app)
+        tapTaskControl(app.buttons["workspace-views"], app: app)
+        tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
+        XCTAssertTrue(revealTaskElement(app.buttons["activate-custom-" + id], in: "views-list", app: app))
+        XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
+        tapTaskControl(app.buttons["close-views"], app: app)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 15))
+        capture("iPad regular preference retained after compact relaunch", app: app)
+    }
+
+    private func resizeWindow(_ app: XCUIApplication, toward target: CGPoint) {
+        let window = app.windows.firstMatch.frame
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: window.maxX - 8, dy: window.maxY - 8))
+            .press(forDuration: 0.3, thenDragTo: origin.withOffset(CGVector(dx: target.x, dy: target.y)), withVelocity: .slow, thenHoldForDuration: 1)
+    }
+
+    private func waitForCompactTabs(_ app: XCUIApplication) {
+        let compact = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.tabBars.firstMatch.exists && app.tabBars.firstMatch.frame.midY > app.windows.firstMatch.frame.midY
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [compact], timeout: 10), .completed)
+    }
+
     func testAdaptiveNavigationCatalogAndSidebarPreference() throws {
         let app = launch()
         let today = workspaceTab("Today", app: app)
@@ -21,13 +111,13 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["workspace-views"].isHittable)
         capture("iPad initial native top tabs", app: app)
         tapTaskControl(app.buttons["workspace-views"], app: app)
-        tapTaskMenuItem(app.buttons["open-view-completed"], app: app)
+        tapTaskMenuItem(app.collectionViews.buttons["Done"].firstMatch, app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Done")
         XCTAssertFalse(workspaceTab("Today", app: app).isSelected)
         tapTaskControl(app.buttons["workspace-views"], app: app)
-        XCTAssertEqual(app.buttons["open-view-completed"].value as? String, "1")
+        XCTAssertTrue(app.collectionViews.buttons["Done"].firstMatch.images["checkmark"].exists)
         capture("iPad Views shows unfavorited current view", app: app)
-        tapTaskMenuItem(app.buttons["open-view-today"], app: app)
+        tapTaskMenuItem(app.collectionViews.buttons["Today"].firstMatch, app: app)
         tapTaskControl(app.buttons["New task"], app: app)
         let taskTitle = description(app)
         focusTaskText(taskTitle, app: app)
@@ -51,22 +141,22 @@ final class iPadWorkspaceUITests: XCTestCase {
         let id = String(saved.identifier.dropFirst("saved-view-".count))
         XCTAssertFalse(app.buttons["activate-custom-" + id].isEnabled)
         tapTaskControl(app.buttons["close-views"], app: app)
-        let sidebar = app.buttons["ToggleSideBar"]
+        let sidebar = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["ToggleSideBar", "ToggleSidebar"])).firstMatch
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(sidebar, app: app)
         XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 5))
         capture("iPad native sidebar complete catalog", app: app)
-        let directProject = app.buttons["sidebar-project-Workspace"]
+        let directProject = app.descendants(matching: .any).matching(identifier: "sidebar-project-Workspace").firstMatch
         XCTAssertTrue(directProject.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(directProject, app: app)
         XCTAssertTrue(taskRow(named: "Direct project task", app: app).waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Workspace")
         capture("iPad sidebar direct project", app: app)
-        let custom = app.buttons["sidebar-view-custom-" + id]
+        let custom = app.descendants(matching: .any).matching(identifier: "sidebar-view-custom-" + id).firstMatch
         XCTAssertTrue(custom.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(custom, app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
-        let close = app.buttons["ToggleSideBar"]
+        let close = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["ToggleSideBar", "ToggleSidebar"])).firstMatch
         XCTAssertTrue(close.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(close, app: app)
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
@@ -77,7 +167,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         XCTAssertEqual(app.staticTexts["workspace-title-text"].firstMatch.label, "Sidebar tasks")
         tapTaskControl(app.buttons["workspace-views"], app: app)
-        XCTAssertEqual(app.buttons["open-view-custom-" + id].value as? String, "1")
+        XCTAssertTrue(app.collectionViews.buttons["Sidebar tasks"].firstMatch.images["checkmark"].exists)
         capture("iPad portrait unfavorited custom Views checkmark", app: app)
         tapTaskMenuItem(app.buttons["manage-favorite-views"], app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["activate-custom-" + id], in: "views-list", app: app))
@@ -93,7 +183,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         tapTaskControl(app.buttons["sidebar-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
-        let hideSidebar = app.buttons["ToggleSideBar"]
+        let hideSidebar = app.buttons.matching(NSPredicate(format: "identifier IN %@", ["ToggleSideBar", "ToggleSidebar"])).firstMatch
         XCTAssertTrue(hideSidebar.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(hideSidebar, app: app)
         XCTAssertTrue(today.waitForExistence(timeout: 5))
