@@ -125,3 +125,13 @@ CI HID results are separate acceptance evidence. Physical keyboard/touch,
 VoiceOver, account services and distribution were not exercised. The local
 simulator TaskChampion library was reused after confirming matching bridge
 sources and lockfile; the fresh native build remains a CI check.
+
+PR smoke CI at `cd44696` passed 11 of 12 iPad journeys, including the native
+keyboard capture/edit/save/completion/reopen journey (106.360 seconds). The
+remaining journey could not find Upcoming after relaunch: its failure hierarchy
+contained the native sidebar cell `tab-upcoming`, while the test helper queried
+only buttons. Favorite helpers now query stable identifiers across native element
+types; the adaptive journey also checks favorite order with the sidebar open.
+The 14 UI-selection and 12 CI-routing checks passed after this test-only fix.
+New-head canonical UI results remain pending. The earlier local Cmd-Return
+limitation does not negate the passing CI native keyboard result.

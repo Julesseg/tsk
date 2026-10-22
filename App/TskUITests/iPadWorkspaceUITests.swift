@@ -176,6 +176,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5), app.debugDescription)
         tapTaskControl(sidebar, app: app)
         XCTAssertTrue(app.buttons["sidebar-settings"].waitForExistence(timeout: 5))
+        XCTAssertEqual(workspaceTabs(in: app).map(\.label), ["Today", "Upcoming", "Projects", "All"])
         capture("iPad native sidebar complete catalog", app: app)
         let directProject = app.descendants(matching: .any).matching(identifier: "sidebar-project-Workspace").firstMatch
         XCTAssertTrue(directProject.waitForExistence(timeout: 5), app.debugDescription)

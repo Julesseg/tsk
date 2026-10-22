@@ -11,13 +11,13 @@ extension XCTestCase {
 
     @MainActor func workspaceTab(_ title: String, app: XCUIApplication) -> XCUIElement {
         if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons[title] }
-        return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "tab-", title)).firstMatch
+        return app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "tab-", title)).firstMatch
     }
 
     @MainActor func workspaceTabs(in app: XCUIApplication) -> [XCUIElement] {
         if UIDevice.current.userInterfaceIdiom != .pad { return app.tabBars.buttons.allElementsBoundByIndex }
         var seen: Set<String> = []
-        return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-")).allElementsBoundByIndex.filter {
+        return app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "tab-")).allElementsBoundByIndex.filter {
             seen.insert($0.identifier).inserted
         }
     }
