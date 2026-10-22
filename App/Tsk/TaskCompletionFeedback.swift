@@ -55,6 +55,7 @@ final class TaskCompletionFeedback {
         guard let saved = await operation() else { return nil }
         entries[task.id]?.phase = .checked
         do {
+            if animated { try await pause(.milliseconds(400)) }
             try await pause(.seconds(1))
             if shouldRemove() {
                 entries[task.id]?.phase = .collapsing

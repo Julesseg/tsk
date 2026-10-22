@@ -115,11 +115,14 @@ struct TaskListRow: View {
                 } label: {
                     Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                         .font(.title2).foregroundStyle(.secondary)
+                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
+                        .animation(reduceMotion ? nil : .default, value: checked)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .disabled(store.isSaving || phase != nil)
+                .disabled(phase != nil)
+                .allowsHitTesting(!store.isSaving)
                 .accessibilityLabel("\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
                 .accessibilityValue(checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")

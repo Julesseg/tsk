@@ -123,7 +123,7 @@ import XCTest
         let tappedAt = Date().timeIntervalSince1970
         circle.tap()
         let checked = app.buttons.matching(NSPredicate(format: "identifier == %@ AND value == %@", "complete-task-row-" + ordinaryID, "Completed")).firstMatch
-        XCTAssertTrue(checked.waitForExistence(timeout: 5))
+        XCTAssertTrue(checked.exists || checked.waitForExistence(timeout: 1))
         let checkedAt = Date().timeIntervalSince1970
         capture("Checked task remains visible before collapse", app)
         XCTAssertTrue(planned.firstMatch.waitForNonExistence(timeout: 15))

@@ -36,7 +36,7 @@ import TskNative
             return saved
         }
     }
-    #expect(await pauses.next() == .seconds(1))
+    #expect(await pauses.next() == .milliseconds(400))
     #expect(try await manager.task(id: task.id).status == "completed")
     #expect(latest.isEmpty)
     #expect(feedback.phase(for: task.id, context: context) == .checked)
@@ -44,6 +44,9 @@ import TskNative
     #expect(retained == [task])
     #expect(UpcomingDay.groups(tasks: retained, at: now).flatMap(\.entries).count == 2)
     #expect(feedback.visibleTasks([], context: .init(query: .completed)).isEmpty)
+    clock.advance()
+    #expect(await pauses.next() == .seconds(1))
+    #expect(feedback.phase(for: task.id, context: context) == .checked)
     clock.advance()
     #expect(await pauses.next() == .milliseconds(280))
     #expect(feedback.phase(for: task.id, context: context) == .collapsing)
@@ -123,8 +126,10 @@ import TskNative
             return saved
         }
     }
-    #expect(await pauses.next() == .seconds(1))
+    #expect(await pauses.next() == .milliseconds(400))
     #expect(feedback.phase(for: task.id, context: context) == .checked)
+    clock.advance()
+    #expect(await pauses.next() == .seconds(1))
     clock.advance()
     let saved = try #require(await completing.value)
     #expect(feedback.phase(for: task.id, context: context) == nil)
