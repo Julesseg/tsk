@@ -39,7 +39,7 @@ import XCTest
             let list = app.collectionViews["task-list"]
             XCTAssertLessThanOrEqual(circle.frame.minX - list.frame.minX, 12)
             capture("Today " + mode, app)
-            row.tap()
+            openTaskInformation(row, app: app)
             let reason = app.collectionViews["task-detail-form"].staticTexts["task-blocked-reason-" + ordinaryID]
             XCTAssertTrue(revealTaskElement(reason, in: "task-detail-form", app: app))
             XCTAssertTrue(reason.label.contains("First prerequisite with a long explanation"))

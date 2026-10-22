@@ -100,7 +100,7 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed)
         XCTAssertTrue(revealTaskElement(app.buttons["sync-now"], in: "sync-settings-form", app: app))
         app.buttons["sync-now"].tap()
-        XCTAssertTrue(app.staticTexts["Synchronized with server"].waitForExistence(timeout: 30))
+        XCTAssertTrue(taskRow(named: "Synchronized with server", app: app).waitForExistence(timeout: 30))
         XCTAssertFalse(app.staticTexts["sync-error"].exists)
         capture("Successful manual synchronization with real server", app)
         app.navigationBars.buttons["Done"].tap()

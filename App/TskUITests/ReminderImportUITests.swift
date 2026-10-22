@@ -65,7 +65,7 @@ final class ReminderImportUITests: XCTestCase {
         app.launch()
         selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Copy fixture H", app: app).waitForExistence(timeout: 15))
-        taskRow(named: "Copy fixture H", app: app).tap()
+        openTaskInformation(taskRow(named: "Copy fixture H", app: app), app: app)
         let notes = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Fixture notes")).firstMatch
         XCTAssertTrue(revealTaskElement(notes, in: "task-detail-form", app: app))
         capture("Reopened durable task with copied notes and independent dates", app)

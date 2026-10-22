@@ -21,7 +21,7 @@ final class TskUpcomingUITests: XCTestCase {
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts["One task two future dates"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "One task two future dates", app: app).waitForExistence(timeout: 10))
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
@@ -35,7 +35,7 @@ final class TskUpcomingUITests: XCTestCase {
         let deadlineIdentity = deadlineRows(app).firstMatch.identifier.suffix(36)
         XCTAssertEqual(plannedIdentity, deadlineIdentity)
         capture("Same-day planned work and deadline with one task identity", app: app)
-        plannedRows(app).firstMatch.tap()
+        openTaskInformation(plannedRows(app).firstMatch, app: app)
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         app.buttons["edit-task"].tap()
         tapButton("plan-tomorrow", app: app)
@@ -65,8 +65,8 @@ final class TskUpcomingUITests: XCTestCase {
         selectUpcoming(app)
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
         selectDoneTasks(app)
-        XCTAssertTrue(app.staticTexts["One task two future dates"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.staticTexts.matching(identifier: "One task two future dates").count, 1)
+        XCTAssertTrue(taskRow(named: "One task two future dates", app: app).waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "task-", "One task two future dates")).count, 1)
     }
 
     private func selectUpcoming(_ app: XCUIApplication) {

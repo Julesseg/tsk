@@ -55,7 +55,53 @@ struct ContentView: View {
         _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
-    var body: some View { calendarWorkspace }
+    var body: some View {
+        calendarWorkspace
+            .overlay {
+                GeometryReader { geometry in
+                    if let editing = store.rowEditing, editing.isExpanded, editing.bounds != .zero {
+                        let origin = geometry.frame(in: .global).origin
+                        TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: { closeRow() })
+                        if let parameter = editing.parameter {
+                            Color.black.opacity(0.08).contentShape(Rectangle())
+                                .onTapGesture { editing.parameter = nil }
+                                .accessibilityLabel("Dismiss date picker")
+                                .accessibilityIdentifier("dismiss-row-parameter-outside")
+                            TaskRowDatePicker(editing: editing, parameter: parameter, now: store.currentDate, availableHeight: max(120, geometry.size.height - 32))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                }
+            }
+            .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
+    }
+
+    private func closeRow(after: (() -> Void)? = nil) {
+        guard let editing = store.rowEditing, !editing.isSaving, editing.isExpanded else { return }
+        if editing.parameter != nil { editing.parameter = nil; return }
+        editing.isSaving = true
+        Task {
+            do {
+                let changes = try editing.draft.changes()
+                let saved = changes.isEmpty ? true : await store.update(id: editing.draft.original.id, changes: changes) != nil
+                guard saved else {
+                    editing.error = store.error
+                    editing.isSaving = false
+                    return
+                }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { editing.isExpanded = false }
+                if !reduceMotion { try? await Task.sleep(for: .milliseconds(350)) }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { store.rowEditing = nil }
+                after?()
+            } catch { editing.error = error.localizedDescription; editing.isSaving = false }
+        }
+    }
+
+    private func showInformation(_ task: TaskRecord) {
+        selectedTaskID = task.id
+        if isProjectWorkspace { projectPath.append(task.id) }
+        else if presentation != .columns { path = [task.id] }
+    }
 
     private var presentation: TaskWorkspacePresentation {
         if sizeClass != .regular { return .compact }
@@ -354,7 +400,7 @@ struct ContentView: View {
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
     private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
-        TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
+        TaskListView(store: store, selection: selection, calendar: calendar, edit: { showInformation($0) })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -366,7 +412,7 @@ struct ContentView: View {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
+                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
@@ -441,13 +487,13 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
         #endif
         return TaskWorkspaceActions(
             capture: capture,
-            edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
+            edit: selectedTask.flatMap { task in task.canEdit ? { withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { store.expandRow(task) } } : nil },
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
