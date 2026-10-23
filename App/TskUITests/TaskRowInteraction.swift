@@ -99,3 +99,20 @@ extension XCTestCase {
         XCTFail("Attribute pill could not be reached: \(identifier)")
     }
 }
+
+extension XCTestCase {
+    @MainActor func closeTaskRow(_ app: XCUIApplication) {
+        let keyboard = app.keyboards.firstMatch
+        let bottom = keyboard.exists && keyboard.frame.height > 0 ? keyboard.frame.minY : app.frame.maxY
+        let viewport = CGRect(x: app.frame.minX, y: app.frame.minY, width: app.frame.width, height: max(0, bottom - app.frame.minY))
+        let targets = app.buttons.matching(identifier: "task-row-outside").allElementsBoundByIndex
+            .map { ($0, $0.frame.intersection(viewport)) }
+            .filter { !$0.1.isNull && !$0.1.isEmpty }
+        guard let target = targets.max(by: { $0.1.width * $0.1.height < $1.1.width * $1.1.height }) else {
+            XCTFail("No visible outside-tap region for the task row")
+            return
+        }
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: target.1.midX - app.frame.minX, dy: target.1.midY - app.frame.minY)).tap()
+    }
+}

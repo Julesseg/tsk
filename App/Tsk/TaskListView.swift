@@ -58,6 +58,7 @@ struct TaskListView: View {
                 }
             }
         }
+        .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
         }
@@ -101,38 +102,22 @@ struct TaskListView: View {
     }
 }
 
-struct TaskListLabel: View {
+struct TaskListMetadata: View {
     let task: TaskRecord
     let store: TaskStore
-    var isCompleted = false
-    var namespace: Namespace.ID?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(task.description)
-                .font(.subheadline)
-                .strikethrough(isCompleted)
-                .foregroundStyle(isCompleted ? .secondary : .primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .modifier(TaskRowMorph(id: "title", namespace: namespace))
-            if !task.project.isEmpty || task.deadline != nil {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if !task.project.isEmpty {
-                        Text(task.project).font(.caption).foregroundStyle(.secondary)
-                            .modifier(TaskRowMorph(id: "project", namespace: namespace))
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                    TimelineView(.periodic(from: .now, by: 60)) { _ in
-                        TaskPlanningCaption(task: task, today: store.currentDate)
-                            .modifier(TaskRowMorph(id: "deadline", namespace: namespace))
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .layoutPriority(1)
-                }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if !task.project.isEmpty {
+                Text(task.project).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
+            Spacer(minLength: 0)
+            TimelineView(.periodic(from: .now, by: 60)) { _ in
+                TaskPlanningCaption(task: task, today: store.currentDate)
+                    .multilineTextAlignment(.trailing)
+            }
+            .layoutPriority(1)
         }
-        .padding(.vertical, 2)
     }
 }
 
@@ -142,7 +127,10 @@ struct TaskListRow: View {
     let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Namespace private var namespace
+    @FocusState private var titleFocused: Bool
+    @State private var headerHeight: CGFloat = 44
+    @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
+    @Environment(\.taskRowAvailableHeight) private var availableHeight
     @Environment(\.taskRowActions) private var rowActions
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }
     private var editing: TaskRowEditing? { store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
@@ -152,7 +140,7 @@ struct TaskListRow: View {
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
     var body: some View {
-        HStack(alignment: !expanded && task.project.isEmpty && task.deadline == nil ? .center : .top, spacing: 4) {
+        HStack(alignment: .top, spacing: 4) {
             if task.canComplete {
                 Button {
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
@@ -171,40 +159,90 @@ struct TaskListRow: View {
                 .accessibilityValue(checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
             }
-            if let editing, expanded {
-                TaskRowEditor(store: store, editing: editing, namespace: namespace,
-                              close: rowActions.close, information: { rowActions.information(task) })
-                    .frame(maxWidth: .infinity)
-                    .transition(.identity)
-            } else {
-                Button {
-                    if task.canEdit {
-                        expand()
-                    } else { edit(task) }
-                } label: {
-                    TaskListLabel(task: editing?.savedTask ?? task, store: store, isCompleted: checked, namespace: namespace)
-                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 0) {
+                TextField("What needs to be done?", text: Binding(
+                    get: { editing?.savedTask?.description ?? editing?.draft.taskDraft.description ?? task.description },
+                    set: { editing?.draft.taskDraft.description = $0 }
+                ), axis: .vertical)
+                .font(.subheadline)
+                .foregroundStyle(checked ? .secondary : .primary)
+                .strikethrough(checked)
+                .textFieldStyle(.plain)
+                .focused($titleFocused)
+                .disabled(!expanded || editing?.isSaving == true)
+                .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
+                .frame(minHeight: 44, alignment: .leading)
+                .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
+                .accessibilityHidden(!expanded)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                ZStack(alignment: .topLeading) {
+                    if !(editing?.savedTask ?? task).project.isEmpty || (editing?.savedTask ?? task).deadline != nil {
+                        TaskListMetadata(task: editing?.savedTask ?? task, store: store)
+                            .padding(.bottom, 2)
+                            .opacity(expanded ? 0 : 1)
+                            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
+                            .accessibilityHidden(true)
+                    }
+                    if let editing {
+                        TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
+                                      information: { rowActions.information(task) })
+                            .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight))
+                            .opacity(expanded ? 1 : 0)
+                            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
+                            .allowsHitTesting(expanded)
+                            .accessibilityHidden(!expanded)
+                    }
                 }
-                .buttonStyle(.plain)
-                .transition(.identity)
-                .disabled(phase != nil)
-                .accessibilityIdentifier(identity)
-                .accessibilityHint(task.canEdit ? "Expand to edit title and dates" : "Show task information")
-                .accessibilityAction(named: "Edit title and dates") {
-                    expand()
+
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay {
+                if !expanded {
+                    Button {
+                        if task.canEdit { expand() } else { edit(task) }
+                    } label: { Color.clear.contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                        .disabled(phase != nil || editing != nil)
+                        .accessibilityLabel { _ in
+                            VStack {
+                                Text(task.description)
+                                TaskListMetadata(task: task, store: store)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        .accessibilityIdentifier(identity)
+                        .accessibilityHint(task.canEdit ? "Expand to edit title and attributes" : "Show task information")
+                        .accessibilityAction(named: "Edit title and attributes", expand)
                 }
             }
         }
         .padding(.vertical, 8)
         .background {
-            if expanded { RoundedRectangle(cornerRadius: 18).fill(.background).shadow(color: .black.opacity(0.12), radius: 12, y: 3) }
+            if expanded {
+                Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
+                    TaskKeyboardCommand(id: "collapse", input: "\u{1b}", modifiers: [], title: "Close Task Editor", action: rowActions.close)
+                ])
+                .allowsHitTesting(false)
+            }
+        }
+        .onChange(of: editing?.isSaving) { _, saving in if saving == true { titleFocused = false } }
+        .background(alignment: .top) {
+            if editing != nil {
+                GeometryReader { geometry in
+                    RoundedRectangle(cornerRadius: 18).fill(.background)
+                        .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
+                        .frame(height: headerHeight + 16 + (expanded ? max(0, geometry.size.height - headerHeight - 16) : 0))
+                        .opacity(expanded ? 1 : 0)
+                        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
+                        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: geometry.size.height)
+                }
+            }
         }
         .opacity(store.rowEditing != nil && editing == nil ? 0.35 : 1)
         .allowsHitTesting(store.rowEditing == nil || editing != nil)
-        .fixedSize(horizontal: false, vertical: true)
         .frame(maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-            if expanded { editing?.bounds = bounds }
+            editing?.bounds = bounds
         }
         .mask {
             VStack(spacing: 0) {
@@ -240,16 +278,7 @@ struct TaskListRow: View {
         }
     }
     private func expand() {
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { store.expandRow(task, rowID: identity) }
+        store.expandRow(task, rowID: identity)
     }
 
-}
-
-struct TaskRowMorph: ViewModifier {
-    let id: String
-    let namespace: Namespace.ID?
-    func body(content: Content) -> some View {
-        if let namespace { content.matchedGeometryEffect(id: id, in: namespace, properties: .position) }
-        else { content }
-    }
 }

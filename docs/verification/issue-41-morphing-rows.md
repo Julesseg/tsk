@@ -212,7 +212,8 @@ are now Shutdown, the temporary iPad is deleted, and Simulator is quit.
 The authorized iOS 18.1 runtime was removed from the installed runtime list;
 iOS 27.0 and 27.1 remain Ready. Free space reached 3.7 GiB after removal.
 macOS retained the associated 8.2 GiB MobileAsset download with a never-collect
-policy; removing that asset requires the pending administrator authentication.
+policy; removing that asset requires administrator authentication. The user could not
+access the Mac, so that authentication prompt was cancelled and the cache remains.
 A temporary iPad used during recovery was stopped and deleted. Restarting the
 simulator service with no booted devices cleared the original iPad's stale
 Shutting Down state, allowing its existing data to be reused.
@@ -230,3 +231,68 @@ and the retained revised title through collapse. Physical frame pacing,
 spoken VoiceOver and the other explicitly listed capture gaps remain open.
 Canonical CI on the pushed head is still required; the latest completed CI
 run on `42f5523` had UI failures and is not evidence for this follow-up.
+
+## Fixed-header follow-up (2026-10-23)
+
+The user's second review replaces the moving title/checkbox and collapse arrow
+with one shared header. Only the lower section reveals attributes; compact
+project/deadline metadata fade as the controls appear. The multiline title uses
+a bounded native text field, including internally scrolling long text. Project
+and priority now use system menus containing selection pickers. Creating a new
+project retains the glass text-entry container. Calendars are measured before
+the selected pill morphs into their glass container.
+
+The new fixed-header regression fails on the preceding `bcc56d6` app: expanding
+moves the title 12 pt horizontally. Endpoint assertions alone missed a separate
+53 pt transient vertical excursion in early follow-up drafts. Actual native
+frames traced that excursion to native List hosting-height animation. A draft
+that reserved all editor space immediately kept the header fixed but made
+neighbouring rows snap, so it was discarded. The final lower reveal samples
+elapsed monotonic time and updates layout height with implicit List animation
+disabled. Its height and the neighbouring rows can then progress together;
+Reduce Motion applies the target directly. The original completion mask is
+preserved.
+
+All seven iPhone row-editing methods pass in
+`/tmp/tsk-61-refinement/phone-bottom-continuous.xcresult`. The native film keeps
+the first checkbox centre at 437.5 px through all 234 frames sampled from the
+opening/closing interval; neighbouring-row detection found 18 intermediate
+positions between its compact and expanded endpoints. These are visible-pixel
+checks in a simulator, not physical-device frame-pacing acceptance. The native
+clips also show the system priority menu and the Scheduled glass transition.
+
+The same final app source covers all seven iPad row-editing methods with passing
+results across `pad-bottom-continuous.xcresult` and `pad-bottom-menu.xcresult`.
+The first run passed five row methods and the existing Upcoming completion
+journey, but its appearance method timed out before app bootstrap as disk space
+reached zero. Its native New Project selection also missed activation: the
+failure hierarchy and per-test film still show the native menu, with no custom
+picker. The test now uses the existing settled-geometry centre-tap helper for
+native options. The appearance, header and complete durable-edit methods pass
+on rerun; its valid native recording shows opening/closing, the system priority
+menu and the Scheduled morph on iPad. The original full iPad recording was
+corrupted at disk exhaustion and is not evidence.
+
+The verified App-source patch relative to `bcc56d6` has SHA-256
+`b3281ce30047585c44f4380c6a1fbbe473660a34245ec3603130a6b01dfa75ef`.
+Signed simulator test builds and all 14 UI-selection tests pass. Core behavior
+is unchanged since the preceding 168-test pass. Two independent review axes
+found zero remaining definite standards violations and zero remaining definite
+spec findings after the neighbouring-row snap was corrected. Physical-device
+frame pacing, physical input, spoken VoiceOver, system Reduce Motion and moved
+Stage Manager/floating-keyboard geometry remain unverified. Canonical CI on
+the pushed follow-up is still required.
+
+The existing iPhone description-edit/completion/relaunch and Upcoming
+completion/removal/label journeys both pass in
+`/tmp/tsk-61-refinement/phone-bottom-regressions.xcresult`.
+
+Final report, local to this Mac:
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-and-implement-with-pr-issue-41/20261023-bottom-reveal/report.html`
+
+Measured size: 4,733,189 bytes, with 172 screenshots and ten actual native clips.
+Chrome at a 390 px viewport decoded all 172 images, expanded all 70 sections,
+measured a 390 px document width and verified image enlargement and native
+video playback. Full captures and labelled iPad crops remain paired; differences
+in initial picker values and missing exact baselines are disclosed. Owned
+simulators were shut down and the report's Chrome tab was closed.

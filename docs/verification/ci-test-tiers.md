@@ -31,8 +31,8 @@ not allocate a signing/build runner.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 18 methods | 15 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 69 declared methods | 59-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Smoke | 20 methods | 17 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 71 declared methods | 61-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |

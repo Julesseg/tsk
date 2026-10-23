@@ -55,7 +55,7 @@ final class TskUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         replaceTaskText(editor, with: "Original task revised", app: app)
         screenshot("Edited draft", app: app)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(taskRow(named: "Original task revised", app: app).waitForExistence(timeout: 10))
         app.terminate()
         app.launch()

@@ -13,6 +13,45 @@ import XCTest
         XCUIDevice.shared.appearance = .light
     }
 
+    func testExpansionKeepsHeaderInPlace() throws {
+        let app = try launch()
+        let compactTitle = app.buttons["task-" + taskID]
+        let checkbox = app.buttons["complete-task-row-" + taskID]
+        XCTAssertTrue(compactTitle.waitForExistence(timeout: 10))
+        let titleFrame = CGRect(x: compactTitle.frame.minX, y: compactTitle.frame.minY, width: compactTitle.frame.width, height: 44)
+        let checkboxFrame = checkbox.frame
+        capture("Fixed header before expansion", app)
+        app.buttons["task-" + taskID].tap()
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.frame.minX, titleFrame.minX, accuracy: 1)
+        XCTAssertEqual(title.frame.midY, titleFrame.midY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.minY, checkboxFrame.minY, accuracy: 1)
+        XCTAssertFalse(app.buttons["collapse-task-row"].exists)
+        capture("Fixed header with attributes revealed", app)
+        try tapOutside(app)
+        XCTAssertTrue(compactTitle.waitForExistence(timeout: 10))
+        XCTAssertEqual(compactTitle.frame.minX, titleFrame.minX, accuracy: 1)
+        XCTAssertEqual(compactTitle.frame.minY, titleFrame.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.minY, checkboxFrame.minY, accuracy: 1)
+        capture("Fixed header after collapse", app)
+    }
+
+    func testLongTitleUsesBoundedHeaderWithKeyboard() throws {
+        let app = try launch(largeText: true, longTitle: true)
+        app.buttons["task-" + taskID].tap()
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.tap()
+        title.typeText(" updated")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        if keyboard.frame.height > 0 { XCTAssertLessThanOrEqual(title.frame.maxY, keyboard.frame.minY) }
+        XCTAssertLessThan(title.frame.height, app.frame.height / 2)
+        XCTAssertTrue((title.value as? String ?? "").contains("updated"))
+        capture("Long title scrolls within the bounded header", app)
+    }
+
     func testOutsideSaveValidationPickerLayerAndDurableTitle() throws {
         let app = try launch()
         let row = app.buttons["task-" + taskID]
@@ -26,8 +65,11 @@ import XCTest
         capture("Expanded without keyboard", app)
         XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
         openTaskRowParameter("priority", app: app)
-        app.buttons["row-priority-H"].tap()
+        capture("Native priority menu", app)
+        tapTaskControlAtCenter(app.buttons["High"], app: app)
         openTaskRowParameter("project", app: app)
+        capture("Native project menu", app)
+        tapTaskControlAtCenter(app.buttons["New project…"], app: app)
         let project = app.textFields["row-project-input"]
         XCTAssertTrue(project.waitForExistence(timeout: 5))
         replaceTaskText(project, with: "Release.Next", app: app)
@@ -71,8 +113,8 @@ import XCTest
         XCTAssertEqual(app.buttons["row-project"].value as? String, "Release.Next")
         XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
         openTaskRowParameter("priority", app: app)
-        capture("Priority glass picker after relaunch", app)
-        app.buttons["close-row-parameter"].tap()
+        capture("Native priority menu after relaunch", app)
+        tapTaskControlAtCenter(app.buttons["High"], app: app)
         capture("Dates persist independently after relaunch", app)
         openTaskRowParameter("deadline", app: app)
         XCTAssertTrue(app.datePickers["deadline-picker"].waitForExistence(timeout: 5))
@@ -82,7 +124,7 @@ import XCTest
         XCTAssertTrue(app.datePickers["waiting-date-picker"].waitForExistence(timeout: 5))
         capture("Focused waiting-date control", app)
         app.buttons["close-row-parameter"].tap()
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         let plainID = "A0000000-0000-0000-0000-000000000002"
         let circle = app.buttons["complete-task-row-" + plainID]
@@ -91,7 +133,7 @@ import XCTest
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertEqual(circle.frame.minY, circleY, accuracy: 1)
         capture("Plain task expands with anchored completion circle", app)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
@@ -110,7 +152,7 @@ import XCTest
         openTaskRowParameter("deadline", app: app)
         app.buttons["remove-deadline"].tap()
         XCTAssertTrue(app.staticTexts["Deadlines"].exists)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(app.buttons[identifier].waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
         capture("Upcoming membership applies after collapse", app)
@@ -136,14 +178,14 @@ import XCTest
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText(" unsaved")
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         let error = app.staticTexts["draft-error"]
         XCTAssertTrue(error.waitForExistence(timeout: 10))
         let scroll = app.descendants(matching: .any)["task-row-editor"].firstMatch
         if !error.isHittable { scroll.swipeUp() }
         capture("Failed occurrence retains draft with internal overflow", app)
         XCTAssertTrue((title.value as? String ?? "").contains("unsaved"))
-        XCTAssertTrue(app.buttons["collapse-task-row"].exists)
+        XCTAssertFalse(app.buttons["collapse-task-row"].exists)
     }
 
     func testAppearanceAndAccessibilityOverflow() throws {
@@ -161,7 +203,7 @@ import XCTest
             capture("Scheduled calendar " + mode, app)
             app.buttons["close-row-parameter"].tap()
             XCTAssertTrue(app.textFields["task-description"].exists)
-            app.buttons["collapse-task-row"].tap()
+            closeTaskRow(app)
             XCTAssertTrue(app.textFields["task-description"].waitForNonExistence(timeout: 10))
             app.terminate()
         }
@@ -183,11 +225,11 @@ import XCTest
         title.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
@@ -198,6 +240,12 @@ import XCTest
             ["id": taskID, "attributes": ["description": "Prepare the release with the product team", "status": "pending", "project": "Release", "scheduled": "1792231200", "due": "1792238400", "opaque": "retain"].map { ["key": $0.key, "value": $0.value] }],
             ["id": "A0000000-0000-0000-0000-000000000002", "attributes": [["key": "description", "value": "Review accessibility findings"], ["key": "status", "value": "pending"]]]
         ]
+        if longTitle {
+            var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
+            let description = try XCTUnwrap(attributes.firstIndex { $0["key"] == "description" })
+            attributes[description]["value"] = String(repeating: "Review the release and accessibility findings with the product team. ", count: 16)
+            records[0]["attributes"] = attributes
+        }
         if crowded {
             for index in 1...12 {
                 records.append(["id": String(format: "90000000-0000-0000-0000-%012d", index), "attributes": [["key": "description", "value": "Earlier task \(index) with a longer title to fill the list"], ["key": "status", "value": "pending"]]])
@@ -213,10 +261,7 @@ import XCTest
     }
 
     private func tapOutside(_ app: XCUIApplication) throws {
-        let targets = app.buttons.matching(identifier: "task-row-outside").allElementsBoundByIndex.map { element in
-            (element, element.frame.width * element.frame.height)
-        }
-        try XCTUnwrap(targets.max { $0.1 < $1.1 }).0.tap()
+        closeTaskRow(app)
     }
 
     private func tapOutsideParameter(_ app: XCUIApplication) throws {
