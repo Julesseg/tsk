@@ -20,12 +20,13 @@ import XCTest
         XCTAssertTrue(compactTitle.waitForExistence(timeout: 10))
         let titleFrame = CGRect(x: compactTitle.frame.minX, y: compactTitle.frame.minY, width: compactTitle.frame.width, height: 44)
         let checkboxFrame = checkbox.frame
+        XCTAssertEqual(checkboxFrame.midY, compactTitle.frame.midY, accuracy: 1, "Center the checkbox beside the title and metadata together")
         capture("Fixed header before expansion", app)
         app.buttons["task-" + taskID].tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertEqual(title.frame.minX, titleFrame.minX, accuracy: 1)
-        XCTAssertEqual(title.frame.midY, titleFrame.midY, accuracy: 1)
+        XCTAssertEqual(title.frame.minY, titleFrame.minY, accuracy: 1)
         XCTAssertEqual(checkbox.frame.minY, checkboxFrame.minY, accuracy: 1)
         XCTAssertFalse(app.buttons["collapse-task-row"].exists)
         capture("Fixed header with attributes revealed", app)
@@ -35,6 +36,22 @@ import XCTest
         XCTAssertEqual(compactTitle.frame.minY, titleFrame.minY, accuracy: 1)
         XCTAssertEqual(checkbox.frame.minY, checkboxFrame.minY, accuracy: 1)
         capture("Fixed header after collapse", app)
+    }
+
+    func testCompactControlsAndDateSurface() throws {
+        let app = try launch()
+        app.buttons["task-" + taskID].tap()
+        XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
+        capture("Smaller attribute controls", app)
+        for parameter in ["scheduled", "deadline", "waiting-date"] {
+            openTaskRowParameter(parameter, app: app)
+            XCTAssertTrue(app.datePickers[parameter + "-picker"].waitForExistence(timeout: 5))
+            capture(parameter + " continuous glass surface", app)
+            app.buttons["close-row-parameter"].tap()
+            XCTAssertTrue(app.datePickers[parameter + "-picker"].waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.textFields["task-description"].exists)
+        }
+        capture("Controls restored after calendars", app)
     }
 
     func testLongTitleUsesBoundedHeaderWithKeyboard() throws {
