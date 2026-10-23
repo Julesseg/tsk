@@ -34,7 +34,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let scheduled = app.datePickers["scheduled-picker"]
         XCTAssertTrue(scheduled.waitForExistence(timeout: 5))
         scheduled.buttons["DatePicker.NextMonth"].tap()
-        scheduled.buttons.matching(NSPredicate(format: "label MATCHES %@", "[A-Za-z]+ 1 [A-Za-z]+")).firstMatch.tap()
+        scheduled.buttons.matching(NSPredicate(format: "label MATCHES %@", "[A-Za-z]+, [A-Za-z]+ 1")).firstMatch.tap()
         app.buttons["close-row-parameter"].tap()
         app.buttons["collapse-task-row"].tap()
         XCTAssertTrue(description(app).waitForNonExistence(timeout: 10))
@@ -172,7 +172,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
-        app.launchArguments = arguments
+        app.launchArguments = arguments + ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launch()
         return app
     }

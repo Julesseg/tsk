@@ -36,7 +36,7 @@ struct UpcomingTaskList: View {
             .refreshable { await store.reload() }
             .task(id: viewport.height) { await Task.yield(); revealEditor(using: proxy) }
             .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy) }
-            .task(id: store.rowEditing?.bounds.height) { await Task.yield(); revealEditor(using: proxy) }
+            .task(id: store.rowEditing?.bounds) { await Task.yield(); revealEditor(using: proxy) }
             .onChange(of: selection?.wrappedValue) { _, id in
                 if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.task.id == id }) { proxy.scrollTo(entry.id) }
             }
@@ -44,7 +44,7 @@ struct UpcomingTaskList: View {
     }
 
     private func revealEditor(using proxy: ScrollViewProxy) {
-        guard let editing = store.rowEditing, editing.bounds != .zero,
+        guard !Task.isCancelled, let editing = store.rowEditing, editing.bounds != .zero,
               let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == editing.rowID }) else { return }
         if editing.bounds.minY >= viewport.minY && editing.bounds.maxY <= viewport.maxY { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
