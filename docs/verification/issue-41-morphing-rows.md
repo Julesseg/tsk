@@ -176,3 +176,57 @@ Swift parsing, all 14 UI-selection tests and diff whitespace checks pass for thi
 simulator run was attempted while disk space remained exhausted. The extracted
 CI screenshots and native recordings remain under
 `/tmp/tsk-61-refinement/ci-ipad-all` and `ci-iphone-all`.
+
+### Rendering-boundary correction and disk recovery
+
+Native capture on `42f5523` confirmed that compositing before the scroll clip
+still did not contain the root glass renderer. The final implementation gives
+the horizontal pill stack its own nearest `GlassEffectContainer`, inside the
+clipped scroll view. A temporary selected-pill proxy and the floating picker
+share the root container and identity, preserving the native morph without
+extracting the complete scrolling strip into the root renderer. The proxy
+preserves the full pill geometry within its visible clip, follows active row
+movement, and freezes the return target during dismissal. The picker anchor
+stays stable while editing changes the pill's value or width.
+
+Row reveal now observes whether the editor crosses the viewport boundary,
+rather than retargeting an animation for every changing scroll coordinate.
+The outside-picker test chooses a visible backdrop region that excludes the
+picker, native bars and keyboard. The scrolling helper taps the actual visible
+pill fragment rather than asking XCTest for an offscreen activation point.
+Keyboard admission accepts both a visible software keyboard and native text
+input without a positive-height software keyboard.
+
+The final signed simulator test build and 14 UI-selection tests pass. Native
+captures establish containment on iPad in normal light/dark and accessibility
+XXXL states. All five iPhone row-editing methods pass in
+`/tmp/tsk-61-refinement/phone-verified.xcresult`. On the same final app source,
+four iPad methods pass in `pad-verified.xcresult`; its durable-edit method
+exposed the offscreen-hittability issue above and passes after the helper fix
+in `pad-durable.xcresult`. The final app-source patch is unchanged between
+those runs (SHA-256 `9668d2e19a95142ce0d9a1445141db546127ac3e772f007d67cd480b9c4dc0b2`).
+The iPad software-keyboard element reported zero height during native text
+input; visible docked keyboard geometry is verified on iPhone. Both devices
+are now Shutdown, the temporary iPad is deleted, and Simulator is quit.
+
+The authorized iOS 18.1 runtime was removed from the installed runtime list;
+iOS 27.0 and 27.1 remain Ready. Free space reached 3.7 GiB after removal.
+macOS retained the associated 8.2 GiB MobileAsset download with a never-collect
+policy; removing that asset requires the pending administrator authentication.
+A temporary iPad used during recovery was stopped and deleted. Restarting the
+simulator service with no booted devices cleared the original iPad's stale
+Shutting Down state, allowing its existing data to be reused.
+
+### Refreshed visual report
+
+`/Users/julesseguin/.local/share/ui-reports/tsk/label-and-implement-with-pr-issue-41/20261023-refinement/report.html`
+
+Measured size: 4,537,245 bytes. The single HTML contains 129 screenshots,
+including before/after interaction comparisons and labelled iPad crops,
+and ten actual native animation clips. At 390 px, Chrome decoded all 129
+images, opened all 54 sections, measured document width 390 px and verified
+image enlargement and embedded native clip playback. Native frames show contained iPad pills, picker morphs
+and the retained revised title through collapse. Physical frame pacing,
+spoken VoiceOver and the other explicitly listed capture gaps remain open.
+Canonical CI on the pushed head is still required; the latest completed CI
+run on `42f5523` had UI failures and is not evidence for this follow-up.

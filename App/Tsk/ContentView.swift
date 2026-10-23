@@ -70,26 +70,55 @@ struct ContentView: View {
                                     .accessibilityLabel("Dismiss attribute picker")
                                     .accessibilityIdentifier("dismiss-row-parameter-outside")
                                     .transition(.identity)
-                                TaskRowPickerLayout(source: editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)) {
-                                    TaskRowParameterPicker(editing: editing, parameter: parameter,
-                                                           projects: TaskProjectSelection.names(in: store.tasks),
-                                                           now: store.currentDate, availableHeight: max(120, geometry.size.height - 32),
-                                                           dismiss: dismissRowParameter)
-                                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
+                                let anchor = editing.parameterAnchor.offsetBy(dx: -origin.x, dy: -origin.y)
+                                if editing.parameterExpanded {
+                                    TaskRowPickerLayout(source: anchor) {
+                                        TaskRowParameterPicker(editing: editing, parameter: parameter,
+                                                               projects: TaskProjectSelection.names(in: store.tasks),
+                                                               now: store.currentDate, availableHeight: max(120, geometry.size.height - 32),
+                                                               dismiss: dismissRowParameter)
+                                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
+                                            .glassEffectID(parameter.id, in: attributeGlassNamespace)
+                                            .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
+                                    }
+                                    .transition(.identity)
+                                } else {
+                                    let source = editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)
+                                    let pill = editing.parameterBounds.offsetBy(dx: -editing.parameterSource.minX, dy: -editing.parameterSource.minY)
+                                    TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
+                                        .frame(width: pill.width, height: pill.height)
+                                        .offset(x: pill.minX, y: pill.minY)
+                                        .frame(width: source.width, height: source.height, alignment: .topLeading)
+                                        .clipped()
+                                        .glassEffect(.regular, in: TaskRowParameterSourceShape(pill: pill))
                                         .glassEffectID(parameter.id, in: attributeGlassNamespace)
                                         .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
+                                        .position(x: source.midX, y: source.midY)
+                                        .allowsHitTesting(false)
+                                        .accessibilityHidden(true)
+                                        .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in
+                                            guard !editing.parameterClosing, editing.parameter == parameter else { return }
+                                            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
+                                        }
+                                        .transition(.identity)
                                 }
-                                .transition(.identity)
                             }
                         }
                     }
                 }
         }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }, glassNamespace: attributeGlassNamespace))
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
     }
 
     private func dismissRowParameter() {
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { store.rowEditing?.parameter = nil }
+        guard let editing = store.rowEditing, editing.parameter != nil, !editing.parameterClosing else { return }
+        editing.parameterClosing = true
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
+            editing.parameterExpanded = false
+        } completion: {
+            editing.parameter = nil
+            editing.parameterClosing = false
+        }
     }
 
     private func closeRow(after: (() -> Void)? = nil) {

@@ -36,17 +36,21 @@ struct UpcomingTaskList: View {
             .refreshable { await store.reload() }
             .task(id: viewport.height) { await Task.yield(); revealEditor(using: proxy) }
             .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy) }
-            .task(id: store.rowEditing?.bounds) { await Task.yield(); revealEditor(using: proxy) }
+            .task(id: editorIsClipped) { await Task.yield(); revealEditor(using: proxy) }
             .onChange(of: selection?.wrappedValue) { _, id in
                 if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.task.id == id }) { proxy.scrollTo(entry.id) }
             }
         }
     }
 
+    private var editorIsClipped: Bool {
+        guard let editing = store.rowEditing, editing.bounds != .zero else { return false }
+        return editing.bounds.minY < viewport.minY - 1 || editing.bounds.maxY > viewport.maxY + 1
+    }
+
     private func revealEditor(using proxy: ScrollViewProxy) {
-        guard !Task.isCancelled, let editing = store.rowEditing, editing.bounds != .zero,
+        guard !Task.isCancelled, editorIsClipped, let editing = store.rowEditing,
               let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == editing.rowID }) else { return }
-        if editing.bounds.minY >= viewport.minY && editing.bounds.maxY <= viewport.maxY { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
     }
 
