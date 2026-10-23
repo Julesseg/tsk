@@ -32,7 +32,8 @@ import XCTest
         XCTAssertTrue(project.waitForExistence(timeout: 5))
         replaceTaskText(project, with: "Release.Next", app: app)
         capture("Project glass picker", app)
-        app.buttons["close-row-parameter"].tap()
+        tapTaskControlAtCenter(app.buttons["close-row-parameter"], app: app, requiresVisibleKeyboard: true)
+        XCTAssertTrue(app.textFields["row-project-input"].waitForNonExistence(timeout: 5))
         openTaskRowParameter("scheduled", app: app)
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
         capture("Direct Scheduled calendar", app)
@@ -40,7 +41,7 @@ import XCTest
         XCTAssertTrue(title.exists)
         XCTAssertFalse(app.datePickers["scheduled-picker"].exists)
         openTaskRowParameter("scheduled", app: app)
-        app.datePickers["scheduled-picker"].buttons["Sunday 18 October"].tap()
+        app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
         app.buttons["close-row-parameter"].tap()
         XCTAssertTrue(title.exists)
         XCTAssertFalse(app.datePickers["scheduled-picker"].exists)
@@ -173,7 +174,8 @@ import XCTest
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         let information = app.buttons["task-row-information"]
-        XCTAssertTrue(information.isHittable)
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in information.isHittable && information.frame.maxY <= app.tabBars.firstMatch.frame.minY }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 5), .completed)
         XCTAssertLessThanOrEqual(information.frame.maxY, app.tabBars.firstMatch.frame.minY)
         capture("Lower-list row expanded within available height", app)
         title.tap()
@@ -185,6 +187,7 @@ import XCTest
 
     private func launch(largeText: Bool = false, crowded: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"

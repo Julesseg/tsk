@@ -153,3 +153,26 @@ could open. No passing result is claimed for that attempt.
 
 Both owned simulators are shut down. The refreshed report is pending final
 captures; the report above is historical and does not show the new pills.
+
+### Canonical refinement CI follow-up
+
+Run `39953658735` on `602a5cf` built both app targets, but both UI lanes
+failed. CI iPad screenshots confirm that `.clipped()` alone still allows
+pill foreground and glass to escape the sidebar. The follow-up composites
+that scroll view before clipping; its native result is pending the next run.
+The lower-row iPad journey also exposed an information control under the tab
+bar. Row bounds are now measured after final sizing, and reveal reacts to
+position changes as well as height changes. The existing visibility assertion
+now waits for the bounded reveal to finish without weakening its geometry gate.
+
+CI also exposed locale-dependent calendar queries, full-width attribute swipes
+that overshot at large text sizes, and a project Done tap during keyboard
+relayout. The affected tests pin English US calendar labels, use bounded drags,
+and use existing stable-keyboard control admission before Done. Other failing
+Share, Spotlight, widget and annotation journeys were left unchanged. The next
+canonical run must establish both the fixes and their visual outcome.
+
+Swift parsing, all 14 UI-selection tests and diff whitespace checks pass for this follow-up. No new local
+simulator run was attempted while disk space remained exhausted. The extracted
+CI screenshots and native recordings remain under
+`/tmp/tsk-61-refinement/ci-ipad-all` and `ci-iphone-all`.

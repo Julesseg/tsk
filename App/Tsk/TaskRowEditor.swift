@@ -62,6 +62,7 @@ struct TaskRowEditor: View {
                 }.padding(4)
             }
             .scrollIndicators(.hidden)
+            .compositingGroup()
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
