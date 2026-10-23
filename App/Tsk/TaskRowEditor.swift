@@ -9,9 +9,9 @@ struct TaskRowEditor: View {
     let information: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
-    @Environment(\.taskRowActions) private var rowActions
     @FocusState private var titleFocused: Bool
     @State private var measuredContentHeight: CGFloat = 0
+    @State private var parameterViewport = CGRect.zero
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -52,18 +52,21 @@ struct TaskRowEditor: View {
                     .accessibilityIdentifier("collapse-task-row")
             }
             ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(TaskRowParameter.allCases) { parameter in
-                        TaskRowParameterPill(editing: editing, parameter: parameter,
-                                             namespace: rowActions.glassNamespace ?? namespace, rowNamespace: namespace) {
-                            titleFocused = false
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(TaskRowParameter.allCases) { parameter in
+                            TaskRowParameterPill(editing: editing, parameter: parameter, viewport: parameterViewport,
+                                                 namespace: namespace, rowNamespace: namespace) {
+                                titleFocused = false
+                            }
                         }
-                    }
-                }.padding(4)
+                    }.padding(4)
+                }
+                .opacity(editing.parameter != nil ? 0 : 1)
             }
             .scrollIndicators(.hidden)
-            .compositingGroup()
             .clipped()
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { parameterViewport = $0 }
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
             TaskAvailabilityView(task: editing.draft.original, store: store)
@@ -91,6 +94,7 @@ struct TaskRowEditor: View {
 private struct TaskRowParameterPill: View {
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
+    let viewport: CGRect
     let namespace: Namespace.ID
     let rowNamespace: Namespace.ID
     let unfocus: () -> Void
@@ -101,20 +105,14 @@ private struct TaskRowParameterPill: View {
         let value = parameter.value(in: editing.draft.taskDraft)
         Button {
             unfocus()
-            editing.parameterSource = bounds
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameter = parameter }
+            updateSource()
+            editing.parameterAnchor = editing.parameterSource
+            editing.parameterExpanded = false
+            editing.parameterClosing = false
+            editing.parameter = parameter
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: parameter.symbol)
-                if let value {
-                    Text(value).lineLimit(1)
-                        .modifier(TaskRowMorph(id: parameter.rawValue, namespace: parameter == .project && !editing.draft.original.project.isEmpty || parameter == .deadline && editing.draft.original.deadline != nil ? rowNamespace : nil))
-                }
-            }
-            .font(.subheadline)
-            .padding(.horizontal, 14)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Capsule())
+            TaskRowParameterLabel(parameter: parameter, value: value,
+                                  namespace: parameter == .project && !editing.draft.original.project.isEmpty || parameter == .deadline && editing.draft.original.deadline != nil ? rowNamespace : nil)
         }
         .buttonStyle(.plain)
         .glassEffect(editing.parameter != nil ? .identity : .regular.interactive(), in: Capsule())
@@ -124,7 +122,20 @@ private struct TaskRowParameterPill: View {
         .accessibilityLabel(parameter.title)
         .accessibilityValue(value ?? "Not set")
         .accessibilityIdentifier("row-" + parameter.identifier)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds = $0 }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+            bounds = $0
+            if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
+        }
+        .onChange(of: viewport) { _, _ in
+            if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
+        }
+    }
+
+    private func updateSource() {
+        let visible = bounds.intersection(viewport)
+        guard !visible.isEmpty && !visible.isNull else { return }
+        editing.parameterBounds = bounds
+        editing.parameterSource = visible
     }
 }
 
@@ -235,5 +246,33 @@ struct TaskRowPickerLayout: Layout {
         let preferredY = below + height <= bounds.maxY - 16 ? below : source.minY - height - 8
         let y = min(max(bounds.minY + 16, preferredY), bounds.maxY - height - 16)
         picker.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: width, height: height))
+    }
+}
+
+struct TaskRowParameterLabel: View {
+    let parameter: TaskRowParameter
+    let value: String?
+    var namespace: Namespace.ID? = nil
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: parameter.symbol)
+            if let value {
+                Text(value).lineLimit(1)
+                    .modifier(TaskRowMorph(id: parameter.rawValue, namespace: namespace))
+            }
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 14)
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Capsule())
+    }
+}
+
+struct TaskRowParameterSourceShape: Shape {
+    let pill: CGRect
+
+    func path(in rect: CGRect) -> Path {
+        Capsule().path(in: pill).intersection(Path(rect))
     }
 }

@@ -29,7 +29,7 @@ struct TaskListView: View {
                         .refreshable { await store.reload(); await calendar.refresh() }
                         .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                         .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: store.rowEditing?.bounds) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: editorIsClipped(in: geometry.frame(in: .global), keyboardInset: keyboardInset)) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                         .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             } else if let error = store.error, store.visibleTasks.isEmpty {
@@ -53,7 +53,7 @@ struct TaskListView: View {
                     .refreshable { await store.reload() }
                     .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                     .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                    .task(id: store.rowEditing?.bounds) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    .task(id: editorIsClipped(in: geometry.frame(in: .global), keyboardInset: keyboardInset)) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             }
@@ -78,9 +78,13 @@ struct TaskListView: View {
         return max(0, bounds.maxY - keyboardFrame.minY)
     }
 
+    private func editorIsClipped(in viewport: CGRect, keyboardInset: CGFloat) -> Bool {
+        guard let editing = store.rowEditing, editing.bounds != .zero else { return false }
+        return editing.bounds.minY < viewport.minY - 1 || editing.bounds.maxY > viewport.maxY - keyboardInset + 1
+    }
+
     private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat) {
-        guard !Task.isCancelled, let editing = store.rowEditing, editing.bounds != .zero else { return }
-        if editing.bounds.minY >= viewport.minY && editing.bounds.maxY <= viewport.maxY - keyboardInset { return }
+        guard !Task.isCancelled, editorIsClipped(in: viewport, keyboardInset: keyboardInset), let editing = store.rowEditing else { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
             proxy.scrollTo(editing.draft.original.id, anchor: .top)
         }

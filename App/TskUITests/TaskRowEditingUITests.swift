@@ -32,19 +32,21 @@ import XCTest
         XCTAssertTrue(project.waitForExistence(timeout: 5))
         replaceTaskText(project, with: "Release.Next", app: app)
         capture("Project glass picker", app)
-        tapTaskControlAtCenter(app.buttons["close-row-parameter"], app: app, requiresVisibleKeyboard: true)
+        let keyboard = app.keyboards.firstMatch
+        tapTaskControlAtCenter(app.buttons["close-row-parameter"], app: app,
+                               requiresVisibleKeyboard: keyboard.exists && !keyboard.frame.isEmpty)
         XCTAssertTrue(app.textFields["row-project-input"].waitForNonExistence(timeout: 5))
         openTaskRowParameter("scheduled", app: app)
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
         capture("Direct Scheduled calendar", app)
-        app.descendants(matching: .any)["dismiss-row-parameter-outside"].firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.1)).tap()
+        try tapOutsideParameter(app)
         XCTAssertTrue(title.exists)
-        XCTAssertFalse(app.datePickers["scheduled-picker"].exists)
+        XCTAssertTrue(app.datePickers["scheduled-picker"].waitForNonExistence(timeout: 5))
         openTaskRowParameter("scheduled", app: app)
         app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
         app.buttons["close-row-parameter"].tap()
         XCTAssertTrue(title.exists)
-        XCTAssertFalse(app.datePickers["scheduled-picker"].exists)
+        XCTAssertTrue(app.datePickers["scheduled-picker"].waitForNonExistence(timeout: 5))
         replaceTaskText(title, with: " ", app: app)
         try tapOutside(app)
         XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
@@ -215,6 +217,25 @@ import XCTest
             (element, element.frame.width * element.frame.height)
         }
         try XCTUnwrap(targets.max { $0.1 < $1.1 }).0.tap()
+    }
+
+    private func tapOutsideParameter(_ app: XCUIApplication) throws {
+        let backdrop = app.descendants(matching: .any)["dismiss-row-parameter-outside"].firstMatch
+        let frame = backdrop.frame.intersection(app.frame)
+        let top = max(frame.minY, app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? frame.minY)
+        var bottom = min(frame.maxY, app.tabBars.firstMatch.frame.minY)
+        if app.keyboards.firstMatch.exists { bottom = min(bottom, app.keyboards.firstMatch.frame.minY) }
+        let visible = CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
+        let picker = app.scrollViews["row-parameter-picker"].frame.intersection(visible)
+        let regions = [
+            CGRect(x: visible.minX, y: visible.minY, width: visible.width, height: max(0, picker.minY - visible.minY)),
+            CGRect(x: visible.minX, y: picker.maxY, width: visible.width, height: max(0, visible.maxY - picker.maxY)),
+            CGRect(x: visible.minX, y: visible.minY, width: max(0, picker.minX - visible.minX), height: visible.height),
+            CGRect(x: picker.maxX, y: visible.minY, width: max(0, visible.maxX - picker.maxX), height: visible.height)
+        ].filter { !$0.isEmpty && !$0.isNull }
+        let target = try XCTUnwrap(regions.max { $0.width * $0.height < $1.width * $1.height })
+        backdrop.coordinate(withNormalizedOffset: CGVector(dx: (target.midX - frame.minX) / frame.width,
+                                                          dy: (target.midY - frame.minY) / frame.height)).tap()
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {
