@@ -36,7 +36,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         scheduled.buttons["DatePicker.NextMonth"].tap()
         scheduled.buttons.matching(NSPredicate(format: "label MATCHES %@", "[A-Za-z]+, [A-Za-z]+ 1")).firstMatch.tap()
         app.buttons["close-row-parameter"].tap()
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(description(app).waitForNonExistence(timeout: 10))
         app.tabBars.buttons["Upcoming"].tap()
         let upcomingRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@", "upcoming-planned-", "Keyboard task")).firstMatch

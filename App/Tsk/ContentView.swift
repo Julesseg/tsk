@@ -71,18 +71,22 @@ struct ContentView: View {
                                     .accessibilityIdentifier("dismiss-row-parameter-outside")
                                     .transition(.identity)
                                 let anchor = editing.parameterAnchor.offsetBy(dx: -origin.x, dy: -origin.y)
-                                if editing.parameterExpanded {
-                                    TaskRowPickerLayout(source: anchor) {
-                                        TaskRowParameterPicker(editing: editing, parameter: parameter,
-                                                               projects: TaskProjectSelection.names(in: store.tasks),
-                                                               now: store.currentDate, availableHeight: max(120, geometry.size.height - 32),
-                                                               dismiss: dismissRowParameter)
-                                            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
-                                            .glassEffectID(parameter.id, in: attributeGlassNamespace)
-                                            .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-                                    }
-                                    .transition(.identity)
-                                } else {
+                                TaskRowPickerLayout(source: anchor) {
+                                    TaskRowParameterPicker(editing: editing, parameter: parameter,
+                                                           now: store.currentDate, availableHeight: max(120, geometry.size.height - 32),
+                                                           ready: {
+                                                               guard editing.parameter == parameter, !editing.parameterExpanded, !editing.parameterClosing else { return }
+                                                               withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
+                                                           }, dismiss: dismissRowParameter)
+                                        .opacity(editing.parameterExpanded ? 1 : 0)
+                                        .glassEffect(editing.parameterExpanded ? .regular : .identity, in: RoundedRectangle(cornerRadius: 24))
+                                        .glassEffectID(editing.parameterExpanded ? parameter.id : nil, in: attributeGlassNamespace)
+                                        .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
+                                        .allowsHitTesting(editing.parameterExpanded)
+                                        .accessibilityHidden(!editing.parameterExpanded)
+                                }
+                                .transition(.identity)
+                                if !editing.parameterExpanded {
                                     let source = editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)
                                     let pill = editing.parameterBounds.offsetBy(dx: -editing.parameterSource.minX, dy: -editing.parameterSource.minY)
                                     TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
@@ -96,10 +100,6 @@ struct ContentView: View {
                                         .position(x: source.midX, y: source.midY)
                                         .allowsHitTesting(false)
                                         .accessibilityHidden(true)
-                                        .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in
-                                            guard !editing.parameterClosing, editing.parameter == parameter else { return }
-                                            withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
-                                        }
                                         .transition(.identity)
                                 }
                             }
@@ -137,7 +137,7 @@ struct ContentView: View {
                 editing.savedTask = saved
                 withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { editing.isExpanded = false }
                 if !reduceMotion { try? await Task.sleep(for: .milliseconds(350)) }
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) { store.rowEditing = nil }
+                store.rowEditing = nil
                 after?()
             } catch { editing.error = error.localizedDescription; editing.isSaving = false }
         }
@@ -539,7 +539,7 @@ struct ContentView: View {
         #endif
         return TaskWorkspaceActions(
             capture: capture,
-            edit: selectedTask.flatMap { task in task.canEdit ? { withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { store.expandRow(task) } } : nil },
+            edit: selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {

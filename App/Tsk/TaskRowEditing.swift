@@ -17,7 +17,7 @@ final class TaskRowEditing {
     var parameterBounds = CGRect.zero
     var savedTask: TaskRecord?
     var error: String?
-    var isExpanded = true
+    var isExpanded = false
     var isSaving = false
     var bounds = CGRect.zero
 

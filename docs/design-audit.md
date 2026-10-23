@@ -86,8 +86,11 @@ The editor expands the row inside the current list, replacing the native sheet
 and separate page. Neighbouring rows move aside and the surrounding list dims.
 Tapping outside collapses the row.
 
-Morphing means that already-visible elements move to their expanded positions,
-newly revealed controls fade in, and the component container changes size to fit
+Following user review, the title and checkbox stay fixed while the lower section
+expands. Compact project and deadline metadata fade into the attribute controls;
+project and priority use native menu pickers. Glass attribute containers morph
+from their source pills.
+Newly revealed controls fade in, and the component container changes size to fit
 the layout. Reverse the transition when collapsing. See ADR-0004.
 
 Hide raw technical information entirely from the app rather than moving it to a
