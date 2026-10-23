@@ -296,3 +296,38 @@ measured a 390 px document width and verified image enlargement and native
 video playback. Full captures and labelled iPad crops remain paired; differences
 in initial picker values and missing exact baselines are disclosed. Owned
 simulators were shut down and the report's Chrome tab was closed.
+
+### Canonical CI: outside-tap admission
+
+Run `40021090247` on `78abe51` passed all seven iPad row-editor methods and six
+of seven on iPhone. The iPhone durable-edit method failed its blank-title
+validation assertion. Its native failure recording and hierarchy show a test
+input error: the outside-tap helper sampled keyboard top 722 pt, then tapped
+`(193.0, 454.2)` after the keyboard moved to top 418 pt. That tap typed `T` into
+the previously blank title, so it never requested a save. The helper now uses
+the existing control admission policy and an element-relative centre tap. With
+a visible keyboard it requires matching keyboard/control geometry in successive
+samples and rejects overlap before delivering input. Validation assertions are
+retained.
+
+The same CI run also failed unrelated iPhone Share, Spotlight, independent
+keyboard and widget journeys. iPad's annotation journey exceeded the 20-second
+admission deadline while accessibility reads took 30.9 seconds despite returning
+valid visible geometry. Those tests and their timeouts were left intact. Core,
+persistent replica and signed IPA checks passed. New-head canonical CI remains
+required; the visual report retains the unchanged App source at `78abe51`.
+
+The focused local follow-up also reproduced a missed native New Project menu
+selection with the menu still present. Native options now use the existing
+picker helper, which verifies the expected menu choices and stable ancestor
+geometry before a real centre tap. A disk-exhausted iPad attempt crashed Xcode
+while writing its result bundle and is not counted as passing evidence.
+
+The signed test build passes. The complete focused iPhone journey passes in
+`phone-outside-admission.xcresult`, including two matching keyboard/backdrop
+samples before blank-title validation, save, relaunch and independent dates.
+After adopting native-picker admission, iPad reached the project editor and
+blank-title validation, but repeated local runs exhausted disk space and Xcode
+could not finish their result bundles, even without duplicate video recording.
+No full passing result is claimed for those iPad follow-ups. Local retries
+stopped; canonical CI must verify the final harness. App UI code is unchanged.

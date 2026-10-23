@@ -112,7 +112,7 @@ extension XCTestCase {
             XCTFail("No visible outside-tap region for the task row")
             return
         }
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: target.1.midX - app.frame.minX, dy: target.1.midY - app.frame.minY)).tap()
+        tapTaskControlAtCenter(target.0, app: app,
+                               requiresVisibleKeyboard: keyboard.exists && keyboard.frame.height > 0)
     }
 }
