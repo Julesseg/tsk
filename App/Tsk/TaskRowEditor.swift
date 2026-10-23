@@ -53,8 +53,8 @@ struct TaskRowEditor: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             ScrollView(.horizontal) {
-                GlassEffectContainer(spacing: 8) {
-                    HStack(spacing: 8) {
+                GlassEffectContainer(spacing: 6) {
+                    HStack(spacing: 6) {
                         ForEach(TaskRowParameter.allCases) { parameter in
                             TaskRowParameterPill(editing: editing, parameter: parameter, viewport: parameterViewport,
                                                  projects: store.availableProjects,
@@ -128,28 +128,35 @@ private struct TaskRowParameterPill: View {
                         }
                     }
                 } label: {
-                    TaskRowParameterLabel(parameter: parameter, value: value)
+                    label
                 }
                 .simultaneousGesture(TapGesture().onEnded { unfocus() })
             } else {
-                Button(action: openPicker) { TaskRowParameterLabel(parameter: parameter, value: value) }
+                Button(action: openPicker) { label }
             }
         }
         .buttonStyle(.plain)
-        .glassEffect(editing.parameter == parameter ? .identity : .regular.interactive(), in: Capsule())
-        .glassEffectID(editing.parameter == parameter ? nil : parameter.id, in: namespace)
-        .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-        .opacity(editing.parameter == parameter ? 0 : 1)
         .accessibilityLabel(parameter.title)
         .accessibilityValue(value ?? "Not set")
         .accessibilityIdentifier("row-" + parameter.identifier)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-            bounds = $0
-            if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
-        }
         .onChange(of: viewport) { _, _ in
             if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
         }
+    }
+
+    private var label: some View {
+        TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
+            .glassEffect(editing.parameter == parameter ? .identity : .regular.interactive(), in: Capsule())
+            .glassEffectID(editing.parameter == parameter ? nil : parameter.id, in: namespace)
+            .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
+            .opacity(editing.parameter == parameter ? 0 : 1)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                bounds = $0
+                if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
+            }
+            .padding(.vertical, 6)
+            .frame(minWidth: 44)
+            .contentShape(Rectangle())
     }
 
     private func openPicker() {
@@ -248,23 +255,49 @@ struct TaskRowParameterPicker: View {
     }
 }
 
-struct TaskRowPickerLayout: Layout {
-    let source: CGRect
+struct TaskRowPickerSurface: View {
+    @Bindable var editing: TaskRowEditing
+    let parameter: TaskRowParameter
+    let origin: CGPoint
+    let size: CGSize
+    let now: Date
+    let dismiss: () -> Void
+    @State private var contentHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        proposal.replacingUnspecifiedDimensions()
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard let picker = subviews.first else { return }
-        let width = min(360, bounds.width - 32)
-        let size = picker.sizeThatFits(ProposedViewSize(width: width, height: nil))
-        let height = min(size.height, bounds.height - 32)
-        let x = min(max(bounds.minX + 16, source.midX - width / 2), bounds.maxX - width - 16)
-        let below = source.maxY + 8
-        let preferredY = below + height <= bounds.maxY - 16 ? below : source.minY - height - 8
-        let y = min(max(bounds.minY + 16, preferredY), bounds.maxY - height - 16)
-        picker.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: width, height: height))
+    var body: some View {
+        let source = editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)
+        let anchor = editing.parameterAnchor.offsetBy(dx: -origin.x, dy: -origin.y)
+        let pill = editing.parameterBounds.offsetBy(dx: -editing.parameterSource.minX, dy: -editing.parameterSource.minY)
+        let width = min(360, size.width - 32)
+        let height = min(contentHeight, max(120, size.height - 32))
+        let x = min(max(16, anchor.midX - width / 2), size.width - width - 16)
+        let below = anchor.maxY + 8
+        let preferredY = below + height <= size.height - 16 ? below : anchor.minY - height - 8
+        let y = min(max(16, preferredY), size.height - height - 16)
+        let expanded = editing.parameterExpanded
+        ZStack(alignment: .topLeading) {
+            TaskRowParameterPicker(editing: editing, parameter: parameter,
+                                   now: now, availableHeight: max(120, size.height - 32), ready: {
+                guard editing.parameter == parameter, !expanded, !editing.parameterClosing else { return }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
+            }, dismiss: dismiss)
+                .frame(width: width)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                .opacity(expanded ? 1 : 0)
+                .accessibilityHidden(!expanded)
+            TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
+                .frame(width: pill.width, height: pill.height)
+                .offset(x: pill.minX, y: pill.minY)
+                .opacity(expanded ? 0 : 1)
+                .accessibilityHidden(true)
+        }
+        .frame(width: expanded ? width : source.width, height: expanded ? height : source.height, alignment: .topLeading)
+        .clipped()
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: expanded ? 24 : 16))
+        .position(x: expanded ? x + width / 2 : source.midX,
+                  y: expanded ? y + height / 2 : source.midY)
+        .allowsHitTesting(expanded)
     }
 }
 
@@ -273,23 +306,15 @@ struct TaskRowParameterLabel: View {
     let value: String?
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Image(systemName: parameter.symbol)
             if let value {
                 Text(value).lineLimit(1)
             }
         }
-        .font(.subheadline)
-        .padding(.horizontal, 14)
-        .frame(minWidth: 44, minHeight: 44)
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .frame(minWidth: 32, minHeight: 32)
         .contentShape(Capsule())
-    }
-}
-
-struct TaskRowParameterSourceShape: Shape {
-    let pill: CGRect
-
-    func path(in rect: CGRect) -> Path {
-        Capsule().path(in: pill).intersection(Path(rect))
     }
 }

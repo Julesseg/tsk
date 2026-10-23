@@ -331,3 +331,55 @@ blank-title validation, but repeated local runs exhausted disk space and Xcode
 could not finish their result bundles, even without duplicate video recording.
 No full passing result is claimed for those iPad follow-ups. Local retries
 stopped; canonical CI must verify the final harness. App UI code is unchanged.
+
+### Compact alignment and continuous date surface
+
+The compact checkbox had been aligned with a 44-point title field, leaving it
+above the center of rows with project/deadline metadata. The compact title and
+metadata now form one measured header; the checkbox centers beside that header,
+and the metadata keeps its layout space while fading during bottom expansion.
+The title's extra minimum height applies only to rows without metadata.
+
+The previous date transition exchanged two separate glass effects while fading
+the calendar in its final layout. The replacement keeps one glass surface and
+animates its frame, position and corner radius between the visible pill and the
+measured picker. The expanded placement is anchored at opening so typing a new
+project cannot move the container; the return follows the current pill bounds.
+Reduce Motion applies the final geometry directly. Scheduled, Deadline and
+Waiting keep their existing native graphical pickers and independent values.
+
+Attribute pills now use caption text, 10-point horizontal padding and a
+32-point minimum visible height. Their labels retain a minimum 44-by-44-point
+touch area, including icon-only values. Native project and priority menus remain
+system menus.
+
+The signed simulator test build passes. The focused iPhone run in
+`/tmp/tsk-61-small-controls/phone-final.xcresult` passes
+`testExpansionKeepsHeaderInPlace` (including compact header centering) and
+`testCompactControlsAndDateSurface` (all three date controls, opening and
+closing). The initial icon-only touch-area failure was reproduced before the
+44-point minimum hit area and passes with that fix. A native per-test recording
+of the date transition shows intermediate surface sizes rather than an opacity
+handoff; the compact header screenshots also show the corrected visual center.
+
+The broader iPhone edit/save journey reaches native project/priority selection,
+new-project entry, direct date selection, and blank-title validation. Its final
+save/relaunch assertion fails with the visible error `Local task storage failed:
+Setting journal_mode=WAL`. During that run the Mac also rejected temporary-file
+creation with `no space left on device`; the native recording is zero bytes.
+This is not claimed as a passing persistence journey or usable motion evidence.
+Storage code and assertions are unchanged. The valid earlier date-transition
+recording is in `phone-evidence/AE039B4D-9CEB-49C8-9B5B-E008D5F71F27.mp4` under
+the same temporary directory. Canonical CI remains required for the full suite.
+
+Both focused methods also pass on iPad in
+`/tmp/tsk-61-small-controls/pad-final.xcresult`. The valid final-source native
+recording `pad-final-motion.mp4` shows opening/closing the three date controls;
+the recorded display is rotated relative to the app after orientation setup,
+so inspection uses a counterclockwise rotation without synthesizing frames.
+The initial iPhone transition recording predates the final compact spacing,
+minimum hit width and fixed expanded project anchor; final-source date and
+header functional checks pass on both families. Full-suite, dark/large-text,
+physical-device frame pacing and spoken accessibility checks were not repeated
+for this refinement. All simulators booted for it were shut down and Simulator
+was quit. No new HTML report was generated, as requested.

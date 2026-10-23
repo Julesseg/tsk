@@ -44,7 +44,6 @@ struct ContentView: View {
     @State private var sidebarError: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var projectPath = NavigationPath()
-    @Namespace private var attributeGlassNamespace
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
@@ -70,38 +69,10 @@ struct ContentView: View {
                                     .accessibilityLabel("Dismiss attribute picker")
                                     .accessibilityIdentifier("dismiss-row-parameter-outside")
                                     .transition(.identity)
-                                let anchor = editing.parameterAnchor.offsetBy(dx: -origin.x, dy: -origin.y)
-                                TaskRowPickerLayout(source: anchor) {
-                                    TaskRowParameterPicker(editing: editing, parameter: parameter,
-                                                           now: store.currentDate, availableHeight: max(120, geometry.size.height - 32),
-                                                           ready: {
-                                                               guard editing.parameter == parameter, !editing.parameterExpanded, !editing.parameterClosing else { return }
-                                                               withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
-                                                           }, dismiss: dismissRowParameter)
-                                        .opacity(editing.parameterExpanded ? 1 : 0)
-                                        .glassEffect(editing.parameterExpanded ? .regular : .identity, in: RoundedRectangle(cornerRadius: 24))
-                                        .glassEffectID(editing.parameterExpanded ? parameter.id : nil, in: attributeGlassNamespace)
-                                        .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-                                        .allowsHitTesting(editing.parameterExpanded)
-                                        .accessibilityHidden(!editing.parameterExpanded)
-                                }
-                                .transition(.identity)
-                                if !editing.parameterExpanded {
-                                    let source = editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)
-                                    let pill = editing.parameterBounds.offsetBy(dx: -editing.parameterSource.minX, dy: -editing.parameterSource.minY)
-                                    TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
-                                        .frame(width: pill.width, height: pill.height)
-                                        .offset(x: pill.minX, y: pill.minY)
-                                        .frame(width: source.width, height: source.height, alignment: .topLeading)
-                                        .clipped()
-                                        .glassEffect(.regular, in: TaskRowParameterSourceShape(pill: pill))
-                                        .glassEffectID(parameter.id, in: attributeGlassNamespace)
-                                        .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-                                        .position(x: source.midX, y: source.midY)
-                                        .allowsHitTesting(false)
-                                        .accessibilityHidden(true)
-                                        .transition(.identity)
-                                }
+                                TaskRowPickerSurface(editing: editing, parameter: parameter, origin: origin,
+                                                     size: geometry.size, now: store.currentDate,
+                                                     dismiss: dismissRowParameter)
+                                    .transition(.identity)
                             }
                         }
                     }
