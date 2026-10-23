@@ -55,7 +55,7 @@ struct ReminderImportView: View {
                                     if item.recurrence != nil { Text("Recurring template · weekly at 09:00 GMT").accessibilityIdentifier("reminders-preview-template") }
                                     if let draft = item.draft {
                                         Text("Project: \(draft.attributes["project"] ?? "No project")")
-                                        if let planned = draft.plannedDate { Text("Planned day: \(planned.formatted(date: .abbreviated, time: .shortened))") }
+                                        if let planned = draft.plannedDate { Text("Scheduled: \(planned.formatted(date: .abbreviated, time: .shortened))") }
                                         if let deadline = draft.deadline { Text("Deadline: \(deadline.formatted(date: .abbreviated, time: .shortened))") }
                                         if let priority = draft.attributes["priority"] { Text("Priority: \(priority)") }
                                         ForEach(TaskRecord(id: UUID(), attributes: draft.attributes).annotations) { note in Text(note.text).font(.footnote) }

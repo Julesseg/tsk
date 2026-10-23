@@ -9,7 +9,9 @@ final class TaskRowEditing {
     let tasks: [TaskRecord]
     let upcomingDays: [UpcomingDay]
     var draft: TaskRowDraft
-    var parameter: TaskDateParameter?
+    var parameter: TaskRowParameter?
+    var parameterSource = CGRect.zero
+    var savedTask: TaskRecord?
     var error: String?
     var isExpanded = true
     var isSaving = false
@@ -24,28 +26,61 @@ final class TaskRowEditing {
     }
 }
 
-enum TaskDateParameter: String, Identifiable, CaseIterable {
-    case planned = "Planned day", deadline = "Deadline", waiting = "Waiting date"
+enum TaskRowParameter: String, Identifiable, CaseIterable {
+    case project, scheduled, deadline, waiting, priority
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .project: "Project"
+        case .scheduled: "Scheduled"
+        case .deadline: "Deadline"
+        case .waiting: "Waiting date"
+        case .priority: "Priority"
+        }
+    }
     var attribute: String {
-        switch self { case .planned: "scheduled"; case .deadline: "due"; case .waiting: "wait" }
+        switch self { case .deadline: "due"; case .waiting: "wait"; default: rawValue }
     }
     var symbol: String {
-        switch self { case .planned: "calendar"; case .deadline: "flag"; case .waiting: "pause.circle" }
+        switch self {
+        case .project: "folder"
+        case .scheduled: "calendar"
+        case .deadline: "flag"
+        case .waiting: "pause.circle"
+        case .priority: "exclamationmark"
+        }
     }
     func date(in draft: TaskDraft) -> Date? {
-        switch self { case .planned: draft.plannedDate; case .deadline: draft.deadline; case .waiting: draft.waitUntil }
+        switch self {
+        case .scheduled: draft.plannedDate
+        case .deadline: draft.deadline
+        case .waiting: draft.waitUntil
+        default: nil
+        }
     }
     func setDate(_ date: Date, in draft: inout TaskRowDraft) {
         switch self {
-        case .planned: draft.choosePlannedDay(date)
+        case .scheduled: draft.choosePlannedDay(date)
         case .deadline: draft.taskDraft.deadline = date
         case .waiting: draft.taskDraft.waitUntil = date
+        default: break
         }
     }
-    var identifier: String {
-        switch self { case .planned: "planned-day"; case .deadline: "deadline"; case .waiting: "waiting-date" }
+    func value(in draft: TaskDraft) -> String? {
+        if let date = date(in: draft) {
+            return date.formatted(date: .abbreviated, time: self == .scheduled ? .omitted : .shortened)
+        }
+        guard let raw = draft.attributes[attribute], !raw.isEmpty else { return nil }
+        switch self {
+        case .project: return raw
+        case .priority: return Self.priorityTitle(raw)
+        default: return "Unrecognized date"
+        }
     }
+    static func priorityTitle(_ value: String) -> String {
+        ["": "None", "L": "Low", "M": "Medium", "H": "High"][value] ?? value
+    }
+    var identifier: String { self == .waiting ? "waiting-date" : rawValue }
 }
 
 extension UpcomingTaskEntry {

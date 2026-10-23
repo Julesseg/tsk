@@ -6,22 +6,32 @@ title, project and deadline use matched geometry, the row changes height and
 new controls fade in. Other rows dim and cannot receive the closing tap.
 Reduce Motion removes the explicit morph, collapse and focus-scroll animations.
 
-The expanded row has a title field, horizontal planned-day/deadline/waiting-date
-parameters, full availability reasons, a collapse control and a route to
+The expanded row has a title field, a horizontal strip of rounded Liquid Glass
+attribute pills, full availability reasons, a collapse control and a route to
 supporting task information. Existing tasks do not focus a field on expansion.
 The editor measures its content, grows to the available list height, and then
 scrolls internally. Its available height follows keyboard/layout changes.
 The parameter picker also scrolls when its content exceeds available height.
 
-Today, Tomorrow, Choose day and Remove planned day need no enable switch.
+Project is first, followed by Scheduled, deadline, waiting date and priority.
+Pills show an icon and the current value, or only the icon when unset. Their
+accessible labels retain the attribute name. Project accepts existing or new
+names; priority offers None, Low, Medium and High. A selected pill shares a
+native glass identity with its anchored picker. Other pill surfaces disappear
+while it is open to prevent their glass from merging into the panel.
+
+The user review on 2026-10-23 supersedes the issue's intermediate
+Today/Tomorrow/Choose day menu: Scheduled opens the calendar directly, without
+an enable switch. Deadline and waiting date retain independent date/time controls.
 Opening a parameter alone does not change a stored date. Choosing a value
-changes the draft; an outside tap dismisses the picker only. The next outside
+changes the draft; Done can confirm the displayed date for an unset attribute.
+An outside tap dismisses the picker only. The next outside
 tap, collapse control, Command-Return or Escape validates, saves and collapses.
 Blank descriptions and persistence failures keep the draft and actionable error.
 No Cancel, completion Undo or draft restoration is added.
 
-`TaskRowDraft` in Core owns title validation, planned-day calendar boundaries
-and the patch restricted to description, scheduled, due and wait. Hidden fields
+`TaskRowDraft` in Core owns title validation, Scheduled calendar boundaries
+and the patch restricted to description, project, priority, scheduled, due and wait. Hidden fields
 and unrecognized dates remain unchanged unless the user edits that parameter.
 The existing manager preserves ordinary/occurrence restrictions and atomic
 occurrence mutations. Supporting information and its existing editors remain
@@ -34,6 +44,23 @@ Upcoming appearance expands; its other appearance dims. Keyboard expansion
 resolves the same appearance identity as rendering and refuses missing rows.
 No draft is written outside the normal task-save operation.
 
+The editor keeps one persistent scroll subtree across keyboard and size changes.
+Its initial height accommodates the 44-point collapse control and its padding;
+subsequent height comes from measured content, capped by the available viewport.
+The first measurement does not start a second animation alongside row expansion;
+later content-height changes retain their resize animation.
+Position matching avoids stretching title and metadata. Intrinsic row content is
+pinned to the top of the List cell while its height animates; the completion
+circle also uses top alignment when an unadorned task expands. Only clipped editors
+request a scroll, including after a height change. The saved record remains
+visible during the frozen-list handoff, preventing an old-title flash.
+Picker scrim/layout transitions use identity so their outgoing hit area cannot
+intercept the first tap after dismissal; the glass effect owns its morph.
+
+Scheduled is also the label in supporting forms, detail, series transitions,
+Reminders review and App Intents. Storage keys and existing shortcut identities
+remain unchanged. Supporting forms retain their existing organization.
+
 ## Verification
 
 Core tests cover independent planned/deadline/waiting values, hidden fields,
@@ -41,7 +68,7 @@ blank-title rejection, real boundary-level write failure, occurrence/sibling
 scope, recurring-template rejection and chosen-day normalization over Paris DST.
 
 `TaskRowEditingUITests` exercises save/relaunch, invalid draft retention,
-parameter-first outside dismissal, direct planned-day choices, focused date
+parameter-first outside dismissal, the direct Scheduled calendar, focused date
 controls, title/keyboard geometry, occurrence save failure at accessibility
 XXXL, Upcoming anchoring and post-collapse membership. Appearance captures run
 on both device families. The existing iPad native-keyboard journey now edits
@@ -73,7 +100,7 @@ new-task capture, before the inline edit journey began. Its canonical HID
 CI result remains pending; the overall iPad result bundle therefore contains
 five passing row-editing methods and this one failing keyboard method.
 
-## Recorded local results
+## Initial implementation results (before the 2026-10-23 refinement)
 
 After fetching and merging `origin/main` (already current at `d3c14fe`),
 `cd Core && swift test` passed all 167 tests. UI-selection tests passed 14/14;
@@ -88,7 +115,7 @@ Both standards and issue-spec reviews have no remaining findings in the
 canonical fullscreen paths. The window-coordinate limitation above remains
 an explicit acceptance gap.
 
-## UI report
+## Initial UI report (historical)
 
 App source: `e91c88ab05aae391976fef2c687e3286c0bc5507`.
 Signed base source: `d3c14fe3be2d8cef07ce63d75c835a7e9a128ebf`.
@@ -102,3 +129,27 @@ opened all 30 sections, reported a 390-pixel document width, and verified
 image enlargement. Full native captures and recordings remain source evidence
 under `/tmp/tsk-41-evidence`; the report is the single deliverable HTML file.
 Both simulators booted for verification were shut down.
+
+## Refinement verification in progress (2026-10-23)
+
+The Core suite passed all 168 tests, including project/priority persistence and
+removal while preserving independent dates and opaque attributes. The signed
+simulator build succeeds with the explicit horizontal clipping boundary.
+
+Before that final clipping modifier, all five row-editing methods passed on
+iPhone (`/tmp/tsk-61-refinement/phone-final.log`). The preceding build also
+passed the existing durable edit/completion journey. Actual frame inspection
+confirmed that making the first height measurement nonanimated removes the
+large initial whole-row excursion; edited titles stay visible through collapse.
+
+iPad normal light/dark picker and collapse flows passed before clipping, but
+native recordings exposed glass pill foreground escaping the narrow sidebar.
+An explicit clip was added to the horizontal scroll view. Its native visual
+verification and the remaining iPad matrix are pending: Xcode and simulator
+launches repeatedly exhausted this Mac's disk space even after task-owned
+temporary builds and obsolete captures were removed. The final clipping build
+succeeded, but the following simulator launch stalled before the first row
+could open. No passing result is claimed for that attempt.
+
+Both owned simulators are shut down. The refreshed report is pending final
+captures; the report above is historical and does not show the new pills.

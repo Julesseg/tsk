@@ -28,7 +28,7 @@ public struct TaskRowDraft: Equatable, Sendable {
         guard !title.isEmpty else { throw TaskManagementError.emptyDescription }
         var edited = original.attributes
         if !taskDraft.description.matchesBytes(original.description) { edited["description"] = title }
-        for key in ["scheduled", "due", "wait"] { edited[key] = taskDraft.attributes[key] }
+        for key in ["project", "priority", "scheduled", "due", "wait"] { edited[key] = taskDraft.attributes[key] }
         return edited.changes(comparedTo: original.attributes)
     }
 }
