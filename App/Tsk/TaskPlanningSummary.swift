@@ -5,10 +5,10 @@ struct TaskPlanningSummary: View {
     let task: TaskRecord
     var body: some View {
         if let date = task.plannedDate {
-            LabeledContent("Planned day") { Text(date, format: .dateTime.day().month().year()) }
+            LabeledContent("Scheduled") { Text(date, format: .dateTime.day().month().year()) }
                 .accessibilityIdentifier("task-planned-day")
         } else if let raw = task.attributes["scheduled"] {
-            LabeledContent("Planned day", value: "Unrecognized date: \(raw)")
+            LabeledContent("Scheduled", value: "Unrecognized date: \(raw)")
         }
         if let date = task.deadline {
             LabeledContent("Deadline") { Text(date, format: .dateTime.day().month().year().hour().minute()) }

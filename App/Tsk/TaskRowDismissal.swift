@@ -39,6 +39,7 @@ struct TaskRowDismissal: View {
 struct TaskRowActions {
     var close: () -> Void = {}
     var information: (TaskRecord) -> Void = { _ in }
+    var glassNamespace: Namespace.ID?
 }
 
 private struct TaskRowActionsKey: EnvironmentKey {

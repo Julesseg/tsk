@@ -5,7 +5,7 @@ struct UpcomingTaskList: View {
     let store: TaskStore
     var selection: Binding<UUID?>? = nil
     let edit: (TaskRecord) -> Void
-    var viewportHeight: CGFloat = 0
+    var viewport = CGRect.zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -15,7 +15,7 @@ struct UpcomingTaskList: View {
                     Section {
                         ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                             if index == 0 || group.entries[index - 1].role != entry.role {
-                                Text(entry.role == .planned ? "Planned work" : "Deadlines")
+                                Text(entry.role == .planned ? "Scheduled" : "Deadlines")
                                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                                     .accessibilityAddTraits(.isHeader)
                                     .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 2, trailing: 12))
@@ -34,20 +34,20 @@ struct UpcomingTaskList: View {
             }
             .accessibilityIdentifier("upcoming-list")
             .refreshable { await store.reload() }
-            .task(id: viewportHeight) {
-                await Task.yield()
-                if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == store.rowEditing?.rowID }) {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
-                }
-            }
-            .onChange(of: store.rowEditing?.rowID) { _, rowID in
-                if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == rowID }) {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
-                }
-            }
+            .task(id: viewport.height) { await Task.yield(); revealEditor(using: proxy) }
+            .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy) }
+            .task(id: store.rowEditing?.bounds.height) { await Task.yield(); revealEditor(using: proxy) }
             .onChange(of: selection?.wrappedValue) { _, id in
                 if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.task.id == id }) { proxy.scrollTo(entry.id) }
             }
         }
     }
+
+    private func revealEditor(using proxy: ScrollViewProxy) {
+        guard let editing = store.rowEditing, editing.bounds != .zero,
+              let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == editing.rowID }) else { return }
+        if editing.bounds.minY >= viewport.minY && editing.bounds.maxY <= viewport.maxY { return }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
+    }
+
 }

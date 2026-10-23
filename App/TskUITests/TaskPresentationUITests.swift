@@ -32,7 +32,7 @@ import XCTest
             XCTAssertTrue(row.label.contains("Due Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
             XCTAssertFalse(app.buttons["notification-attention"].exists)
-            for hidden in ["Active", "Waiting", "Blocked by", "Deadline", "Generated occurrence", "Planned work"] {
+            for hidden in ["Active", "Waiting", "Blocked by", "Deadline", "Generated occurrence", "Scheduled"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }
             let circle = app.buttons["complete-task-row-" + ordinaryID]
@@ -107,10 +107,10 @@ import XCTest
         let label = planned.firstMatch.label
         XCTAssertTrue(label.contains("Due Tomorrow"))
         XCTAssertTrue(label.contains("Release"))
-        for hidden in ["Deadline", "Active", "Waiting", "Blocked by", "First prerequisite", "Planned work", "Planned day"] {
+        for hidden in ["Deadline", "Active", "Waiting", "Blocked by", "First prerequisite", "Scheduled"] {
             XCTAssertFalse(label.contains(hidden))
         }
-        XCTAssertTrue(app.staticTexts["Planned work"].exists)
+        XCTAssertTrue(app.staticTexts["Scheduled"].exists)
         XCTAssertTrue(app.staticTexts["Deadlines"].exists)
         planned.firstMatch.swipeLeft()
         XCTAssertFalse(app.buttons["Complete"].exists)

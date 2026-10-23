@@ -25,7 +25,7 @@ import Testing
     #expect(try await manager.task(id: task.id) == task)
     draft.taskDraft.description = "  Revised  "
     draft.taskDraft.deadline = nil
-    draft.taskDraft.attributes["project"] = "Accidental hidden edit"
+    draft.taskDraft.attributes["opaque"] = "Accidental hidden edit"
     let saved = try await manager.update(id: task.id, changes: draft.changes())
     #expect(saved.description == "Revised")
     #expect(saved.attributes["due"] == nil)
@@ -83,4 +83,23 @@ private struct RowUnwritableReplica: TaskReplica {
     let task = TaskRecord(id: UUID(), attributes: ["description": "  Imported title  ", "status": "pending", "scheduled": "unknown", "opaque": "retain"])
     let draft = TaskRowDraft(task: task)
     #expect(try draft.changes().isEmpty)
+}
+
+@Test func rowOrganizationEditsPersistWithoutChangingIndependentDatesOrHiddenFields() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let task = try await manager.create(TaskDraft(description: "Release", attributes: ["project": "Old", "priority": "M", "scheduled": "1792231200", "due": "1792238400", "wait": "unknown", "opaque": "retain"]))
+    var draft = TaskRowDraft(task: task)
+    draft.taskDraft.project = "New.Project"
+    draft.taskDraft.priority = "H"
+    let saved = try await manager.update(id: task.id, changes: draft.changes())
+    #expect(saved.project == "New.Project")
+    #expect(saved.priority == "H")
+    #expect(saved.attributes["scheduled"] == "1792231200")
+    #expect(saved.attributes["due"] == "1792238400")
+    #expect(saved.attributes["wait"] == "unknown")
+    #expect(saved.attributes["opaque"] == "retain")
+    draft.taskDraft.project = ""
+    draft.taskDraft.priority = ""
+    #expect(try draft.changes()["project"] == .some(nil))
+    #expect(try draft.changes()["priority"] == .some(nil))
 }

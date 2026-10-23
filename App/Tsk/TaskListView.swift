@@ -28,8 +28,9 @@ struct TaskListView: View {
                     }.accessibilityIdentifier("task-list")
                         .refreshable { await store.reload(); await calendar.refresh() }
                         .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
-                        .onChange(of: store.rowEditing?.rowID) { _, _ in revealEditor(using: proxy) }
-                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy) }
+                        .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: store.rowEditing?.bounds.height) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             } else if let error = store.error, store.visibleTasks.isEmpty {
                 ContentUnavailableView {
@@ -40,7 +41,7 @@ struct TaskListView: View {
             } else if store.visibleTasks.isEmpty {
                 ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(store.customView != nil ? "Edit the filter or choose another view to find tasks." : "Capture a task to get started. Saved tasks stay on this device when you're offline."))
             } else if store.customView == nil && store.query == .upcoming {
-                UpcomingTaskList(store: store, selection: selection, edit: edit, viewportHeight: geometry.size.height - keyboardInset)
+                UpcomingTaskList(store: store, selection: selection, edit: edit, viewport: CGRect(origin: geometry.frame(in: .global).origin, size: CGSize(width: geometry.size.width, height: geometry.size.height - keyboardInset)))
             } else {
                 ScrollViewReader { proxy in
                     List(selection: selection) {
@@ -51,8 +52,9 @@ struct TaskListView: View {
                     .accessibilityIdentifier("task-list")
                     .refreshable { await store.reload() }
                     .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
-                    .onChange(of: store.rowEditing?.rowID) { _, _ in revealEditor(using: proxy) }
-                    .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy) }
+                    .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    .task(id: store.rowEditing?.bounds.height) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             }
         }
@@ -76,8 +78,9 @@ struct TaskListView: View {
         return max(0, bounds.maxY - keyboardFrame.minY)
     }
 
-    private func revealEditor(using proxy: ScrollViewProxy) {
-        guard let editing = store.rowEditing else { return }
+    private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat) {
+        guard let editing = store.rowEditing, editing.bounds != .zero else { return }
+        if editing.bounds.minY >= viewport.minY && editing.bounds.maxY <= viewport.maxY - keyboardInset { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
             proxy.scrollTo(editing.draft.original.id, anchor: .top)
         }
@@ -145,7 +148,7 @@ struct TaskListRow: View {
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
     var body: some View {
-        HStack(alignment: task.project.isEmpty && task.deadline == nil ? .center : .top, spacing: 4) {
+        HStack(alignment: !expanded && task.project.isEmpty && task.deadline == nil ? .center : .top, spacing: 4) {
             if task.canComplete {
                 Button {
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
@@ -168,16 +171,18 @@ struct TaskListRow: View {
                 TaskRowEditor(store: store, editing: editing, namespace: namespace,
                               close: rowActions.close, information: { rowActions.information(task) })
                     .frame(maxWidth: .infinity)
+                    .transition(.identity)
             } else {
                 Button {
                     if task.canEdit {
                         expand()
                     } else { edit(task) }
                 } label: {
-                    TaskListLabel(task: task, store: store, isCompleted: checked, namespace: namespace)
+                    TaskListLabel(task: editing?.savedTask ?? task, store: store, isCompleted: checked, namespace: namespace)
                         .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .transition(.identity)
                 .disabled(phase != nil)
                 .accessibilityIdentifier(identity)
                 .accessibilityHint(task.canEdit ? "Expand to edit title and dates" : "Show task information")
@@ -196,6 +201,7 @@ struct TaskListRow: View {
         .opacity(store.rowEditing != nil && editing == nil ? 0.35 : 1)
         .allowsHitTesting(store.rowEditing == nil || editing != nil)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxHeight: .infinity, alignment: .top)
         .mask {
             VStack(spacing: 0) {
                 LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)
@@ -239,7 +245,7 @@ struct TaskRowMorph: ViewModifier {
     let id: String
     let namespace: Namespace.ID?
     func body(content: Content) -> some View {
-        if let namespace { content.matchedGeometryEffect(id: id, in: namespace) }
+        if let namespace { content.matchedGeometryEffect(id: id, in: namespace, properties: .position) }
         else { content }
     }
 }

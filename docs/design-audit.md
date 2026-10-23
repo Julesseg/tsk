@@ -396,3 +396,15 @@ iPad tabs or task-detail navigation. Keyboard commands and focus must remain
 usable; physical keyboard and live window-resizing acceptance remain separate
 from injected simulator events. These are future acceptance checks, not
 verification already performed by this design interview.
+
+### User review: attribute pills and Scheduled (2026-10-23)
+
+Replace the intermediate Today/Tomorrow/Choose day menu in the in-list editor
+with the date control itself. Label Taskwarrior's `scheduled` date Scheduled;
+its independence from the deadline is unchanged. Use rounded Liquid Glass
+attribute pills in the horizontal strip, project first, displaying only an icon
+and the current value when present. Project and priority are editable in this
+strip. Coordinate a selected pill and its picker through a shared glass
+container and identity where supported. Preserve the existing picker-first
+outside dismissal and save-on-collapse behavior. Opening and closing the row
+must avoid provisional-height, scroll-anchor and stale-value jumps.

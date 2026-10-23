@@ -69,3 +69,22 @@ extension XCTestCase {
         }
     }
 }
+
+extension XCTestCase {
+    @MainActor func openTaskRowParameter(_ identifier: String, app: XCUIApplication) {
+        let parameters = app.scrollViews["row-date-parameters"]
+        let button = app.buttons["row-" + identifier]
+        for _ in 0..<5 {
+            let frame = button.frame
+            let visible = frame.intersection(parameters.frame).intersection(app.frame)
+            if button.exists && button.isHittable && visible.width >= 44 && visible.height >= 44 {
+                button.coordinate(withNormalizedOffset: CGVector(dx: (visible.midX - frame.minX) / frame.width,
+                                                                 dy: (visible.midY - frame.minY) / frame.height)).tap()
+                return
+            }
+            if button.frame.midX < parameters.frame.midX { parameters.swipeRight() }
+            else { parameters.swipeLeft() }
+        }
+        XCTFail("Attribute pill could not be reached: \(identifier)")
+    }
+}
