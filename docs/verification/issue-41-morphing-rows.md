@@ -383,3 +383,61 @@ header functional checks pass on both families. Full-suite, dark/large-text,
 physical-device frame pacing and spoken accessibility checks were not repeated
 for this refinement. All simulators booted for it were shut down and Simulator
 was quit. No new HTML report was generated, as requested.
+
+### Native attribute presentations and stable checkbox tint
+
+The completion button used the disabled state while any row was being edited.
+That changed its native tint. Completion now keeps its existing appearance and
+blocks input through hit testing, accessibility interaction eligibility and an
+action guard while editing. Its actual completion-feedback disabled state is
+unchanged. A pixel comparison of the same iPhone checkbox region fails on
+`0fe5f65` (1,147 blue pixels compact, zero expanded) and passes with the fix
+(1,147 in each state).
+
+Project and priority menus had native menu chrome around a separately styled
+glass label, while dates used only that custom label. All attribute controls
+now use the same small native glass button style, capsule shape and caption
+label. The captured iPhone Project, Scheduled and Deadline borders have equal
+76-pixel sampled vertical extents at matching positions. Their widths follow
+their values; their outer layouts keep a 44-point minimum size.
+
+The manual date-picker surface and its position/height/corner animation have
+been removed. A native SwiftUI popover hosts the graphical DatePicker (or the
+new-project TextField). An explicit matched transition source and native zoom
+transition connect the control to the presentation. The initial native popover
+without that explicit connection still left a separate source pill; that
+intermediate version is not the final fix. The final iPhone native recording
+shows the source-to-popover transition and its return. Outside dismissal keeps
+the task draft open; Done and date removal dismiss the picker independently.
+Content fits its intrinsic size or scrolls when constrained.
+
+Apple describes native presentation continuity in
+[Build a SwiftUI app with the new design](https://developer.apple.com/videos/play/wwdc2025/323/)
+and the source/destination API in
+[zoom(sourceID:in:)](https://developer.apple.com/documentation/swiftui/navigationtransition/zoom(sourceid:in:)).
+
+The signed simulator test build passes. Both focused iPhone methods pass in
+`/tmp/tsk-61-native-popovers/phone-zoom.xcresult`. The attribute journey now also
+checks outside dismissal, native priority selection, the native project menu,
+New Project presentation and returning to the same expanded draft. The color
+comparison passes on its exported captures. The valid native recording is
+`phone-zoom-motion.mp4` in that directory. The final iPad build adds a guarded
+dismissal binding so a closing popover cannot clear another parameter's state.
+
+CI run `40037615974` on `0fe5f65` stopped before XCUITest: the added regression
+method had not been reflected in the selection tests' fixed method counts.
+Those expectations and their coverage table now include it (21/18 smoke,
+72/62 full). All 14 selection checks pass. This changes the expected counts,
+not the tier selectors or existing coverage. Full canonical CI is required on
+the new head. Persistence, physical-device input/frame pacing, spoken
+accessibility, dark/large-text and system Reduce Motion were not reverified in
+this focused refinement. No HTML report is generated, per user instruction.
+
+The final iPad attribute journey passes in `pad-zoom.xcresult`. Its subsequent
+header method could not reach app bootstrap while disk space fell to 109 MiB.
+After removing superseded task-owned temporary exports, the same final source
+passes the standalone header method in `pad-header.xcresult`. The iPad film is
+zero bytes and is not motion evidence; the iPhone native film remains valid.
+Both device families therefore have passing focused header and native-attribute
+coverage, with the iPad results spanning two runs. All owned simulators were
+shut down after verification and Simulator was quit.
