@@ -8,10 +8,8 @@ struct TaskRowEditor: View {
     let information: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
-    @Namespace private var namespace
     @State private var measuredContentHeight: CGFloat = 0
     @State private var revealProgress: CGFloat = 0
-    @State private var parameterViewport = CGRect.zero
 
     var body: some View {
         ScrollView {
@@ -56,9 +54,8 @@ struct TaskRowEditor: View {
                 GlassEffectContainer(spacing: 6) {
                     HStack(spacing: 6) {
                         ForEach(TaskRowParameter.allCases) { parameter in
-                            TaskRowParameterPill(editing: editing, parameter: parameter, viewport: parameterViewport,
-                                                 projects: store.availableProjects,
-                                                 namespace: namespace) {
+                            TaskRowParameterPill(editing: editing, parameter: parameter,
+                                                 projects: store.availableProjects, now: store.currentDate) {
                                 titleFocused = false
                             }
                         }
@@ -67,7 +64,6 @@ struct TaskRowEditor: View {
             }
             .scrollIndicators(.hidden)
             .clipped()
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { parameterViewport = $0 }
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
             TaskAvailabilityView(task: editing.draft.original, store: store)
@@ -96,12 +92,10 @@ struct TaskRowEditor: View {
 private struct TaskRowParameterPill: View {
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
-    let viewport: CGRect
     let projects: [String]
-    let namespace: Namespace.ID
+    let now: Date
     let unfocus: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var bounds = CGRect.zero
+    @Namespace private var presentationNamespace
 
     var body: some View {
         let value = parameter.value(in: editing.draft.taskDraft)
@@ -135,81 +129,59 @@ private struct TaskRowParameterPill: View {
                 Button(action: openPicker) { label }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
+        .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
+        .popover(isPresented: Binding(
+            get: { editing.parameter == parameter },
+            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
+        ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            TaskRowParameterPicker(editing: editing, parameter: parameter, now: now) { editing.parameter = nil }
+                .frame(width: 340)
+                .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
+                .presentationCompactAdaptation(.popover)
+        }
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
         .accessibilityLabel(parameter.title)
         .accessibilityValue(value ?? "Not set")
         .accessibilityIdentifier("row-" + parameter.identifier)
-        .onChange(of: viewport) { _, _ in
-            if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
-        }
     }
 
     private var label: some View {
         TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
-            .glassEffect(editing.parameter == parameter ? .identity : .regular.interactive(), in: Capsule())
-            .glassEffectID(editing.parameter == parameter ? nil : parameter.id, in: namespace)
-            .glassEffectTransition(reduceMotion ? .identity : .matchedGeometry)
-            .opacity(editing.parameter == parameter ? 0 : 1)
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
-                bounds = $0
-                if editing.parameter == parameter && !editing.parameterClosing { updateSource() }
-            }
-            .padding(.vertical, 6)
-            .frame(minWidth: 44)
-            .contentShape(Rectangle())
     }
 
     private func openPicker() {
         unfocus()
-        updateSource()
-        editing.parameterAnchor = editing.parameterSource
-        editing.parameterExpanded = false
-        editing.parameterClosing = false
         editing.parameter = parameter
-    }
-
-    private func updateSource() {
-        let visible = bounds.intersection(viewport)
-        guard !visible.isEmpty && !visible.isNull else { return }
-        editing.parameterBounds = bounds
-        editing.parameterSource = visible
     }
 }
 
 struct TaskRowParameterPicker: View {
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
-    let availableHeight: CGFloat
-    let ready: () -> Void
     let dismiss: () -> Void
     @State private var selectedDate: Date
-    @State private var measuredContentHeight: CGFloat = 0
 
-    init(editing: TaskRowEditing, parameter: TaskRowParameter, now: Date, availableHeight: CGFloat, ready: @escaping () -> Void, dismiss: @escaping () -> Void) {
+    init(editing: TaskRowEditing, parameter: TaskRowParameter, now: Date, dismiss: @escaping () -> Void) {
         self.editing = editing
         self.parameter = parameter
-        self.availableHeight = availableHeight
-        self.ready = ready
         self.dismiss = dismiss
         _selectedDate = State(initialValue: parameter.date(in: editing.draft.taskDraft) ?? now)
     }
 
     var body: some View {
-        ScrollView {
-            content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }
+                .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .frame(height: min(measuredContentHeight, availableHeight))
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row-parameter-picker")
         .accessibilityAddTraits(.isModal)
-        .task(id: measuredContentHeight > 0) {
-            guard measuredContentHeight > 0 else { return }
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            ready()
-        }
     }
 
     private var content: some View {
@@ -255,52 +227,6 @@ struct TaskRowParameterPicker: View {
     }
 }
 
-struct TaskRowPickerSurface: View {
-    @Bindable var editing: TaskRowEditing
-    let parameter: TaskRowParameter
-    let origin: CGPoint
-    let size: CGSize
-    let now: Date
-    let dismiss: () -> Void
-    @State private var contentHeight: CGFloat = 0
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let source = editing.parameterSource.offsetBy(dx: -origin.x, dy: -origin.y)
-        let anchor = editing.parameterAnchor.offsetBy(dx: -origin.x, dy: -origin.y)
-        let pill = editing.parameterBounds.offsetBy(dx: -editing.parameterSource.minX, dy: -editing.parameterSource.minY)
-        let width = min(360, size.width - 32)
-        let height = min(contentHeight, max(120, size.height - 32))
-        let x = min(max(16, anchor.midX - width / 2), size.width - width - 16)
-        let below = anchor.maxY + 8
-        let preferredY = below + height <= size.height - 16 ? below : anchor.minY - height - 8
-        let y = min(max(16, preferredY), size.height - height - 16)
-        let expanded = editing.parameterExpanded
-        ZStack(alignment: .topLeading) {
-            TaskRowParameterPicker(editing: editing, parameter: parameter,
-                                   now: now, availableHeight: max(120, size.height - 32), ready: {
-                guard editing.parameter == parameter, !expanded, !editing.parameterClosing else { return }
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) { editing.parameterExpanded = true }
-            }, dismiss: dismiss)
-                .frame(width: width)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-                .opacity(expanded ? 1 : 0)
-                .accessibilityHidden(!expanded)
-            TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
-                .frame(width: pill.width, height: pill.height)
-                .offset(x: pill.minX, y: pill.minY)
-                .opacity(expanded ? 0 : 1)
-                .accessibilityHidden(true)
-        }
-        .frame(width: expanded ? width : source.width, height: expanded ? height : source.height, alignment: .topLeading)
-        .clipped()
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: expanded ? 24 : 16))
-        .position(x: expanded ? x + width / 2 : source.midX,
-                  y: expanded ? y + height / 2 : source.midY)
-        .allowsHitTesting(expanded)
-    }
-}
-
 struct TaskRowParameterLabel: View {
     let parameter: TaskRowParameter
     let value: String?
@@ -313,8 +239,6 @@ struct TaskRowParameterLabel: View {
             }
         }
         .font(.caption)
-        .padding(.horizontal, 10)
-        .frame(minWidth: 32, minHeight: 32)
-        .contentShape(Capsule())
+        .lineLimit(1)
     }
 }

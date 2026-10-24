@@ -63,17 +63,6 @@ struct ContentView: View {
                         if let editing = store.rowEditing, editing.isExpanded, editing.bounds != .zero {
                             let origin = geometry.frame(in: .global).origin
                             TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: { closeRow() })
-                            if let parameter = editing.parameter {
-                                Color.black.opacity(0.08).contentShape(Rectangle())
-                                    .onTapGesture { dismissRowParameter() }
-                                    .accessibilityLabel("Dismiss attribute picker")
-                                    .accessibilityIdentifier("dismiss-row-parameter-outside")
-                                    .transition(.identity)
-                                TaskRowPickerSurface(editing: editing, parameter: parameter, origin: origin,
-                                                     size: geometry.size, now: store.currentDate,
-                                                     dismiss: dismissRowParameter)
-                                    .transition(.identity)
-                            }
                         }
                     }
                 }
@@ -82,14 +71,7 @@ struct ContentView: View {
     }
 
     private func dismissRowParameter() {
-        guard let editing = store.rowEditing, editing.parameter != nil, !editing.parameterClosing else { return }
-        editing.parameterClosing = true
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.3)) {
-            editing.parameterExpanded = false
-        } completion: {
-            editing.parameter = nil
-            editing.parameterClosing = false
-        }
+        store.rowEditing?.parameter = nil
     }
 
     private func closeRow(after: (() -> Void)? = nil) {

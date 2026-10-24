@@ -147,6 +147,7 @@ struct TaskListRow: View {
         HStack(alignment: .top, spacing: 4) {
             if task.canComplete {
                 Button {
+                    guard store.rowEditing == nil, !store.isSaving else { return }
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
                 } label: {
                     Image(systemName: checked ? "checkmark.circle.fill" : "circle")
@@ -158,8 +159,9 @@ struct TaskListRow: View {
                 }
                 .buttonStyle(.borderless)
                 .frame(height: headerHeight)
-                .disabled(phase != nil || store.rowEditing != nil)
-                .allowsHitTesting(!store.isSaving)
+                .disabled(phase != nil)
+                .allowsHitTesting(!store.isSaving && store.rowEditing == nil)
+                .accessibilityRespondsToUserInteraction(store.rowEditing == nil)
                 .accessibilityLabel("\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
                 .accessibilityValue(checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")

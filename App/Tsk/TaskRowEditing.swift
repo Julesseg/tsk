@@ -10,11 +10,6 @@ final class TaskRowEditing {
     let upcomingDays: [UpcomingDay]
     var draft: TaskRowDraft
     var parameter: TaskRowParameter?
-    var parameterExpanded = false
-    var parameterClosing = false
-    var parameterSource = CGRect.zero
-    var parameterAnchor = CGRect.zero
-    var parameterBounds = CGRect.zero
     var savedTask: TaskRecord?
     var error: String?
     var isExpanded = false
