@@ -61,8 +61,8 @@ struct TaskSeriesTransitionEditor: View {
                         TextField("Taskwarrior recurrence", text: $rule).textInputAutocapitalization(.never).autocorrectionDisabled().focused($typing, equals: "rule").accessibilityIdentifier("transition-rule")
                         Text("Named calendar periods and fixed durations differ. For example, biannual and 2years differ at leap day; P2M resets the clock to midnight after its first date.").font(.footnote)
                     }
-                    Section("Planned and waiting dates") {
-                        Picker("Planned day", selection: $plannedMode) { ForEach(SeriesOffsetMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("transition-planned-mode")
+                    Section("Scheduled and waiting dates") {
+                        Picker("Scheduled", selection: $plannedMode) { ForEach(SeriesOffsetMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("transition-planned-mode")
                         if plannedMode == .set { DatePicker("First planned date", selection: $planned, displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, generatorZone).accessibilityIdentifier("transition-planned-date") }
                         Picker("Wait until", selection: $waitMode) { ForEach(SeriesOffsetMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("transition-wait-mode")
                         if waitMode == .set { DatePicker("First wait date", selection: $wait, displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, generatorZone).accessibilityIdentifier("transition-wait-date") }
@@ -119,7 +119,7 @@ struct TaskSeriesTransitionEditor: View {
                     Text(old.description)
                     Text(old.id.uuidString).font(.caption.monospaced())
                     Text("Due: \(date(old.deadline!, zone: generatorZone)) → \(date(moved.deadline!, zone: generatorZone))")
-                    Text("Planned: \(optionalDate(old.plannedDate)) → \(optionalDate(moved.plannedDate))").font(.caption)
+                    Text("Scheduled: \(optionalDate(old.plannedDate)) → \(optionalDate(moved.plannedDate))").font(.caption)
                     Text("Wait: \(optionalDate(old.waitUntil)) → \(optionalDate(moved.waitUntil))").font(.caption)
                 }
                 .accessibilityIdentifier("transition-preview-\(old.id.uuidString)")

@@ -26,13 +26,13 @@ An expression that selects tasks according to Taskwarrior's filtering language.
 **Imported task**:
 A task created in tsk from an Apple reminder.
 
-**Planned day**:
+**Scheduled**:
 An organizational date expressing the day on which the user intends to work on a task, distinct from its deadline.
-_Avoid_: Deadline as a synonym for planned day
+_Avoid_: Deadline or planned day as the interface label for Scheduled
 
 **Deadline**:
 The date or time by which a task must be finished.
-_Avoid_: Planned day as a synonym for deadline
+_Avoid_: Scheduled as a synonym for deadline
 
 **Continuous import**:
 Repeatedly moving eligible reminders from selected Apple Reminders lists into tsk and removing the imported source reminders. Imported tasks are subsequently managed independently.

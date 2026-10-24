@@ -70,7 +70,7 @@ import XCTest
         selectAllTasks(app)
         XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 15))
         capture("Extension-created task is visible in the main app after process reopen", app)
-        taskRow(named: title, app: app).tap()
+        openTaskInformation(taskRow(named: title, app: app), app: app)
         XCTAssertTrue(revealTaskElement(app.staticTexts["Project, Shared.Reading"], in: "task-detail-form", app: app))
         XCTAssertTrue(app.staticTexts["Tags, reference"].exists)
         let note = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Full shared text café e\u{301}")).firstMatch

@@ -93,7 +93,7 @@ import XCTest
         capture("Injected protocol read failure hides Calendar; ordinary task controls remain available", app)
         createTask("Calendar failure task", app)
         let row = taskRow(named: "Calendar failure task", app: app)
-        XCTAssertTrue(row.waitForExistence(timeout: 15)); row.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 15)); openTaskInformation(row, app: app)
         XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 10))
         app.buttons["complete-task"].tap()
     }
