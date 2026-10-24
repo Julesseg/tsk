@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 61,
+    "title": "feat(tasks): edit titles and attributes in expandable rows",
+    "sha": "72321e2",
+    "time": "2026-10-24T00:38:56.921Z"
+  },
+  {
+    "pr": 59,
+    "title": "feat(tasks): simplify rows and smooth completion removal",
+    "sha": "517b1e3",
+    "time": "2026-10-22T18:52:09.978Z"
+  },
+  {
+    "pr": 60,
+    "title": "feat(ipad): adopt native adaptive tabs and sidebar",
+    "sha": "fb272a3",
+    "time": "2026-10-22T15:45:53.861Z"
+  },
+  {
+    "pr": 52,
+    "title": "feat(calendar): add compact day overview to Today",
+    "sha": "b88caee",
+    "time": "2026-10-22T00:25:25.821Z"
+  },
+  {
+    "pr": 50,
+    "title": "ci: skip expensive tests for documentation-only changes",
+    "sha": "a34c1a3",
+    "time": "2026-10-21T14:40:26.841Z"
+  }
+]
