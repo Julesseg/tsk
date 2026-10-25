@@ -44,8 +44,8 @@ struct UpcomingTaskList: View {
     }
 
     private var editorIsClipped: Bool {
-        guard let editing = store.rowEditing, editing.bounds != .zero else { return false }
-        return editing.bounds.minY < viewport.minY - 1 || editing.bounds.maxY > viewport.maxY + 1
+        guard let editing = store.rowEditing, !editing.isAnimating, editing.visibilityBounds != .zero else { return false }
+        return editing.visibilityBounds.minY < viewport.minY - 1 || editing.visibilityBounds.maxY > viewport.maxY + 1
     }
 
     private func revealEditor(using proxy: ScrollViewProxy) {

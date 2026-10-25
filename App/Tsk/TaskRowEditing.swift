@@ -9,45 +9,62 @@ final class TaskRowEditing {
     let context: TaskCompletionFeedback.Context
     let tasks: [TaskRecord]
     let upcomingDays: [UpcomingDay]
+    let referenceDate: Date
     var draft: TaskRowDraft
     var parameter: TaskRowParameter?
     var savedTask: TaskRecord?
     var error: String?
     var isExpanded = false
     var isSaving = false
-    var bounds = CGRect.zero
+    private(set) var bounds = CGRect.zero
+    private(set) var visibilityBounds = CGRect.zero
+    private(set) var isAnimating = false
     var revealProgress: CGFloat = 0
     var focusInset: CGFloat = 12
-    @ObservationIgnored private var motionID = 0
+    @ObservationIgnored private var motion: TaskRowMotion?
 
     init(task: TaskRecord, rowID: String, context: TaskCompletionFeedback.Context, tasks: [TaskRecord], now: Date) {
         self.rowID = rowID
         self.context = context
         self.tasks = tasks
+        referenceDate = now
         upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
         draft = TaskRowDraft(task: task)
     }
 
     func setExpanded(_ expanded: Bool, reduceMotion: Bool) async {
-        motionID += 1
-        let currentMotion = motionID
+        motion?.cancel()
+        motion = nil
+        isAnimating = true
         isExpanded = expanded
         let target: CGFloat = expanded ? 1 : 0
         let initial = revealProgress
         let duration = (expanded ? 0.18 : 0.14) * Double(abs(target - initial))
-        guard !reduceMotion, duration > 0 else { revealProgress = target; return }
-        let start = ContinuousClock.now
-        while !Task.isCancelled, currentMotion == motionID {
-            let elapsed = start.duration(to: .now)
-            let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-            let fraction = min(1, seconds / duration)
-            let eased = 1 - pow(1 - fraction, 4)
+        guard !reduceMotion, duration > 0 else {
+            revealProgress = target
+            visibilityBounds = bounds
+            isAnimating = false
+            return
+        }
+        let animation = TaskRowMotion(duration: duration) { [weak self] eased in
+            guard let self else { return }
             withTransaction(Transaction(animation: nil)) {
                 revealProgress = initial + (target - initial) * eased
             }
-            if fraction == 1 { return }
-            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
         }
+        motion = animation
+        await animation.run()
+        if motion === animation {
+            revealProgress = target
+            motion = nil
+            visibilityBounds = bounds
+            isAnimating = false
+        }
+    }
+
+    func measure(_ bounds: CGRect) {
+        self.bounds = bounds
+        if !isAnimating { visibilityBounds = bounds }
     }
 }
 

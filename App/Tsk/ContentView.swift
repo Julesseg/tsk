@@ -59,12 +59,7 @@ struct ContentView: View {
         GlassEffectContainer(spacing: 8) {
             calendarWorkspace
                 .overlay {
-                    GeometryReader { geometry in
-                        if let editing = store.rowEditing, editing.isExpanded, editing.bounds != .zero {
-                            let origin = geometry.frame(in: .global).origin
-                            TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: { closeRow() })
-                        }
-                    }
+                    TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
         }
         .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
@@ -541,4 +536,18 @@ private struct TaskListSelection: Equatable {
 
 private enum TaskWorkspacePresentation: Equatable {
     case columns, accessibilityColumns, compact
+}
+
+private struct TaskRowDismissalOverlay: View {
+    let editing: TaskRowEditing?
+    let close: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let editing, editing.isExpanded, editing.bounds != .zero {
+                let origin = geometry.frame(in: .global).origin
+                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: close)
+            }
+        }
+    }
 }

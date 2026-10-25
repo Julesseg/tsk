@@ -533,3 +533,77 @@ pickers and anchored plain-row collapse. Its native recording is
 the prototype browser tab was closed while leaving the pre-existing browser open.
 System Reduce Motion, physical-device input/frame pacing and spoken VoiceOver
 were not verified. Canonical CI is required on the new pushed head.
+
+## Display-linked expansion and observation isolation (2026-10-25)
+
+The follow-up complaint concerns pacing, which the earlier endpoint geometry
+assertions did not establish. A quiet native fixture, with the XCTest driver
+idle and the real clock enabled, reproduced a first timer-driven progress jump
+from 0 to 0.837. The fixed 16 ms sleep also added its delay after each update's
+layout work.
+
+TaskRowMotion now uses CADisplayLink's presentation timestamps. Its lifetime is
+bounded by completion/cancellation, and replacement motion retains ownership of
+the shared progress. The chosen A curve, 180/140 ms durations and spacing remain.
+The iPhone plist opts in to the display-link frame-rate range. Preferred rates
+are requests, not measured rendering guarantees.
+
+Progress reads now live in small modifiers for offset, spacing and fades.
+The task header and List construction do not observe each progress update.
+Editor controls have a separate content view and a stable session reference
+date. Row geometry is cached without writing SwiftUI State on each measurement.
+Live bounds update only a dedicated dismissal overlay; separate visibility
+bounds and an animation guard defer scrolling until expansion finishes. This
+preserves immediate control/outside taps without letting intermediate geometry
+retarget the scrolling animation.
+
+A controlled native comparison kept the same CADisplayLink clock, curve,
+durations, real date and five actual open/close cycles, with the XCTest driver
+idle during motion. The before variant used the previous row/content/geometry
+implementation with that same display clock; the after variant used this
+observation refactor. Temporary body counters recorded:
+
+| Evaluation or measurement | Before | After |
+| --- | ---: | ---: |
+| Editor control content | 98 | 19 |
+| Selected row body | 90 | 35 |
+| Neighbour row bodies | 160 | 50 |
+| Outer screen body | 10 | 10 |
+| Outer task-list body | 16 | 15 |
+| Reveal wrapper body | 98 | 116 |
+| Display-linked updates | 55 | 93 |
+| Median callback interval within motion | 33.333 ms | 16.672 ms |
+
+The work reduction is concentrated in row/control construction. The small
+reveal wrapper updates more often as more display callbacks arrive. These are
+body counts and callback intervals, not presented-frame FPS or a device hitch
+ratio; the largest observed callback gap remains 49.983 ms. Raw counters,
+timestamps, controlled-variant harness and result bundles are under
+`/tmp/tsk-61-frame-pacing/`: `body-count-comparison.json`, `body-count.py`,
+`body-before.xcresult` and `body-after.xcresult`.
+
+The clean candidate passes six iPhone methods in `phone-isolated.xcresult`:
+fixed first/middle headers, compact native controls/calendars, complete outside
+save/validation/relaunch, lower-row keyboard visibility and Upcoming regrouping.
+Four iPad methods pass in `pad-isolated.xcresult`: both header/spacing studies,
+native controls/calendars and lower-row keyboard visibility. The test-selection
+suite passes all 14 checks. The restored production test build passes after
+removing the temporary body counters and autoplay.
+
+Frame studies use the encoded native `phone-isolated-motion.mp4` and
+`pad-isolated-motion.mp4`. During the visible All-list middle-row study, all 91
+iPhone source frames retain the selected checkbox centre at 582 px; all 89 iPad
+source frames retain it at 327.5 px after rotation for inspection. The earlier
+and following rows traverse intermediate positions and return on collapse.
+These measured windows exclude app/tab entry and are recorded in
+`phone-final-study.json` and `pad-final-study.json`. No frames were interpolated.
+All task-owned simulators were shut down after their runs.
+
+The Hitches Instruments template is unsupported on this simulator, and the
+XCTHitchMetric attempt returned no measurements. Neither is reported as a
+passing performance gate. Display-link probes still contain approximately
+33 ms intervals; their cause is not attributed solely to the simulator.
+Physical-device hitch/frame-pacing acceptance, system Reduce Motion and spoken
+VoiceOver remain unverified. Canonical CI is required on the pushed head.
+Temporary probes/autoplay and altered fixtures were removed; no HTML UI report
+was generated.
