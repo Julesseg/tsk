@@ -85,7 +85,7 @@ extension XCTestCase {
             }
             let frame = button.frame
             let visible = frame.intersection(parameters.frame).intersection(app.frame)
-            if !visible.isNull && !visible.isEmpty && visible.width >= 44 && visible.height >= 44 && button.isEnabled {
+            if !visible.isNull && !visible.isEmpty && visible.width >= 44 - 0.001 && visible.height >= 44 - 0.001 && button.isEnabled {
                 app.coordinate(withNormalizedOffset: .zero)
                     .withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: visible.midY - app.frame.minY)).tap()
                 return

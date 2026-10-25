@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 import TskCore
 
 @MainActor @Observable
@@ -15,6 +16,9 @@ final class TaskRowEditing {
     var isExpanded = false
     var isSaving = false
     var bounds = CGRect.zero
+    var revealProgress: CGFloat = 0
+    var focusInset: CGFloat = 12
+    @ObservationIgnored private var motionID = 0
 
     init(task: TaskRecord, rowID: String, context: TaskCompletionFeedback.Context, tasks: [TaskRecord], now: Date) {
         self.rowID = rowID
@@ -22,6 +26,28 @@ final class TaskRowEditing {
         self.tasks = tasks
         upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
         draft = TaskRowDraft(task: task)
+    }
+
+    func setExpanded(_ expanded: Bool, reduceMotion: Bool) async {
+        motionID += 1
+        let currentMotion = motionID
+        isExpanded = expanded
+        let target: CGFloat = expanded ? 1 : 0
+        let initial = revealProgress
+        let duration = (expanded ? 0.18 : 0.14) * Double(abs(target - initial))
+        guard !reduceMotion, duration > 0 else { revealProgress = target; return }
+        let start = ContinuousClock.now
+        while !Task.isCancelled, currentMotion == motionID {
+            let elapsed = start.duration(to: .now)
+            let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+            let fraction = min(1, seconds / duration)
+            let eased = 1 - pow(1 - fraction, 4)
+            withTransaction(Transaction(animation: nil)) {
+                revealProgress = initial + (target - initial) * eased
+            }
+            if fraction == 1 { return }
+            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
+        }
     }
 }
 

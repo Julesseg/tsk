@@ -9,7 +9,6 @@ struct TaskRowEditor: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
-    @State private var revealProgress: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -18,25 +17,8 @@ struct TaskRowEditor: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
-        .frame(height: revealProgress * min(measuredContentHeight, availableHeight), alignment: .top)
+        .frame(height: editing.revealProgress * min(measuredContentHeight, availableHeight), alignment: .top)
         .clipped()
-        .task(id: editing.isExpanded) {
-            let target: CGFloat = editing.isExpanded ? 1 : 0
-            guard !reduceMotion else { revealProgress = target; return }
-            let initial = revealProgress
-            let start = ContinuousClock.now
-            while !Task.isCancelled {
-                let elapsed = start.duration(to: .now)
-                let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-                let fraction = min(1, seconds / 0.28)
-                let eased = fraction * fraction * (3 - 2 * fraction)
-                withTransaction(Transaction(animation: nil)) {
-                    revealProgress = initial + (target - initial) * eased
-                }
-                if fraction == 1 { return }
-                do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
-            }
-        }
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-row-editor")
@@ -44,7 +26,7 @@ struct TaskRowEditor: View {
             guard measuredContentHeight > 0 else { return }
             await Task.yield()
             guard !Task.isCancelled, !editing.isExpanded, !editing.isSaving else { return }
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.28)) { editing.isExpanded = true }
+            await editing.setExpanded(true, reduceMotion: reduceMotion)
         }
     }
 
@@ -164,6 +146,7 @@ struct TaskRowParameterPicker: View {
     let parameter: TaskRowParameter
     let dismiss: () -> Void
     @State private var selectedDate: Date
+    @State private var contentHeight: CGFloat = 400
 
     init(editing: TaskRowEditing, parameter: TaskRowParameter, now: Date, dismiss: @escaping () -> Void) {
         self.editing = editing
@@ -173,11 +156,11 @@ struct TaskRowParameterPicker: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
-            content
-            ScrollView { content }
-                .scrollBounceBehavior(.basedOnSize)
+        ScrollView {
+            content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(idealHeight: contentHeight, maxHeight: contentHeight)
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row-parameter-picker")
