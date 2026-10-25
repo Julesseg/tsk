@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsk · Task row motion prototype</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f4f6;--surface:#fff;--text:#171719;--muted:#717178;--line:#e3e3e8;--blue:#087eff;--shadow:0 6px 24px #00000012}
+@media(prefers-color-scheme:dark){:root{--bg:#151517;--surface:#202023;--text:#f3f3f5;--muted:#a1a1aa;--line:#3a3a42;--blue:#439cff;--shadow:0 6px 24px #00000045}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 20px 116px}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:3px solid var(--blue);outline-offset:3px}main{max-width:880px;margin:auto;display:grid;grid-template-columns:minmax(0,430px) minmax(230px,1fr);gap:32px;align-items:start}h1{font-size:22px;line-height:1.2;font-weight:600;margin:4px 0 12px}h2{font-size:17px;font-weight:600;margin:0 0 8px}p{margin:8px 0 18px;color:var(--muted)}.eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}main>section{min-width:0;width:100%}.phone{background:var(--surface);border:1px solid var(--line);border-radius:30px;overflow:hidden;box-shadow:var(--shadow)}.appbar{height:62px;display:flex;align-items:center;justify-content:center;position:relative;font-size:18px;font-weight:600}.gear{position:absolute;right:22px;display:flex;color:var(--muted)}svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.viewport{height:502px;position:relative;overflow:hidden;padding:24px 8px 0}.list{position:relative;will-change:transform}.task{padding:4px 8px;position:relative;border-radius:18px;will-change:padding,opacity;background:transparent}.task.selected{background:var(--surface)}.header{height:44px;display:flex;gap:4px;align-items:center;position:relative;z-index:1}.check{width:40px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--blue);flex-shrink:0}.check svg{width:23px;height:23px;stroke-width:1.7}.title{border:0;background:none;text-align:left;min-width:0;flex:1;padding:0;min-height:44px;font-size:14px;line-height:19px}.titletext{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metadata{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:11px;line-height:17px;margin-top:3px;gap:10px}.deadline{display:flex;align-items:center;gap:3px;white-space:nowrap}.deadline svg{width:12px;height:12px}.editor{height:0;overflow:hidden;padding-left:44px;will-change:height;pointer-events:none}.editor-content{height:108px;padding-top:8px}.pills{display:flex;gap:6px;white-space:nowrap;overflow:hidden;padding:3px 1px 8px}.pill{height:26px;border:1px solid var(--line);border-radius:99px;padding:0 9px;display:flex;gap:5px;align-items:center;font-size:11px;background:var(--surface)}.pill svg{width:12px;height:12px}.info{margin-top:13px;color:var(--blue);display:flex;align-items:center;gap:7px;font-size:13px}.info svg{width:15px;height:15px}.anchor{position:absolute;left:3px;right:3px;height:0;border-top:1px dashed color-mix(in srgb,var(--blue) 35%,transparent);z-index:4;pointer-events:none;opacity:0}.appfooter{border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:16px 8px 20px;color:var(--muted);font-size:12px}.appfooter .active{color:var(--blue)}.study{padding:6px 0}.description{min-height:64px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.action{border:1px solid var(--line);background:var(--surface);padding:9px 12px;border-radius:12px;min-height:44px}.action.primary{background:var(--text);color:var(--surface);border-color:var(--text)}.action[aria-pressed=true]{border-color:var(--blue);color:var(--blue)}dl{margin:20px 0;display:grid;grid-template-columns:1fr auto;gap:11px 15px;font-size:13px}dt{color:var(--muted)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.separator{height:1px;background:var(--line);margin:20px 0}.state{display:flex;gap:9px;align-items:center;color:var(--muted);font-size:12px;min-height:24px}.dot{height:7px;width:7px;border-radius:50%;background:var(--blue)}.note{font-size:12px;line-height:1.5}.legend{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:7px;margin:12px 3px}.legend i{width:20px;border-top:1px dashed var(--blue)}.switcher{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--text);color:var(--surface);box-shadow:var(--shadow);border-radius:99px;padding:5px;max-width:calc(100% - 24px)}.switcher button{border:0;background:transparent;color:inherit;min-width:44px;min-height:44px;border-radius:99px}.switcher button:hover{background:color-mix(in srgb,var(--surface) 13%,transparent)}.variant-label{text-align:center;min-width:180px;font-size:13px;padding:0 8px}.variant-label small{display:block;font-size:10px;opacity:.65;text-transform:uppercase;letter-spacing:.09em}.variant-label span{display:block}.jump{display:flex;gap:6px;margin:12px 0}.jump button{border:1px solid var(--line);background:var(--surface);border-radius:99px;min-width:44px;min-height:38px}.jump button[aria-pressed=true]{background:var(--text);color:var(--surface);border-color:var(--text)}
+@media(max-width:700px){body{padding:14px 12px 105px}main{display:flex;flex-direction:column;gap:20px;max-width:430px}.phone{width:100%;border-radius:24px}.viewport{height:500px}.study{width:100%}.description{min-height:0}.study h1{font-size:20px}.jump{margin:10px 0}.metadata{font-size:11px}.title{font-size:13px}.appbar{height:54px}.note{margin-bottom:6px}}
+@media(prefers-reduced-motion:reduce){.list,.task,.editor{will-change:auto}}
+</style>
+<svg aria-hidden="true" style="display:none"><defs>
+<symbol id="circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24"><path d="M3 6h7l2 3h9v11H3zM3 9V5h7l2 2h9v2"/></symbol>
+<symbol id="calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h2m4 0h2m-8 3h2m4 0h2"/></symbol>
+<symbol id="flag" viewBox="0 0 24 24"><path d="M5 22V3c5-4 9 4 15 0v11c-6 4-10-4-15 0"/></symbol>
+<symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 10v7m0-11v.1"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><path d="m9 3 1-2h4l1 2 3 2 2-.2 2 3-1.2 2v4L22 16l-2 3-2-.2-3 2-1 2h-4l-1-2-3-2-2 .2-2-3 1.2-2v-4L2 8l2-3L6 5z"/><circle cx="12" cy="12" r="3.5"/></symbol>
+</defs></svg>
+<main id="motion-prototype">
+<section aria-label="Task list motion preview">
+<div class="phone"><header class="appbar">All<span class="gear"><svg><use href="#gear"/></svg></span></header><div class="viewport" id="viewport"><div class="anchor" id="anchor"></div><div class="list" id="list"></div></div><footer class="appfooter"><span>Today</span><span>Upcoming</span><span>Projects</span><span class="active">All</span></footer></div>
+<div class="legend"><i></i><span>Title position before opening</span></div>
+</section>
+<aside class="study">
+<div class="eyebrow">Throwaway motion prototype</div><h1 id="heading"></h1><p class="description" id="description"></p>
+<div class="jump" aria-label="Variants"><button type="button" data-variant="A">A</button><button type="button" data-variant="B">B</button><button type="button" data-variant="C">C</button></div>
+<div class="actions"><button class="action primary" id="toggle" type="button">Expand task</button><button class="action" id="replay" type="button">Replay</button><button class="action" id="slow" type="button" aria-pressed="false">0.25× speed</button></div>
+<div class="state" role="status" aria-live="polite"><span class="dot"></span><span id="state"></span></div>
+<dl><dt>Open / close</dt><dd id="timing"></dd><dt>Curve</dt><dd id="curve"></dd><dt>Compact padding</dt><dd>4 pt per edge</dd><dt>Expanded padding</dt><dd id="padding"></dd><dt>Title moves</dt><dd id="header-shift"></dd><dt>Tasks above move</dt><dd id="before-shift"></dd><dt>Tasks below move</dt><dd id="after-shift"></dd></dl>
+<div class="separator"></div><p class="note">Tap any task, or replay the same open/close sequence. Dimming, spacing and reveal share one clock in every variant. Top-edge rows clamp to stay visible.</p><p class="note">Uses the app’s task-row test fixture. This is a layout and timing sketch; native glass, picker transitions and iOS frame pacing remain app checks.</p>
+</aside>
+</main>
+<nav class="switcher" aria-label="Motion variant switcher"><button id="previous" type="button" aria-label="Previous variant">←</button><div class="variant-label"><small>Prototype</small><span id="variant-label"></span></div><button id="next" type="button" aria-label="Next variant">→</button></nav>
+<script>
+(() => {
+const root=document.getElementById('motion-prototype');
+const $=id=>document.getElementById(id);
+const svg=name=>`<svg aria-hidden="true"><use href="#${name}"/></svg>`;
+const variants={
+ A:{name:'Pinned title · quick',description:'The title stays at the tap position. Tasks above nudge up slightly; the attributes and tasks below open downward.',open:180,close:140,gap:12,curve:'Fast ease-out',easing:t=>1-Math.pow(1-t,4),shift:h=>12},
+ B:{name:'Small lift · spring',description:'The selected task lifts a little into a larger pocket of space. A restrained spring softens the landing.',open:240,close:180,gap:18,curve:'Damped spring',easing:t=>{const w=11,z=.8,d=w*Math.sqrt(1-z*z);const f=x=>1-Math.exp(-z*w*x)*(Math.cos(d*x)+z*w/d*Math.sin(d*x));return f(t)/f(1)},shift:h=>28},
+ C:{name:'Centered card · glide',description:'The growing card keeps its center near the original task. Space opens both upward and downward; the title travels farther.',open:220,close:160,gap:12,curve:'Cubic ease-out',easing:t=>1-Math.pow(1-t,3),shift:h=>12+h/2}
+};
+const fixture=['Earlier task 1 with a longer title to fill the list','Earlier task 2 with a longer title to fill the list','Earlier task 3 with a longer title to fill the list','Prepare the release with the product team','Review accessibility findings','Earlier task 4 with a longer title to fill the list'];
+const list=$('list'),rows=fixture.map((title,index)=>{
+ const row=document.createElement('article');row.className='task';
+ row.innerHTML=`<div class="header"><span class="check">${svg('circle')}</span><button class="title" type="button" aria-expanded="false"><span class="titletext">${title}</span>${index===3?`<span class="metadata"><span>Release</span><span class="deadline">${svg('flag')}Tomorrow</span></span>`:''}</button></div><div class="editor" aria-hidden="true"><div class="editor-content"><div class="pills"><span class="pill">${svg('folder')}${index===3?'Release':''}</span><span class="pill">${svg('calendar')}${index===3?'Oct 17, 2026':''}</span><span class="pill">${svg('flag')}${index===3?'Oct 17, 2026 at 2:00 PM':''}</span><span class="pill">!</span></div><span class="info">${svg('info')}More task information</span></div></div>`;
+ row.querySelector('button').onclick=()=>selectTask(index);list.append(row);return row;
+});
+let key='A',selected=3,progress=0,target=0,frame=0,slow=false,sequence=0;
+const editorHeight=108;
+function geometry(){const v=variants[key],baseTop=24+selected*52;return{v,shift:Math.min(v.shift(editorHeight),Math.max(0,baseTop-4))}}
+function signed(value){const n=Math.round(value);return n===0?'0 pt':`${n>0?'+':''}${n} pt`}
+function render(){
+ const {v,shift}=geometry(),p=progress,clamped=Math.max(0,Math.min(1,p));
+ list.style.transform=`translate3d(0,${-shift*p}px,0)`;
+ rows.forEach((row,index)=>{
+  const active=index===selected;row.classList.toggle('selected',active&&p>0);
+  row.style.paddingTop=row.style.paddingBottom=`${4+(active?v.gap*p:0)}px`;
+  row.style.opacity=active?1:1-.55*clamped;
+  row.style.boxShadow=active&&p>0?`0 4px 20px color-mix(in srgb,var(--text) ${6*clamped}%,transparent)`:'none';
+  row.querySelector('.editor').style.height=`${active?Math.max(0,editorHeight*p):0}px`;
+  row.querySelector('.editor-content').style.opacity=active?clamped:0;
+  row.querySelector('button').setAttribute('aria-expanded',active&&target===1?'true':'false');
+  const meta=row.querySelector('.metadata');if(meta)meta.style.opacity=active?1-clamped:1;
+ });
+ $('anchor').style.top=`${24+selected*52+4+22}px`;$('anchor').style.opacity=clamped*.8;
+ $('header-shift').textContent=signed((v.gap-shift)*p);
+ $('before-shift').textContent=signed(-shift*p);
+ $('after-shift').textContent=signed((editorHeight+2*v.gap-shift)*p);
+ $('toggle').textContent=target?'Collapse task':'Expand task';
+}
+function animate(to){
+ cancelAnimationFrame(frame);target=to;const initial=progress,{v}=geometry();
+ const duration=(to?v.open:v.close)*(slow?4:1)*Math.min(1,Math.abs(to-initial));
+ $('state').textContent=to?'Expanding · spacing + dimming together':'Collapsing · spacing + dimming together';
+ const start=performance.now();
+ return new Promise(resolve=>{
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches||duration<1){progress=to;render();$('state').textContent=to?'Expanded':'Collapsed';resolve();return}
+  function tick(now){const t=Math.min(1,(now-start)/duration);progress=initial+(to-initial)*v.easing(t);render();if(t<1)frame=requestAnimationFrame(tick);else{progress=to;render();$('state').textContent=to?'Expanded':'Collapsed';resolve()}}
+  frame=requestAnimationFrame(tick);
+ });
+}
+function selectTask(index){sequence++;if(index===selected){animate(target?0:1);return}cancelAnimationFrame(frame);selected=index;progress=0;target=0;render();animate(1)}
+function choose(next){sequence++;cancelAnimationFrame(frame);key=variants[next]?next:'A';progress=0;target=0;
+ const v=variants[key];$('heading').textContent=key+' · '+v.name;$('description').textContent=v.description;$('variant-label').textContent=key+' / 3 · '+v.name;
+ $('timing').textContent=`${v.open} / ${v.close} ms`;$('curve').textContent=v.curve;$('padding').textContent=`${4+v.gap} pt per edge`;
+ root.querySelectorAll('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.variant===key?'true':'false'));
+ const url=new URL(location.href);url.searchParams.set('variant',key);history.replaceState(null,'',url);render();$('state').textContent='Collapsed · tap a task to compare';
+ window.__motionPrototype={variant:key,selected,progress};
+}
+function cycle(delta){const keys=Object.keys(variants);choose(keys[(keys.indexOf(key)+delta+keys.length)%keys.length])}
+$('toggle').onclick=()=>{sequence++;animate(target?0:1)};
+$('replay').onclick=async()=>{const token=++sequence;cancelAnimationFrame(frame);progress=0;target=0;render();await animate(1);if(token!==sequence)return;await new Promise(r=>setTimeout(r,slow?1800:700));if(token===sequence)await animate(0)};
+$('slow').onclick=()=>{sequence++;slow=!slow;$('slow').setAttribute('aria-pressed',slow?'true':'false');$('state').textContent=slow?'Quarter speed · durations above are normal speed':'Normal speed'};
+$('previous').onclick=()=>cycle(-1);$('next').onclick=()=>cycle(1);
+root.querySelectorAll('[data-variant]').forEach(b=>b.onclick=()=>choose(b.dataset.variant));
+document.addEventListener('keydown',event=>{if(event.target instanceof Element&&event.target.closest('input,textarea,[contenteditable]'))return;if(event.key==='ArrowRight'){event.preventDefault();cycle(1)}if(event.key==='ArrowLeft'){event.preventDefault();cycle(-1)}});
+choose(new URL(location.href).searchParams.get('variant')||'A');
+window.__motionPrototypeState=()=>({variant:key,selected,progress,target,slow,headerShift:geometry().v.gap-geometry().shift,upperShift:-geometry().shift,lowerShift:editorHeight+2*geometry().v.gap-geometry().shift});
+})();
+</script>
+</html>
