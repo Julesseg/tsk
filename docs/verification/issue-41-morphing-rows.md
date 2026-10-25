@@ -441,3 +441,95 @@ zero bytes and is not motion evidence; the iPhone native film remains valid.
 Both device families therefore have passing focused header and native-attribute
 coverage, with the iPad results spanning two runs. All owned simulators were
 shut down after verification and Simulator was quit.
+
+### Chosen motion A (2026-10-25)
+
+Jules chose A from the throwaway motion study. The original question, runnable
+A/B/C comparison and verdict are archived on
+[prototype/issue-41-row-motion](https://github.com/Julesseg/tsk/tree/prototype/issue-41-row-motion/App/Prototypes/task-row-motion),
+with a [decision pointer on issue #41](https://github.com/Julesseg/tsk/issues/41#issuecomment-6394662730).
+The implementation branch contains only A.
+
+Compact rows now have four points of vertical padding per edge. Expansion opens
+12 more points above and below the selected row while shifting the list up by
+12 points, keeping the title and checkbox at the tap position. Near the top
+viewport edge, the upward shift and matching top padding clamp together. The
+bottom still opens space for the editor. Existing scrolling keeps lower rows
+and keyboard-focused controls visible.
+
+One presentation progress value drives editor height, control/metadata fades,
+card appearance, surrounding padding, list translation and neighbor dimming.
+Opening uses a 180 ms quartic ease-out; closing uses 140 ms, scaled for a partial
+reversal. The separate metadata/background animations and fixed 350 ms cleanup
+wait are removed. Layout updates retain disabled implicit List animations to
+avoid the native hosting-cell recentering found in the earlier refinement.
+Reduce Motion applies the final presentation state directly.
+
+The signed simulator test build and all 14 selection-routing checks pass. The
+new middle-row regression is included in both smoke lanes (22 iPhone/19 iPad
+methods; full coverage is 73/63). It checks compact height, the fixed selected
+header, the earlier row's 12-point upward shift, movement below the editor and
+restoration after collapse. Both geometry regressions pass on iPhone and iPad.
+The iPad native attribute/menu/popover journey also passes. The iPhone recording contains 97 encoded source frames with all three
+checkboxes detected during the middle-row opening/closing study: the selected
+center stays at 582 px, the earlier center moves 426 to 390 px, and the following
+center moves 738 to 1140 px. The same changing frames show dimming and movement;
+there is no separate dim-only phase. These variable-rate simulator source frames
+were not interpolated and do not establish physical-device frame pacing.
+
+Local evidence lives under `/tmp/tsk-61-motion-a/`: `build.log`,
+`phone-geometry.xcresult`, `phone-geometry-motion.mp4`, exported native captures,
+`phone-native-frames.json` and `phone-motion-summary.json`. No HTML UI report is
+generated, per user instruction.
+
+The valid iPad recording is `pad-geometry-motion.mp4` (portrait recording canvas
+with the landscape app rotated inside it). After rotating decoded source frames
+for measurement, all 74 frames with the three study checkboxes keep the selected
+center at 327.5 px. The geometry tests independently verify the 12-point nudge.
+The corresponding result bundle and native captures are `pad-geometry.xcresult`
+and `pad-captures/`.
+
+The broader iPhone run passed appearance/accessibility overflow, native controls,
+long-title keyboard bounds, failed-draft retention, lower-row visibility and
+Upcoming regrouping. The outside-save journey reproduced the prior CI failure:
+after Select All and Delete in New Project, typing failed because the TextField
+lost keyboard focus. A minimized native sequence reproduced it again in
+`phone-project-red.xcresult`.
+
+The picker duplicated its content inside `ViewThatFits`. Removing a project's
+value also removes the Remove Project button and changes the content's height.
+A single measured, height-bounded ScrollView now preserves the content identity
+as that height changes. The same minimized sequence passes without refocusing
+or changing the text helper in `phone-project-green.xcresult`. The full journey
+also now explicitly waits for keyboard disappearance after its Hide Keyboard
+button, before selecting an outside-save target; this covers the keyboard
+snapshot race seen in the prior iPad CI log.
+
+The restored iPhone picker/appearance checks pass with the stable container.
+The full save journey proceeds through validation, durable relaunch and
+independent dates/project/priority readback, then exposed a test-only hit-area
+failure. The enabled Waiting control was fully visible but its CGRect width
+was `43.99999999999994` instead of 44, so the helper repeatedly scrolled instead
+of tapping. A shortened fixture reproduced the exact value in
+`phone-pill-probe.xcresult`. Hit-area admission now allows 0.001 pt of numeric
+rounding; app control dimensions and hit targets are unchanged. Temporary
+fixture changes and debug instrumentation were removed before the final build.
+
+The original complete iPhone outside-save/validation/relaunch journey passes in
+`phone-durable.xcresult` after the rounding correction, including the previously
+blocked Waiting picker and plain-row anchored collapse. The stable-container
+appearance/accessibility and complete native-control checks pass in
+`phone-final.xcresult`; that earlier bundle also retains the diagnosed rounding
+failure, so it is not described as an entirely passing run. The final source
+build is `build-verified.log`. Geometry, keyboard, failed-draft and Upcoming
+checks are retained in the focused bundles above; the entire canonical suite
+still belongs to CI on the pushed head.
+
+The original complete iPad outside-save/validation/relaunch journey also passes
+in `pad-durable.xcresult` on the final source, including New Project replacement,
+invalid-draft retention, keyboard dismissal, saved attribute readback, all date
+pickers and anchored plain-row collapse. Its native recording is
+`pad-durable-motion.mp4`. All owned simulators were shut down after their runs;
+the prototype browser tab was closed while leaving the pre-existing browser open.
+System Reduce Motion, physical-device input/frame pacing and spoken VoiceOver
+were not verified. Canonical CI is required on the new pushed head.

@@ -58,9 +58,11 @@ struct TaskListView: View {
                 }
             }
         }
+        .offset(y: -(store.rowEditing.map { $0.focusInset * $0.revealProgress } ?? 0))
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
+        .environment(\.taskRowViewport, geometry.frame(in: .global))
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.completionFeedback.removingIDs(context: store.completionContext))
         .environment(\.defaultMinListRowHeight, 0)
@@ -129,12 +131,15 @@ struct TaskListRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var titleFocused: Bool
     @State private var headerHeight: CGFloat = 44
+    @State private var rowBounds = CGRect.zero
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @Environment(\.taskRowAvailableHeight) private var availableHeight
+    @Environment(\.taskRowViewport) private var viewport
     @Environment(\.taskRowActions) private var rowActions
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }
     private var editing: TaskRowEditing? { store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
     private var expanded: Bool { editing?.isExpanded == true }
+    private var progress: CGFloat { editing?.revealProgress ?? 0 }
     private var hasMetadata: Bool {
         let current = editing?.savedTask ?? task
         return !current.project.isEmpty || current.deadline != nil
@@ -185,8 +190,7 @@ struct TaskListRow: View {
                     if hasMetadata {
                         TaskListMetadata(task: editing?.savedTask ?? task, store: store)
                             .padding(.bottom, 2)
-                            .opacity(expanded ? 0 : 1)
-                            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
+                            .opacity(1 - progress)
                             .accessibilityHidden(true)
                     }
                 }
@@ -195,9 +199,8 @@ struct TaskListRow: View {
                 if let editing {
                     TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
                                   information: { rowActions.information(task) })
-                        .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight))
-                        .opacity(expanded ? 1 : 0)
-                        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
+                        .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24))
+                        .opacity(progress)
                         .allowsHitTesting(expanded)
                         .accessibilityHidden(!expanded)
                 }
@@ -223,7 +226,8 @@ struct TaskListRow: View {
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.top, 4 + (editing?.focusInset ?? 0) * progress)
+        .padding(.bottom, 4 + 12 * progress)
         .background {
             if expanded {
                 Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
@@ -235,21 +239,23 @@ struct TaskListRow: View {
         .onChange(of: editing?.isSaving) { _, saving in if saving == true { titleFocused = false } }
         .background(alignment: .top) {
             if editing != nil {
-                GeometryReader { geometry in
-                    RoundedRectangle(cornerRadius: 18).fill(.background)
-                        .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
-                        .frame(height: headerHeight + 16 + (expanded ? max(0, geometry.size.height - headerHeight - 16) : 0))
-                        .opacity(expanded ? 1 : 0)
-                        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: expanded)
-                        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: geometry.size.height)
-                }
+                RoundedRectangle(cornerRadius: 18).fill(.background)
+                    .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
+                    .opacity(progress)
             }
         }
-        .opacity(store.rowEditing != nil && editing == nil ? 0.35 : 1)
+        .opacity(editing == nil ? 1 - 0.55 * (store.rowEditing?.revealProgress ?? 0) : 1)
         .allowsHitTesting(store.rowEditing == nil || editing != nil)
         .frame(maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
+            rowBounds = bounds
             editing?.bounds = bounds
+        }
+        .onChange(of: editing?.rowID) { _, _ in
+            if let editing {
+                editing.bounds = rowBounds
+                editing.focusInset = min(12, max(0, rowBounds.minY - viewport.minY))
+            }
         }
         .mask {
             VStack(spacing: 0) {

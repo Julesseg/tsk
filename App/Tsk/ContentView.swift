@@ -88,8 +88,7 @@ struct ContentView: View {
                     return
                 }
                 editing.savedTask = saved
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { editing.isExpanded = false }
-                if !reduceMotion { try? await Task.sleep(for: .milliseconds(350)) }
+                await editing.setExpanded(false, reduceMotion: reduceMotion)
                 store.rowEditing = nil
                 after?()
             } catch { editing.error = error.localizedDescription; editing.isSaving = false }

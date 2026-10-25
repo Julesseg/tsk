@@ -67,6 +67,30 @@ import XCTest
         XCTAssertTrue(app.textFields["task-description"].exists)
     }
 
+    func testMiddleRowOpensSpaceAroundItsFixedHeader() throws {
+        let app = try launch(neighbors: true)
+        let rows = app.collectionViews["task-list"].cells
+        XCTAssertEqual(rows.count, 3)
+        let before = rows.element(boundBy: 0).frame
+        let after = rows.element(boundBy: 2).frame
+        let checkbox = app.buttons["complete-task-row-" + taskID]
+        let header = checkbox.frame
+        XCTAssertLessThanOrEqual(before.height, 53, "Compact rows use four points of padding on each edge")
+        capture("Tighter list before middle row expansion", app)
+        app.buttons["task-" + taskID].tap()
+        XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
+        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY - 12, accuracy: 1)
+        XCTAssertGreaterThan(rows.element(boundBy: 2).frame.minY, after.minY + 12)
+        capture("Middle row opens space above and below its fixed header", app)
+        try tapOutside(app)
+        XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
+        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY, accuracy: 1)
+        XCTAssertEqual(rows.element(boundBy: 2).frame.minY, after.minY, accuracy: 1)
+        capture("Tighter list restored after middle row collapse", app)
+    }
+
     func testLongTitleUsesBoundedHeaderWithKeyboard() throws {
         let app = try launch(largeText: true, longTitle: true)
         app.buttons["task-" + taskID].tap()
@@ -128,6 +152,7 @@ import XCTest
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
         capture("Focused title above keyboard", app)
         app.buttons["dismiss-row-keyboard"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         try tapOutside(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
@@ -259,7 +284,7 @@ import XCTest
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
@@ -280,6 +305,9 @@ import XCTest
             for index in 1...12 {
                 records.append(["id": String(format: "90000000-0000-0000-0000-%012d", index), "attributes": [["key": "description", "value": "Earlier task \(index) with a longer title to fill the list"], ["key": "status", "value": "pending"]]])
             }
+        }
+        if neighbors {
+            records.append(["id": "90000000-0000-0000-0000-000000000001", "attributes": [["key": "description", "value": "Earlier task"], ["key": "status", "value": "pending"]]])
         }
         let data = try JSONSerialization.data(withJSONObject: records)
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
