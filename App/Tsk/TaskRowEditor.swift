@@ -12,7 +12,7 @@ struct TaskRowEditor: View {
 
     var body: some View {
         ScrollView {
-            content
+            TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, information: information)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -29,15 +29,22 @@ struct TaskRowEditor: View {
             await editing.setExpanded(true, reduceMotion: reduceMotion)
         }
     }
+}
 
-    private var content: some View {
+private struct TaskRowEditorContent: View {
+    let store: TaskStore
+    @Bindable var editing: TaskRowEditing
+    @FocusState.Binding var titleFocused: Bool
+    let information: () -> Void
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 6) {
                     HStack(spacing: 6) {
                         ForEach(TaskRowParameter.allCases) { parameter in
                             TaskRowParameterPill(editing: editing, parameter: parameter,
-                                                 projects: store.availableProjects, now: store.currentDate) {
+                                                 projects: store.availableProjects, now: editing.referenceDate) {
                                 titleFocused = false
                             }
                         }

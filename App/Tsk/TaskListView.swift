@@ -58,7 +58,7 @@ struct TaskListView: View {
                 }
             }
         }
-        .offset(y: -(store.rowEditing.map { $0.focusInset * $0.revealProgress } ?? 0))
+        .modifier(TaskRowFocusOffset(editing: store.rowEditing))
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
@@ -82,8 +82,8 @@ struct TaskListView: View {
     }
 
     private func editorIsClipped(in viewport: CGRect, keyboardInset: CGFloat) -> Bool {
-        guard let editing = store.rowEditing, editing.bounds != .zero else { return false }
-        return editing.bounds.minY < viewport.minY - 1 || editing.bounds.maxY > viewport.maxY - keyboardInset + 1
+        guard let editing = store.rowEditing, !editing.isAnimating, editing.visibilityBounds != .zero else { return false }
+        return editing.visibilityBounds.minY < viewport.minY - 1 || editing.visibilityBounds.maxY > viewport.maxY - keyboardInset + 1
     }
 
     private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat) {
@@ -131,7 +131,7 @@ struct TaskListRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var titleFocused: Bool
     @State private var headerHeight: CGFloat = 44
-    @State private var rowBounds = CGRect.zero
+    @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @Environment(\.taskRowViewport) private var viewport
@@ -139,7 +139,6 @@ struct TaskListRow: View {
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }
     private var editing: TaskRowEditing? { store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
     private var expanded: Bool { editing?.isExpanded == true }
-    private var progress: CGFloat { editing?.revealProgress ?? 0 }
     private var hasMetadata: Bool {
         let current = editing?.savedTask ?? task
         return !current.project.isEmpty || current.deadline != nil
@@ -190,7 +189,7 @@ struct TaskListRow: View {
                     if hasMetadata {
                         TaskListMetadata(task: editing?.savedTask ?? task, store: store)
                             .padding(.bottom, 2)
-                            .opacity(1 - progress)
+                            .modifier(TaskRowFade(editing: editing, disappearing: true))
                             .accessibilityHidden(true)
                     }
                 }
@@ -200,7 +199,7 @@ struct TaskListRow: View {
                     TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
                                   information: { rowActions.information(task) })
                         .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24))
-                        .opacity(progress)
+                        .modifier(TaskRowFade(editing: editing))
                         .allowsHitTesting(expanded)
                         .accessibilityHidden(!expanded)
                 }
@@ -226,8 +225,7 @@ struct TaskListRow: View {
                 }
             }
         }
-        .padding(.top, 4 + (editing?.focusInset ?? 0) * progress)
-        .padding(.bottom, 4 + 12 * progress)
+        .modifier(TaskRowSpacing(editing: editing))
         .background {
             if expanded {
                 Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
@@ -241,20 +239,20 @@ struct TaskListRow: View {
             if editing != nil {
                 RoundedRectangle(cornerRadius: 18).fill(.background)
                     .shadow(color: .black.opacity(0.12), radius: 12, y: 3)
-                    .opacity(progress)
+                    .modifier(TaskRowFade(editing: editing))
             }
         }
-        .opacity(editing == nil ? 1 - 0.55 * (store.rowEditing?.revealProgress ?? 0) : 1)
+        .modifier(TaskRowDimming(editing: editing == nil ? store.rowEditing : nil))
         .allowsHitTesting(store.rowEditing == nil || editing != nil)
         .frame(maxHeight: .infinity, alignment: .top)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
-            rowBounds = bounds
-            editing?.bounds = bounds
+            rowGeometry.bounds = bounds
+            editing?.measure(bounds)
         }
         .onChange(of: editing?.rowID) { _, _ in
             if let editing {
-                editing.bounds = rowBounds
-                editing.focusInset = min(12, max(0, rowBounds.minY - viewport.minY))
+                editing.measure(rowGeometry.bounds)
+                editing.focusInset = min(12, max(0, rowGeometry.bounds.minY - viewport.minY))
             }
         }
         .mask {
@@ -294,4 +292,45 @@ struct TaskListRow: View {
         store.expandRow(task, rowID: identity)
     }
 
+}
+
+@MainActor private final class TaskRowGeometry {
+    var bounds = CGRect.zero
+}
+
+private struct TaskRowFocusOffset: ViewModifier {
+    let editing: TaskRowEditing?
+
+    func body(content: Content) -> some View {
+        content.offset(y: -(editing.map { $0.focusInset * $0.revealProgress } ?? 0))
+    }
+}
+
+private struct TaskRowDimming: ViewModifier {
+    let editing: TaskRowEditing?
+
+    func body(content: Content) -> some View {
+        content.opacity(1 - 0.55 * (editing?.revealProgress ?? 0))
+    }
+}
+
+private struct TaskRowSpacing: ViewModifier {
+    let editing: TaskRowEditing?
+
+    func body(content: Content) -> some View {
+        let progress = editing?.revealProgress ?? 0
+        content
+            .padding(.top, 4 + (editing?.focusInset ?? 0) * progress)
+            .padding(.bottom, 4 + 12 * progress)
+    }
+}
+
+private struct TaskRowFade: ViewModifier {
+    let editing: TaskRowEditing?
+    var disappearing = false
+
+    func body(content: Content) -> some View {
+        let progress = editing?.revealProgress ?? 0
+        content.opacity(disappearing ? 1 - progress : progress)
+    }
 }
