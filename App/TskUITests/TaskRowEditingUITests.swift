@@ -280,6 +280,20 @@ import XCTest
         title.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
+        title.typeText(" scroll retained")
+        app.buttons["dismiss-row-keyboard"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        let list = app.collectionViews["task-list"]
+        let originalY = title.frame.minY
+        let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+        let end = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        XCTAssertTrue(!title.exists || title.frame.minY > originalY + 30, "The list must scroll from outside the expanded row without pinning it")
+        XCTAssertFalse(app.buttons["task-" + taskID].exists, "Scrolling must not close the draft")
+        capture("List scrolled while retaining the expanded draft", app)
+        for _ in 0..<4 where !title.isHittable { list.swipeUp() }
+        XCTAssertTrue(title.isHittable)
+        XCTAssertTrue((title.value as? String ?? "").contains("scroll retained"))
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
@@ -302,7 +316,7 @@ import XCTest
             records[0]["attributes"] = attributes
         }
         if crowded {
-            for index in 1...12 {
+            for index in 1...24 {
                 records.append(["id": String(format: "90000000-0000-0000-0000-%012d", index), "attributes": [["key": "description", "value": "Earlier task \(index) with a longer title to fill the list"], ["key": "status", "value": "pending"]]])
             }
         }

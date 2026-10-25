@@ -36,7 +36,7 @@ struct UpcomingTaskList: View {
             .refreshable { await store.reload() }
             .task(id: viewport.height) { await Task.yield(); revealEditor(using: proxy) }
             .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy) }
-            .task(id: editorIsClipped) { await Task.yield(); revealEditor(using: proxy) }
+            .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy) }
             .onChange(of: selection?.wrappedValue) { _, id in
                 if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.task.id == id }) { proxy.scrollTo(entry.id) }
             }

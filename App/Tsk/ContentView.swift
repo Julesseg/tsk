@@ -58,6 +58,11 @@ struct ContentView: View {
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             calendarWorkspace
+                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                    guard let editing = store.rowEditing, editing.isExpanded,
+                          !editing.bounds.contains(tap.location) else { return }
+                    closeRow()
+                })
                 .overlay {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
@@ -547,7 +552,25 @@ private struct TaskRowDismissalOverlay: View {
             if let editing, editing.isExpanded, editing.bounds != .zero {
                 let origin = geometry.frame(in: .global).origin
                 TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: close)
+                    .allowsHitTesting(false)
             }
+        }
+        .background {
+            GeometryReader { geometry in
+                if let editing, editing.bounds != .zero {
+                    let origin = geometry.frame(in: .global).origin
+                    let bounds = editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y)
+                    let viewport = editing.viewport.offsetBy(dx: -origin.x, dy: -origin.y)
+                    Path { path in
+                        path.addRect(CGRect(origin: .zero, size: geometry.size))
+                        path.addPath(Path(roundedRect: bounds, cornerRadius: 18).intersection(Path(viewport)))
+                    }
+                    .fill(Color.black.opacity(0.08 * editing.revealProgress), style: FillStyle(eoFill: true))
+                }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }
