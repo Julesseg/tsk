@@ -118,9 +118,7 @@ private struct TaskRowParameterPill: View {
                 Button(action: openPicker) { label }
             }
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.capsule)
-        .controlSize(.small)
+        .buttonStyle(TaskRowParameterButtonStyle())
         .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
         .popover(isPresented: Binding(
             get: { editing.parameter == parameter },
@@ -222,13 +220,25 @@ struct TaskRowParameterLabel: View {
     let value: String?
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: parameter.symbol)
+        HStack(spacing: 5) {
+            Image(systemName: parameter.symbol).font(.caption)
             if let value {
                 Text(value).lineLimit(1)
             }
         }
-        .font(.caption)
+        .font(.caption2)
         .lineLimit(1)
+    }
+}
+
+private struct TaskRowParameterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 9)
+            .frame(minHeight: 26)
+            .background(.background, in: Capsule())
+            .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
+            .opacity(configuration.isPressed ? 0.65 : 1)
     }
 }

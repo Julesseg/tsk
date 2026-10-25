@@ -29,7 +29,7 @@ struct TaskListView: View {
                         .refreshable { await store.reload(); await calendar.refresh() }
                         .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                         .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: editorIsClipped(in: geometry.frame(in: .global), keyboardInset: keyboardInset)) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                         .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             } else if let error = store.error, store.visibleTasks.isEmpty {
@@ -53,7 +53,7 @@ struct TaskListView: View {
                     .refreshable { await store.reload() }
                     .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                     .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                    .task(id: editorIsClipped(in: geometry.frame(in: .global), keyboardInset: keyboardInset)) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
             }
@@ -251,10 +251,12 @@ struct TaskListRow: View {
         }
         .onChange(of: editing?.rowID) { _, _ in
             if let editing {
+                editing.viewport = viewport
                 editing.measure(rowGeometry.bounds)
                 editing.focusInset = min(12, max(0, rowGeometry.bounds.minY - viewport.minY))
             }
         }
+        .onChange(of: viewport) { _, bounds in editing?.viewport = bounds }
         .mask {
             VStack(spacing: 0) {
                 LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)

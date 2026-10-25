@@ -16,6 +16,7 @@ final class TaskRowEditing {
     var error: String?
     var isExpanded = false
     var isSaving = false
+    var viewport = CGRect.zero
     private(set) var bounds = CGRect.zero
     private(set) var visibilityBounds = CGRect.zero
     private(set) var isAnimating = false

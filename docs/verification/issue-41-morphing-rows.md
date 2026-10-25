@@ -607,3 +607,54 @@ Physical-device hitch/frame-pacing acceptance, system Reduce Motion and spoken
 VoiceOver remain unverified. Canonical CI is required on the pushed head.
 Temporary probes/autoplay and altered fixtures were removed; no HTML UI report
 was generated.
+
+## Scrollable focus and prototype controls (2026-10-25)
+
+Expanded drafts now allow native list panning. The outside-tap recognizer lives
+on the workspace, while the existing accessible save/close regions no longer
+intercept touches. A drag leaves the draft open; a tap outside the row
+still validates and saves. Initial expansion and viewport/keyboard
+changes retain visibility correction, but changing scroll coordinates no longer
+retarget it. All/Today and Upcoming share this behavior.
+
+An 8% black scrim follows the shared reveal progress across the app and its safe
+areas. Its rounded cutout follows the expanded row, clipped to the list viewport,
+so the card stays undimmed without exposing navigation chrome when scrolled.
+The chosen A clock, curve and durations are unchanged.
+
+The archived `prototype/issue-41-row-motion` capsule design is translated to a
+26-point minimum visible height, thin outline, nine-point horizontal padding,
+small icon/value labels and adaptive system colors. The 44-point interaction
+areas, native Project/Priority menus, and matched-source date popovers remain.
+
+The lower-row native regression now edits a title, hides the keyboard, drags
+from a surrounding row, verifies the list moved without collapsing the draft,
+then scrolls back and checks the unsaved text before outside saving.
+
+The signed simulator build and all 14 test-routing checks pass. Native iPhone
+fixed-header, picker/menu and complete outside-save/validation/relaunch checks
+pass in `phone-interaction.xcresult`, `phone-final-visual.xcresult` and
+`phone-pickers-save.xcresult`. The final dark-mode overflow/keyboard/scrolling
+sequence passes in `phone-keyboard-hit-test.xcresult`.
+
+The equivalent iPad overflow sequence passes in `pad-scroll-overflow.xcresult`.
+The iPad light/dark and accessibility XXXL journey passes in `pad-final.xcresult`;
+that bundle also retains an initial scrolling-fixture failure because twelve
+neighbours fit on the taller iPad after keyboard dismissal. The regression now
+uses twenty-four neighbours so both device families have a real scroll range.
+
+A clipped-viewport tap-test candidate incorrectly closed the iPhone draft when
+Hide Keyboard changed the viewport. The same dark-mode sequence is red in
+`phone-scroll-overflow.xcresult` and green with live row-bound tap detection in
+`phone-keyboard-hit-test.xcresult`. Viewport clipping applies only to the visual
+scrim cutout.
+
+Actual native captures under `/tmp/tsk-61-refinements/` show the flat capsules,
+retained draft after scrolling and continuous dimming. In the final light iPhone
+capture, sampled background/top/bottom safe-area pixels change from RGB 255 to
+235 while a blank expanded-card pixel remains RGB 255; raw values are retained
+in `dimming-pixels.json`. Every task-owned simulator was shut down after its run.
+
+Canonical CI is required on the pushed head. Physical-device gestures/frame
+pacing and spoken VoiceOver are not established by these simulator checks.
+No HTML UI report was generated.
