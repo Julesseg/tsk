@@ -737,3 +737,29 @@ simulator in `/tmp/tsk-61-ci/spotlight-local.xcresult`, including actual system
 search, opening the persisted UUID and index removal after completion. Its
 temporary simulator was shut down and deleted; the iPad simulator was shut
 down after its focused check. Canonical CI is being rerun to verify both lanes.
+
+### Isolate Spotlight system integration
+
+The subsequent `e137774` retry passed iPad and every iPhone row-editing case,
+but Xcode timed out launching the app for Spotlight before feature execution.
+Together with the earlier unacknowledged indexing operation and a complete
+Spotlight pass on the same head, this motivates removing shared simulator
+state from the test setup. It does not establish one app indexing defect.
+
+The runner now partitions Spotlight from Share/workspace execution. Each
+selected Spotlight method receives a newly created simulator using the
+original lane's device type and runtime. Its XCTest result, test-aligned
+service diagnostics, participant traces and preparation/cleanup manifest are
+retained before shutdown and deletion. An `always()` cleanup step also removes
+recorded devices left by a killed runner. Include/skip selectors, exact UUID
+and system Search assertions, indexing/query budgets and method limits remain
+unchanged; every selected test runs once and any phase failure keeps CI red.
+
+The runner regressions initially failed against the shared-simulator setup.
+All 35 routing, simulator-selection and runner regressions now pass, including
+complete full-suite selection without duplicates, failed-boot cleanup,
+interrupted execution and preservation of pre-existing devices. The first
+native run through the new wrapper passed the complete Spotlight
+search/open/completion/index-removal journey in 172.355 seconds and recorded
+successful shutdown/deletion. Two further fresh-simulator runs and canonical
+CI remain pending; this is not yet a claim of established long-term reliability.

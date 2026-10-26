@@ -116,7 +116,8 @@ def phases(filters):
     if not selected:
         raise ValueError("Selection contains no UI tests")
     share = {test for test in selected if matches(test, "TskUITests/ShareCaptureUITests")}
-    return [phase for phase, enabled in (("share", share), ("main", selected - share)) if enabled]
+    spotlight = {test for test in selected if matches(test, "TskUITests/SpotlightUITests")}
+    return [phase for phase, enabled in (("spotlight", spotlight), ("share", share), ("main", selected - share - spotlight)) if enabled]
 
 
 def requires_sync_peer(filters):
