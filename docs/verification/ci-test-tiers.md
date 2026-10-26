@@ -113,6 +113,11 @@ Outstanding discovery children are cancelled, reaped and recorded on exit.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.
+The disposable simulator uses an available runtime matching the selected iOS
+Simulator SDK's major/minor version. An unrelated newer installed runtime cannot
+silently change the lane's device or OS; a missing matching runtime fails with
+the SDK version in the error. Simulator selection has portable regressions in
+`scripts/test-ui-test-simulator.py`, run by the routing job.
 Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
 The expanded workspace selection exceeded the former 30-minute step limit;
 the measured iPad run spent 10 minutes 33 seconds in simulator preparation

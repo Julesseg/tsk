@@ -688,3 +688,26 @@ passes in `pickers.xcresult`, covering all three calendars and native menus.
 Native screenshots confirm the pills occupy the compact metadata line.
 All task-owned simulators were shut down. iPad, physical-device frame pacing and
 canonical CI were not established by these focused local checks.
+
+## Adaptive focus background and CI corrections (2026-10-26)
+
+The surrounding app uses an 8% white scrim in dark mode and retains its 8% black
+scrim in light mode, with the same animated card cutout. Native iPhone captures
+in `/tmp/tsk-61-ci/capture-baseline.xcresult` show dark background/safe-area pixels
+changing from RGB 0 to 20 while the expanded card stays RGB 0. Light background
+pixels still change from RGB 255 to 235 while the card stays RGB 255. The
+light/dark and accessibility XXXL picker journey passes.
+
+The same run reproduces the canonical capture failure: tapping New task leaves
+Today visible without its editor. Restricting the workspace outside-tap gesture
+to active row editing makes the complete capture/cancel/validation/save/relaunch
+journey pass in `/tmp/tsk-61-ci/capture-gesture.xcresult`. The existing test was
+retained without changing its assertions or text-field queries.
+
+The failing iPhone CI lane selected an iOS 27.1 iPhone Duo despite its Xcode 27.0
+SDK. Simulator selection now matches the selected SDK's major/minor runtime;
+the regression fails with the former selector and passes with the correction.
+All 30 routing, UI-selection and simulator-selection checks pass. The preceding
+iPad lane stopped before XCTest when its simulator shut down; a fresh canonical
+run is still required to establish both lanes. Task-owned local simulators were
+shut down. Physical-device frame pacing and input remain unverified.
