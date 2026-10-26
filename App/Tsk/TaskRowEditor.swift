@@ -38,7 +38,7 @@ private struct TaskRowEditorContent: View {
     let information: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 4) {
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 6) {
                     HStack(spacing: 6) {
@@ -48,7 +48,7 @@ private struct TaskRowEditorContent: View {
                                 titleFocused = false
                             }
                         }
-                    }.padding(4)
+                    }.padding(.horizontal, 4)
                 }
             }
             .scrollIndicators(.hidden)
@@ -72,8 +72,7 @@ private struct TaskRowEditorContent: View {
                 }
             }.font(.subheadline)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
         .disabled(editing.isSaving)
     }
 }

@@ -658,3 +658,16 @@ in `dimming-pixels.json`. Every task-owned simulator was shut down after its run
 Canonical CI is required on the pushed head. Physical-device gestures/frame
 pacing and spoken VoiceOver are not established by these simulator checks.
 No HTML UI report was generated.
+
+## Tighter expanded-row spacing (2026-10-26)
+
+Reduced the editor's vertical stack spacing from 16 to 4 points, removed its
+8-point top inset and the attribute strip's vertical padding, and reduced the
+bottom inset to 8 points. Header geometry and 44-point control hit areas remain
+unchanged.
+
+The signed simulator build and the native iPhone fixed-header and picker/menu
+checks pass in `/tmp/tsk-61-spacing/spacing.xcresult`. Exported captures confirm
+the tighter gaps above and below the pills. The owned simulator was shut down.
+The iPad suite and physical-device interaction were not rerun for this spacing
+change; canonical CI remains required on the pushed head.
