@@ -120,6 +120,7 @@ jobs:
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: |
           python3 scripts/test-ui-test-selection.py
+          python3 scripts/test-simulator-host-diagnostics.py
           python3 scripts/test-native-keyboard-hid-installer.py
           python3 scripts/test-native-keyboard-hid-relay.py
           python3 scripts/test-native-keyboard-hid-owner.py
@@ -214,7 +215,9 @@ jobs:
             peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
           fi
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
-          python3 ../scripts/with-sync-fixture.py \
+          python3 ../scripts/with-simulator-host-diagnostics.py \
+            --output "$TSK_EVENTKIT_EVIDENCE_DIR/host" -- \
+            python3 ../scripts/with-sync-fixture.py \
             --server ../.build/sync-server/target/release/taskchampion-sync-server \
             --output ../.build/ui-sync "${peer[@]}" -- \
             ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" --skip-build \
