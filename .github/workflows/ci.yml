@@ -121,6 +121,7 @@ jobs:
         run: |
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-simulator-host-diagnostics.py
+          python3 scripts/test-simulator-spotlight-log.py
           python3 scripts/test-native-keyboard-hid-installer.py
           python3 scripts/test-native-keyboard-hid-relay.py
           python3 scripts/test-native-keyboard-hid-owner.py
