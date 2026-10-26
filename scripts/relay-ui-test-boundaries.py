@@ -128,7 +128,7 @@ class BoundaryCapture:
                             return
                         self.record('spotlight-window-start', method=method)
                         entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), self.device,
-                                            str(self.evidence / ('spotlight-' + method + '.log')), str(stop)], 'spotlight', method, str(stop))
+                                            str(self.evidence / ('spotlight-' + method + '.log')), str(stop), '--maximum-seconds', '600'], 'spotlight', method, str(stop))
                         if entry:
                             self.active[method] = entry
                 else:

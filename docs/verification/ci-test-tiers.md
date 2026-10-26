@@ -143,6 +143,9 @@ bundles and `.build/eventkit-fixture/spotlight/<method>` diagnostics distinguish
 simulator preparation, app launch and indexing/search failures. `phases.json`
 records each owned simulator, result, exit status and cleanup outcome.
 Timed guest log streams use `log stream --timeout` and expire inside the guest.
+The method-aligned Spotlight stream covers its existing 600-second XCTest window
+or stops when the method ends, so slow setup cannot consume the capture before
+the first query. The separate workspace stream retains its 60-second cap.
 The collector does not terminate the host `simctl spawn` client at its duration
 boundary while XCTest is active. Explicit test completion and cancellation still
 reap the owned logging process. This transport change requires CI verification;
