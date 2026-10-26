@@ -104,7 +104,7 @@ if [[ "$test_phases" == *spotlight* ]]; then
         "${build_arguments[@]}" -resultBundlePath "$result_path" || spotlight_status=$?
     printf 'Fresh Spotlight UI status: %s\n' "$spotlight_status"
     case "$spotlight_status" in
-        0|65) ;;
+        0) ;;
         *) exit "$spotlight_status" ;;
     esac
 fi

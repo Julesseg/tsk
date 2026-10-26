@@ -4,7 +4,7 @@ Pull requests and pushes to `main` with non-documentation changes run all Core
 and persistent Native tests, plus focused UI smoke coverage on both device
 families. Existing check names stay unchanged for branch protection. The UI
 runner builds once per lane and reuses that build and synchronization fixture.
-The UI command records scoped host CoreSimulator lifecycle logs and samples
+The UI command records scoped host CoreSimulator unified and service logs and samples
 memory, swap, disk and process usage every 15 seconds under
 `.build/eventkit-fixture/host`. These diagnostics preserve the test command's
 exit status and never shut down or restart a simulator. A simulator disappearing
@@ -130,8 +130,10 @@ the SDK version in the error. Simulator selection has portable regressions in
 Spotlight phase selection honors the original include/skip filters and runs
 each selected method exactly once. Its 600-second method limits, indexing/query
 budgets and actual system Search/UUID/completion assertions are unchanged.
-A failed Spotlight case keeps the lane red even if the subsequent phases pass;
-there is no automatic case retry. Separate `TestResults-spotlight-*.xcresult`
+A failed Spotlight phase stops the lane before Share/main execution, preserving
+the failure and uploading its diagnostics immediately after owned cleanup.
+Successful lanes retain the complete selection. There is no automatic case retry.
+Separate `TestResults-spotlight-*.xcresult`
 bundles and `.build/eventkit-fixture/spotlight/<method>` diagnostics distinguish
 simulator preparation, app launch and indexing/search failures. `phases.json`
 records each owned simulator, result, exit status and cleanup outcome.

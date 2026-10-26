@@ -219,12 +219,12 @@ if name == 'xcodebuild' and 'test-without-building' in args:
         self.assertEqual(set(destinations), {"platform=iOS Simulator,id=" + device for device in deleted})
         self.assertFalse(any(call["args"] == ["simctl", "boot", "owned-test-device"] for call in calls))
 
-    def test_spotlight_failure_survives_successful_main_and_cleans_owned_device(self):
+    def test_spotlight_failure_returns_immediately_after_its_owned_cleanup(self):
         result, calls = self.run_runner(selection.selection("smoke", "iPhone"), spotlight_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
-        self.assertEqual(len(executions), 3)
-        self.assertIn("-skip-testing:TskUITests/SpotlightUITests", executions[-1])
+        self.assertEqual(len(executions), 1)
+        self.assertFalse(any(call["args"] == ["simctl", "boot", "owned-test-device"] for call in calls))
         self.assertEqual(sum(call["args"][:2] == ["simctl", "delete"] for call in calls), 1)
 
     def test_failed_spotlight_boot_still_deletes_its_device_and_preserves_prebooted_device(self):
