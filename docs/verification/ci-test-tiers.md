@@ -119,6 +119,11 @@ start, with a 30-second discovery cap. Each request still keeps its original
 only cached for its device, runner bundle and process after checking the exact
 owner, attempt and nonce request file; every subsequent request is checked too.
 Outstanding discovery children are cancelled, reaped and recorded on exit.
+An already timed-out background preparation is retained in diagnostics and does
+not invalidate a later shortcut request. That request may perform one fresh
+lookup using its original deadline and five-second dispatch reservation. A
+pending preparation timeout, failed live lookup or mismatched request still
+fails without command replay or an extended budget.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.

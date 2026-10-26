@@ -661,6 +661,58 @@ class RunnerContainerTests(unittest.IsolatedAsyncioTestCase):
         location.mkdir(parents=True, exist_ok=True)
         (location / (value['request'] + '.request.json')).write_text(json.dumps(value))
 
+    async def test_timed_out_prefetch_does_not_poison_later_request_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            clock = 100.0
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[TimeoutError(), root]) as discover, mock.patch.object(relay, 'time', SimpleNamespace(monotonic=lambda: clock, time=lambda: clock)):
+                await containers.start_case(relay.ANNOTATIONS)
+                with self.assertRaises(TimeoutError):
+                    await containers.lookup
+                clock = 250.0
+                value = request(relay.ANNOTATIONS, 'secondNoteCommandN')
+                value['expiresAt'] = clock + 12
+                self.write_request(root, value)
+                exchange = await containers.exchange(value, deadline=clock + 12)
+                exchange.close()
+                self.assertEqual(discover.await_count, 2)
+                self.assertIsNone(discover.await_args_list[0].args[1])
+                self.assertEqual(discover.await_args_list[0].kwargs['deadline'], 135)
+                self.assertEqual(discover.await_args_list[1].args[1], value)
+                self.assertEqual(discover.await_args_list[1].kwargs['deadline'], 262)
+
+    async def test_timed_out_prefetch_cannot_retry_a_failed_live_lookup(self):
+        containers = relay.RunnerContainers('owned-udid', {})
+        self.addAsyncCleanup(containers.close)
+        with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[TimeoutError(), TimeoutError()]) as discover:
+            await containers.start_case(relay.ANNOTATIONS)
+            with self.assertRaises(TimeoutError):
+                await containers.lookup
+            deadline = time.monotonic() + 12
+            with self.assertRaises(TimeoutError):
+                await containers.exchange(request(relay.ANNOTATIONS, 'secondNoteCommandN'), deadline=deadline)
+            self.assertEqual(discover.await_count, 2)
+            self.assertEqual(discover.call_args.kwargs['deadline'], deadline)
+            self.assertEqual(containers.verified, {})
+
+    async def test_timed_out_prefetch_still_rejects_foreign_request_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            containers = relay.RunnerContainers('owned-udid', {})
+            self.addAsyncCleanup(containers.close)
+            value = request(relay.ANNOTATIONS, 'secondNoteCommandN')
+            self.write_request(root, dict(value, runnerPID=4321))
+            with mock.patch.object(relay, 'container_for', new_callable=mock.AsyncMock, side_effect=[TimeoutError(), root]) as discover:
+                await containers.start_case(relay.ANNOTATIONS)
+                with self.assertRaises(TimeoutError):
+                    await containers.lookup
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    await containers.exchange(value, deadline=time.monotonic() + 12)
+                self.assertEqual(discover.await_count, 2)
+                self.assertEqual(containers.verified, {})
+
     async def test_slow_preparation_finishes_before_request_without_spending_its_dispatch_budget(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
