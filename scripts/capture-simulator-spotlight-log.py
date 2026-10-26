@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+import argparse
 import datetime
 import json
 import math
 import pathlib
 import signal
 import subprocess
-import sys
 import time
 
 
@@ -56,4 +56,10 @@ def capture(device, output, stop, maximum_seconds=60):
 
 
 if __name__ == '__main__':
-    capture(*sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('device')
+    parser.add_argument('output')
+    parser.add_argument('stop')
+    parser.add_argument('--maximum-seconds', type=int, default=60, choices=range(1, 601), metavar='1..600')
+    args = parser.parse_args()
+    capture(args.device, args.output, args.stop, args.maximum_seconds)
