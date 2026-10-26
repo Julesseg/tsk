@@ -4,6 +4,11 @@ Pull requests and pushes to `main` with non-documentation changes run all Core
 and persistent Native tests, plus focused UI smoke coverage on both device
 families. Existing check names stay unchanged for branch protection. The UI
 runner builds once per lane and reuses that build and synchronization fixture.
+The UI command records scoped host CoreSimulator lifecycle logs and samples
+memory, swap, disk and process usage every 15 seconds under
+`.build/eventkit-fixture/host`. These diagnostics preserve the test command's
+exit status and never shut down or restart a simulator. A simulator disappearing
+mid-test remains a failure; its host evidence is uploaded alongside XCTest results.
 Each selected Spotlight method runs first on its own newly created simulator,
 matching the lane's device type and runtime. That simulator is shut down and
 deleted after its result and diagnostics are collected, including on failure.
