@@ -711,3 +711,29 @@ All 30 routing, UI-selection and simulator-selection checks pass. The preceding
 iPad lane stopped before XCTest when its simulator shut down; a fresh canonical
 run is still required to establish both lanes. Task-owned local simulators were
 shut down. Physical-device frame pacing and input remain unverified.
+
+### Canonical CI follow-up
+
+Run `40381224328` verifies SDK-matched iOS 27.0 iPhone 18 Pro Max and iPad Pro
+13-inch simulators. Share capture, real synchronization, native keyboard input,
+widgets, capture/edit persistence, and the other selected row checks pass. One
+check fails per lane: an unacknowledged Core Spotlight deletion on iPhone and a
+keyboard-dismissal tap at the row's previous position on iPad.
+
+The scrolling regression now uses the existing stable, uncovered target
+admission when an onscreen keyboard is present, and normal visible-control
+admission for hardware-keyboard focus. Its keyboard-disappearance, scroll and
+draft-retention assertions are unchanged. The iPad journey passes locally in
+`/tmp/tsk-61-ci/pad-keyboards.xcresult`; requiring an onscreen keyboard even in
+hardware-keyboard mode failed in the preceding `pad-dismissal.xcresult`.
+
+The Spotlight trace reaches `spotlight.delete.submission` with indexing
+available, but receives no completion callback. The system log records its
+query stalling behind queued data. The indexing and query acceptance budgets
+and assertions remain unchanged for the fresh canonical run.
+
+The unchanged Spotlight case passes on a newly created, isolated iPhone
+simulator in `/tmp/tsk-61-ci/spotlight-local.xcresult`, including actual system
+search, opening the persisted UUID and index removal after completion. Its
+temporary simulator was shut down and deleted; the iPad simulator was shut
+down after its focused check. Canonical CI is being rerun to verify both lanes.

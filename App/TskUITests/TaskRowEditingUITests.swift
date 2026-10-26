@@ -283,7 +283,11 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
         title.typeText(" scroll retained")
-        app.buttons["dismiss-row-keyboard"].tap()
+        if app.keyboards.firstMatch.exists && app.keyboards.firstMatch.frame.height > 0 {
+            tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app, requiresVisibleKeyboard: true)
+        } else {
+            tapTaskControl(app.buttons["dismiss-row-keyboard"], app: app)
+        }
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         let list = app.collectionViews["task-list"]
         let originalY = title.frame.minY
