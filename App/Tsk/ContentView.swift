@@ -62,7 +62,7 @@ struct ContentView: View {
                     guard let editing = store.rowEditing, editing.isExpanded,
                           !editing.bounds.contains(tap.location) else { return }
                     closeRow()
-                })
+                }, including: store.rowEditing == nil ? .subviews : .all)
                 .overlay {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
@@ -546,6 +546,7 @@ private enum TaskWorkspacePresentation: Equatable {
 private struct TaskRowDismissalOverlay: View {
     let editing: TaskRowEditing?
     let close: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geometry in
@@ -565,7 +566,7 @@ private struct TaskRowDismissalOverlay: View {
                         path.addRect(CGRect(origin: .zero, size: geometry.size))
                         path.addPath(Path(roundedRect: bounds, cornerRadius: 18).intersection(Path(viewport)))
                     }
-                    .fill(Color.black.opacity(0.08 * editing.revealProgress), style: FillStyle(eoFill: true))
+                    .fill((colorScheme == .dark ? Color.white : Color.black).opacity(0.08 * editing.revealProgress), style: FillStyle(eoFill: true))
                 }
             }
             .ignoresSafeArea()
