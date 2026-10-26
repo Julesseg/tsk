@@ -17,6 +17,28 @@ POPEN = subprocess.Popen
 
 
 class HostDiagnosticsTests(unittest.TestCase):
+    def test_captures_legacy_service_events_after_command_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = pathlib.Path(directory)
+            source = output / "source.log"
+            source.write_text("older unrelated event\n")
+            cursor = diagnostics.service_log_cursor(source)
+            with source.open("a") as file:
+                file.write("shutdown requester 123\n")
+            diagnostics.capture_service_log(source, output, cursor)
+            self.assertEqual((output / "core-simulator-service.log").read_text(), "shutdown requester 123\n")
+
+    def test_preserves_new_service_log_after_rotation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = pathlib.Path(directory)
+            source = output / "source.log"
+            source.write_text("previous service\n")
+            cursor = diagnostics.service_log_cursor(source)
+            source.rename(output / "source.log.1")
+            source.write_text("restarted service\n")
+            diagnostics.capture_service_log(source, output, cursor)
+            self.assertEqual((output / "core-simulator-service.log").read_text(), "restarted service\n")
+
     def execute(self, status, logger_status=None):
         processes = []
 

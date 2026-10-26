@@ -3,12 +3,32 @@ import argparse
 import datetime
 import json
 import pathlib
+import shutil
 import signal
 import subprocess
 import time
 
 
-PREDICATE = '(process == "CoreSimulatorService" OR process == "simdiskimaged" OR process == "Simulator" OR process == "DeviceHub" OR process == "launchd_sim" OR subsystem BEGINSWITH "com.apple.CoreSimulator") OR (process == "kernel" AND (eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "memory pressure"))'
+PREDICATE = '(process CONTAINS "CoreSimulatorService" OR process == "simdiskimaged" OR process == "Simulator" OR process == "DeviceHub" OR process == "launchd_sim" OR subsystem BEGINSWITH "com.apple.CoreSimulator") OR (process == "kernel" AND (eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "memory pressure"))'
+
+
+def service_log_cursor(source):
+    try:
+        state = source.stat()
+        return state.st_ino, state.st_size
+    except FileNotFoundError:
+        return None, 0
+
+
+def capture_service_log(source, output, cursor):
+    with source.open("rb") as file:
+        state = source.stat()
+        offset = cursor[1] if state.st_ino == cursor[0] and state.st_size >= cursor[1] else 0
+        offset = max(offset, state.st_size - 16 * 1024 * 1024)
+        file.seek(offset)
+        with (output / "core-simulator-service.log").open("wb") as destination:
+            shutil.copyfileobj(file, destination)
+    return {"source": str(source), "offset": offset, "bytes": state.st_size - offset}
 
 
 def utc():
@@ -52,6 +72,8 @@ def run(command, output):
     logger = None
     interrupted = None
     handlers = {}
+    service_log = pathlib.Path.home() / "Library/Logs/CoreSimulator/CoreSimulator.log"
+    cursor = service_log_cursor(service_log)
 
     def interrupt(number, _frame):
         nonlocal interrupted
@@ -97,6 +119,10 @@ def run(command, output):
             stop(logger)
             receipt["logStatus"] = logger.returncode
         receipt["finishedUTC"] = utc()
+        try:
+            receipt["serviceLog"] = capture_service_log(service_log, output, cursor)
+        except OSError as error:
+            receipt["serviceLogError"] = str(error)
         for number, handler in handlers.items():
             signal.signal(number, handler)
         (output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
