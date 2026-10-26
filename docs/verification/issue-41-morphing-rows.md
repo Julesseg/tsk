@@ -671,3 +671,20 @@ checks pass in `/tmp/tsk-61-spacing/spacing.xcresult`. Exported captures confirm
 the tighter gaps above and below the pills. The owned simulator was shut down.
 The iPad suite and physical-device interaction were not rerun for this spacing
 change; canonical CI remains required on the pushed head.
+
+### Replace the compact metadata space
+
+The editor now reuses the measured space occupied by compact project/deadline
+metadata as the row reveals its attributes. Pills align to the top of their
+44-point touch areas. The original compact header still determines checkbox
+alignment; title and checkbox positions remain fixed through expansion/collapse.
+
+The native position regression fails before this change: the first control
+starts at y=164, beyond the allowed title-bottom-plus-six-points position of
+y=146. It passes after the change, alongside fixed-header/collapse and long-title
+keyboard checks in `/tmp/tsk-61-metadata-row/green.xcresult`. The picker check
+initially failed during app installation because storage ran out; its rerun
+passes in `pickers.xcresult`, covering all three calendars and native menus.
+Native screenshots confirm the pills occupy the compact metadata line.
+All task-owned simulators were shut down. iPad, physical-device frame pacing and
+canonical CI were not established by these focused local checks.

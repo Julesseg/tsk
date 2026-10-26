@@ -28,6 +28,8 @@ import XCTest
         XCTAssertEqual(title.frame.minX, titleFrame.minX, accuracy: 1)
         XCTAssertEqual(title.frame.minY, titleFrame.minY, accuracy: 1)
         XCTAssertEqual(checkbox.frame.minY, checkboxFrame.minY, accuracy: 1)
+        XCTAssertLessThanOrEqual(app.buttons["row-project"].frame.minY, title.frame.maxY + 6,
+                                 "Attribute controls replace the compact metadata line immediately below the title")
         XCTAssertTrue(checkbox.isEnabled, "Expanding a row must not apply disabled checkbox styling")
         XCTAssertFalse(app.buttons["collapse-task-row"].exists)
         capture("Fixed header with attributes revealed", app)
