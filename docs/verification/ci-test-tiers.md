@@ -137,6 +137,11 @@ Separate `TestResults-spotlight-*.xcresult`
 bundles and `.build/eventkit-fixture/spotlight/<method>` diagnostics distinguish
 simulator preparation, app launch and indexing/search failures. `phases.json`
 records each owned simulator, result, exit status and cleanup outcome.
+Timed guest log streams use `log stream --timeout` and expire inside the guest.
+The collector does not terminate the host `simctl spawn` client at its duration
+boundary while XCTest is active. Explicit test completion and cancellation still
+reap the owned logging process. This transport change requires CI verification;
+the local forced-stop probe did not reproduce the hosted SimLaunchHost restart.
 The runner regressions cover selection preservation, separate devices,
 failure propagation, failed-boot cleanup and preservation of prebooted devices.
 Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
