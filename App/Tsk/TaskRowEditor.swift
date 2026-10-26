@@ -128,7 +128,7 @@ private struct TaskRowParameterPill: View {
                 .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
                 .presentationCompactAdaptation(.popover)
         }
-        .frame(minWidth: 44, minHeight: 44)
+        .frame(minWidth: 44, minHeight: 44, alignment: .top)
         .contentShape(Rectangle())
         .accessibilityLabel(parameter.title)
         .accessibilityValue(value ?? "Not set")

@@ -131,6 +131,7 @@ struct TaskListRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var titleFocused: Bool
     @State private var headerHeight: CGFloat = 44
+    @State private var titleHeight: CGFloat = 44
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @Environment(\.taskRowAvailableHeight) private var availableHeight
@@ -143,6 +144,7 @@ struct TaskListRow: View {
         let current = editing?.savedTask ?? task
         return !current.project.isEmpty || current.deadline != nil
     }
+    private var attributesOverlap: CGFloat { hasMetadata ? max(0, headerHeight - titleHeight - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
@@ -184,6 +186,7 @@ struct TaskListRow: View {
                     .disabled(!expanded || editing?.isSaving == true)
                     .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
                     .frame(minHeight: hasMetadata ? 0 : 44, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { titleHeight = $0 }
                     .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
                     .accessibilityHidden(!expanded)
                     if hasMetadata {
@@ -198,7 +201,8 @@ struct TaskListRow: View {
                 if let editing {
                     TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
                                   information: { rowActions.information(task) })
-                        .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24))
+                        .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24 + attributesOverlap))
+                        .modifier(TaskRowAttributePosition(editing: editing, overlap: attributesOverlap))
                         .modifier(TaskRowFade(editing: editing))
                         .allowsHitTesting(expanded)
                         .accessibilityHidden(!expanded)
@@ -334,5 +338,14 @@ private struct TaskRowFade: ViewModifier {
     func body(content: Content) -> some View {
         let progress = editing?.revealProgress ?? 0
         content.opacity(disappearing ? 1 - progress : progress)
+    }
+}
+
+private struct TaskRowAttributePosition: ViewModifier {
+    let editing: TaskRowEditing
+    let overlap: CGFloat
+
+    func body(content: Content) -> some View {
+        content.padding(.top, -overlap * editing.revealProgress)
     }
 }
