@@ -4,6 +4,7 @@ simulator_id=${1:?Pass the target simulator UDID followed by xcodebuild argument
 shift
 spotlight_capture_pid=""
 spotlight_stop_file=""
+booted_by_runner=false
 stop_spotlight_capture() {
     if [[ -n "$spotlight_capture_pid" ]]; then
         touch "$spotlight_stop_file"
@@ -39,7 +40,7 @@ cleanup() {
             python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-ui-boundaries.py" "$TSK_EVENTKIT_EVIDENCE_DIR" || true
         fi
     fi
-    if [[ "$was_booted" == no ]]; then
+    if [[ "$booted_by_runner" == true ]]; then
         xcrun simctl shutdown "$simulator_id" || true
     fi
     python3 - "$booted_file" <<'PY'
@@ -54,10 +55,6 @@ PY
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-if [[ "$was_booted" == no ]]; then
-    xcrun simctl boot "$simulator_id"
-fi
-xcrun simctl bootstatus "$simulator_id" -b
 build_arguments=()
 share_arguments=()
 test_filters=()
@@ -100,9 +97,28 @@ if [[ "$skip_build" == true ]]; then
 else
     xcodebuild build-for-testing -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}"
 fi
+execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
+spotlight_status=0
+if [[ "$test_phases" == *spotlight* ]]; then
+    python3 "$(dirname "${BASH_SOURCE[0]}")/run-spotlight-ui-tests.py" --template "$simulator_id" -- \
+        "${build_arguments[@]}" -resultBundlePath "$result_path" || spotlight_status=$?
+    printf 'Fresh Spotlight UI status: %s\n' "$spotlight_status"
+    case "$spotlight_status" in
+        0|65) ;;
+        *) exit "$spotlight_status" ;;
+    esac
+fi
+if [[ "$test_phases" == spotlight ]]; then
+    exit "$spotlight_status"
+fi
+if [[ "$was_booted" == no ]]; then
+    booted_by_runner=true
+    xcrun simctl boot "$simulator_id"
+fi
+xcrun simctl bootstatus "$simulator_id" -b
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
-execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
+build_arguments+=(-skip-testing:TskUITests/SpotlightUITests)
 share_status=0
 if [[ "$test_phases" == *share* ]]; then
     xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
@@ -114,7 +130,8 @@ case "$share_status" in
     130|143) exit "$share_status" ;;
     *) exit "$share_status" ;;
 esac
-if [[ "$test_phases" == share ]]; then
+if [[ "$test_phases" != *main* ]]; then
+    if [[ "$spotlight_status" -ne 0 ]]; then exit "$spotlight_status"; fi
     exit "$share_status"
 fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
@@ -153,5 +170,8 @@ case "$main_status" in
 esac
 if [[ "$share_status" -ne 0 ]]; then
     exit "$share_status"
+fi
+if [[ "$spotlight_status" -ne 0 ]]; then
+    exit "$spotlight_status"
 fi
 exit "$main_status"

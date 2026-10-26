@@ -231,8 +231,11 @@ jobs:
       - name: Remove owned isolated simulator
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() && steps.sim.outputs.id != '' }}
         run: |
+          spotlight_cleanup_status=0
+          python3 scripts/run-spotlight-ui-tests.py --cleanup-manifest .build/eventkit-fixture/spotlight/phases.json || spotlight_cleanup_status=$?
           xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
           xcrun simctl delete "${{ steps.sim.outputs.id }}"
+          exit "$spotlight_cleanup_status"
 
       - name: Upload test results
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() }}
@@ -242,6 +245,7 @@ jobs:
           path: |
             App/TestResults.xcresult
             App/TestResults-sharing.xcresult
+            App/TestResults-spotlight-*.xcresult
             .build/ui-sync
             .build/eventkit-fixture
           if-no-files-found: ignore

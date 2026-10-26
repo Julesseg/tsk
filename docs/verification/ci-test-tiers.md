@@ -3,8 +3,12 @@
 Pull requests and pushes to `main` with non-documentation changes run all Core
 and persistent Native tests, plus focused UI smoke coverage on both device
 families. Existing check names stay unchanged for branch protection. The UI
-runner builds once per lane and reuses that build, simulator and synchronization
-fixture. An independent peer
+runner builds once per lane and reuses that build and synchronization fixture.
+Each selected Spotlight method runs first on its own newly created simulator,
+matching the lane's device type and runtime. That simulator is shut down and
+deleted after its result and diagnostics are collected, including on failure.
+Share and the remaining UI methods then use the lane's original simulator.
+An independent peer
 verifies the uploaded UI task whenever the real-server synchronization scenario
 is selected. The iPad smoke selection exercises workspace/keyboard behavior and
 does not create that server task.
@@ -56,7 +60,7 @@ native keyboard input, installed Share capture, installed widget behavior and
 actual Spotlight opening/completion. The iPad selection checks keyboard-driven
 capture/edit/completion/reopen, adaptive landscape/portrait views, custom views
 at accessibility text sizes, modal annotation commands and native text input.
-Share runs first only when selected; the iPad smoke lane skips its separate
+Share precedes the remaining workspace tests only when selected; the iPad smoke lane skips its separate
 launch and host-fixture installation.
 
 Calendar presentation, hidden missing-access/read-error states, and Settings access/Retry recovery run on both device
@@ -118,6 +122,16 @@ Simulator SDK's major/minor version. An unrelated newer installed runtime cannot
 silently change the lane's device or OS; a missing matching runtime fails with
 the SDK version in the error. Simulator selection has portable regressions in
 `scripts/test-ui-test-simulator.py`, run by the routing job.
+Spotlight phase selection honors the original include/skip filters and runs
+each selected method exactly once. Its 600-second method limits, indexing/query
+budgets and actual system Search/UUID/completion assertions are unchanged.
+A failed Spotlight case keeps the lane red even if the subsequent phases pass;
+there is no automatic case retry. Separate `TestResults-spotlight-*.xcresult`
+bundles and `.build/eventkit-fixture/spotlight/<method>` diagnostics distinguish
+simulator preparation, app launch and indexing/search failures. `phases.json`
+records each owned simulator, result, exit status and cleanup outcome.
+The runner regressions cover selection preservation, separate devices,
+failure propagation, failed-boot cleanup and preservation of prebooted devices.
 Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
 The expanded workspace selection exceeded the former 30-minute step limit;
 the measured iPad run spent 10 minutes 33 seconds in simulator preparation
