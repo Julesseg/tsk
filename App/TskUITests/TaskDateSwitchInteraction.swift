@@ -90,7 +90,7 @@ extension XCTestCase {
         let tutorial = app.buttons["Continue"]
         if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
         let keyboardDone = app.buttons[keyboardDismissIdentifier]
-        if app.keyboards.firstMatch.exists {
+        if keyboardDone.exists || app.keyboards.firstMatch.exists {
             XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
             tapTaskControlAtCenter(keyboardDone, app: app, file: file, line: line)
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)

@@ -50,10 +50,10 @@ import XCTest
         XCTAssertTrue(revealTaskElement(descriptionField(host), in: "share-task-form", app: host))
         replace(descriptionField(host), with: title)
         let project = host.textFields["task-project"]
-        XCTAssertTrue(revealTaskElement(project, in: "share-task-form", app: host))
+        XCTAssertTrue(revealTaskElement(project, in: "share-task-form", app: host, bottomInset: host.buttons["dismiss-share-keyboard"]))
         project.tap(); project.typeText("Shared.Reading")
         let tag = host.textFields["task-tag-input"]
-        XCTAssertTrue(revealTaskElement(tag, in: "share-task-form", app: host))
+        XCTAssertTrue(revealTaskElement(tag, in: "share-task-form", app: host, bottomInset: host.buttons["dismiss-share-keyboard"]))
         tag.tap(); tag.typeText("reference")
         host.buttons["add-tag"].tap()
         setDateSwitch("planned-day-enabled", to: true, app: host, in: "share-task-form", keyboardDismissIdentifier: "dismiss-share-keyboard")
