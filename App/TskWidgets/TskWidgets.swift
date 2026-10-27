@@ -37,7 +37,8 @@ struct TaskWidgetProvider: AppIntentTimelineProvider {
             let snapshot = try await manager.viewSnapshot(reference: reference)
             let title = try await manager.registeredViews().first(where: { $0.reference == reference })?.name ?? selected.name
             let next = snapshot.nextEvaluation ?? now.addingTimeInterval(900)
-            return (TaskWidgetEntry(date: now, title: title, tasks: Array(snapshot.tasks.prefix(6)), count: snapshot.tasks.count, error: nil), max(now.addingTimeInterval(60), min(next, now.addingTimeInterval(900))))
+            let tasks = snapshot.listTasks
+            return (TaskWidgetEntry(date: now, title: title, tasks: Array(tasks.prefix(6)), count: tasks.count, error: nil), max(now.addingTimeInterval(60), min(next, now.addingTimeInterval(900))))
         } catch {
             return (TaskWidgetEntry(date: now, title: "Tasks unavailable", tasks: [], count: 0, error: error.localizedDescription), now.addingTimeInterval(300))
         }

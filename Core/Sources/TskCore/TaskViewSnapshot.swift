@@ -6,6 +6,8 @@ public struct TaskViewSnapshot: Equatable, Sendable {
     public let projects: [String]
     public let nextEvaluation: Date?
 
+    public var listTasks: [TaskRecord] { tasks.filter { $0.recurrenceInspection?.kind != .template } }
+
     public init(tasks: [TaskRecord], allTasks: [TaskRecord], projects: [String], nextEvaluation: Date? = nil) {
         self.tasks = tasks
         self.allTasks = allTasks

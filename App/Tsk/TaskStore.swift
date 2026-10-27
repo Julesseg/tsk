@@ -137,7 +137,7 @@ final class TaskStore {
             }
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
-            tasks = snapshot.tasks
+            tasks = snapshot.listTasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil
