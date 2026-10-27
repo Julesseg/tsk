@@ -178,7 +178,8 @@ final class iPadWorkspaceUITests: XCTestCase {
     }
 
     private func description(_ app: XCUIApplication) -> XCUIElement {
-        app.textFields["task-description"].firstMatch
+        app.descendants(matching: .any).matching(identifier: "task-description")
+            .matching(.textField, identifier: nil).firstMatch
     }
 
     private func capture(_ name: String, app: XCUIApplication) {
