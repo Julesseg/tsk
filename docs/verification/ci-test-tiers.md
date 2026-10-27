@@ -150,6 +150,12 @@ The collector does not terminate the host `simctl spawn` client at its duration
 boundary while XCTest is active. Explicit test completion and cancellation still
 reap the owned logging process. This transport change requires CI verification;
 the local forced-stop probe did not reproduce the hosted SimLaunchHost restart.
+The indexing-wait diagnostic branch enables one two-second `sample` capture per
+Spotlight method, triggered only by the Tsk indexing watchdog in that owned
+simulator's log. A noninteractive CI `sudo` helper owns the sampler's ten-second
+process limit and cleanup; the monitor has a twelve-second ceiling. It records
+the native worker stack without restarting the
+service, replaying input or changing XCTest selection, assertions or deadlines.
 The runner regressions cover selection preservation, separate devices,
 failure propagation, failed-boot cleanup and preservation of prebooted devices.
 Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
