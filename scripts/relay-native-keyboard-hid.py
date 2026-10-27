@@ -392,9 +392,6 @@ class RunnerContainers:
         remaining = deadline - time.monotonic() - 5
         if remaining <= 0:
             raise ValueError('Runner discovery cannot consume the five-second dispatch reservation')
-        if self.lookup is not None and self.lookup.done() and not self.lookup.cancelled() and isinstance(self.lookup.exception(), TimeoutError):
-            self.receipt.setdefault('expiredContainerPreparations', []).append(dict(observedMonotonic=time.monotonic(), requestDeadlineMonotonic=deadline))
-            await self.close()
         if self.lookup is None:
             container = await container_for(self.udid, request, self.receipt, deadline=deadline)
         else:
