@@ -71,7 +71,9 @@ and companion, fixed case/phase sequences, nonce/PID/device/socket checks,
 retains its 30-second cap, exact owner/attempt/nonce validation and child cleanup.
 There is no command replay or automatic test retry. Keyboard-dismissal controls
 still require visible keyboard geometry and two stable samples inside the
-20-second control deadline.
+20-second control deadline. Native menu selection checks the exact ordered menu
+and two stable, finite, ancestor-contained row snapshots, then performs one tap
+at that admitted position without resolving the disappearing menu button again.
 
 Run full coverage on both families before accepting system integrations,
 workflow changes, or behavior outside smoke coverage:
