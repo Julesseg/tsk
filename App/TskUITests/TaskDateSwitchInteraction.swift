@@ -217,12 +217,15 @@ extension XCTestCase {
             let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
             ready = XCTWaiter.wait(for: [settled], timeout: remaining) == .completed
         }
-        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline,
+              let geometry = previous, geometry.isVisible, let applicationFrame = geometry.ancestorFrames.first else {
             recordTaskInteraction(app, detail: "Native picker option has no stable visible menu row: \(label); \(lastSample)")
             XCTFail("Native picker menu did not settle: \(label); \(lastSample)", file: file, line: line)
             return
         }
-        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: geometry.frame.midX - applicationFrame.minX,
+                                 dy: geometry.frame.midY - applicationFrame.minY)).tap()
     }
 
     private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, keyboardRequirement: TaskControlKeyboardRequirement = .none, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
