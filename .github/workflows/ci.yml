@@ -120,8 +120,6 @@ jobs:
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
         run: |
           python3 scripts/test-ui-test-selection.py
-          python3 scripts/test-simulator-host-diagnostics.py
-          python3 scripts/test-simulator-spotlight-log.py
           python3 scripts/test-native-keyboard-hid-installer.py
           python3 scripts/test-native-keyboard-hid-relay.py
           python3 scripts/test-native-keyboard-hid-owner.py
@@ -188,8 +186,21 @@ jobs:
 
       - name: Resolve an available ${{ matrix.family }} simulator
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
+        env:
+          DEVICE_FAMILY: ${{ matrix.family }}
         id: sim
-        run: python3 scripts/create-ui-test-simulator.py --family "${{ matrix.family }}"
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json | python3 -c '
+          import json, os, subprocess, sys
+          devices = json.load(sys.stdin)["devices"]
+          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if runtime == "com.apple.CoreSimulator.SimRuntime.iOS-27-0" and device["name"].startswith(os.environ["DEVICE_FAMILY"])]
+          runtime, device = max(available, key=lambda item: (item[0], "13-inch" in item[1]["name"] or "12.9-inch" in item[1]["name"], "Pro" in item[1]["name"], item[1]["name"]))
+          identifier = subprocess.check_output(["xcrun", "simctl", "create", "tsk isolated " + os.environ["DEVICE_FAMILY"], device["deviceTypeIdentifier"], runtime], text=True).strip()
+          print("Created isolated simulator: " + device["name"] + " (" + identifier + ")")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("id=" + identifier + "\n")
+          '
 
       - name: Run prebuilt UI tests
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
@@ -216,9 +227,7 @@ jobs:
             peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
           fi
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
-          python3 ../scripts/with-simulator-host-diagnostics.py \
-            --output "$TSK_EVENTKIT_EVIDENCE_DIR/host" -- \
-            python3 ../scripts/with-sync-fixture.py \
+          python3 ../scripts/with-sync-fixture.py \
             --server ../.build/sync-server/target/release/taskchampion-sync-server \
             --output ../.build/ui-sync "${peer[@]}" -- \
             ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" --skip-build \
@@ -235,11 +244,8 @@ jobs:
       - name: Remove owned isolated simulator
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() && steps.sim.outputs.id != '' }}
         run: |
-          spotlight_cleanup_status=0
-          python3 scripts/run-spotlight-ui-tests.py --cleanup-manifest .build/eventkit-fixture/spotlight/phases.json || spotlight_cleanup_status=$?
           xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
           xcrun simctl delete "${{ steps.sim.outputs.id }}"
-          exit "$spotlight_cleanup_status"
 
       - name: Upload test results
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() }}
@@ -249,7 +255,6 @@ jobs:
           path: |
             App/TestResults.xcresult
             App/TestResults-sharing.xcresult
-            App/TestResults-spotlight-*.xcresult
             .build/ui-sync
             .build/eventkit-fixture
           if-no-files-found: ignore
