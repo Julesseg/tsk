@@ -112,7 +112,10 @@ private struct TaskRowParameterPill: View {
                 } label: {
                     label
                 }
-                .simultaneousGesture(TapGesture().onEnded { unfocus() })
+                .simultaneousGesture(TapGesture().onEnded {
+                    unfocus()
+                    traceTaskRowMenuHitTests(parameter: parameter, editing: editing)
+                })
             } else {
                 Button(action: openPicker) { label }
             }
@@ -247,6 +250,45 @@ private struct TaskRowParameterButtonStyle: ButtonStyle {
             .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
             .opacity(configuration.isPressed ? 0.65 : 1)
     }
+}
+
+@MainActor
+func traceTaskRowMenuHitTests(parameter: TaskRowParameter, editing: TaskRowEditing) {
+#if DEBUG
+    guard ProcessInfo.processInfo.environment["TSK_TEST_MENU_PROBE"] == "1" else { return }
+    traceTaskRowMenu("menu label tapped \(parameter.rawValue)", editing: editing)
+    Task { @MainActor [weak editing] in
+        for delay in [0.5, 0.5, 1.0, 2.0, 2.0, 2.0] {
+            try? await Task.sleep(for: .seconds(delay))
+            guard let editing, editing.isExpanded else { return }
+            let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+            var count = 0
+            for window in windows {
+                var pending: [UIView] = [window]
+                var visited = 0
+                while let view = pending.popLast(), visited < 10_000 {
+                    visited += 1
+                    pending.append(contentsOf: view.subviews)
+                    guard let cell = view as? UICollectionViewCell,
+                          String(describing: type(of: cell)).contains("ContextMenu") else { continue }
+                    count += 1
+                    guard count <= 30 else { continue }
+                    let center = cell.convert(CGPoint(x: cell.bounds.midX, y: cell.bounds.midY), to: window)
+                    guard center.x.isFinite, center.y.isFinite else { continue }
+                    let hit = window.hitTest(center, with: nil)
+                    var chain: [String] = []
+                    var ancestor = hit
+                    while let current = ancestor, chain.count < 12 {
+                        chain.append(String(describing: type(of: current)))
+                        ancestor = current.superview
+                    }
+                    print("[TSK61-MENU-HIT-PROBE] time=\(CACurrentMediaTime()) parameter=\(parameter.rawValue) center=\(center) cell=\(cell.convert(cell.bounds, to: window)) hidden=\(cell.isHidden) alpha=\(cell.alpha) interactive=\(cell.isUserInteractionEnabled) window=\(type(of: window)) level=\(window.windowLevel.rawValue) hitInsideCell=\(hit?.isDescendant(of: cell) ?? false) chain=\(chain)")
+                }
+            }
+            print("[TSK61-MENU-HIT-PROBE] time=\(CACurrentMediaTime()) parameter=\(parameter.rawValue) cells=\(count)")
+        }
+    }
+#endif
 }
 
 @MainActor
