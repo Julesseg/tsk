@@ -9,8 +9,9 @@ public struct PendingTaskNotification: Sendable {
     public let identifier: String
     public let request: TaskNotificationRequest?
     public let nextTriggerDate: Date?
-    public init(identifier: String, request: TaskNotificationRequest?, nextTriggerDate: Date?) {
-        self.identifier = identifier; self.request = request; self.nextTriggerDate = nextTriggerDate
+    public let contentMatchesRequest: Bool
+    public init(identifier: String, request: TaskNotificationRequest?, nextTriggerDate: Date?, contentMatchesRequest: Bool = true) {
+        self.identifier = identifier; self.request = request; self.nextTriggerDate = nextTriggerDate; self.contentMatchesRequest = contentMatchesRequest
     }
 }
 
@@ -96,7 +97,7 @@ public extension TaskManager {
         for attempt in 0..<3 {
             let expected = eligibleNotificationRequests(plan.future, accepted: state.accepted, uncertain: state.attemptingMissed ?? [], at: now())
             let pending = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) }
-            let obsolete = pending.filter { pending in !expected.contains { $0.identifier == pending.identifier && $0 == pending.request && $0.fireDate == pending.nextTriggerDate } }.map(\.identifier)
+            let obsolete = pending.filter { pending in !expected.contains { $0.identifier == pending.identifier && $0 == pending.request && $0.fireDate == pending.nextTriggerDate && pending.contentMatchesRequest } }.map(\.identifier)
             await center.remove(identifiers: obsolete)
             authorization = try await center.authorization()
             if authorization.permitsAlerts {
@@ -111,7 +112,7 @@ public extension TaskManager {
                 await center.remove(identifiers: pending.map(\.identifier))
             }
             var retained = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) }
-            registered = expected.filter { request in retained.contains { $0.identifier == request.identifier && $0.request == request && $0.nextTriggerDate == request.fireDate } }
+            registered = expected.filter { request in retained.contains { $0.identifier == request.identifier && $0.request == request && $0.nextTriggerDate == request.fireDate && $0.contentMatchesRequest } }
             if authorization.permitsAlerts, !registered.isEmpty, registered.count < expected.count {
                 let nearest = Array(expected.prefix(registered.count))
                 await center.remove(identifiers: retained.filter { pending in !nearest.contains { $0.identifier == pending.identifier } }.map(\.identifier))
@@ -122,7 +123,7 @@ public extension TaskManager {
                     } catch { errors.append(error.localizedDescription) }
                 }
                 retained = try await center.pending().filter { $0.identifier.hasPrefix(TaskNotificationRequest.identifierPrefix) }
-                registered = expected.filter { request in retained.contains { $0.identifier == request.identifier && $0.request == request && $0.nextTriggerDate == request.fireDate } }
+                registered = expected.filter { request in retained.contains { $0.identifier == request.identifier && $0.request == request && $0.nextTriggerDate == request.fireDate && $0.contentMatchesRequest } }
             }
             authorization = try await center.authorization()
             if !authorization.permitsAlerts {

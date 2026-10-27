@@ -32,7 +32,7 @@ public struct TaskNotificationRequest: Codable, Equatable, Sendable {
     public let events: [TaskNotificationEvent]
     public var identifier: String { Self.identifierPrefix + taskID.uuidString.lowercased() + "." + kind.rawValue }
     public var message: String {
-        switch kind { case .planned: "Planned work"; case .due: "Task is due"; case .combined: "Planned and due" }
+        switch kind { case .planned: "Planned work"; case .due: ""; case .combined: "Planned and due" }
     }
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.taskID == rhs.taskID && lhs.title.matchesBytes(rhs.title) && lhs.kind == rhs.kind && lhs.fireDate == rhs.fireDate && lhs.events == rhs.events
