@@ -13,7 +13,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCUIDevice.shared.appearance = .light
     }
 
-    func testCreationPlacementAndEverySettingsDestination() {
+    func testPlacementAndEverySettingsDestination() {
         let app = launch()
         XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         capture("After empty workspace")
@@ -32,19 +32,6 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertFalse(app.buttons["task-shortcuts"].exists)
         XCTAssertFalse(app.buttons["spotlight-settings"].exists)
         XCTAssertFalse(app.buttons["spotlight-pending"].exists)
-        tapTaskControl(create, app: app)
-        XCTAssertTrue(app.buttons["save-task"].waitForExistence(timeout: 5))
-        capture("After task editor")
-        let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
-        focusTaskText(field, app: app)
-        field.typeText("Plan the week")
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
-        XCTAssertEqual(field.value as? String, "Plan the week")
-        tapTaskControl(app.buttons["save-task"], app: app)
-        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Plan the week", app: app), timeout: 15))
-        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
-        XCTAssertFalse(create.isSelected)
-        capture("After populated workspace")
         tapTaskControl(settings, app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
         capture("After settings")
@@ -73,7 +60,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(create, app: app)
         XCTAssertTrue(app.buttons["save-task"].waitForExistence(timeout: 5))
         tapTaskControl(app.buttons["Cancel"], app: app)
-        XCTAssertTrue(taskRow(named: "Plan the week", app: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["save-task"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(create.exists)
     }
 
     func testSettingsRemainReachableAtLargestTextSize() {

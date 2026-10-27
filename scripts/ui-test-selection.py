@@ -4,22 +4,16 @@ import re
 
 
 PHONE_SMOKE = (
-    "TaskRowEditingUITests",
-    "WorkspaceSettingsUITests",
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
-    "TskUITests/testDescriptionEditAndCompletionPersistAcrossRelaunch",
+    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-    "TaskAnnotationUITests/testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-    "ShareCaptureUITests",
-    "WidgetUITests",
-    "SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry",
 )
 PAD_SMOKE = (
-    "TaskRowEditingUITests",
-    "WorkspaceSettingsUITests",
-    "iPadWorkspaceUITests",
-    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
+    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",
+    "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
 )
 PAD_FULL = (
@@ -40,7 +34,7 @@ DIAGNOSTIC = (
 )
 KEYBOARD = (
     "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
-    "WorkspaceSettingsUITests/testCreationPlacementAndEverySettingsDestination",
+    "WorkspaceSettingsUITests/testPlacementAndEverySettingsDestination",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
     "ShareCaptureUITests",

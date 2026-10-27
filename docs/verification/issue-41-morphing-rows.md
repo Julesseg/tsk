@@ -353,11 +353,12 @@ Attribute pills now use caption text, 10-point horizontal padding and a
 touch area, including icon-only values. Native project and priority menus remain
 system menus.
 
-The signed simulator test build passes. The focused iPhone run in
+The signed simulator test build passes. The historical focused iPhone run in
 `/tmp/tsk-61-small-controls/phone-final.xcresult` passes
 `testExpansionKeepsHeaderInPlace` (including compact header centering) and
 `testCompactControlsAndDateSurface` (all three date controls, opening and
-closing). The initial icon-only touch-area failure was reproduced before the
+closing). These methods are now consolidated into the middle-row geometry and
+durable edit journeys; see [the consolidation audit](test-suite-consolidation.md). The initial icon-only touch-area failure was reproduced before the
 44-point minimum hit area and passes with that fix. A native per-test recording
 of the date transition shows intermediate surface sizes rather than an opacity
 handoff; the compact header screenshots also show the corrected visual center.

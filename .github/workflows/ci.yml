@@ -45,6 +45,10 @@ jobs:
           python3 scripts/test-ci-test-routing.py
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-ui-shard-checks.py
+          python3 scripts/test-native-keyboard-hid-installer.py
+          python3 scripts/test-native-keyboard-hid-relay.py
+          python3 scripts/test-native-keyboard-hid-owner.py
+          python3 scripts/test-native-keyboard-boundary-cleanup.py
       - name: Classify changed paths
         id: route
         run: python3 scripts/ci-test-routing.py
@@ -99,7 +103,7 @@ jobs:
       fail-fast: false
       matrix:
         family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '["iPhone"]' || '["iPhone","iPad"]') }}
-        partition: ${{ fromJSON(github.event_name == 'workflow_dispatch' && (inputs.diagnostic_only || contains(fromJSON('["keyboard","text"]'), inputs.ui_suite)) && '["all"]' || '["workspace","row-editing"]') }}
+        partition: ${{ fromJSON(!inputs.diagnostic_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && '["workspace","row-editing"]' || '["all"]') }}
     steps:
       - name: Documentation-only change
         if: ${{ needs.changes.outputs.run_tests == 'false' }}
@@ -117,15 +121,6 @@ jobs:
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
         with:
           python-version: "3.12"
-
-      - name: Verify owned native keyboard transport boundaries
-        if: ${{ needs.changes.outputs.run_tests == 'true' }}
-        run: |
-          python3 scripts/test-ui-test-selection.py
-          python3 scripts/test-native-keyboard-hid-installer.py
-          python3 scripts/test-native-keyboard-hid-relay.py
-          python3 scripts/test-native-keyboard-hid-owner.py
-          python3 scripts/test-native-keyboard-boundary-cleanup.py
 
       - name: Install pinned native keyboard transport
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
@@ -162,7 +157,7 @@ jobs:
           swift build --package-path Native --product tsk-native-probe
 
       - name: Run Calendar controller regressions
-        if: ${{ needs.changes.outputs.run_tests == 'true' }}
+        if: ${{ needs.changes.outputs.run_tests == 'true' && matrix.family == 'iPhone' && matrix.partition != 'row-editing' }}
         timeout-minutes: 5
         run: TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib" swift test --package-path App/ControllerTests
 
@@ -282,7 +277,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           UI_FAMILY: ${{ matrix.family }}
-          UI_PARTITIONS: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_only || contains(fromJSON('["keyboard","text"]'), inputs.ui_suite)) && 'all' || 'workspace,row-editing' }}
+          UI_PARTITIONS: ${{ !inputs.diagnostic_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'workspace,row-editing' || 'all' }}
         run: |
           set -euo pipefail
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" | \

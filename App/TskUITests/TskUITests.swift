@@ -38,44 +38,6 @@ final class TskUITests: XCTestCase {
         screenshot("Raw attributes and identity", app: app)
     }
 
-    func testDescriptionEditAndCompletionPersistAcrossRelaunch() throws {
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
-        app.buttons["New task"].tap()
-        let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
-        field.typeText("Original task")
-        app.buttons["save-task"].tap()
-        XCTAssertTrue(taskRow(named: "Original task", app: app).waitForExistence(timeout: 10))
-        taskRow(named: "Original task", app: app).tap()
-        let editor = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        replaceTaskText(editor, with: "Original task revised", app: app)
-        screenshot("Edited draft", app: app)
-        closeTaskRow(app)
-        XCTAssertTrue(taskRow(named: "Original task revised", app: app).waitForExistence(timeout: 10))
-        app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "Original task revised", app: app).waitForExistence(timeout: 10))
-        screenshot("Edited task after relaunch", app: app)
-        openTaskInformation(taskRow(named: "Original task revised", app: app), app: app)
-        XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 5))
-        app.buttons["complete-task"].tap()
-        XCTAssertFalse(app.buttons["complete-task"].waitForExistence(timeout: 2))
-        screenshot("Completed detail", app: app)
-        app.terminate()
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
-        XCTAssertFalse(taskRow(named: "Original task revised", app: app).exists)
-        selectDoneTasks(app)
-        XCTAssertTrue(taskRow(named: "Original task revised", app: app).waitForExistence(timeout: 10))
-        screenshot("Completed list after relaunch", app: app)
-    }
-
     func testOrganizationProjectViewsAndListActionsPersist() throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString

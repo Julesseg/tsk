@@ -18,21 +18,21 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        for family, count in (("iPhone", 22), ("iPad", 19)):
+        for family, count in (("iPhone", 5), ("iPad", 4)):
             with self.subTest(family=family):
                 smoke = selection.selected_methods(selection.selection("smoke", family))
                 full = selection.selected_methods(selection.selection("full", family))
                 self.assertEqual(len(smoke), count)
                 self.assertLess(smoke, full)
         pad = selection.selected_methods(selection.selection("smoke", "iPad"))
-        self.assertEqual(sum("/iPadWorkspaceUITests/" in test for test in pad), 3)
+        self.assertEqual(sum("/iPadWorkspaceUITests/" in test for test in pad), 2)
         self.assertTrue(any(test.endswith("/testIndependentNativeTextViewRecognizesPlainAndCommandKeys") for test in pad))
 
     def test_partitions_run_every_selected_method_once_and_preserve_all_native_cases(self):
         spec = importlib.util.spec_from_file_location("partition_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        for suite in ("smoke", "full"):
+        for suite in ("full",):
             for family in ("iPhone", "iPad"):
                 with self.subTest(suite=suite, family=family):
                     original = selection.selected_methods(selection.selection(suite, family))
@@ -40,7 +40,7 @@ class SelectionTests(unittest.TestCase):
                     methods = [selection.selected_methods(group) for group in groups]
                     self.assertEqual(methods[0] | methods[1], original)
                     self.assertFalse(methods[0] & methods[1])
-                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 9)
+                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 6)
                     self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
                     self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
                     self.assertFalse(owner.selected_cases(groups[1]))
@@ -50,19 +50,31 @@ class SelectionTests(unittest.TestCase):
                     self.assertFalse(selection.requires_sync_peer(groups[1]))
 
     def test_partition_cli_preserves_the_original_full_selection(self):
-        result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "smoke", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
+        result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 9)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 6)
+
+    def test_smoke_covers_task_round_trip_and_native_input_without_installed_system_tours(self):
+        for family in ("iPhone", "iPad"):
+            smoke = selection.selected_methods(selection.selection("smoke", family))
+            full = selection.selected_methods(selection.selection("full", family))
+            self.assertIn("TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion", smoke)
+            self.assertIn("TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys", smoke)
+            self.assertEqual(selection.phases(selection.selection("smoke", family)), ["main"])
+            for suite in ("ShareCaptureUITests", "WidgetUITests", "SpotlightUITests"):
+                self.assertFalse(any("/" + suite + "/" in case for case in smoke))
+                self.assertTrue(any("/" + suite + "/" in case for case in full))
 
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPhone"))), 67)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 63)
+        self.assertEqual(len(pad), 58)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
-        self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 13)
+        self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 12)
 
     def test_keyboard_diagnostics_keep_existing_state_and_transport_checks_on_both_devices(self):
         for family in ("iPhone", "iPad"):

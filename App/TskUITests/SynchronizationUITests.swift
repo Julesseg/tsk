@@ -68,6 +68,10 @@ final class SynchronizationUITests: XCTestCase {
         let clientID = try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])
         let secret = try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"])
         let token = try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])
+        XCTAssertEqual(try XCTUnwrap(URL(string: serverURL)).host, "127.0.0.1")
+        XCTAssertNotNil(UUID(uuidString: clientID))
+        XCTAssertNotNil(UUID(uuidString: token))
+        XCTAssertFalse(secret.isEmpty)
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
@@ -112,19 +116,6 @@ final class SynchronizationUITests: XCTestCase {
         app.launch()
         selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
-    }
-
-    func testRealFixtureSettingsReachTheUITestRunner() throws {
-        let environment = ProcessInfo.processInfo.environment
-        let url = try XCTUnwrap(URL(string: XCTUnwrap(environment["TSK_UI_SYNC_SERVER_URL"])))
-        XCTAssertEqual(url.host, "127.0.0.1")
-        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])))
-        XCTAssertNotNil(UUID(uuidString: try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])))
-        XCTAssertFalse(try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"]).isEmpty)
-        let proof = XCTAttachment(string: "Real fixture URL: \(url)\nClient: \(environment["TSK_UI_SYNC_CLIENT_ID"]!)\nToken: \(environment["TSK_UI_SYNC_FIXTURE_TOKEN"]!)")
-        proof.name = "Real server settings received by UI runner"
-        proof.lifetime = .keepAlways
-        add(proof)
     }
 
     private func revealSynchronizationSettings(_ app: XCUIApplication) -> Bool {
