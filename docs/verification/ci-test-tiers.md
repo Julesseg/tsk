@@ -110,7 +110,14 @@ owner, attempt and nonce request file; every subsequent request is checked too.
 Outstanding discovery children are cancelled, reaped and recorded on exit.
 
 UI products build in a separate 20-minute step before creating/booting a test
-simulator. Execution reuses those signed arm64 products with `--skip-build`.
+simulator. `scripts/create-ui-test-simulator.py` restricts candidates to the
+selected iOS Simulator SDK major/minor release, then retains the existing
+device-family and size preferences. Installing a newer runtime cannot silently
+move the lane to another device/runtime. Missing matching devices fail before
+creation; the workflow records the owned simulator ID for existing cleanup.
+Selector regressions cover mixed runtimes, both families, unavailable devices,
+numeric patch ordering and the actual create/output boundary. Execution reuses
+those signed arm64 products with `--skip-build`.
 Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
 The expanded workspace selection exceeded the former 30-minute step limit;
 the measured iPad run spent 10 minutes 33 seconds in simulator preparation
