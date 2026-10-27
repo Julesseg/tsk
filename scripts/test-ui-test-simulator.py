@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 import importlib.util
+import json
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,6 +19,19 @@ def device(name, available=True):
 
 
 class SimulatorSelectionTests(unittest.TestCase):
+    def test_explicit_runtime_remains_fixed_when_selected_toolchain_sdk_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tool = root / "xcrun"
+            tool.write_text("#!" + sys.executable + "\nimport json,os,pathlib,sys\na=sys.argv[1:]\nif a==['--sdk','iphonesimulator','--show-sdk-version']: print('27.1')\nelif a==['simctl','list','devices','available','--json']: print(json.dumps({'devices':{'com.apple.CoreSimulator.SimRuntime.iOS-27-0':[{'name':'iPhone 18 Pro Max','deviceTypeIdentifier':'phone-type','isAvailable':True}]}}))\nelif a[:2]==['simctl','create']:\n pathlib.Path(os.environ['CREATE_RECEIPT']).write_text(json.dumps(a))\n print('owned-probe-device')\nelse: sys.exit(99)\n")
+            tool.chmod(0o700)
+            environment = dict(os.environ, PATH=str(root) + os.pathsep + os.environ.get("PATH", ""), GITHUB_OUTPUT=str(root / "output"), CREATE_RECEIPT=str(root / "created.json"))
+            result = subprocess.run([sys.executable, str(Path(simulator.__file__)), "--family", "iPhone", "--runtime-version", "27.0"], env=environment, capture_output=True, text=True, timeout=3)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads((root / "created.json").read_text())[-1], "com.apple.CoreSimulator.SimRuntime.iOS-27-0")
+            self.assertIn("SDK 27.1", result.stdout)
+            self.assertEqual((root / "output").read_text(), "id=owned-probe-device\n")
+
     def test_newer_installed_runtime_does_not_override_selected_sdk(self):
         devices = {
             "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [device("iPhone 18 Pro Max")],

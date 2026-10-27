@@ -28,10 +28,11 @@ def select_template(devices, family, sdk_version):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--family", required=True, choices=["iPhone", "iPad"])
+    parser.add_argument("--runtime-version")
     arguments = parser.parse_args()
     sdk_version = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"], text=True).strip()
     devices = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "--json"], text=True))["devices"]
-    runtime, device = select_template(devices, arguments.family, sdk_version)
+    runtime, device = select_template(devices, arguments.family, arguments.runtime_version or sdk_version)
     identifier = subprocess.check_output(["xcrun", "simctl", "create", "tsk isolated " + arguments.family, device["deviceTypeIdentifier"], runtime], text=True).strip()
     print(f"Created isolated simulator: {device['name']} ({identifier}), runtime {runtime}, SDK {sdk_version}")
     with open(os.environ["GITHUB_OUTPUT"], "a") as output:
