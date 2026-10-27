@@ -256,3 +256,37 @@ func traceTaskRowMenu(_ event: String, editing: TaskRowEditing) {
     print("[TSK61-MENU-PROBE] event=\(event) editing=\(ObjectIdentifier(editing)) parameter=\(editing.parameter?.rawValue ?? "nil") expanded=\(editing.isExpanded) saving=\(editing.isSaving)")
 #endif
 }
+
+@MainActor
+func traceTaskRowAnimationWait(editing: TaskRowEditing) {
+#if DEBUG
+    guard ProcessInfo.processInfo.environment["TSK_TEST_MENU_PROBE"] == "1" else { return }
+    Task { @MainActor [weak editing] in
+        for delay in [2, 8, 60] {
+            try? await Task.sleep(for: .seconds(delay))
+            guard let editing else { return }
+            let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+            var visited = 0
+            var active = 0
+            func inspect(_ layer: CALayer, path: String) {
+                guard visited < 10_000 else { return }
+                visited += 1
+                for key in layer.animationKeys() ?? [] {
+                    guard let animation = layer.animation(forKey: key) else { continue }
+                    active += 1
+                    guard active <= 200 else { continue }
+                    print("[TSK61-ANIMATION-PROBE] path=\(path) owner=\(layer.delegate.map { String(describing: type(of: $0)) } ?? "nil") key=\(key) type=\(type(of: animation)) duration=\(animation.duration) repeat=\(animation.repeatCount) repeatDuration=\(animation.repeatDuration) speed=\(animation.speed) begin=\(animation.beginTime) removed=\(animation.isRemovedOnCompletion) keyPath=\((animation as? CAPropertyAnimation)?.keyPath ?? "nil")")
+                }
+                for (index, child) in (layer.sublayers ?? []).enumerated() {
+                    inspect(child, path: path + "/" + String(index))
+                }
+            }
+            for (index, window) in windows.enumerated() {
+                print("[TSK61-ANIMATION-PROBE] window=\(index) type=\(type(of: window)) screen=\(ObjectIdentifier(window.screen)) hidden=\(window.isHidden) key=\(window.isKeyWindow)")
+                inspect(window.layer, path: String(index))
+            }
+            print("[TSK61-ANIMATION-PROBE] elapsed=\(CACurrentMediaTime()) visited=\(visited) active=\(active) rowAnimating=\(editing.isAnimating) expanded=\(editing.isExpanded) progress=\(editing.revealProgress) parameter=\(editing.parameter?.rawValue ?? "nil")")
+        }
+    }
+#endif
+}

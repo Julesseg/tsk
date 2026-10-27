@@ -93,7 +93,11 @@ struct ContentView: View {
                 await editing.setExpanded(false, reduceMotion: reduceMotion)
                 store.rowEditing = nil
                 after?()
-            } catch { editing.error = error.localizedDescription; editing.isSaving = false }
+            } catch {
+                editing.error = error.localizedDescription
+                editing.isSaving = false
+                traceTaskRowAnimationWait(editing: editing)
+            }
         }
     }
 
