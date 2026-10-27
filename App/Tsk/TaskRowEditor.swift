@@ -121,12 +121,17 @@ private struct TaskRowParameterPill: View {
         .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
         .popover(isPresented: Binding(
             get: { editing.parameter == parameter },
-            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
+            set: {
+                traceTaskRowMenu("popover binding \(parameter.rawValue)=\($0)", editing: editing)
+                if !$0 && editing.parameter == parameter { editing.parameter = nil }
+            }
         ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             TaskRowParameterPicker(editing: editing, parameter: parameter, now: now) { editing.parameter = nil }
                 .frame(width: 340)
                 .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
                 .presentationCompactAdaptation(.popover)
+                .onAppear { traceTaskRowMenu("picker appeared \(parameter.rawValue)", editing: editing) }
+                .onDisappear { traceTaskRowMenu("picker disappeared \(parameter.rawValue)", editing: editing) }
         }
         .frame(minWidth: 44, minHeight: 44, alignment: .top)
         .contentShape(Rectangle())
@@ -140,8 +145,10 @@ private struct TaskRowParameterPill: View {
     }
 
     private func openPicker() {
+        traceTaskRowMenu("openPicker entered \(parameter.rawValue)", editing: editing)
         unfocus()
         editing.parameter = parameter
+        traceTaskRowMenu("openPicker assigned \(parameter.rawValue)", editing: editing)
     }
 }
 
@@ -240,4 +247,12 @@ private struct TaskRowParameterButtonStyle: ButtonStyle {
             .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
             .opacity(configuration.isPressed ? 0.65 : 1)
     }
+}
+
+@MainActor
+func traceTaskRowMenu(_ event: String, editing: TaskRowEditing) {
+#if DEBUG
+    guard ProcessInfo.processInfo.environment["TSK_TEST_MENU_PROBE"] == "1" else { return }
+    print("[TSK61-MENU-PROBE] event=\(event) editing=\(ObjectIdentifier(editing)) parameter=\(editing.parameter?.rawValue ?? "nil") expanded=\(editing.isExpanded) saving=\(editing.isSaving)")
+#endif
 }

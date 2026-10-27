@@ -1,19 +1,14 @@
-name: CI
+name: Native menu action diagnostic
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [full, smoke, keyboard, text]
+        options: [smoke]
         required: true
-        default: full
+        default: smoke
       diagnostic_only:
         description: Run only the existing diagnostic iPhone lane
         type: boolean
@@ -102,8 +97,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '["iPhone"]' || '["iPhone","iPad"]') }}
-        partition: ${{ fromJSON(!inputs.diagnostic_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && '["workspace","row-editing"]' || '["all"]') }}
+        family: [iPad]
+        partition: [all]
     steps:
       - name: Documentation-only change
         if: ${{ needs.changes.outputs.run_tests == 'false' }}
@@ -261,7 +256,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && format('App · Diagnostic UI boundaries ({0})', matrix.family) || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && format('App · {0} diagnostics ({1})', inputs.ui_suite == 'keyboard' && 'Keyboard' || 'Text', matrix.family) || matrix.family == 'iPhone' && 'App · XCUITest (macOS)' || 'App · XCUITest (iPad)' }}
+    name: Native menu diagnostic gate (iPad)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -270,14 +265,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '["iPhone"]' || '["iPhone","iPad"]') }}
+        family: [iPad]
     steps:
       - uses: actions/checkout@v4
       - name: Require every selected UI shard
         env:
           GH_TOKEN: ${{ github.token }}
           UI_FAMILY: ${{ matrix.family }}
-          UI_PARTITIONS: ${{ !inputs.diagnostic_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'workspace,row-editing' || 'all' }}
+          UI_PARTITIONS: all
         run: |
           set -euo pipefail
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" | \

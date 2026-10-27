@@ -61,6 +61,7 @@ struct ContentView: View {
                 .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
                     guard let editing = store.rowEditing, editing.isExpanded,
                           !editing.bounds.contains(tap.location) else { return }
+                    traceTaskRowMenu("outside tap \(tap.location) bounds=\(editing.bounds)", editing: editing)
                     closeRow()
                 }, including: store.rowEditing == nil ? .subviews : .all)
                 .overlay {
@@ -76,6 +77,7 @@ struct ContentView: View {
 
     private func closeRow(after: (() -> Void)? = nil) {
         guard let editing = store.rowEditing, !editing.isSaving, editing.isExpanded else { return }
+        traceTaskRowMenu("closeRow entered", editing: editing)
         if editing.parameter != nil { dismissRowParameter(); return }
         editing.isSaving = true
         Task {
