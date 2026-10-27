@@ -41,7 +41,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Verify test routing
-        run: python3 scripts/test-ci-test-routing.py
+        run: |
+          python3 scripts/test-ci-test-routing.py
+          python3 scripts/test-ui-test-selection.py
+          python3 scripts/test-ui-shard-checks.py
       - name: Classify changed paths
         id: route
         run: python3 scripts/ci-test-routing.py
@@ -87,15 +90,16 @@ jobs:
             TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
 
-  app-ui-tests:
+  app-ui-test-shards:
     needs: changes
-    name: ${{ github.event_name == 'workflow_dispatch' && !inputs.diagnostic_only && (inputs.ui_suite == 'keyboard' && format('App · Keyboard diagnostics ({0})', matrix.family) || inputs.ui_suite == 'text' && format('App · Text diagnostics ({0})', matrix.family)) || matrix.job-name }}
+    name: App · UI shard (${{ matrix.family }}, ${{ matrix.partition }})
     runs-on: ${{ needs.changes.outputs.run_tests == 'true' && 'xcode-27' || 'ubuntu-24.04' }}
     timeout-minutes: ${{ inputs.diagnostic_only && 90 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 180 || 60 }}
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '[{"family":"iPhone","job-name":"App · Diagnostic UI boundaries (iPhone)","artifact":"ui-diagnostic-boundaries","diagnostic":true}]' || '[{"family":"iPhone","job-name":"App · XCUITest (macOS)","artifact":"ui-test-results"},{"family":"iPad","job-name":"App · XCUITest (iPad)","artifact":"ui-test-results-ipad"}]') }}
+        family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '["iPhone"]' || '["iPhone","iPad"]') }}
+        partition: ${{ fromJSON(github.event_name == 'workflow_dispatch' && (inputs.diagnostic_only || contains(fromJSON('["keyboard","text"]'), inputs.ui_suite)) && '["all"]' || '["workspace","row-editing"]') }}
     steps:
       - name: Documentation-only change
         if: ${{ needs.changes.outputs.run_tests == 'false' }}
@@ -205,16 +209,18 @@ jobs:
         timeout-minutes: ${{ inputs.diagnostic_only && 60 || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 150 || 45 }}
         working-directory: App
         env:
-          UI_SUITE: ${{ matrix.diagnostic && 'diagnostic' || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && inputs.ui_suite || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
+          UI_SUITE: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && 'diagnostic' || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && inputs.ui_suite || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
           UI_FAMILY: ${{ matrix.family }}
+          UI_PARTITION: ${{ matrix.partition }}
+          UI_NATIVE_KEYBOARD: ${{ matrix.partition == 'row-editing' && '0' || '1' }}
         run: |
           set -eo pipefail
           export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
-          export TSK_NATIVE_KEYBOARD_HID=1
+          export TSK_NATIVE_KEYBOARD_HID="$UI_NATIVE_KEYBOARD"
           export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
           coverage=()
-          selection=$(python3 ../scripts/ui-test-selection.py select "$UI_SUITE" "$UI_FAMILY")
+          selection=$(python3 ../scripts/ui-test-selection.py select "$UI_SUITE" "$UI_FAMILY" --partition "$UI_PARTITION")
           while IFS= read -r selector; do
             if [[ -n "$selector" ]]; then coverage+=("$selector"); fi
           done <<< "$selection"
@@ -249,10 +255,35 @@ jobs:
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', matrix.family == 'iPhone' && 'ui-test-results' || 'ui-test-results-ipad', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
             App/TestResults.xcresult
             App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
           if-no-files-found: ignore
+
+  app-ui-tests:
+    needs: [changes, app-ui-test-shards]
+    if: always()
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && format('App · Diagnostic UI boundaries ({0})', matrix.family) || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && format('App · {0} diagnostics ({1})', inputs.ui_suite == 'keyboard' && 'Keyboard' || 'Text', matrix.family) || matrix.family == 'iPhone' && 'App · XCUITest (macOS)' || 'App · XCUITest (iPad)' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && '["iPhone"]' || '["iPhone","iPad"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require every selected UI shard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UI_FAMILY: ${{ matrix.family }}
+          UI_PARTITIONS: ${{ github.event_name == 'workflow_dispatch' && (inputs.diagnostic_only || contains(fromJSON('["keyboard","text"]'), inputs.ui_suite)) && 'all' || 'workspace,row-editing' }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" | \
+            python3 scripts/check-ui-shards.py --family "$UI_FAMILY" --partitions "$UI_PARTITIONS"

@@ -2,21 +2,29 @@
 
 Pull requests and pushes to `main` with non-documentation changes run all Core
 and persistent Native tests, plus focused UI smoke coverage on both device
-families. Existing check names stay unchanged for branch protection. The UI
-runner builds once per lane and reuses that build and synchronization fixture.
-The UI command records scoped host CoreSimulator unified and service logs and samples
-memory, swap, disk and process usage every 15 seconds under
-`.build/eventkit-fixture/host`. These diagnostics preserve the test command's
-exit status and never shut down or restart a simulator. A simulator disappearing
-mid-test remains a failure; its host evidence is uploaded alongside XCTest results.
-Each selected Spotlight method runs first on its own newly created simulator,
-matching the lane's device type and runtime. That simulator is shut down and
-deleted after its result and diagnostics are collected, including on failure.
-Share and the remaining UI methods then use the lane's original simulator.
-An independent peer
-verifies the uploaded UI task whenever the real-server synchronization scenario
-is selected. The iPad smoke selection exercises workspace/keyboard behavior and
-does not create that server task.
+families. Existing check names stay unchanged for branch protection.
+
+Each device family uses a workspace worker and a row-editing worker for smoke
+and full coverage. The workspace worker retains the previous selection; the
+row-editing worker runs the nine added row journeys. Their selections are
+disjoint and their union is the complete selected suite. Every original native
+keyboard case remains in the workspace worker with its existing HID owner,
+identity checks and deadlines. The row journeys use XCTest text input and do
+not select native HID command cases. Each worker builds once and owns one
+isolated simulator. Share runs before the remaining workspace cases when
+selected; Spotlight remains in that original workspace pipeline.
+
+The existing `App · XCUITest (macOS)` and `App · XCUITest (iPad)` checks require
+all workers for their device family to complete successfully. They inspect jobs
+from the current run attempt, so a missing, duplicate, skipped, cancelled,
+failed or still-running worker cannot produce a green gate. Artifacts keep the
+existing workspace names and add a `-row-editing` suffix for the new worker.
+Focused keyboard, text and diagnostic dispatches retain one worker per selected
+family because their selections do not include row-editing coverage.
+
+An independent peer verifies the uploaded UI task whenever the real-server
+synchronization scenario is selected. The iPad smoke workspace selection does
+not create that server task.
 
 A lightweight Linux job classifies the complete pull-request diff from its merge
 base, or the before/after range for a push. Documentation-only changes skip Core
@@ -119,45 +127,23 @@ start, with a 30-second discovery cap. Each request still keeps its original
 only cached for its device, runner bundle and process after checking the exact
 owner, attempt and nonce request file; every subsequent request is checked too.
 Outstanding discovery children are cancelled, reaped and recorded on exit.
-An already timed-out background preparation is retained in diagnostics and does
-not invalidate a later shortcut request. That request may perform one fresh
-lookup using its original deadline and five-second dispatch reservation. A
-pending preparation timeout, failed live lookup or mismatched request still
-fails without command replay or an extended budget.
 
 UI products build in a separate 20-minute step before creating/booting a test
 simulator. Execution reuses those signed arm64 products with `--skip-build`.
-The disposable simulator uses an available runtime matching the selected iOS
-Simulator SDK's major/minor version. An unrelated newer installed runtime cannot
-silently change the lane's device or OS; a missing matching runtime fails with
-the SDK version in the error. Simulator selection has portable regressions in
-`scripts/test-ui-test-simulator.py`, run by the routing job.
-Spotlight phase selection honors the original include/skip filters and runs
-each selected method exactly once. Its 600-second method limits, indexing/query
-budgets and actual system Search/UUID/completion assertions are unchanged.
-A failed Spotlight phase stops the lane before Share/main execution, preserving
-the failure and uploading its diagnostics immediately after owned cleanup.
-Successful lanes retain the complete selection. There is no automatic case retry.
-Separate `TestResults-spotlight-*.xcresult`
-bundles and `.build/eventkit-fixture/spotlight/<method>` diagnostics distinguish
-simulator preparation, app launch and indexing/search failures. `phases.json`
-records each owned simulator, result, exit status and cleanup outcome.
-Timed guest log streams use `log stream --timeout` and expire inside the guest.
-The method-aligned Spotlight stream covers its existing 600-second XCTest window
-or stops when the method ends, so slow setup cannot consume the capture before
-the first query. The separate workspace stream retains its 60-second cap.
-The collector does not terminate the host `simctl spawn` client at its duration
-boundary while XCTest is active. Explicit test completion and cancellation still
-reap the owned logging process. This transport change requires CI verification;
-the local forced-stop probe did not reproduce the hosted SimLaunchHost restart.
-The runner regressions cover selection preservation, separate devices,
-failure propagation, failed-boot cleanup and preservation of prebooted devices.
-Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
-The expanded workspace selection exceeded the former 30-minute step limit;
-the measured iPad run spent 10 minutes 33 seconds in simulator preparation
-before starting `xcodebuild`. The additional budget covers preparation and
-the selected journeys without changing individual test limits or assertions.
-Full execution/job limits are 150/180 minutes; diagnostics have 60/90-minute limits.
+The disposable simulator is pinned to iOS 27.0 with Xcode 27.0, rather than
+selecting an unrelated newer installed runtime. Both device families preserve
+the original shared-simulator test pipeline and its ownership cleanup.
+
+Smoke execution retains a 45-minute step limit and a 60-minute overall worker
+limit. The unpartitioned iPad smoke run on 08c5e4d spent about ten minutes in
+preparation, passed 17 cases (including all nine row journeys), then hit the
+step limit while the next case was progressing without an assertion failure.
+Separating the added row journeys preserves every case and its 600-second
+method limit and targets that cumulative timeout without increasing budgets. The workspace workers
+run 13 iPhone or 10 iPad smoke methods; row workers run nine methods on either
+family. Full coverage partitions the 73 declared iPhone methods as 64 + 9 and
+the 63 selected iPad methods as 54 + 9. Full execution/job limits stay at
+150/180 minutes; diagnostics keep 60/90-minute limits.
 These are ceilings, not measured completion times. Every method retains the
 600-second XCTest limit. The later `always()` step removes the owned simulator
 after a UI step failure or timeout. Runtime and signed-distribution acceptance

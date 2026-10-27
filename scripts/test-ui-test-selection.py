@@ -28,6 +28,32 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(sum("/iPadWorkspaceUITests/" in test for test in pad), 3)
         self.assertTrue(any(test.endswith("/testIndependentNativeTextViewRecognizesPlainAndCommandKeys") for test in pad))
 
+    def test_partitions_run_every_selected_method_once_and_preserve_all_native_cases(self):
+        spec = importlib.util.spec_from_file_location("partition_owner", ROOT / "scripts/with-native-keyboard-hid.py")
+        owner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(owner)
+        for suite in ("smoke", "full"):
+            for family in ("iPhone", "iPad"):
+                with self.subTest(suite=suite, family=family):
+                    original = selection.selected_methods(selection.selection(suite, family))
+                    groups = [selection.selection(suite, family, partition) for partition in ("workspace", "row-editing")]
+                    methods = [selection.selected_methods(group) for group in groups]
+                    self.assertEqual(methods[0] | methods[1], original)
+                    self.assertFalse(methods[0] & methods[1])
+                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 9)
+                    self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
+                    self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
+                    self.assertFalse(owner.selected_cases(groups[1]))
+                    command = ["xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned", "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never", "-resultBundlePath", "Results.xcresult", *groups[0], "-skip-testing:TskUITests/ShareCaptureUITests"]
+                    owner.validate_command(command, "owned")
+                    self.assertEqual(selection.requires_sync_peer(groups[0]), selection.requires_sync_peer(selection.selection(suite, family)))
+                    self.assertFalse(selection.requires_sync_peer(groups[1]))
+
+    def test_partition_cli_preserves_the_original_full_selection(self):
+        result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "smoke", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 9)
+
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         pad = selection.selected_methods(selection.selection("full", "iPad"))
