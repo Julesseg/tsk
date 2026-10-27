@@ -89,7 +89,7 @@ def selected_methods(filters):
     }
 
 
-def selection(suite, family):
+def selection(suite, family, partition="all"):
     if suite == "text":
         tests = TEXT
     elif suite == "keyboard":
@@ -108,7 +108,20 @@ def selection(suite, family):
         selector = item.removeprefix("-only-testing:")
         if not any(matches(test, selector) for test in available):
             raise ValueError("Unknown UI test selector: " + selector)
-    return filters
+    if partition == "all":
+        return filters
+    selected = selected_methods(filters)
+    rows = {test for test in selected if matches(test, "TskUITests/TaskRowEditingUITests")}
+    row_group = rows
+    if partition == "row-editing":
+        chosen = row_group
+    elif partition == "workspace":
+        chosen = selected - row_group
+    else:
+        raise ValueError("Unknown UI partition: " + partition)
+    if not chosen or partition == "row-editing" and not rows:
+        raise ValueError("UI partition contains no selected row coverage")
+    return ["-only-testing:" + test for test in sorted(chosen)]
 
 
 def phases(filters):
@@ -129,6 +142,7 @@ def main():
     select = commands.add_parser("select")
     select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text"))
     select.add_argument("family", choices=("iPhone", "iPad"))
+    select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
@@ -136,7 +150,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == "select":
-            output = selection(args.suite, args.family)
+            output = selection(args.suite, args.family, args.partition)
         elif args.command == "phases":
             output = phases(args.filters)
         else:
