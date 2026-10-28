@@ -44,7 +44,8 @@ private struct TaskRowEditorContent: View {
                     HStack(spacing: 6) {
                         ForEach(TaskRowParameter.allCases) { parameter in
                             TaskRowParameterPill(editing: editing, parameter: parameter,
-                                                 projects: store.availableProjects, now: editing.referenceDate) {
+                                                 projects: store.availableProjects,
+                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
                                 titleFocused = false
                             }
                         }
@@ -81,6 +82,7 @@ private struct TaskRowParameterPill: View {
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
     let projects: [String]
+    let tags: [String]
     let now: Date
     let unfocus: () -> Void
     @Namespace private var presentationNamespace
@@ -107,6 +109,9 @@ private struct TaskRowParameterPill: View {
                             ForEach(["", "L", "M", "H"], id: \.self) { priority in
                                 Text(TaskRowParameter.priorityTitle(priority)).tag(priority)
                             }
+                            if !["", "L", "M", "H"].contains(editing.draft.taskDraft.priority) {
+                                Text(editing.draft.taskDraft.priority).tag(editing.draft.taskDraft.priority)
+                            }
                         }
                     }
                 } label: {
@@ -123,7 +128,7 @@ private struct TaskRowParameterPill: View {
             get: { editing.parameter == parameter },
             set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
         ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-            TaskRowParameterPicker(editing: editing, parameter: parameter, now: now) { editing.parameter = nil }
+            TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
                 .frame(width: 340)
                 .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
                 .presentationCompactAdaptation(.popover)
@@ -148,13 +153,16 @@ private struct TaskRowParameterPill: View {
 struct TaskRowParameterPicker: View {
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
+    let tags: [String]
     let dismiss: () -> Void
     @State private var selectedDate: Date
     @State private var contentHeight: CGFloat = 400
+    @State private var tagError: String?
 
-    init(editing: TaskRowEditing, parameter: TaskRowParameter, now: Date, dismiss: @escaping () -> Void) {
+    init(editing: TaskRowEditing, parameter: TaskRowParameter, tags: [String], now: Date, dismiss: @escaping () -> Void) {
         self.editing = editing
         self.parameter = parameter
+        self.tags = tags
         self.dismiss = dismiss
         _selectedDate = State(initialValue: parameter.date(in: editing.draft.taskDraft) ?? now)
     }
@@ -177,7 +185,10 @@ struct TaskRowParameterPicker: View {
                 Label(parameter.title, systemImage: parameter.symbol).font(.headline)
                 Spacer()
                 Button("Done") {
-                    if parameter != .project && parameter != .priority && parameter.date(in: editing.draft.taskDraft) == nil {
+                    if parameter == .tags {
+                        do { try editing.draft.addTagInput() }
+                        catch { tagError = error.localizedDescription; return }
+                    } else if parameter != .project && parameter != .priority && parameter.date(in: editing.draft.taskDraft) == nil {
                         parameter.setDate(selectedDate, in: &editing.draft)
                     }
                     dismiss()
@@ -193,6 +204,8 @@ struct TaskRowParameterPicker: View {
                     .accessibilityIdentifier("row-project-input")
             case .priority:
                 EmptyView()
+            case .tags:
+                TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
             default:
                 DatePicker(parameter.title, selection: $selectedDate,
                            displayedComponents: parameter == .scheduled ? [.date] : [.date, .hourAndMinute])
@@ -201,7 +214,7 @@ struct TaskRowParameterPicker: View {
                     .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
                     .accessibilityIdentifier(parameter.identifier + "-picker")
             }
-            if editing.draft.taskDraft.attributes[parameter.attribute] != nil {
+            if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
                 Button("Remove " + parameter.title.lowercased(), role: .destructive) {
                     editing.draft.taskDraft.attributes[parameter.attribute] = nil
                     dismiss()
@@ -222,7 +235,7 @@ struct TaskRowParameterLabel: View {
         HStack(spacing: 5) {
             Image(systemName: parameter.symbol).font(.caption)
             if let value {
-                Text(value).lineLimit(1)
+                Text(value).lineLimit(1).frame(maxWidth: 220)
             }
         }
         .font(.caption2)

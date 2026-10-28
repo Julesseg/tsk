@@ -40,7 +40,7 @@ class SelectionTests(unittest.TestCase):
                     methods = [selection.selected_methods(group) for group in groups]
                     self.assertEqual(methods[0] | methods[1], original)
                     self.assertFalse(methods[0] & methods[1])
-                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 6)
+                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 7)
                     self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
                     self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
                     self.assertFalse(owner.selected_cases(groups[1]))
@@ -52,7 +52,7 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 6)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 7)
 
     def test_smoke_covers_task_round_trip_without_hardware_or_installed_system_tours(self):
         for family in ("iPhone", "iPad"):
@@ -70,11 +70,11 @@ class SelectionTests(unittest.TestCase):
 
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
-        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPhone"))), 67)
+        self.assertEqual(len(selection.selected_methods(selection.selection("full", "iPhone"))), 68)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 58)
+        self.assertEqual(len(pad), 59)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
             self.assertTrue(selection.selected_methods(selection.selection(suite, family)))
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 12)
