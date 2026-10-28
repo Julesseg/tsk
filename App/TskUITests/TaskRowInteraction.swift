@@ -56,3 +56,63 @@ extension XCTestCase {
         return app.buttons.matching(predicate).firstMatch
     }
 }
+
+extension XCTestCase {
+    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication) {
+        tapTaskControl(row, app: app)
+        let information = app.buttons["task-row-information"]
+        if information.waitForExistence(timeout: 2) {
+            let editor = app.scrollViews["task-row-editor"]
+            if !information.isHittable { editor.swipeUp() }
+            tapTaskControl(information, app: app)
+            XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
+        }
+    }
+}
+
+extension XCTestCase {
+    @MainActor func openTaskRowParameter(_ identifier: String, app: XCUIApplication) {
+        let parameters = app.scrollViews["row-date-parameters"]
+        let button = app.buttons["row-" + identifier]
+        guard button.waitForExistence(timeout: 5) else {
+            XCTFail("Attribute pill is missing: \(identifier)")
+            return
+        }
+        for _ in 0..<12 {
+            guard button.exists else {
+                XCTFail("Attribute pill is missing: \(identifier)")
+                return
+            }
+            let frame = button.frame
+            let visible = frame.intersection(parameters.frame).intersection(app.frame)
+            if !visible.isNull && !visible.isEmpty && visible.width >= 44 - 0.001 && visible.height >= 44 - 0.001 && button.isEnabled {
+                app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: visible.midY - app.frame.minY)).tap()
+                return
+            }
+            let direction: CGFloat = frame.midX < parameters.frame.midX ? 1 : -1
+            let distance = min(parameters.frame.width * 0.4, max(44, abs(frame.midX - parameters.frame.midX)))
+            let start = parameters.coordinate(withNormalizedOffset: CGVector(dx: 0.5 - direction * 0.2, dy: 0.5))
+            let end = start.withOffset(CGVector(dx: direction * distance, dy: 0))
+            start.press(forDuration: 0.1, thenDragTo: end)
+        }
+        XCTFail("Attribute pill could not be reached: \(identifier)")
+    }
+}
+
+extension XCTestCase {
+    @MainActor func closeTaskRow(_ app: XCUIApplication) {
+        let keyboard = app.keyboards.firstMatch
+        let bottom = keyboard.exists && keyboard.frame.height > 0 ? keyboard.frame.minY : app.frame.maxY
+        let viewport = CGRect(x: app.frame.minX, y: app.frame.minY, width: app.frame.width, height: max(0, bottom - app.frame.minY))
+        let targets = app.buttons.matching(identifier: "task-row-outside").allElementsBoundByIndex
+            .map { ($0, $0.frame.intersection(viewport)) }
+            .filter { !$0.1.isNull && !$0.1.isEmpty }
+        guard let target = targets.max(by: { $0.1.width * $0.1.height < $1.1.width * $1.1.height }) else {
+            XCTFail("No visible outside-tap region for the task row")
+            return
+        }
+        tapTaskControlAtCenter(target.0, app: app,
+                               requiresVisibleKeyboard: keyboard.exists && keyboard.frame.height > 0)
+    }
+}

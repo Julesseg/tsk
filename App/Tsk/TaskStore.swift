@@ -25,11 +25,25 @@ final class TaskStore {
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
     let completionFeedback = TaskCompletionFeedback()
+    var rowEditing: TaskRowEditing?
     var completionContext: TaskCompletionFeedback.Context {
         .init(query: query, project: projectSelection, customViewID: customView?.id, filter: customView.map { UTF8String($0.expression) })
     }
-    var visibleTasks: [TaskRecord] { completionFeedback.visibleTasks(tasks, context: completionContext) }
-    var upcomingDays: [UpcomingDay] { UpcomingDay.groups(tasks: visibleTasks, at: currentDate) }
+    var visibleTasks: [TaskRecord] {
+        if let rowEditing, rowEditing.context == completionContext { return rowEditing.tasks }
+        return completionFeedback.visibleTasks(tasks, context: completionContext)
+    }
+    var upcomingDays: [UpcomingDay] {
+        if let rowEditing, rowEditing.context == completionContext { return rowEditing.upcomingDays }
+        return UpcomingDay.groups(tasks: visibleTasks, at: currentDate)
+    }
+
+    func expandRow(_ task: TaskRecord, rowID: String? = nil) {
+        guard rowEditing == nil, !isSaving, task.canEdit, visibleTasks.contains(where: { $0.id == task.id }) else { return }
+        let upcomingID = customView == nil && query == .upcoming ? upcomingDays.flatMap(\.entries).first { $0.task.id == task.id }?.rowIdentifier : nil
+        guard customView != nil || query != .upcoming || upcomingID != nil else { return }
+        rowEditing = TaskRowEditing(task: task, rowID: rowID ?? upcomingID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
+    }
     private var reloadGeneration = 0
     var nextFilterEvaluation: Date?
     var filterRefreshGeneration = 0
@@ -123,7 +137,7 @@ final class TaskStore {
             }
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
-            tasks = snapshot.tasks
+            tasks = snapshot.listTasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil

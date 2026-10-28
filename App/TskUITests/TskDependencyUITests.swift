@@ -12,9 +12,9 @@ final class TskDependencyUITests: XCTestCase {
         captureTask("Prerequisite outside Today", planned: false, waiting: false, app: app)
         captureTask("Planned dependent", planned: true, waiting: true, app: app)
         app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.staticTexts["Planned dependent"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Prerequisite outside Today"].exists)
-        app.staticTexts["Planned dependent"].tap()
+        XCTAssertTrue(taskRow(named: "Planned dependent", app: app).waitForExistence(timeout: 10))
+        XCTAssertFalse(taskRow(named: "Prerequisite outside Today", app: app).exists)
+        openTaskInformation(taskRow(named: "Planned dependent", app: app), app: app)
         tap(app.buttons["add-dependency"], in: app)
         let candidate = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-candidate-")).firstMatch
         XCTAssertTrue(candidate.waitForExistence(timeout: 5))
@@ -49,9 +49,9 @@ final class TskDependencyUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.staticTexts["Planned dependent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Planned dependent", app: app).waitForExistence(timeout: 10))
         XCTAssertEqual(blockedReasons(app).count, 0)
-        app.staticTexts["Planned dependent"].tap()
+        openTaskInformation(taskRow(named: "Planned dependent", app: app), app: app)
         tap(app.buttons["dependency-task-\(targetIdentity)"], in: app)
         XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
@@ -64,7 +64,7 @@ final class TskDependencyUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.tabBars.buttons["Today"].tap()
-        app.staticTexts["Planned dependent"].tap()
+        openTaskInformation(taskRow(named: "Planned dependent", app: app), app: app)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-task-")).firstMatch.exists)
         tap(app.buttons["add-dependency"], in: app)
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-candidate-")).firstMatch.waitForExistence(timeout: 5))
@@ -80,7 +80,7 @@ final class TskDependencyUITests: XCTestCase {
         if planned { setDateSwitch("planned-day-enabled", to: true, app: app) }
         if waiting { setDateSwitch("waiting-date-enabled", to: true, app: app) }
         app.buttons["save-task"].tap()
-        XCTAssertTrue(app.staticTexts[description].waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: description, app: app).waitForExistence(timeout: 10))
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {

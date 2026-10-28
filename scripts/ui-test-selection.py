@@ -1,24 +1,18 @@
 import argparse
+import importlib.util
 import pathlib
 import re
 
 
 PHONE_SMOKE = (
-    "WorkspaceSettingsUITests",
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
-    "TskUITests/testDescriptionEditAndCompletionPersistAcrossRelaunch",
+    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-    "TaskAnnotationUITests/testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-    "ShareCaptureUITests",
-    "WidgetUITests",
-    "SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry",
 )
 PAD_SMOKE = (
-    "WorkspaceSettingsUITests",
-    "iPadWorkspaceUITests",
-    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
 )
 PAD_FULL = (
     "WorkspaceSettingsUITests",
@@ -26,7 +20,7 @@ PAD_FULL = (
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
     "TypedFilterUITests", "ReminderImportUITests", "ContinuousReminderImportUITests",
-    "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
+    "TaskRowEditingUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
     "WidgetUITests", "SpotlightUITests", "TaskNotificationUITests", "MissedNotificationUITests",
 )
 DIAGNOSTIC = (
@@ -38,7 +32,7 @@ DIAGNOSTIC = (
 )
 KEYBOARD = (
     "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
-    "WorkspaceSettingsUITests/testCreationPlacementAndEverySettingsDestination",
+    "WorkspaceSettingsUITests/testPlacementAndEverySettingsDestination",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
     "ShareCaptureUITests",
@@ -87,7 +81,7 @@ def selected_methods(filters):
     }
 
 
-def selection(suite, family):
+def selection(suite, family, partition="all"):
     if suite == "text":
         tests = TEXT
     elif suite == "keyboard":
@@ -106,7 +100,20 @@ def selection(suite, family):
         selector = item.removeprefix("-only-testing:")
         if not any(matches(test, selector) for test in available):
             raise ValueError("Unknown UI test selector: " + selector)
-    return filters
+    if partition == "all":
+        return filters
+    selected = selected_methods(filters)
+    rows = {test for test in selected if matches(test, "TskUITests/TaskRowEditingUITests")}
+    row_group = rows
+    if partition == "row-editing":
+        chosen = row_group
+    elif partition == "workspace":
+        chosen = selected - row_group
+    else:
+        raise ValueError("Unknown UI partition: " + partition)
+    if not chosen or partition == "row-editing" and not rows:
+        raise ValueError("UI partition contains no selected row coverage")
+    return ["-only-testing:" + test for test in sorted(chosen)]
 
 
 def phases(filters):
@@ -121,22 +128,35 @@ def requires_sync_peer(filters):
     return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
 
 
+def requires_native_keyboard(filters):
+    selected_methods(filters)
+    spec = importlib.util.spec_from_file_location("native_keyboard_owner", pathlib.Path(__file__).with_name("with-native-keyboard-hid.py"))
+    owner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(owner)
+    return bool(owner.selected_cases(filters))
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
     select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text"))
     select.add_argument("family", choices=("iPhone", "iPad"))
+    select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
     peer.add_argument("filters", nargs=argparse.REMAINDER)
+    native = commands.add_parser("native-keyboard")
+    native.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
-            output = selection(args.suite, args.family)
+            output = selection(args.suite, args.family, args.partition)
         elif args.command == "phases":
             output = phases(args.filters)
+        elif args.command == "native-keyboard":
+            output = ["yes" if requires_native_keyboard(args.filters) else "no"]
         else:
             output = ["yes" if requires_sync_peer(args.filters) else "no"]
     except ValueError as error:

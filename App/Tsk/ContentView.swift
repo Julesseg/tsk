@@ -55,7 +55,51 @@ struct ContentView: View {
         _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
-    var body: some View { calendarWorkspace }
+    var body: some View {
+        GlassEffectContainer(spacing: 8) {
+            calendarWorkspace
+                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                    guard let editing = store.rowEditing, editing.isExpanded,
+                          !editing.bounds.contains(tap.location) else { return }
+                    closeRow()
+                }, including: store.rowEditing == nil ? .subviews : .all)
+                .overlay {
+                    TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
+                }
+        }
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
+    }
+
+    private func dismissRowParameter() {
+        store.rowEditing?.parameter = nil
+    }
+
+    private func closeRow(after: (() -> Void)? = nil) {
+        guard let editing = store.rowEditing, !editing.isSaving, editing.isExpanded else { return }
+        if editing.parameter != nil { dismissRowParameter(); return }
+        editing.isSaving = true
+        Task {
+            do {
+                let changes = try editing.draft.changes()
+                let saved = changes.isEmpty ? editing.draft.original : await store.update(id: editing.draft.original.id, changes: changes)
+                guard let saved else {
+                    editing.error = store.error
+                    editing.isSaving = false
+                    return
+                }
+                editing.savedTask = saved
+                await editing.setExpanded(false, reduceMotion: reduceMotion)
+                store.rowEditing = nil
+                after?()
+            } catch { editing.error = error.localizedDescription; editing.isSaving = false }
+        }
+    }
+
+    private func showInformation(_ task: TaskRecord) {
+        selectedTaskID = task.id
+        if isProjectWorkspace { projectPath.append(task.id) }
+        else if presentation != .columns { path = [task.id] }
+    }
 
     private var presentation: TaskWorkspacePresentation {
         if sizeClass != .regular { return .compact }
@@ -354,7 +398,7 @@ struct ContentView: View {
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
     private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
-        TaskListView(store: store, selection: selection, calendar: calendar, edit: { editingTask = $0 })
+        TaskListView(store: store, selection: selection, calendar: calendar, edit: { showInformation($0) })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -366,7 +410,7 @@ struct ContentView: View {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = store.error, !store.tasks.isEmpty { errorBanner(error, retry: { Task { await store.reload() } }) }
+                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
@@ -441,13 +485,13 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
         #endif
         return TaskWorkspaceActions(
             capture: capture,
-            edit: selectedTask.flatMap { task in task.canEdit ? { editingTask = task } : nil },
+            edit: selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
             complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
@@ -497,4 +541,37 @@ private struct TaskListSelection: Equatable {
 
 private enum TaskWorkspacePresentation: Equatable {
     case columns, accessibilityColumns, compact
+}
+
+private struct TaskRowDismissalOverlay: View {
+    let editing: TaskRowEditing?
+    let close: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let editing, editing.isExpanded, editing.bounds != .zero {
+                let origin = geometry.frame(in: .global).origin
+                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: close)
+                    .allowsHitTesting(false)
+            }
+        }
+        .background {
+            GeometryReader { geometry in
+                if let editing, editing.bounds != .zero {
+                    let origin = geometry.frame(in: .global).origin
+                    let bounds = editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y)
+                    let viewport = editing.viewport.offsetBy(dx: -origin.x, dy: -origin.y)
+                    Path { path in
+                        path.addRect(CGRect(origin: .zero, size: geometry.size))
+                        path.addPath(Path(roundedRect: bounds, cornerRadius: 18).intersection(Path(viewport)))
+                    }
+                    .fill((colorScheme == .dark ? Color.white : Color.black).opacity(0.08 * editing.revealProgress), style: FillStyle(eoFill: true))
+                }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
 }

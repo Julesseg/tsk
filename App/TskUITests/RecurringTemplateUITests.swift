@@ -43,6 +43,19 @@ final class RecurringTemplateUITests: XCTestCase {
         app.launch()
         selectAllTasks(app)
         XCTAssertTrue(app.staticTexts["No unfinished tasks"].waitForExistence(timeout: 10))
+        openWorkspaceSetting("custom-views", app: app)
+        tapTaskControl(app.buttons["new-custom-view"], app: app)
+        let viewName = app.textFields["custom-view-name"]
+        XCTAssertTrue(viewName.waitForExistence(timeout: 5))
+        viewName.tap()
+        viewName.typeText("Everything unfinished")
+        let expression = app.textViews["raw-filter-expression"]
+        expression.tap()
+        expression.typeText("status.not:completed")
+        tapTaskControl(app.buttons["save-custom-view"], app: app)
+        activateSavedWorkspaceView(app)
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
+        XCTAssertFalse(taskRow(named: "Review recurring work", app: app).exists)
         openTemplates(app)
         XCTAssertTrue(app.staticTexts["Review recurring work"].waitForExistence(timeout: 10))
         app.staticTexts["Review recurring work"].tap()
@@ -69,7 +82,7 @@ final class RecurringTemplateUITests: XCTestCase {
         selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.tap()
+        openTaskInformation(row, app: app)
         XCTAssertTrue(app.staticTexts["occurrence-only-explanation"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons["edit-task"].label, "Edit occurrence")
         capture("Actual generator occurrence offers occurrence-only actions", app)
@@ -124,7 +137,7 @@ final class RecurringTemplateUITests: XCTestCase {
         selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.tap()
+        openTaskInformation(row, app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         app.buttons["complete-task"].tap()
         XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))

@@ -1,153 +1,107 @@
 # CI test tiers
 
 Pull requests and pushes to `main` with non-documentation changes run all Core
-and persistent Native tests, plus focused UI smoke coverage on both device
-families. Existing check names stay unchanged for branch protection. The UI
-runner builds once per lane and reuses that build, simulator and synchronization
-fixture. An independent peer
-verifies the uploaded UI task whenever the real-server synchronization scenario
-is selected. The iPad smoke selection exercises workspace/keyboard behavior and
-does not create that server task.
-
-A lightweight Linux job classifies the complete pull-request diff from its merge
-base, or the before/after range for a push. Documentation-only changes skip Core
-and Native jobs; the iPhone/iPad check names still run on Linux and report the
-skip without allocating an Xcode runner, building products or booting simulators.
-The workflow itself is never filtered out, so its check contexts still appear.
-The routing regressions run even for documentation-only changes.
-
-The documentation allowlist is root Markdown files, nested `README.md` files,
-root `LICENSE`/`LICENSE.txt`, and documentation/text/image/PDF files under `docs/`
-(`.md`, `.txt`, `.rst`, `.adoc`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`,
-`.pdf`). Unknown paths, mixed changes and executable examples run normal tests.
-Renames inspect both old and new paths, so moving source into documentation does
-not skip tests. Empty diffs, missing comparison commits and classification errors
-also run tests. Nightly, manual and unrecognized event types always run tests,
-including explicit smoke and diagnostic dispatches.
-
-The installable Release workflow already ignores Markdown and `docs/` changes;
-it also ignores the root license files so those documentation-only changes do
-not allocate a signing/build runner.
+and persistent Native tests, plus a small UI smoke selection on both device
+families. The existing `App · XCUITest (macOS)` and `App · XCUITest (iPad)`
+check names remain the branch-protection gates.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 13 methods | 10 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 64 declared methods | 54-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
-| Diagnostic | Existing 13-method subset | — | Manual `diagnostic_only=true` |
+| Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
+| Full | All 67 declared methods | 58-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
 
-Full coverage on both families includes compact task rows, completion circles,
-occurrence failure feedback and light/dark accessibility captures
-(`TaskPresentationUITests`).
+The iPhone smoke journeys cover capture/validation/cancel/reopen; row title and
+attribute editing, picker dismissal, invalid-draft retention and durable
+completion; persisted view ordering and capacity; and real-server synchronization.
+The iPad journeys cover the same row round trip and adaptive landscape/portrait
+project/date views.
 
-Both device families check workspace control placement, every Settings destination,
-Settings at the largest accessibility text size, persisted tab ordering and capacity,
-and Projects drill-down. Both also hold an actual HTTP synchronization request open
-to check title-adjacent progress and the absence of workspace synchronization footers,
-then return a server failure and check that its details remain in Settings.
-Appearance captures require visual confirmation of the
-rendered mode. The iPhone smoke selection
-checks capture/validation/cancel/reopen, durable
-editing/completion, real-server synchronization, annotation toolbar saves,
-native keyboard input, installed Share capture, installed widget behavior and
-actual Spotlight opening/completion. The iPad selection checks keyboard-driven
-capture/edit/completion/reopen, adaptive landscape/portrait views, custom views
-at accessibility text sizes, modal annotation commands and native text input.
-Share runs first only when selected; the iPad smoke lane skips its separate
-launch and host-fixture installation.
+Physical-keyboard journeys run in full/nightly and focused keyboard/text
+diagnostics. PR smoke does not certify physical-keyboard delivery. This keeps
+ordinary task editing independent of the native keyboard companion's startup.
+Full and diagnostic selections still require the owned transport whenever they
+include a hardware-keyboard case; a missing transport fails before XCTest can
+silently use the local fallback. Native request proofs, assertions and deadlines
+are unchanged. The workflow installs the companion only for those selections.
 
-Calendar presentation, hidden missing-access/read-error states, and Settings access/Retry recovery run on both device
-families in the full suite, including populated light/dark and largest-text
-captures, saved start/end hours, source-calendar colors, empty Calendar/tasks and many-event scrolling. Controlled Calendar
-sources establish presentation; actual EventKit authorization and read-only
-local-source checks remain separate CalendarTodayUITests.
+Installed Share capture, widgets, all three Spotlight scenarios, Settings tours,
+appearance/accessibility permutations, annotations, recurrence, Reminders,
+Calendar, notifications, exhaustive typed attributes and filters, and additional
+persistence/error journeys run in full coverage. Moving a scenario to full
+coverage does not establish that it passed. System changes still require actual
+native full-suite results before acceptance. See [the consolidation audit](test-suite-consolidation.md)
+for the merged methods and measured baseline.
 
-Native task actions, exhaustive typed attributes and filters, recurrence, Reminders copy/move and
-permission changes, notification delivery/revocation, stale/peer Spotlight
-results and repeated persistence/error journeys remain in the full suite.
-Existing workflows enter their destinations through Settings. iPad-only methods still
-skip on iPhone. Source selectors live in `scripts/ui-test-selection.py`; its
-checks reject renamed selectors and empty UI selections.
+Smoke uses one worker per family. Full coverage uses disjoint workspace and
+row-editing workers: 61 + 6 methods on iPhone and 52 + 6 on iPad. Each method is
+selected once per family. Native HID cases remain in the workspace worker with
+their existing identity checks and deadlines. The row-only worker selects no
+native command cases and uses XCTest input. Focused diagnostic dispatches use
+one worker per selected family. Each worker builds once, owns one disposable
+simulator, and runs Share before the remaining cases when selected.
 
-Keyboard diagnostics retain native command delivery, installed Share capture,
-Calendar failure capture, workspace creation, view ordering and automatic-sync
-failure recovery. They also exercise annotation creation, real-server connection
-entry and typed rating menus on both families, plus dependency navigation and
-project text replacement on iPhone. This focused manual selection uses the smoke time limits and
-does not change PR or nightly coverage. Keyboard-dismissal admission requires a
-visible software keyboard, a control outside its occupied area, and two stable
-geometry samples within the existing 20-second control deadline.
-Its distinct check names prevent the focused subset from satisfying the
-canonical XCUITest branch-protection checks.
-Its separate concurrency group allows diagnostics to run alongside full coverage;
-repeated keyboard dispatches replace only the earlier keyboard run.
+The gates inspect jobs from the current run attempt and require every expected
+worker for their family to complete successfully. Missing, duplicate, skipped,
+cancelled, failed or pending workers fail the gate. Existing workspace artifact
+names remain; full row artifacts add `-row-editing`.
 
-Text diagnostics cover local attribute creation, series-rule and typed-value
-replacement, Share editing and independent native text input on both families.
-They use the smoke time limits,
-separate check names and a separate concurrency group. They do not change smoke,
-full or keyboard selections or satisfy canonical branch-protection checks.
+Portable selection, routing, installer, relay, owner and cleanup regressions run
+once in the Linux routing job. Calendar controller regressions run once in the
+iPhone workspace/all Mac worker. Native runtime and input acceptance remain in
+the actual iPhone/iPad workers. An independent peer verifies the uploaded task
+whenever the real-server synchronization journey is selected.
 
-One owned relay process performs the fixed UP-only initialization and then arms
-the live log using the same client context. Client connection setup and the UP-only
-RPC share the initialization budget; later commands reuse that context instead of
-opening a client connection within each dispatch budget. Dispatch failure retains
-the existing UP-only cleanup before the context closes, with no command replay or
-added reconnect loop. The owner allows 30 seconds from child launch
-for initialization and 10 seconds from its recorded completion for arming.
-Sticky initialization proof survives the transition to waiting; both admissions
-validate the owned relay PID, companion PID, session token, device and socket.
-XCTest starts only after both phases succeed and both processes remain alive.
-UP-only initialization does not establish native input acceptance. Existing
-request, dispatch and recovery limits remain unchanged.
+Documentation-only changes skip Core/Native builds and run the named UI workers
+on Linux without Xcode or simulators. Routing inspects the complete PR diff from
+its merge base, or the before/after range for a push. Its allowlist is root
+Markdown and license files, nested `README.md` files, and documentation/text/image/PDF
+files under `docs/`. Unknown paths, mixed changes, executable examples, empty
+diffs, missing commits and classification errors run normal tests. Renames
+inspect both paths. Nightly and manual dispatches always run tests. The Release
+workflow also excludes documentation-only changes.
 
-Native keyboard cases prepare the runner container in the background at case
-start, with a 30-second discovery cap. Each request still keeps its original
-12-second deadline and five-second dispatch reservation. A discovered path is
-only cached for its device, runner bundle and process after checking the exact
-owner, attempt and nonce request file; every subsequent request is checked too.
-Outstanding discovery children are cancelled, reaped and recorded on exit.
+UI products build in a separate 20-minute step before simulator creation.
+Execution reuses those signed arm64 products with `--skip-build`. Xcode 27.0
+is explicit. The simulator selector matches the selected SDK's major/minor
+release, preserving the runtime repair on `main`; a newer installed runtime
+cannot silently change the lane. Its portable selection checks run in routing.
+Smoke keeps its 45-minute execution and 60-minute worker limits. Full keeps
+150/180-minute execution/worker limits; diagnostics keep 60/90. Every method
+keeps its 600-second XCTest limit. These are ceilings, not measured durations.
+The `always()` cleanup removes the owned simulator after failure or timeout.
 
-UI products build in a separate 20-minute step before creating/booting a test
-simulator. `scripts/create-ui-test-simulator.py` restricts candidates to the
-selected iOS Simulator SDK major/minor release, then retains the existing
-device-family and size preferences. Installing a newer runtime cannot silently
-move the lane to another device/runtime. Missing matching devices fail before
-creation; the workflow records the owned simulator ID for existing cleanup.
-Selector regressions cover mixed runtimes, both families, unavailable devices,
-numeric patch ordering and the actual create/output boundary. Execution reuses
-those signed arm64 products with `--skip-build`.
-Smoke execution has a 45-minute step limit and a 60-minute overall job limit.
-The expanded workspace selection exceeded the former 30-minute step limit;
-the measured iPad run spent 10 minutes 33 seconds in simulator preparation
-before starting `xcodebuild`. The additional budget covers preparation and
-the selected journeys without changing individual test limits or assertions.
-Full execution/job limits are 150/180 minutes; diagnostics have 60/90-minute limits.
-These are ceilings, not measured completion times. Every method retains the
-600-second XCTest limit. The later `always()` step removes the owned simulator
-after a UI step failure or timeout. Runtime and signed-distribution acceptance
-still require their actual results; a smoke pass establishes only its selected
-workflows.
+Full and diagnostic native keyboard admission retains UP-only initialization, a live owned relay
+and companion, fixed case/phase sequences, nonce/PID/device/socket checks,
+30-second initialization and 10-second arming limits. Requests retain their
+12-second deadline and five-second dispatch reservation. Container prefetch
+retains its 30-second cap, exact owner/attempt/nonce validation and child cleanup.
+There is no command replay or automatic test retry. Keyboard-dismissal controls
+still require visible keyboard geometry and two stable samples inside the
+20-second control deadline. Native menu selection checks the exact ordered menu
+and two stable, finite, ancestor-contained row snapshots, then performs one tap
+at that admitted position without resolving the disappearing menu button again.
 
-Run the full suite on a published branch before accepting changes to system
-integrations or workflows outside smoke coverage:
+Run full coverage on both families before accepting system integrations,
+workflow changes, or behavior outside smoke coverage:
 
 ```sh
 gh workflow run ci.yml --repo Julesseg/tsk --ref <branch> -f ui_suite=full
 ```
 
-Manual dispatch defaults to full coverage. The nightly schedule runs the
-default branch once the workflow is merged. Manual, scheduled and PR/push
-runs have separate concurrency groups, so dispatching full coverage preserves
-an active PR run. Repeated dispatches on the same branch replace each other.
-Verify the run's head SHA before attributing its result to a change. Existing
-artifact names and ownership/cleanup evidence are retained.
+Manual dispatch defaults to full. Manual, scheduled and PR/push runs have
+separate concurrency groups; repeated dispatches on one branch replace each
+other. Verify the actual run head SHA. Keyboard/text diagnostics have separate
+names and concurrency groups and cannot satisfy canonical branch protection.
+Appearance captures require visual confirmation; source, builds and focused
+checks do not establish system delivery or signed-distribution acceptance.
 
-Inspect the exact selection or verify routing without booting a simulator:
+Inspect selections without booting a simulator:
 
 ```sh
 python3 scripts/ui-test-selection.py select smoke iPhone
-python3 scripts/ui-test-selection.py select full iPad
+python3 scripts/ui-test-selection.py select full iPad --partition workspace
 python3 scripts/test-ui-test-selection.py
 ```

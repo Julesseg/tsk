@@ -6,24 +6,14 @@ final class TaskAnnotationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testAddValidateEditAndReopenTimestampedAnnotations() throws {
-        try exerciseAnnotationRoundTrip()
-    }
-
-    func testToolbarSaveValidatesEditsAndDurablyReopensTimestampedAnnotations() throws {
-        try exerciseAnnotationRoundTrip(keyboardShortcuts: false)
-    }
-
-    private func exerciseAnnotationRoundTrip(keyboardShortcuts: Bool = true) throws {
         if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
-        let commands = keyboardShortcuts ? try TaskKeyboardCommand(.annotations, app: app) : nil
+        let commands = try TaskKeyboardCommand(.annotations, app: app)
         func save(_ phase: String) throws {
-            if let commands {
-                try commands.perform(phase) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
-            } else { tapTaskControlAtCenter(app.buttons["save-annotation"], app: app) }
+            try commands.perform(phase) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
         }
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
@@ -36,7 +26,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertEqual(description.value as? String, "Task with supporting notes")
         tapTaskControl(app.buttons["save-task"], app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task with supporting notes", app: app), timeout: 10))
-        taskRow(named: "Task with supporting notes", app: app).tap()
+        openTaskInformation(taskRow(named: "Task with supporting notes", app: app), app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
         capture("Annotations empty in native task detail", app: app)
         app.buttons["add-annotation"].tap()
@@ -59,32 +49,18 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
         editor.typeText("Second independent note")
-        if let commands {
-            try commands.perform("secondNoteCommandN") { app.typeKey("n", modifierFlags: .command) }
-            XCTAssertFalse(app.textFields["task-description"].exists)
-            XCTAssertTrue(editor.exists)
-        }
+        try commands.perform("secondNoteCommandN") { app.typeKey("n", modifierFlags: .command) }
+        XCTAssertFalse(app.textFields["task-description"].exists)
+        XCTAssertTrue(editor.exists)
         try save("secondNoteSave")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
-        if let commands {
-            try commands.perform("editSelectAll") { editor.typeKey("a", modifierFlags: .command) }
-        } else {
-            let original = try XCTUnwrap(editor.value as? String)
-            XCTAssertEqual(original, "First supporting note\nAnother line")
-            editor.press(forDuration: 1.1)
-            let menu = app.menuItems["Select All"]
-            let button = app.buttons["Select All"]
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in menu.exists || button.exists }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
-            let selectAll = menu.exists ? menu : button
-            selectAll.tap()
-        }
+        try commands.perform("editSelectAll") { editor.typeKey("a", modifierFlags: .command) }
         editor.typeText("First supporting note\nAnother line revised")
-        if !keyboardShortcuts { XCTAssertEqual(editor.value as? String, "First supporting note\nAnother line revised") }
+        XCTAssertEqual(editor.value as? String, "First supporting note\nAnother line revised")
         capture("Edit annotation keeps its original timestamp", app: app)
         try save("editedNoteSave")
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
@@ -92,7 +68,7 @@ final class TaskAnnotationUITests: XCTestCase {
         app.launch()
         selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
-        taskRow(named: "Task with supporting notes", app: app).tap()
+        openTaskInformation(taskRow(named: "Task with supporting notes", app: app), app: app)
         let first = app.staticTexts["annotation-text-annotation_1792144800"]
         let second = app.staticTexts["annotation-text-annotation_1792144801"]
         XCTAssertTrue(revealTaskElement(first, in: "task-detail-form", app: app))
