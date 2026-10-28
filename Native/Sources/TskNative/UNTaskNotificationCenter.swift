@@ -52,10 +52,7 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
         defer { TaskParticipantDiagnostics.end("notifications.pending", id: trace) }
         return await withCheckedContinuation { continuation in
             center.getPendingNotificationRequests { requests in
-                let values = requests.map { request in
-                    let payload = (request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
-                    return PendingTaskNotification(identifier: request.identifier, request: payload, nextTriggerDate: (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate())
-                }
+                let values = requests.map(Self.pendingNotification)
                 continuation.resume(returning: values)
             }
         }
@@ -63,11 +60,7 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
 
     public func add(_ request: TaskNotificationRequest) async throws {
         guard try await authorization().permitsAlerts else { throw TaskManagementError.storage("Notifications are not permitted. Saved tasks remain available.") }
-        let content = UNMutableNotificationContent()
-        content.title = request.title
-        content.body = request.message
-        content.sound = .default
-        content.userInfo = [Self.payloadKey: try JSONEncoder().encode(request), "taskID": request.taskID.uuidString]
+        let content = try Self.content(for: request)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         var components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: request.fireDate)
@@ -80,11 +73,7 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
 
     public func addImmediate(_ request: TaskNotificationRequest) async throws {
         guard try await authorization().permitsAlerts else { throw TaskManagementError.storage("Notifications are not permitted. Retry missed alerts after enabling notifications.") }
-        let content = UNMutableNotificationContent()
-        content.title = request.title
-        content.body = request.message + " (missed while away)"
-        content.sound = .default
-        content.userInfo = [Self.payloadKey: try JSONEncoder().encode(request), "taskID": request.taskID.uuidString]
+        let content = try Self.content(for: request)
         try await addNative(UNNotificationRequest(identifier: request.immediateIdentifier, content: content, trigger: nil))
     }
 
@@ -114,6 +103,23 @@ public final class UNTaskNotificationCenter: TaskNotificationCenter, @unchecked 
         let trace = TaskParticipantDiagnostics.begin("notifications.delivered-identifiers")
         defer { TaskParticipantDiagnostics.end("notifications.delivered-identifiers", id: trace) }
         return await withCheckedContinuation { continuation in center.getDeliveredNotifications { continuation.resume(returning: $0.map(\.request.identifier)) } }
+    }
+
+    static func content(for request: TaskNotificationRequest) throws -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = request.title
+        content.body = request.message
+        content.sound = .default
+        if #available(iOS 15, macOS 12, *) { content.interruptionLevel = .timeSensitive }
+        content.userInfo = [Self.payloadKey: try JSONEncoder().encode(request), "taskID": request.taskID.uuidString]
+        return content
+    }
+
+    static func pendingNotification(_ request: UNNotificationRequest) -> PendingTaskNotification {
+        let payload = (request.content.userInfo[Self.payloadKey] as? Data).flatMap { try? JSONDecoder().decode(TaskNotificationRequest.self, from: $0) }
+        var matches = payload.map { request.content.title == $0.title && request.content.body == $0.message } ?? false
+        if #available(iOS 15, macOS 12, *) { matches = matches && request.content.interruptionLevel == .timeSensitive }
+        return PendingTaskNotification(identifier: request.identifier, request: payload, nextTriggerDate: (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate(), contentMatchesRequest: matches)
     }
 
     private func addNative(_ request: UNNotificationRequest) async throws {

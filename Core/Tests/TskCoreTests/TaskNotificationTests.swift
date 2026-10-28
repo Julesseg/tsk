@@ -54,20 +54,26 @@ private actor NotificationTestState: TaskNotificationStateStore {
 private actor NotificationPolicyCenter: TaskNotificationCenter {
     var permission = TaskNotificationAuthorization.authorized
     var requests: [String: TaskNotificationRequest] = [:]
+    var outdated = Set<String>()
+    var additions = 0
     let capacity: Int
     let revokeAfterAdd: Bool
     init(capacity: Int, revokeAfterAdd: Bool = false) { self.capacity = capacity; self.revokeAfterAdd = revokeAfterAdd }
     func authorization() -> TaskNotificationAuthorization { permission }
     func requestAuthorization() -> TaskNotificationAuthorization { permission }
-    func pending() -> [PendingTaskNotification] { requests.values.map { PendingTaskNotification(identifier: $0.identifier, request: $0, nextTriggerDate: $0.fireDate) } }
+    func pending() -> [PendingTaskNotification] { requests.values.map { PendingTaskNotification(identifier: $0.identifier, request: $0, nextTriggerDate: $0.fireDate, contentMatchesRequest: !outdated.contains($0.identifier)) } }
     func add(_ request: TaskNotificationRequest) throws {
         guard permission.permitsAlerts else { throw TaskManagementError.storage("Permission revoked") }
         guard requests.count < capacity || requests[request.identifier] != nil else { throw TaskManagementError.storage("Registration capacity reached") }
         requests[request.identifier] = request
+        outdated.remove(request.identifier)
+        additions += 1
         if revokeAfterAdd { permission = .denied }
     }
     func remove(identifiers: [String]) { for id in identifiers { requests[id] = nil } }
     func deny() { permission = .denied }
+    func markOutdated() { outdated = Set(requests.keys) }
+    func additionCount() -> Int { additions }
 }
 
 @Test func notificationReconciliationRetainsNearestReadBackAlertsAndCancelsKnownLocalChanges() async throws {
@@ -131,4 +137,23 @@ private final class NotificationTestClock: @unchecked Sendable {
     #expect(report.registered.isEmpty)
     #expect(await center.pending().isEmpty)
     #expect(try await manager.notificationState(using: state).accepted.isEmpty)
+}
+
+@Test func notificationReconciliationRefreshesOutdatedContentWithoutRepeatingAcceptedEvents() async throws {
+    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792100000) })
+    let state = NotificationTestState()
+    let center = NotificationPolicyCenter(capacity: 10)
+    _ = try await manager.create(TaskDraft(description: "Existing alert", attributes: ["due": "1792141200"]))
+    let original = try await manager.reconcileNotifications(center: center, store: state)
+    let accepted = try await manager.notificationState(using: state).accepted
+    await center.markOutdated()
+    let refreshed = try await manager.reconcileNotifications(center: center, store: state)
+    #expect(refreshed.registered == original.registered)
+    #expect(refreshed.errors.isEmpty)
+    #expect(await center.additionCount() == 2)
+    let current = try await manager.notificationState(using: state).accepted
+    #expect(current.map(\.event) == accepted.map(\.event))
+    #expect(current.map(\.acceptedAt) == accepted.map(\.acceptedAt))
+    _ = try await manager.reconcileNotifications(center: center, store: state)
+    #expect(await center.additionCount() == 2)
 }
