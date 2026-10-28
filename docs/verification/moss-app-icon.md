@@ -42,3 +42,22 @@ The mobile report was checked at 390 px and 320 px, including every image and
 tap-to-enlarge. Its runtime comparisons use matching crops of the app grids;
 the unmodified screenshots and build logs are retained at
 `/tmp/tsk-moss-install-verification/`. Both task-owned simulators were shut down.
+
+## CI repair
+
+The original icon revision `08698b4` used the earlier inline simulator selector.
+Its failed iPhone jobs selected iPhone Duo on iOS 27.1 while Xcode/SDK 27.0 was
+active (for example, job `122563401580`). The selector chose the newest runtime
+rather than the selected SDK release.
+
+The branch is rebased onto `78e9bcb`, which includes `db76204` (SDK-matched
+runtime selection) and `aed247d` (Share controls account for the editing toolbar).
+Both canonical UI lanes passed on that upstream revision before its merge.
+A replay of the actual CI selector against SDK 27.0 with both installed runtimes
+failed before rebase by selecting 27.1, and passed after rebase by selecting 27.0.
+The five simulator-selection regressions and all 162 Core tests pass locally.
+Assertions, deadlines, native transport ownership and coverage are unchanged.
+The exact rebased icon revision still requires its own canonical UI result.
+
+The installed-icon captures and local Xcode builds above were made on the
+original `d3c14fe` baseline plus the icon change, before this rebase.
