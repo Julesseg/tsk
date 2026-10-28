@@ -181,19 +181,16 @@ struct TaskRowParameterPicker: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Label(parameter.title, systemImage: parameter.symbol).font(.headline)
-                Spacer()
-                Button("Done") {
-                    if parameter == .tags {
-                        do { try editing.draft.addTagInput() }
-                        catch { tagError = error.localizedDescription; return }
-                    } else if parameter != .project && parameter != .priority && parameter.date(in: editing.draft.taskDraft) == nil {
-                        parameter.setDate(selectedDate, in: &editing.draft)
-                    }
-                    dismiss()
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    heading.fixedSize()
+                    Spacer(minLength: 12)
+                    doneButton.fixedSize()
                 }
-                .accessibilityIdentifier("close-row-parameter")
+                VStack(alignment: .leading, spacing: 8) {
+                    heading
+                    doneButton.frame(maxWidth: .infinity, alignment: .trailing)
+                }
             }
             switch parameter {
             case .project:
@@ -224,6 +221,24 @@ struct TaskRowParameterPicker: View {
         }
         .buttonStyle(.borderless)
         .padding(16)
+    }
+
+    private var heading: some View {
+        Label(parameter.title, systemImage: parameter.symbol).font(.headline)
+            .accessibilityIdentifier("row-parameter-title")
+    }
+
+    private var doneButton: some View {
+        Button("Done") {
+            if parameter == .tags {
+                do { try editing.draft.addTagInput() }
+                catch { tagError = error.localizedDescription; return }
+            } else if parameter != .project && parameter != .priority && parameter.date(in: editing.draft.taskDraft) == nil {
+                parameter.setDate(selectedDate, in: &editing.draft)
+            }
+            dismiss()
+        }
+        .accessibilityIdentifier("close-row-parameter")
     }
 }
 
