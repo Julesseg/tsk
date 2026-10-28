@@ -1,4 +1,4 @@
-name: Native menu action diagnostic
+name: Command inspection differential
 
 on:
   workflow_dispatch:
@@ -209,27 +209,14 @@ jobs:
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
           export TSK_NATIVE_KEYBOARD_HID="$UI_NATIVE_KEYBOARD"
           export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
-          coverage=()
-          selection=$(python3 ../scripts/ui-test-selection.py select "$UI_SUITE" "$UI_FAMILY" --partition "$UI_PARTITION")
-          while IFS= read -r selector; do
-            if [[ -n "$selector" ]]; then coverage+=("$selector"); fi
-          done <<< "$selection"
-          printf 'UI suite: %s (%s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$selection"
-          peer=()
-          verify_peer=$(python3 ../scripts/ui-test-selection.py sync-peer -- "${coverage[@]}")
-          if [[ "$verify_peer" == yes ]]; then
-            peer=(--verify-peer "$(swift build --package-path ../Native --show-bin-path)/tsk-native-probe")
-          fi
           export TSK_TASKCHAMPION_LIBRARY="$PWD/../Native/Bridge/target/release/libtsk_taskchampion.dylib"
           python3 ../scripts/with-sync-fixture.py \
             --server ../.build/sync-server/target/release/taskchampion-sync-server \
-            --output ../.build/ui-sync "${peer[@]}" -- \
-            ../scripts/run-ui-tests.sh "${{ steps.sim.outputs.id }}" --skip-build \
-            -project "$APP_NAME.xcodeproj" \
-            -scheme "$APP_NAME" "${coverage[@]}" \
-            -resultBundlePath TestResults.xcresult \
-            -derivedDataPath ../.build/ui \
-            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+            --output ../.build/ui-sync -- \
+            python3 ../scripts/run-command-inspection-pair.py \
+            --control-id "${{ steps.sim.outputs.id }}" \
+            --output ../.build/command-inspection-pair \
+            --derived-data ../.build/ui
 
       - name: Verify simulator intent metadata and shared storage entitlement
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
@@ -238,8 +225,21 @@ jobs:
       - name: Remove owned isolated simulator
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() && steps.sim.outputs.id != '' }}
         run: |
-          xcrun simctl shutdown "${{ steps.sim.outputs.id }}" || true
-          xcrun simctl delete "${{ steps.sim.outputs.id }}"
+          python3 - "${{ steps.sim.outputs.id }}" <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          ids = [sys.argv[1]]
+          treatment = Path('.build/command-inspection-pair/treatment-device.txt')
+          if treatment.exists(): ids.append(treatment.read_text().strip())
+          inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', '--json']))
+          existing = {device['udid'] for devices in inventory['devices'].values() for device in devices}
+          for identifier in ids:
+              if identifier in existing:
+                  subprocess.run(['xcrun', 'simctl', 'shutdown', identifier], check=False)
+                  subprocess.run(['xcrun', 'simctl', 'delete', identifier], check=True)
+          Path('.build/command-inspection-pair').mkdir(parents=True, exist_ok=True)
+          Path('.build/command-inspection-pair/workflow-cleanup.json').write_text(json.dumps({'owned': ids, 'deletedOrAbsent': True}) + '\n')
+          PY
 
       - name: Upload test results
         if: ${{ needs.changes.outputs.run_tests == 'true' && always() }}
@@ -247,6 +247,7 @@ jobs:
         with:
           name: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', matrix.family == 'iPhone' && 'ui-test-results' || 'ui-test-results-ipad', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
+            .build/command-inspection-pair
             App/TestResults.xcresult
             App/TestResults-sharing.xcresult
             .build/ui-sync
@@ -256,7 +257,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: Native menu diagnostic gate (iPad)
+    name: Command inspection diagnostic gate (iPad)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

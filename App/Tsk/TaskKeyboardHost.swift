@@ -162,7 +162,7 @@ final class TaskKeyboardRouter {
             }
             directChains.append(["keyWindow": window.isKeyWindow, "chain": values])
         }
-        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "responderCaptureDelivered": captured, "responderChain": chain, "runtimeCommands": runtimeCommands, "declarations": declarations,
+        diagnostics.append(["time": Date().timeIntervalSince1970, "event": text, "runtimeCommandInspection": ProcessInfo.processInfo.environment["TSK_TEST_COMMAND_INSPECTION"] == "0" ? "not-inspected" : "inspected", "responderCaptureDelivered": captured, "responderChain": chain, "runtimeCommands": runtimeCommands, "declarations": declarations,
                             "directWindowResponders": directChains, "refreshCount": refreshCount, "installationCount": installationCount,
                             "removalCount": removalCount, "menuRebuildCount": menuRebuildCount])
         diagnostics = Array(diagnostics.suffix(80))
@@ -191,8 +191,9 @@ final class TaskKeyboardRouter {
         diagnostic("editing notification=\(notification.name.rawValue) view=\(String(describing: type(of: view))) firstResponder=\(view.isFirstResponder)", force: true)
     }
 
-    private func diagnosticReturnCommands(_ responder: UIResponder) -> [[String: Any]] {
-        (responder.keyCommands ?? []).filter { $0.input == "\r" && $0.modifierFlags.contains(.command) }.map { command in
+    private func diagnosticReturnCommands(_ responder: UIResponder) -> Any {
+        guard ProcessInfo.processInfo.environment["TSK_TEST_COMMAND_INSPECTION"] != "0" else { return NSNull() }
+        return (responder.keyCommands ?? []).filter { $0.input == "\r" && $0.modifierFlags.contains(.command) }.map { command in
             var record: [String: Any] = ["input": command.input ?? "nil", "modifiers": command.modifierFlags.rawValue,
                 "action": command.action.map { NSStringFromSelector($0) } ?? "nil",
                 "wantsPriorityOverSystemBehavior": command.wantsPriorityOverSystemBehavior,

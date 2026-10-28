@@ -5,6 +5,9 @@ extension XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
+        if let inspection = ProcessInfo.processInfo.environment["TSK_TEST_COMMAND_INSPECTION"] {
+            app.launchEnvironment["TSK_TEST_COMMAND_INSPECTION"] = inspection
+        }
         return app
     }
 
