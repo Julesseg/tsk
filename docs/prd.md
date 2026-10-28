@@ -4,7 +4,7 @@
 
 Taskwarrior users need a capable, modern iPhone and iPad app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
 
-The repository currently provides a greeting app, a pure SwiftPM Core module, and Core/XCUITest scaffolding. Task storage, TaskChampion integration, task views, recurrence controls, and system integrations described here are not implemented yet. This PRD turns the agreed product direction into an initial product contract without recording any personal infrastructure setup.
+This PRD records the agreed product contract without recording personal infrastructure setup. Implementation and runtime verification are tracked separately; a requirement here does not establish that the behavior has been delivered or verified.
 
 ## Solution
 
@@ -25,7 +25,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 5. As a task owner, I want to add and remove task tags, so that I can categorize tasks and use those tags in filters.
 6. As a task owner, I want to set and change task priority, so that I can express its relative importance.
 7. As a task owner, I want to add and edit annotations, so that supporting notes remain attached to the task.
-8. As a task owner, I want to set a planned day independently of a deadline, so that planning work does not change when it must be finished.
+8. As a task owner, I want to set a Scheduled date and time independently of a Deadline, so that planning work does not change when it must be finished.
 9. As a task owner, I want to set and change a waiting date, so that I can distinguish work that is not yet available.
 10. As a task owner, I want to manage dependencies between tasks, so that I can see what blocks work and what becomes available after completion.
 11. As a task owner, I want to start and stop work on a task, so that active work is represented consistently with Taskwarrior.
@@ -36,13 +36,13 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 
 ### Task views and choosing work
 
-16. As a task owner, I want to see tasks planned for today in Today, so that I can act on the work I intended for the day.
-17. As a task owner, I want to keep unfinished tasks planned for earlier days in Today until completion or rescheduling, so that unfinished commitments do not disappear overnight.
+16. As a task owner, I want to see all tasks scheduled for today in Today, including times later today, so that I can review the whole day's intended work.
+17. As a task owner, I want to keep unfinished tasks scheduled for earlier days in Today until completion or rescheduling, so that unfinished commitments do not disappear overnight.
 18. As a task owner, I want to see tasks due today and overdue in Today, so that I can recognize approaching or missed deadlines.
-19. As a task owner, I want to see matching waiting or blocked tasks with their reason in Today, so that I can understand why a planned or due task is not actionable.
-20. As a task owner, I want to see future planned work grouped by day in Upcoming, so that I can review the days ahead.
-21. As a task owner, I want to see future deadlines distinguished from planned dates in Upcoming, so that I can plan work without confusing it with its deadline.
-22. As a task owner, I want to see a task at both its future planned date and its different deadline, so that both commitments are visible.
+19. As a task owner, I want to see matching waiting or blocked tasks with their reason in Today, so that I can understand why a scheduled or due task is not actionable.
+20. As a task owner, I want to see future scheduled work grouped by day and ordered by time in Upcoming, so that I can review the days ahead.
+21. As a task owner, I want to see future deadlines distinguished from Scheduled dates and times in Upcoming, so that I can plan work without confusing it with its deadline.
+22. As a task owner, I want to see a task at both its future Scheduled date and its different Deadline, so that both commitments are visible.
 23. As a task owner, I want to browse tasks by project, so that I can review related work together.
 24. As a Taskwarrior user, I want to enter Taskwarrior filter expressions to define custom views, so that I can use familiar task selection rules.
 25. As a Taskwarrior user, I want to evaluate filters using documented Taskwarrior defaults and locally defined attribute types, so that results have a clear compatibility contract.
@@ -84,7 +84,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 52. As an iOS user, I want to create tasks through Shortcuts and Siri, so that capture can participate in native automation.
 53. As an iOS user, I want to find tasks through Shortcuts and Siri, so that automations can work with existing tasks.
 54. As an iOS user, I want to complete tasks through Shortcuts and Siri, so that I can act without navigating through the main app.
-55. As an iOS user, I want to reschedule tasks through Shortcuts and Siri, so that native automation can update my task plan.
+55. As an iOS user, I want to modify named task fields, including rescheduling, through Shortcuts, so that native automation can update my tasks without command syntax.
 56. As an iOS user, I want to show Today in a widget, so that the day’s tasks are visible outside the app.
 57. As an iOS user, I want to show a chosen task view in a widget, so that the widget can reflect the work I want to monitor.
 58. As an iOS user, I want to complete tasks from a widget, so that a small task action takes minimal interaction.
@@ -150,9 +150,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 
 ### Dates, task views, and filters
 
-- The planned day uses Taskwarrior’s scheduled attribute; the deadline uses its due attribute. Starting work is a separate state and must not be used as the planned day.
-- Today contains unfinished tasks planned for today or an earlier day, and tasks due today or overdue. An unfinished planned task remains until completed or rescheduled. Matching waiting or blocked tasks remain visible with their reason. Calendar events appear in Today only.
-- Upcoming groups future planned work and future deadlines by day, labeling their roles. A task can appear on two dates when its planned date and deadline differ.
+- Scheduled uses Taskwarrior's `scheduled` attribute and supports date and time throughout editors and displays; Deadline uses `due`. Preserve existing timestamps, including midnight, without inferring replacement times. Starting work and Waiting until remain separate. See [ADR 0006](adr/0006-scheduled-includes-time.md) and [implementation ticket #64](https://github.com/Julesseg/tsk/issues/64).
+- Today contains unfinished tasks scheduled for today or an earlier day, including times later today, and tasks due today or overdue. An unfinished scheduled task remains until completed or rescheduled. Matching waiting or blocked tasks remain visible with their reason. Calendar events appear in Today only.
+- Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by actual timestamps, and labels their roles. A task can appear on two dates when its Scheduled and Deadline dates differ.
 - Provide project views and actions directly from lists. Templates and ordinary occurrences remain distinct domain concepts.
 - Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults and local attribute definitions. Do not import desktop reports, contexts, or configuration.
 - TaskChampion’s storage interface is not a Taskwarrior filter evaluator. Implement or reuse compatible evaluation and verify its behavior against the pinned Taskwarrior version, including boolean expressions, modifiers, relative dates, virtual tags, dependencies, and typed custom fields. Explicit errors must not become an excuse to silently replace the requested language with a smaller tag/project filter builder.
@@ -189,12 +189,13 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 
 ### Notifications and other iOS capabilities
 
-- Derive notifications from scheduled and deadline times. Do not require a separate opt-in reminder time on each task. Different times produce distinct planned/due alerts; coincident effective alert times produce one combined alert.
+- Derive notifications from Scheduled and Deadline times. Do not require a separate opt-in reminder time on each task. Different times produce distinct scheduled/due alerts; coincident effective alert times produce one combined alert.
 - Start the midnight-time replacement enabled at 09:00 in the device’s current time zone. Allow choosing another time or disabling replacement. It affects notification timing only; stored task dates remain unchanged. Other timestamps retain their specified times.
 - Treat midnight as a convention, not recovered input precision: Taskwarrior does not retain whether midnight was explicit. Do not advertise reliable detection of a date entered without a time.
 - Reconcile the final local/synchronized task state before producing alerts. Cancel pending events for completed/deleted tasks. On sync, fire newly discovered missed events immediately unless the final state is completed or deleted. Do not fire an already delivered event again on every sync.
 - Reconcile registrations when task dates change. Register local notifications so existing schedules can fire while the app is closed. Remote completion cannot cancel a stale local alert until the relevant change reaches the device; do not imply automatic server-side cancellation.
-- Shortcuts/Siri support create, find, complete, and reschedule. Widgets support Today or a chosen view and task completion. Spotlight opens matching tasks.
+- Shortcuts and simple, unversioned URLs expose Add, Modify, Delete, Find, Complete, Open Task, and Open View with named inputs and shared behavior. Task-targeted actions use one entity or full UUID. Mutations execute immediately and acknowledge durable local storage; optional URL callbacks return structured results and never undo or retry a committed change on delivery failure. Existing saved shortcuts may break; Modify replaces standalone Reschedule. See [ADR 0005](adr/0005-structured-actions-for-urls-and-shortcuts.md) for the decision and implementation tickets.
+- Widgets support Today or a chosen view and task completion. Spotlight opens matching tasks.
 - Sharing text or a URL opens an editable draft retaining the shared content, with project, tags, and dates available before save. File attachment storage is not initial scope.
 - Calendar integration reads events for Today and creates no calendar events or time blocks. Permission denial or revocation leaves ordinary task management usable.
 - iPhone leads everyday capture and action. iPad gets adaptive layout and keyboard interaction at launch. Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
@@ -208,7 +209,7 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Use deterministic time, time zones, and controlled adapter results for meaningful Core scenarios. Prefer a small number of whole workflows over separate seams for each field or view.
 - Verify create/edit/complete/query workflows survive reopening local storage, retain UUIDs and unknown fields, and keep local edits during sync failures. Exercise multiple clients against a real TaskChampion setup before claiming convergence; mocked sync success is insufficient.
 - Compare Taskwarrior filter results against the pinned Taskwarrior client using shared task fixtures. Cover expression operators, parentheses, attribute modifiers, relative dates, virtual tags, dependencies, typed user-defined fields, missing values, and explicit invalid/unsupported-expression errors.
-- Exercise Today and Upcoming at day boundaries: overdue, prior planned days, future planned/deadline dates, tasks present at both dates, completion, rescheduling, waiting/blocked inclusion, and planned-versus-deadline separation. Verify calendar events appear only in Today.
+- Exercise Scheduled time selection and preservation, including non-midnight and existing midnight values. Exercise Today and Upcoming at day/DST boundaries: overdue, earlier Scheduled dates, times later today, future Scheduled/Deadline timestamps, tasks present at both dates, completion, rescheduling, waiting/blocked inclusion, and Scheduled-versus-Deadline separation. Verify calendar events appear only in Today.
 - Round-trip recurring templates through a real external Taskwarrior generator. Verify creation, occurrence return sync, occurrence completion bookkeeping, single-occurrence edits, effective-date series edits, preserved completed history, masks/relationships, and continued generation without duplicated or missing instances. Include date boundaries, relative dates, month ends, leap days, and daylight saving in the supported contract.
 - Test one-time import leaves sources unchanged and continuous import deletes only after durable destination save. Inject destination-save failure, deletion failure, and interruption between stores; verify source preservation and honest duplicate limitations rather than an exactly-once assertion. Verify completed and unselected source items are excluded, lists map to projects, and no per-item provenance or bookkeeping is retained.
 - Verify each supported recurring-reminder conversion against both actual EventKit data and the pinned external generator. Unsupported/unverified rules must remain untouched and be explained; verify source deletion scope for a supported recurring set before claiming safe continuous migration.
