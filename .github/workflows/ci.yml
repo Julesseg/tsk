@@ -124,7 +124,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install pinned native keyboard transport
-        if: ${{ needs.changes.outputs.run_tests == 'true' }}
+        if: ${{ needs.changes.outputs.run_tests == 'true' && matrix.partition != 'row-editing' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && (inputs.diagnostic_only || inputs.ui_suite != 'smoke')) }}
         run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
 
       - uses: dtolnay/rust-toolchain@1.99.0
@@ -195,18 +195,19 @@ jobs:
           UI_SUITE: ${{ github.event_name == 'workflow_dispatch' && inputs.diagnostic_only && 'diagnostic' || github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text"]'), inputs.ui_suite) && inputs.ui_suite || (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'full' || 'smoke' }}
           UI_FAMILY: ${{ matrix.family }}
           UI_PARTITION: ${{ matrix.partition }}
-          UI_NATIVE_KEYBOARD: ${{ matrix.partition == 'row-editing' && '0' || '1' }}
         run: |
           set -eo pipefail
           export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
           export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
-          export TSK_NATIVE_KEYBOARD_HID="$UI_NATIVE_KEYBOARD"
           export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
           coverage=()
           selection=$(python3 ../scripts/ui-test-selection.py select "$UI_SUITE" "$UI_FAMILY" --partition "$UI_PARTITION")
           while IFS= read -r selector; do
             if [[ -n "$selector" ]]; then coverage+=("$selector"); fi
           done <<< "$selection"
+          native_keyboard=$(python3 ../scripts/ui-test-selection.py native-keyboard -- "${coverage[@]}")
+          export TSK_NATIVE_KEYBOARD_HID=0
+          if [[ "$native_keyboard" == yes ]]; then export TSK_NATIVE_KEYBOARD_HID=1; fi
           printf 'UI suite: %s (%s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$selection"
           peer=()
           verify_peer=$(python3 ../scripts/ui-test-selection.py sync-peer -- "${coverage[@]}")

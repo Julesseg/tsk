@@ -25,12 +25,25 @@ other removed methods are covered by the joins above.
 
 ## Less work on every PR
 
-Smoke changes from 22 iPhone + 19 iPad executions to 5 + 4. Share, widgets,
+Smoke changes from 22 iPhone + 19 iPad executions to 4 + 2. Share, widgets,
 Spotlight, Settings tours, annotations and exhaustive appearance/accessibility
 cases remain in nightly/manual full coverage. These are frequency changes,
 not claims that those integrations passed. The smaller smoke still exercises
-native keyboard delivery on both devices and real-server synchronization on
-iPhone, plus the central task and adaptive iPad workflows.
+real-server synchronization on iPhone, plus the central task and adaptive iPad
+workflows. Physical-keyboard journeys remain in full/nightly and focused
+keyboard/text diagnostics. A green smoke run does not certify keyboard shortcuts.
+
+On PR run40708413564, iPad's companion startup timed out before XCTest launched,
+preventing all ordinary task tests from running. Smoke now selects no physical
+keyboard cases and uses the normal XCTest path. Transport enablement is derived
+from the selected cases using the same owner case definitions as native
+acceptance; full and diagnostic keyboard cases still require the transport and
+retain every assertion and deadline. This changes frequency, not native acceptance.
+
+The same run's iPhone lane passed four of five methods. The row journey compared
+a visible checkbox position172 against an earlier infinite baseline. Geometry
+comparisons now require two finite, contained, stable snapshots within five
+seconds before and after expansion. The one-point position assertion remains.
 
 Smoke needs two Mac workers instead of four. Full retains its two disjoint
 partitions per family. Portable harness regressions move from every Mac worker
@@ -47,5 +60,5 @@ peer-membership and stale-result boundaries.
 The selection regressions verify exact smoke membership, full coverage,
 partition disjointness/union, native case ownership, unknown-selector rejection
 and synchronization peer requirements. Native CI must verify the changed
-journeys and full coverage before publication. No post-change runtime reduction
+journeys and full coverage before acceptance. No post-change runtime reduction
 is claimed until measured on a completed run.

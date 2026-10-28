@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import pathlib
 import re
 
@@ -8,13 +9,10 @@ PHONE_SMOKE = (
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
 )
 PAD_SMOKE = (
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-    "iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",
     "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
 )
 PAD_FULL = (
     "WorkspaceSettingsUITests",
@@ -130,6 +128,14 @@ def requires_sync_peer(filters):
     return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
 
 
+def requires_native_keyboard(filters):
+    selected_methods(filters)
+    spec = importlib.util.spec_from_file_location("native_keyboard_owner", pathlib.Path(__file__).with_name("with-native-keyboard-hid.py"))
+    owner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(owner)
+    return bool(owner.selected_cases(filters))
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -141,12 +147,16 @@ def main():
     phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
     peer.add_argument("filters", nargs=argparse.REMAINDER)
+    native = commands.add_parser("native-keyboard")
+    native.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
             output = selection(args.suite, args.family, args.partition)
         elif args.command == "phases":
             output = phases(args.filters)
+        elif args.command == "native-keyboard":
+            output = ["yes" if requires_native_keyboard(args.filters) else "no"]
         else:
             output = ["yes" if requires_sync_peer(args.filters) else "no"]
     except ValueError as error:

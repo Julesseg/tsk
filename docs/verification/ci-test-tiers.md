@@ -7,7 +7,7 @@ check names remain the branch-protection gates.
 
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
-| Smoke | 5 methods | 4 methods | PR, push, manual `ui_suite=smoke` |
+| Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
 | Full | All 67 declared methods | 58-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
@@ -15,10 +15,17 @@ check names remain the branch-protection gates.
 
 The iPhone smoke journeys cover capture/validation/cancel/reopen; row title and
 attribute editing, picker dismissal, invalid-draft retention and durable
-completion; persisted view ordering and capacity; real-server synchronization;
-and independent native keyboard input. The iPad journeys cover the same row
-round trip, keyboard-driven capture/edit/completion/reopen, adaptive
-landscape/portrait project/date views, and independent native keyboard input.
+completion; persisted view ordering and capacity; and real-server synchronization.
+The iPad journeys cover the same row round trip and adaptive landscape/portrait
+project/date views.
+
+Physical-keyboard journeys run in full/nightly and focused keyboard/text
+diagnostics. PR smoke does not certify physical-keyboard delivery. This keeps
+ordinary task editing independent of the native keyboard companion's startup.
+Full and diagnostic selections still require the owned transport whenever they
+include a hardware-keyboard case; a missing transport fails before XCTest can
+silently use the local fallback. Native request proofs, assertions and deadlines
+are unchanged. The workflow installs the companion only for those selections.
 
 Installed Share capture, widgets, all three Spotlight scenarios, Settings tours,
 appearance/accessibility permutations, annotations, recurrence, Reminders,
@@ -66,7 +73,7 @@ Smoke keeps its 45-minute execution and 60-minute worker limits. Full keeps
 keeps its 600-second XCTest limit. These are ceilings, not measured durations.
 The `always()` cleanup removes the owned simulator after failure or timeout.
 
-Native keyboard admission retains UP-only initialization, a live owned relay
+Full and diagnostic native keyboard admission retains UP-only initialization, a live owned relay
 and companion, fixed case/phase sequences, nonce/PID/device/socket checks,
 30-second initialization and 10-second arming limits. Requests retain their
 12-second deadline and five-second dispatch reservation. Container prefetch

@@ -92,6 +92,13 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
     exit 1
 fi
 test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
+if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "${TSK_NATIVE_KEYBOARD_HID:-0}" != 1 ]]; then
+    native_keyboard=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" native-keyboard -- ${test_filters[@]+"${test_filters[@]}"})
+    if [[ "$native_keyboard" == yes ]]; then
+        echo 'Selected hardware-keyboard tests require the owned native transport.' >&2
+        exit 1
+    fi
+fi
 if [[ "$skip_build" == true ]]; then
     if [[ ! -d "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" ]]; then
         echo 'Prebuilt UI tests require existing signed simulator products.' >&2
