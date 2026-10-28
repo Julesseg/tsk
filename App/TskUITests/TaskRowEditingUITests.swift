@@ -120,11 +120,10 @@ import XCTest
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         let plainID = "A0000000-0000-0000-0000-000000000002"
-        let circle = app.buttons["complete-task-row-" + plainID]
-        let circleY = circle.frame.minY
+        let circleY = try visibleCompletionCircleFrame(plainID, app: app).minY
         app.buttons["task-" + plainID].tap()
         XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertEqual(circle.frame.minY, circleY, accuracy: 1)
+        XCTAssertEqual(try visibleCompletionCircleFrame(plainID, app: app).minY, circleY, accuracy: 1)
         capture("Plain task expands with anchored completion circle", app)
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
@@ -251,6 +250,33 @@ import XCTest
         XCTAssertTrue((title.value as? String ?? "").contains("scroll retained"))
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
+    }
+
+    private func visibleCompletionCircleFrame(_ id: String, app: XCUIApplication) throws -> CGRect {
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        var previous: CGRect?
+        var accepted: CGRect?
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  let snapshot = try? app.snapshot(),
+                  let circle = self.taskSnapshot("complete-task-row-" + id, type: .button, in: snapshot) else {
+                previous = nil
+                return false
+            }
+            let frame = circle.frame
+            guard !frame.isNull, !frame.isInfinite, frame.minX.isFinite, frame.minY.isFinite,
+                  frame.maxX.isFinite, frame.maxY.isFinite, frame.width > 0, frame.height > 0,
+                  snapshot.frame.contains(frame), ProcessInfo.processInfo.systemUptime < deadline else {
+                previous = nil
+                return false
+            }
+            defer { previous = frame }
+            guard previous == frame else { return false }
+            accepted = frame
+            return true
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)), .completed)
+        return try XCTUnwrap(accepted, "Completion-circle geometry must be finite, visible and stable before comparison")
     }
 
     private func expandTask(_ app: XCUIApplication) -> XCUIElement {
