@@ -1,6 +1,6 @@
 # Product direction
 
-This brief records the product choices accepted during the design interview. It describes intended behavior; the repository currently contains the app scaffold, not these features.
+This brief records the product choices accepted during the design interviews. It describes intended behavior; implementation and runtime verification are tracked separately.
 
 The [PRD](prd.md) expands this direction into user stories, implementation decisions, testing decisions, and explicit exclusions.
 
@@ -16,17 +16,17 @@ Optimize for capture, choosing what to do next, and completing or rescheduling t
 
 Provide predefined views inspired by Things 3, including Today, Upcoming, and views by project. Allow custom views defined using Taskwarrior filters.
 
-Keep planned work dates separate from deadlines. The planned day uses Taskwarrior's `scheduled` attribute; the deadline uses `due`.
+Keep Scheduled separate from Deadline and Waiting until. Scheduled is the intended work date and time and uses Taskwarrior's `scheduled` attribute; Deadline uses `due`. Preserve existing Scheduled timestamps, including midnight, and support time selection and display throughout the app. See [the Scheduled decision](adr/0006-scheduled-includes-time.md), with implementation tracked in [#64](https://github.com/Julesseg/tsk/issues/64).
 
-Today includes tasks planned for today, unfinished tasks planned for earlier days, and tasks due today or overdue. Unfinished planned tasks remain until completed or rescheduled. Waiting or blocked tasks that meet these criteria remain visible with their reason.
+Today includes unfinished tasks scheduled for any time today, unfinished tasks scheduled for earlier days, and tasks due today or overdue. A task scheduled for later today is already visible; unfinished scheduled tasks remain until completed or rescheduled. Waiting or blocked tasks that meet these criteria remain visible with their reason.
 
-Upcoming groups future planned work and future deadlines by day, clearly labeling planned dates versus deadlines. A task with different planned and deadline dates may appear on both dates.
+Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by their actual timestamps, and clearly distinguishes Scheduled from Deadline. A task with different Scheduled and Deadline dates may appear on both dates.
 
 Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults, with user-defined attribute types configurable locally in tsk. Report invalid or unsupported expressions clearly; Taskwarrior filter compatibility remains the requirement. Saved view definitions stay device-local; they do not synchronize between iPhone and iPad. Importing desktop reports, contexts, or `.taskrc` configuration is not planned.
 
 ## Task editing
 
-Support editing description, project, tags, priority, annotations, planned date, deadline, waiting date, and dependencies, plus starting and stopping work. Include an advanced editor for user-defined attributes and preserve unfamiliar fields.
+Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, and dependencies, plus starting and stopping work. Include an advanced editor for user-defined attributes and preserve unfamiliar fields.
 
 ## Offline use and synchronization
 
@@ -50,11 +50,13 @@ Convert recurring Apple reminders into Taskwarrior templates only for verified s
 
 Calendar integration only displays calendar events in Today. tsk does not create calendar events or time blocks.
 
-Shortcuts and Siri support creating, finding, completing, and rescheduling tasks. Widgets show Today or a chosen task view and provide completion actions. Spotlight opens matching tasks in tsk.
+Shortcuts and the URL scheme will expose Add Task, Modify Task, Delete Task, Find Tasks, Complete Task, Open Task, and Open View using individual named inputs rather than Taskwarrior syntax. Simple URLs have no version component; task-targeted actions use full UUIDs, and mutations save immediately and acknowledge durable local storage. Existing saved shortcuts may break when the actions are rebuilt; Modify covers rescheduling without a legacy Reschedule action. See [the shared-action decision](adr/0005-structured-actions-for-urls-and-shortcuts.md) and its implementation tickets.
+
+Widgets show Today or a chosen task view and provide completion actions. Spotlight opens matching tasks in tsk.
 
 Sharing text or a URL into tsk opens an editable task draft before saving, preserving shared text and links with quick access to project, tags, and dates. File attachment storage is deferred initially.
 
-Notifications are based on scheduled or deadline times. A separate opt-in reminder time per task is not the agreed behavior. Different scheduled and deadline times each produce a notification, distinguished as planned versus due; coincident times produce one combined notification. Completion or deletion cancels pending notifications once known locally.
+Notifications are based on Scheduled or Deadline times. A separate opt-in reminder time per task is not the agreed behavior. Different Scheduled and Deadline times each produce a notification, distinguished as scheduled versus due; coincident times produce one combined notification. Completion or deletion cancels pending notifications once known locally.
 
 Provide a settings option to use a configurable default notification time when a date has the default midnight time. Start enabled at 09:00 in the device's current time zone, with options to change the time or disable the replacement. Other timestamps retain their specified times. This changes notification timing, not the stored task date. Taskwarrior does not retain whether midnight was explicit, so the setting is a convention rather than reliable detection of time-free input. Notification preferences remain device-specific.
 
