@@ -43,6 +43,7 @@ jobs:
       - name: Verify test routing
         run: |
           python3 scripts/test-ci-test-routing.py
+          python3 scripts/test-create-ui-test-simulator.py
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-ui-shard-checks.py
           python3 scripts/test-native-keyboard-hid-installer.py
@@ -183,21 +184,8 @@ jobs:
 
       - name: Resolve an available ${{ matrix.family }} simulator
         if: ${{ needs.changes.outputs.run_tests == 'true' }}
-        env:
-          DEVICE_FAMILY: ${{ matrix.family }}
         id: sim
-        run: |
-          set -euo pipefail
-          xcrun simctl list devices available --json | python3 -c '
-          import json, os, subprocess, sys
-          devices = json.load(sys.stdin)["devices"]
-          available = [(runtime, device) for runtime, entries in devices.items() for device in entries if runtime == "com.apple.CoreSimulator.SimRuntime.iOS-27-0" and device["name"].startswith(os.environ["DEVICE_FAMILY"])]
-          runtime, device = max(available, key=lambda item: (item[0], "13-inch" in item[1]["name"] or "12.9-inch" in item[1]["name"], "Pro" in item[1]["name"], item[1]["name"]))
-          identifier = subprocess.check_output(["xcrun", "simctl", "create", "tsk isolated " + os.environ["DEVICE_FAMILY"], device["deviceTypeIdentifier"], runtime], text=True).strip()
-          print("Created isolated simulator: " + device["name"] + " (" + identifier + ")")
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write("id=" + identifier + "\n")
-          '
+        run: python3 scripts/create-ui-test-simulator.py --family "${{ matrix.family }}"
 
       - name: Run prebuilt UI tests
         if: ${{ needs.changes.outputs.run_tests == 'true' }}

@@ -58,7 +58,9 @@ workflow also excludes documentation-only changes.
 
 UI products build in a separate 20-minute step before simulator creation.
 Execution reuses those signed arm64 products with `--skip-build`. Xcode 27.0
-and iOS 27.0 are explicit; the runner does not select a newer installed runtime.
+is explicit. The simulator selector matches the selected SDK's major/minor
+release, preserving the runtime repair on `main`; a newer installed runtime
+cannot silently change the lane. Its portable selection checks run in routing.
 Smoke keeps its 45-minute execution and 60-minute worker limits. Full keeps
 150/180-minute execution/worker limits; diagnostics keep 60/90. Every method
 keeps its 600-second XCTest limit. These are ceilings, not measured durations.
