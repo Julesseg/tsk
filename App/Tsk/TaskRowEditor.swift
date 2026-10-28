@@ -61,7 +61,7 @@ private struct TaskRowEditorContent: View {
                     .accessibilityIdentifier("draft-error")
                     .accessibilityAddTraits(.updatesFrequently)
             }
-            HStack {
+            HStack(alignment: .top) {
                 Button("More task information", systemImage: "info.circle", action: information)
                     .accessibilityIdentifier("task-row-information")
                 Spacer()
