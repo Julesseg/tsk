@@ -170,6 +170,10 @@ final class TaskStore {
         await perform { try await $0.update(id: id, changes: changes) }
     }
 
+    func updateRow(_ draft: TaskRowDraft) async -> TaskRecord? {
+        await perform { try await $0.updateRow(draft) }
+    }
+
     func dependencyLinks(for task: TaskRecord) -> [TaskDependencyLink] { task.dependencyLinks(in: allTasks) }
 
     func addDependency(id: UUID, prerequisiteID: UUID) async -> TaskRecord? {

@@ -3,6 +3,27 @@ import Testing
 import TskCore
 import TskNative
 
+@Test func inlineNotesAndRowEditsPersistTogetherAcrossNativeReopen() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1792144800) })
+    let original = try await manager.create(TaskDraft(description: "Original", attributes: ["annotation_01": "Edit", "annotation_2": "Clear", "annotation_1792144800": "Keep", "opaque": "retain"]))
+    var draft = TaskRowDraft(task: original)
+    draft.taskDraft.description = "Revised"
+    draft.taskDraft.attributes["annotation_01"] = "Edited inline"
+    draft.taskDraft.attributes["annotation_2"] = ""
+    draft.noteInput = "New note"
+    let saved = try await manager.updateRow(draft)
+    let reopened = TaskManager(replica: TaskChampionReplica(directory: directory))
+    #expect(try await reopened.task(id: original.id) == saved)
+    #expect(saved.description == "Revised")
+    #expect(saved.attributes["annotation_01"] == "Edited inline")
+    #expect(saved.attributes["annotation_2"] == nil)
+    #expect(saved.attributes["annotation_1792144800"] == "Keep")
+    #expect(saved.attributes["annotation_1792144801"] == "New note")
+    #expect(saved.attributes["opaque"] == "retain")
+}
+
 @Test func annotationsSurviveNativeReopenAndConcurrentManagersWithoutLosingIdentity() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }

@@ -6,6 +6,7 @@ public struct TaskRowDraft: Equatable, Sendable {
     public private(set) var original: TaskRecord
     public var taskDraft: TaskDraft
     public var tagInput = ""
+    public var noteInput = ""
 
     public init(task: TaskRecord) {
         original = task
@@ -20,7 +21,9 @@ public struct TaskRowDraft: Equatable, Sendable {
         original = task
         taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
         if titleChanged { taskDraft.description = title }
-        let editedKeys = Self.editableAttributes + edits.keys.filter { $0.utf8.starts(with: "tag_".utf8) }
+        let editedKeys = Self.editableAttributes + edits.keys.filter {
+            $0.utf8.starts(with: "tag_".utf8) || $0.utf8.starts(with: "annotation_".utf8)
+        }
         for key in editedKeys {
             if let value = edits[key] { taskDraft.attributes[key] = value }
         }
@@ -58,5 +61,26 @@ public struct TaskRowDraft: Equatable, Sendable {
             .filter { $0.rawValue.utf8.starts(with: "tag_".utf8) }
         for key in tagKeys { edited[key.rawValue] = organization.taskDraft.attributes[key.rawValue] }
         return edited.changes(comparedTo: original.attributes)
+    }
+}
+
+public extension TaskManager {
+    func updateRow(_ draft: TaskRowDraft) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
+        let changes = try draft.changes()
+        let current = try await task(id: draft.original.id)
+        var notes: TaskAttributePatch = [:]
+        for annotation in draft.original.annotations {
+            let reference = annotation.reference.rawValue
+            let text = draft.taskDraft.attributes[reference] ?? ""
+            guard !text.matchesBytes(annotation.text) else { continue }
+            guard current.attributes[reference] != nil else { throw TaskManagementError.annotationNotFound(reference) }
+            notes.updateValue(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text, forKey: reference)
+        }
+        if !draft.noteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notes[try current.nextAnnotationReference(at: now())] = draft.noteInput
+        }
+        return try await updateTask(id: current.id, changes: changes, annotationChanges: notes)
     }
 }

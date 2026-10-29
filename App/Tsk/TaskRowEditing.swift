@@ -6,12 +6,11 @@ import TskCore
 @MainActor @Observable
 final class TaskRowEditing {
     enum SupportingPanel: Identifiable {
-        case dependency, annotation(TaskAnnotation?), attributes
+        case dependency, attributes
 
         var id: String {
             switch self {
             case .dependency: "dependency"
-            case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
             case .attributes: "attributes"
             }
         }
@@ -91,8 +90,8 @@ final class TaskRowEditing {
         if parameter != nil { parameter = nil; return false }
         isSaving = true
         do {
-            let changes = try draft.changes()
-            let saved = changes.isEmpty ? draft.original : await store.update(id: draft.original.id, changes: changes)
+            _ = try draft.changes()
+            let saved = await store.updateRow(draft)
             guard let saved else {
                 error = store.error
                 isSaving = false
