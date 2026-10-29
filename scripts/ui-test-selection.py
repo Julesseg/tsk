@@ -7,11 +7,13 @@ import re
 PHONE_SMOKE = (
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "TaskBulkSelectionUITests",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
 )
 PAD_SMOKE = (
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "TaskBulkSelectionUITests",
     "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
 )
 PAD_FULL = (
@@ -20,7 +22,7 @@ PAD_FULL = (
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
     "TypedFilterUITests", "ReminderImportUITests", "ContinuousReminderImportUITests",
-    "TaskRowEditingUITests", "TaskScheduledUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
+    "TaskRowEditingUITests", "TaskBulkSelectionUITests", "TaskScheduledUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
     "WidgetUITests", "SpotlightUITests", "TaskNotificationUITests", "MissedNotificationUITests",
 )
 DIAGNOSTIC = (

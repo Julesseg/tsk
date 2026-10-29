@@ -51,6 +51,34 @@ struct OccurrenceTests {
         #expect(try await reopened.task(id: child.id).attributes["opaque"] == "retain")
     }
 
+    @Test @MainActor func bulkCompletionRollsBackEveryTaskAndSiblingMaskOnPersistenceFailure() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let replica = TaskChampionReplica(directory: directory)
+        let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-W-", "opaque": "keep"])
+        let first = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "First", "parent": parent.id.uuidString, "imask": "0"])
+        let second = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Second", "parent": parent.id.uuidString, "imask": "1"])
+        let plain = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Plain", "opaque": "retain"])
+        let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+        let original = try await manager.tasks()
+        let operationCount = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
+        try sqlite(directory, "CREATE TRIGGER fail_bulk BEFORE INSERT ON operations WHEN (SELECT COUNT(*) FROM operations) > \(operationCount.trimmingCharacters(in: .whitespacesAndNewlines)) BEGIN SELECT RAISE(ABORT, 'bulk rollback fixture'); END;")
+        await #expect(throws: (any Error).self) { try await manager.complete(ids: [first.id, second.id, plain.id]) }
+        #expect(try await manager.tasks() == original)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == operationCount)
+        try sqlite(directory, "DROP TRIGGER fail_bulk;")
+        let saved = try await manager.complete(ids: [first.id, second.id, plain.id, first.id])
+        #expect(saved.count == 3)
+        let reopened = try await TaskChampionSession.open(directory: directory)
+        #expect(try await reopened.task(id: parent.id).attributes["mask"] == "++-")
+        #expect(try await reopened.task(id: parent.id).attributes["opaque"] == "keep")
+        #expect(try await reopened.task(id: plain.id).attributes["opaque"] == "retain")
+        for id in [first.id, second.id, plain.id] {
+            #expect(try await reopened.task(id: id).status == "completed")
+            #expect(try await reopened.task(id: id).attributes["end"] == "100")
+        }
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil && ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
     @MainActor func actualTaskwarriorCompletionAndSubsequentGenerationPreserveMasksAndUnknownFields() async throws {
         let env = ProcessInfo.processInfo.environment

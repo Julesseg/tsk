@@ -25,21 +25,33 @@ final class TaskStore {
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
     let completionFeedback = TaskCompletionFeedback()
+    #if DEBUG
+    var selectionGestureProof = ""
+    #endif
+    var isSelectionSwipeActive = false
+    var taskSelectionGeneration = 0
+    var isSelectingTasks = false
+    var selectedTaskIDs: Set<UUID> = []
+    var isSelectionGestureActive = false
+    var selectionGestureTasks: [TaskRecord]?
+    var selectionGestureDays: [UpcomingDay]?
     var rowEditing: TaskRowEditing?
     var completionContext: TaskCompletionFeedback.Context {
         .init(query: query, project: projectSelection, customViewID: customView?.id, filter: customView.map { UTF8String($0.expression) })
     }
     var visibleTasks: [TaskRecord] {
+        if let selectionGestureTasks { return selectionGestureTasks }
         if let rowEditing, rowEditing.context == completionContext { return rowEditing.tasks }
         return completionFeedback.visibleTasks(tasks, context: completionContext)
     }
     var upcomingDays: [UpcomingDay] {
+        if let selectionGestureDays { return selectionGestureDays }
         if let rowEditing, rowEditing.context == completionContext { return rowEditing.upcomingDays }
         return UpcomingDay.groups(tasks: visibleTasks, at: currentDate)
     }
 
     func expandRow(_ task: TaskRecord, rowID: String? = nil) {
-        guard rowEditing == nil, !isSaving, task.canEdit, visibleTasks.contains(where: { $0.id == task.id }) else { return }
+        guard !isSelectionSwipeActive, !isSelectingTasks, rowEditing == nil, !isSaving, task.canEdit, visibleTasks.contains(where: { $0.id == task.id }) else { return }
         let upcomingID = customView == nil && query == .upcoming ? upcomingDays.flatMap(\.entries).first { $0.task.id == task.id }?.rowIdentifier : nil
         guard customView != nil || query != .upcoming || upcomingID != nil else { return }
         rowEditing = TaskRowEditing(task: task, rowID: rowID ?? upcomingID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
@@ -69,6 +81,7 @@ final class TaskStore {
     }
 
     func selectWorkspaceView(_ view: WorkspaceView) {
+        endTaskSelection()
         selectedWorkspaceView = view
         projectSelection = .all
         customView = nil
@@ -195,7 +208,7 @@ final class TaskStore {
     }
 
     func completeFromList(id: UUID, animated: Bool = true) async -> TaskRecord? {
-        guard !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
+        guard !isSelectionSwipeActive, !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
         let context = completionContext
         return await completionFeedback.complete(task: task, visibleTasks: visibleTasks, context: context, animated: animated,
             shouldRemove: { self.completionContext == context && !self.tasks.contains { $0.id == id } },

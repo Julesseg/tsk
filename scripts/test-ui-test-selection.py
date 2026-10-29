@@ -18,7 +18,7 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        for family, count in (("iPhone", 4), ("iPad", 2)):
+        for family, count in (("iPhone", 7), ("iPad", 5)):
             with self.subTest(family=family):
                 smoke = selection.selected_methods(selection.selection("smoke", family))
                 full = selection.selected_methods(selection.selection("full", family))
@@ -71,11 +71,11 @@ class SelectionTests(unittest.TestCase):
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(phone), 71)
+        self.assertEqual(len(phone), 74)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 62)
+        self.assertEqual(len(pad), 65)
         for methods in (phone, pad):
             self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", methods)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
