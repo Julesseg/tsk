@@ -57,6 +57,8 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     var viewport = CGRect.zero
     var rows: [TaskSelectionRow] = []
     private var initial = CGPoint.zero
+    private var latest = CGPoint.zero
+    private var traversedY: ClosedRange<CGFloat> = 0...0
     private var previousY: CGFloat = 0
     private var frozenRows: [TaskSelectionRow] = []
     private var touched: Set<UUID> = []
@@ -85,6 +87,8 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         collapsedLayout?.resume()
         collapsedLayout = nil
         initial = touch.location(in: nil)
+        latest = initial
+        traversedY = initial.y...initial.y
         guard viewport.contains(initial), let row = rows.first(where: { $0.bounds.contains(initial) }),
               store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else { state = .failed; return }
         touched = [row.id]
@@ -102,6 +106,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
         guard let touch = touches.first, state != .failed else { return }
         let point = touch.location(in: nil)
+        recordPosition(point)
         if state == .possible {
             let dx = point.x - initial.x, dy = point.y - initial.y
             guard max(abs(dx), abs(dy)) > 10 else { return }
@@ -131,6 +136,13 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                 guard let self, token == self.generation, let store = self.store,
                       selectionGeneration == store.taskSelectionGeneration else { return }
                 if wasEditing {
+                    #if DEBUG
+                    if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_EDITOR_DELAY"] == "1" {
+                        try? await Task.sleep(for: .seconds(3))
+                    }
+                    #endif
+                    guard token == self.generation, !Task.isCancelled,
+                          selectionGeneration == store.taskSelectionGeneration else { return }
                     let ready = await store.beginSelectionGesture(initialIDs)
                     guard token == self.generation else { return }
                     if !ready { self.state = .cancelled; self.finish(); return }
@@ -139,12 +151,12 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                           selectionGeneration == store.taskSelectionGeneration else { return }
                     self.frozenRows = self.rows
                     self.touched = initialIDs
-                    let point = touch.location(in: nil)
-                    let low = min(self.initial.y, point.y), high = max(self.initial.y, point.y)
+                    let low = max(self.viewport.minY, self.traversedY.lowerBound)
+                    let high = min(self.viewport.maxY, self.traversedY.upperBound)
                     for row in self.frozenRows where row.bounds.maxY >= low && row.bounds.minY <= high {
                         self.touched.insert(row.id)
                     }
-                    self.previousY = point.y
+                    self.previousY = self.latest.y
                     if !self.released { self.freezeScrolling(in: self.view) }
                 }
                 guard selectionGeneration == store.taskSelectionGeneration else { return }
@@ -182,6 +194,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let touch = touches.first { recordPosition(touch.location(in: nil)) }
         if state == .began || state == .changed { state = .ended; release() }
         else { state = .failed }
     }
@@ -211,6 +224,11 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     private func waitForCollapsedRows() async {
         guard !rowsAreCollapsed else { return }
         await withCheckedContinuation { collapsedLayout = $0 }
+    }
+
+    private func recordPosition(_ point: CGPoint) {
+        latest = point
+        traversedY = min(traversedY.lowerBound, point.y)...max(traversedY.upperBound, point.y)
     }
 
     func finish() {
@@ -265,10 +283,26 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
 
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        isTaskListContent(touch.view)
+    }
+
+    private func isTaskListContent(_ view: UIView?) -> Bool {
+        var ancestor = view
+        while let current = ancestor {
+            if current is UITextView || current is UITextField { return false }
+            if let scroll = current as? UIScrollView,
+               scroll.alwaysBounceHorizontal || scroll.contentSize.width > scroll.bounds.width + 1 { return false }
+            if current.accessibilityIdentifier == "task-list" || current.accessibilityIdentifier == "upcoming-list" { return true }
+            ancestor = current.superview
+        }
+        return false
+    }
+
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         guard otherGestureRecognizer is UIPanGestureRecognizer,
               !(otherGestureRecognizer is UIScreenEdgePanGestureRecognizer),
-              let view = otherGestureRecognizer.view else { return false }
+              let view = otherGestureRecognizer.view, isTaskListContent(view) else { return false }
         return view.convert(view.bounds, to: nil).intersects(viewport)
     }
 

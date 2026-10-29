@@ -146,6 +146,7 @@ import XCTest
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
         if probe { app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1" }
+        if crowded { app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1" }
         var records: [[String: Any]] = []
         func add(_ id: String, _ attributes: [String: String]) {
             records.append(["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }])
