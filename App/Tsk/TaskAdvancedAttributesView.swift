@@ -5,23 +5,34 @@ struct TaskAdvancedAttributesSection: View {
     let store: TaskStore
     let task: TaskRecord
     let edit: () -> Void
-    @State private var error: String?
+    private var populated: [TaskAttributeDefinition] {
+        store.attributeDefinitions.filter { task.attributes[$0.name.rawValue] != nil }
+    }
 
     var body: some View {
-        Section("Advanced attributes") {
-            ForEach(store.attributeDefinitions) { definition in
-                if let value = task.attributes[definition.name.rawValue] {
-                    LabeledContent(definition.label.isEmpty ? definition.name.rawValue : definition.label, value: value)
+        Group {
+            if !populated.isEmpty {
+                Section("Custom fields") {
+                    ForEach(populated) { definition in
+                        LabeledContent(definition.label.isEmpty ? definition.name.rawValue : definition.label,
+                                       value: task.attributes[definition.name.rawValue] ?? "")
+                            .accessibilityIdentifier("custom-field-" + definition.name.rawValue)
+                    }
+                    editButton
                 }
+            } else if !store.attributeDefinitions.isEmpty {
+                editButton
             }
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            Button("Advanced editor", systemImage: "slider.horizontal.3") { edit() }
-                .accessibilityIdentifier("advanced-attributes")
         }
         .task {
-            do { try await store.loadAttributeDefinitions(); error = nil }
-            catch { self.error = error.localizedDescription }
+            do { try await store.loadAttributeDefinitions() }
+            catch { store.error = error.localizedDescription }
         }
+    }
+
+    private var editButton: some View {
+        Button("Edit custom fields", systemImage: "slider.horizontal.3", action: edit)
+            .accessibilityIdentifier("advanced-attributes")
     }
 }
 
@@ -39,8 +50,6 @@ struct TaskAdvancedAttributesEditor: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Only changed values are validated. Existing and unregistered fields stay intact when you edit other fields.")
-                        .font(.footnote).foregroundStyle(.secondary)
                     if !task.canEdit { Text("This task's values are read only in the current task state.").font(.footnote) }
                     if store.attributeDefinitions.isEmpty { Text("Define an attribute to edit its value here.").foregroundStyle(.secondary) }
                 }
@@ -86,7 +95,6 @@ struct TaskAdvancedAttributesEditor: View {
                                     .accessibilityIdentifier("uda-value-\(definition.name.rawValue)")
                             }
                         }
-                        Text("\(definition.name.rawValue) · \(definition.type.rawValue)").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -97,7 +105,7 @@ struct TaskAdvancedAttributesEditor: View {
             .safeAreaInset(edge: .bottom) {
                 if focusedAttribute != nil { HStack { Spacer(); Button("Done") { focusedAttribute = nil }.accessibilityIdentifier("dismiss-attributes-keyboard") }.padding().background(.regularMaterial) }
             }
-            .navigationTitle("Advanced attributes")
+            .navigationTitle("Custom fields")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(store.isSaving) }

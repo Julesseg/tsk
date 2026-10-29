@@ -50,8 +50,8 @@ final class SeriesTransitionUITests: XCTestCase {
         editRule("monthly", app: app)
         app.buttons["preview-series-transition"].tap()
         assertPreview(movedID, app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["transition-successor-id"], in: "series-transition-form", app: app))
-        let successorID = app.staticTexts["transition-successor-id"].label
+        XCTAssertTrue(revealTaskElement(app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "transition-successor-")).firstMatch, in: "series-transition-form", app: app))
+        let successorID = String(app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "transition-successor-")).firstMatch.identifier.dropFirst("transition-successor-".count))
         XCTAssertNotNil(UUID(uuidString: successorID))
         XCTAssertNotEqual(successorID, oldID)
         app.buttons["save-series-transition"].tap()
@@ -110,7 +110,7 @@ final class SeriesTransitionUITests: XCTestCase {
         let count = app.staticTexts["transition-preview-count"]
         XCTAssertTrue(revealTaskElement(count, in: "series-transition-form", app: app))
         XCTAssertEqual(count.label, "1 existing future task moves")
-        XCTAssertTrue(revealTaskElement(app.staticTexts["transition-successor-id"], in: "series-transition-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "transition-successor-")).firstMatch, in: "series-transition-form", app: app))
         XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["transition-preview-" + id].firstMatch, in: "series-transition-form", app: app))
     }
     private func capture(_ name: String, _ app: XCUIApplication) {

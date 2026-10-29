@@ -91,20 +91,33 @@ final class TaskStore {
         fixedDate = nil
     }
 
-    func observeParticipantChanges() async {
+    private init(manager: TaskManager, directory: URL, fixedDate: Date?) {
+        self.manager = manager
+        self.directory = directory
+        self.fixedDate = fixedDate
+        query = .all
+    }
+
+    func linkedTaskStore() -> TaskStore {
+        TaskStore(manager: manager, directory: directory, fixedDate: fixedDate)
+    }
+
+    func observeParticipantChanges(reconcileWorkspace: Bool = true) async {
         do {
             var prior: TaskChangeVersion?
             for try await version in await manager.changeUpdates() {
                 if Task.isCancelled { return }
-                try await loadSavedViews()
-                if let selection = customView, let id = selection.id {
-                    guard let current = savedViews.first(where: { $0.id == id }) else {
-                        tasks = []
-                        error = TaskViewError.missingView(id).localizedDescription
-                        prior = version
-                        continue
+                if reconcileWorkspace {
+                    try await loadSavedViews()
+                    if let selection = customView, let id = selection.id {
+                        guard let current = savedViews.first(where: { $0.id == id }) else {
+                            tasks = []
+                            error = TaskViewError.missingView(id).localizedDescription
+                            prior = version
+                            continue
+                        }
+                        openView(current)
                     }
-                    openView(current)
                 }
                 try await loadAttributeDefinitions()
                 await reload()

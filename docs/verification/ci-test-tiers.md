@@ -8,7 +8,7 @@ check names remain the branch-protection gates.
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 70 declared methods | 61-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Full | All 73 declared methods | 64-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
@@ -36,7 +36,7 @@ native full-suite results before acceptance. See [the consolidation audit](test-
 for the merged methods and measured baseline.
 
 Smoke uses one worker per family. Full coverage uses disjoint workspace and
-row-editing workers: 64 + 7 methods on iPhone and 55 + 7 on iPad. Each method is
+row-editing workers: 64 + 10 methods on iPhone and 55 + 10 on iPad. Each method is
 selected once per family. Native HID cases remain in the workspace worker with
 their existing identity checks and deadlines. The row-only worker selects no
 native command cases and uses XCTest input. Focused diagnostic dispatches use

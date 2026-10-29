@@ -6,47 +6,60 @@ struct TaskDependenciesSection: View {
     let task: TaskRecord
     let onSave: (TaskRecord) -> Void
     let select: () -> Void
+    var reveal: ((TaskRecord) -> Void)? = nil
 
     var body: some View {
-        Section("Dependencies") {
-            let links = store.dependencyLinks(for: task)
-            if links.isEmpty { Text("No prerequisites").foregroundStyle(.secondary) }
-            ForEach(links) { link in
-                VStack(alignment: .leading, spacing: 4) {
-                    if let target = link.task {
-                        NavigationLink {
-                            TaskDetailView(store: store, task: target)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(target.description)
-                                Text(target.status.capitalized).font(.caption).foregroundStyle(.secondary)
+        let links = store.dependencyLinks(for: task)
+        if links.isEmpty {
+            addButton
+        } else {
+            Section("Dependencies") {
+                ForEach(links) { link in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let target = link.task {
+                            Group {
+                                if let reveal {
+                                    Button { reveal(target) } label: { prerequisite(target) }
+                                } else {
+                                    NavigationLink { TaskDetailView(store: store, task: target) } label: { prerequisite(target) }
+                                }
                             }
+                            .accessibilityIdentifier("dependency-task-\(target.id.uuidString)")
+                        } else {
+                            Text("Prerequisite unavailable").font(.caption)
                         }
-                        .accessibilityIdentifier("dependency-task-\(target.id.uuidString)")
-                    } else {
-                        Text(link.reference.isEmpty ? "<empty dependency reference>" : link.reference)
-                            .font(.caption).textSelection(.enabled)
-                    }
-                    if let issue = link.issue {
-                        Text(issue.message).font(.caption).foregroundStyle(.secondary)
-                    }
-                    if task.canEdit {
-                        Button("Remove dependency", role: .destructive) {
-                            Task {
-                                if let saved = await store.removeDependency(id: task.id, reference: link.reference) { onSave(saved) }
+                        if let issue = link.issue {
+                            Text(issue.message).font(.caption).foregroundStyle(.secondary)
+                        }
+                        if task.canEdit {
+                            Button("Remove dependency", role: .destructive) {
+                                Task {
+                                    if let saved = await store.removeDependency(id: task.id, reference: link.reference) { onSave(saved) }
+                                }
                             }
+                            .buttonStyle(.borderless)
+                            .disabled(store.isSaving)
+                            .accessibilityIdentifier("remove-dependency-\(link.id.base64EncodedString())")
                         }
-                        .buttonStyle(.borderless)
-                        .disabled(store.isSaving)
-                        .accessibilityIdentifier("remove-dependency-\(link.id.base64EncodedString())")
                     }
                 }
+                addButton
             }
-            if task.canEdit {
-                Button("Add dependency", systemImage: "plus") { select() }
-                    .disabled(store.isSaving)
-                    .accessibilityIdentifier("add-dependency")
-            }
+        }
+    }
+
+    private func prerequisite(_ task: TaskRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(task.description)
+            Text(task.status.capitalized).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var addButton: some View {
+        if task.canEdit {
+            Button("Add dependency", systemImage: "plus") { select() }
+                .disabled(store.isSaving)
+                .accessibilityIdentifier("add-dependency")
         }
     }
 }
@@ -80,7 +93,6 @@ struct TaskDependencySelection: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(candidate.description)
                                 Text(candidate.status.capitalized).font(.caption).foregroundStyle(.secondary)
-                                Text(candidate.id.uuidString).font(.caption2).foregroundStyle(.secondary)
                             }
                         }
                         .disabled(store.isSaving || task.dependencyReferences.contains(candidate.id.uuidString.lowercased()))

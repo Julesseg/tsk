@@ -45,21 +45,8 @@ struct TaskDetailView: View {
             Section("Planning") { TaskPlanningSummary(task: task) }
             TaskAnnotationsSection(store: store, task: task, edit: { panel = .annotation($0) })
             TaskAdvancedAttributesSection(store: store, task: task, edit: { panel = .attributes })
-            Section("Attributes") {
-                ForEach(task.attributes.keyIdentities) { key in
-                    LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(key.rawValue)
-                        .accessibilityValue(task.attributes[key.rawValue] ?? "")
-                        .accessibilityIdentifier("raw-attribute-\(key.rawValue)")
-                }
-            }
-            Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }
             if !task.canEdit, task.recurrenceInspection == nil {
                 Section { Text("These task attributes are preserved. Recurring tasks and unsupported states require their dedicated editor.").font(.footnote) }
-            }
-            if let error = store.error {
-                Section { Text(error).foregroundStyle(.red).accessibilityIdentifier("task-action-error") }
             }
         }
         .accessibilityIdentifier("task-detail-form")

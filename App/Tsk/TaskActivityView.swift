@@ -5,12 +5,9 @@ struct TaskActivityCaption: View {
     let task: TaskRecord
 
     var body: some View {
-        if task.isActive {
+        if task.isActive && task.status == "pending" {
             VStack(alignment: .leading, spacing: 2) {
-                Label(task.status == "pending" ? "Active" : "Saved start marker", systemImage: "play.circle.fill")
-                if let date = task.startedAt {
-                    Text("Started \(date.formatted(date: .abbreviated, time: .shortened))")
-                } else { Text("Saved start timestamp is unavailable: \(task.attributes["start"] ?? "")") }
+                Label("Active", systemImage: "play.circle.fill")
             }
             .font(.caption).foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)

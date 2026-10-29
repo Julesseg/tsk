@@ -62,7 +62,7 @@ extension XCTestCase {
         tapTaskControl(row, app: app)
         let information = app.buttons["task-row-information"]
         if information.waitForExistence(timeout: 2) {
-            let editor = app.scrollViews["task-row-editor"]
+            let editor = app.scrollViews["task-row-supporting-scroll"]
             if !information.isHittable { editor.swipeUp() }
             tapTaskControl(information, app: app)
             XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))

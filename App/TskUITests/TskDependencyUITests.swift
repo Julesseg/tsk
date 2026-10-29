@@ -58,7 +58,7 @@ final class TskDependencyUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let remove = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "remove-dependency-")).firstMatch
         tap(remove, in: app)
-        XCTAssertTrue(app.staticTexts["No prerequisites"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-task-")).firstMatch.waitForNonExistence(timeout: 5))
         screenshot("Explicit dependency removal preserves planned task", app: app)
         app.terminate()
         app.launch()
