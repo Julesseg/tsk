@@ -337,7 +337,11 @@ private struct TaskRowFade: ViewModifier {
 
     func body(content: Content) -> some View {
         let progress = editing?.revealProgress ?? 0
-        content.opacity(disappearing ? 1 - progress : progress)
+        if disappearing && progress == 1 {
+            content.hidden()
+        } else {
+            content.opacity(disappearing ? 1 - progress : progress)
+        }
     }
 }
 
