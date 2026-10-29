@@ -34,8 +34,13 @@ final class TskUITests: XCTestCase {
         XCTAssertTrue(taskRow(named: "Buy milk from the market", app: app).waitForExistence(timeout: 10))
         screenshot("Tasks after relaunch", app: app)
         openTaskInformation(taskRow(named: "Buy milk from the market", app: app), app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["Identity"], in: "task-detail-form", app: app))
-        screenshot("Raw attributes and identity", app: app)
+        let savedDescription = app.staticTexts["task-detail-description"]
+        XCTAssertTrue(savedDescription.waitForExistence(timeout: 5))
+        XCTAssertEqual(savedDescription.label, "Buy milk from the market")
+        XCTAssertTrue(app.descendants(matching: .any)["task-detail-status"].label.contains("Pending"))
+        XCTAssertFalse(app.staticTexts["Identity"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
+        screenshot("Saved task information after relaunch", app: app)
     }
 
     func testOrganizationProjectViewsAndListActionsPersist() throws {
