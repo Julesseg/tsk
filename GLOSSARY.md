@@ -27,7 +27,7 @@ An expression that selects tasks according to Taskwarrior's filtering language.
 A task created in tsk from an Apple reminder.
 
 **Scheduled**:
-The date and time at which the user intends to work on a task, distinct from its deadline and any waiting constraint.
+The date and time at which the user intends to work on a task, distinct from its deadline and any waiting constraint. Midnight is a valid intended time.
 _Avoid_: Planned day; Deadline as a synonym for Scheduled
 
 **Deadline**:

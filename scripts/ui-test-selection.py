@@ -20,7 +20,7 @@ PAD_FULL = (
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
     "TypedFilterUITests", "ReminderImportUITests", "ContinuousReminderImportUITests",
-    "TaskRowEditingUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
+    "TaskRowEditingUITests", "TaskScheduledUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
     "WidgetUITests", "SpotlightUITests", "TaskNotificationUITests", "MissedNotificationUITests",
 )
 DIAGNOSTIC = (

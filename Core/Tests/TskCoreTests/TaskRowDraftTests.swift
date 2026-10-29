@@ -76,12 +76,10 @@ private struct RowUnwritableReplica: TaskReplica {
     #expect(throws: TaskManagementError.unsupportedTaskKind) { try TaskRowDraft(task: template).changes() }
 }
 
-@Test func chosenRowPlannedDayUsesLocalCalendarBoundaryAcrossDST() throws {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+@Test func chosenScheduledTimestampSurvivesDSTWithoutChangingDeadline() throws {
     var draft = TaskRowDraft(task: TaskRecord(id: UUID(), attributes: ["description": "Plan", "status": "pending", "due": "1806271199"]))
-    draft.choosePlannedDay(Date(timeIntervalSince1970: 1806235200), calendar: calendar)
-    #expect(try draft.changes() == ["scheduled": "1806188400"])
+    draft.chooseScheduledDate(Date(timeIntervalSince1970: 1806235200))
+    #expect(try draft.changes() == ["scheduled": "1806235200"])
     #expect(draft.taskDraft.attributes["due"] == "1806271199")
 }
 
@@ -160,4 +158,29 @@ private struct RowUnwritableReplica: TaskReplica {
     #expect(try draft.changes() == ["tag_é": nil])
     #expect(draft.taskDraft.attributes["tag_e\u{301}"] == "decomposed")
     #expect(draft.taskDraft.attributes["tag_BAD"] == "malformed")
+}
+
+@Test func scheduledDayShortcutsKeepTimeAcrossDSTAndOtherDatesIndependent() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+    let parser = ISO8601DateFormatter()
+    let original = TaskRecord(id: UUID(), attributes: ["description": "Ship", "status": "pending", "scheduled": "1806149700", "due": "1806271199", "wait": "1806357600"])
+    var draft = TaskRowDraft(task: original)
+    draft.plan(.tomorrow, now: try #require(parser.date(from: "2027-03-27T10:00:00Z")), calendar: calendar)
+    #expect(try draft.changes() == ["scheduled": "1806232500"])
+}
+
+@Test(arguments: ["1792195200", "1806235200", "1792888200", "1792891800"])
+func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp: String) async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let original = try await manager.create(TaskDraft(description: "Imported", attributes: ["scheduled": timestamp, "due": "1806271199", "wait": "1806357600", "opaque": "retain"]))
+    var draft = TaskRowDraft(task: original)
+    #expect(try draft.changes().isEmpty)
+    draft.taskDraft.description = "Revised"
+    let saved = try await manager.update(id: original.id, changes: draft.changes())
+    let reopened = TaskRowDraft(task: try await manager.task(id: saved.id))
+    #expect(reopened.taskDraft.attributes["scheduled"] == timestamp)
+    #expect(reopened.taskDraft.attributes["due"] == "1806271199")
+    #expect(reopened.taskDraft.attributes["wait"] == "1806357600")
+    #expect(try reopened.changes().isEmpty)
 }

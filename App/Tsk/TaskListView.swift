@@ -142,7 +142,7 @@ struct TaskListRow: View {
     private var expanded: Bool { editing?.isExpanded == true }
     private var hasMetadata: Bool {
         let current = editing?.savedTask ?? task
-        return !current.project.isEmpty || current.deadline != nil
+        return !current.project.isEmpty || current.plannedDate != nil || current.deadline != nil
     }
     private var attributesOverlap: CGFloat { hasMetadata ? max(0, headerHeight - titleHeight - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }

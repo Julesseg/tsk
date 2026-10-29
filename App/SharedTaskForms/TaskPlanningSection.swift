@@ -16,16 +16,16 @@ struct TaskPlanningSection: View {
                 if let date = draft.plannedDate {
                     DatePicker("Scheduled", selection: Binding(
                         get: { date },
-                        set: { draft.plannedDate = Calendar.current.startOfDay(for: $0) }
-                    ), displayedComponents: .date)
+                        set: { draft.plannedDate = $0 }
+                    ), displayedComponents: [.date, .hourAndMinute])
                     .accessibilityIdentifier("planned-day-picker")
                 } else {
                     Text("Unrecognized scheduled date: \(draft.attributes["scheduled"] ?? "")").font(.caption)
                 }
-                Button("Schedule today") { draft.plannedDate = Calendar.current.startOfDay(for: now) }
+                Button("Schedule today") { draft.schedule(on: now) }
                     .accessibilityIdentifier("plan-today")
                 Button("Schedule tomorrow") {
-                    draft.plannedDate = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now))
+                    if let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) { draft.schedule(on: tomorrow) }
                 }
                 .accessibilityIdentifier("plan-tomorrow")
             }
@@ -35,7 +35,7 @@ struct TaskPlanningSection: View {
                 Text("Waiting tasks keep their scheduled date and deadline. A matching task stays visible in Today with its waiting reason.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Text("The scheduled date is when you intend to work. The deadline is when the task must be finished.")
+            Text("Scheduled is the date and time when you intend to work. The deadline is when the task must be finished.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }
