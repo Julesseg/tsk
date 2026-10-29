@@ -69,6 +69,14 @@ import XCTest
         tapTaskControlAtCenter(app.buttons["close-row-parameter"], app: app,
                                requiresVisibleKeyboard: keyboard.exists && !keyboard.frame.isEmpty)
         XCTAssertTrue(app.textFields["row-project-input"].waitForNonExistence(timeout: 5))
+        openTaskRowParameter("tags", app: app)
+        let tagInput = app.textFields["row-tag-input"]
+        XCTAssertTrue(tagInput.waitForExistence(timeout: 5))
+        replaceTaskText(tagInput, with: "release", app: app)
+        app.buttons["close-row-parameter"].tap()
+        XCTAssertTrue(tagInput.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-tags"].value as? String, "release")
+        capture("Tags update the expanded draft", app)
         openTaskRowParameter("scheduled", app: app)
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
         capture("Direct Scheduled calendar", app)
@@ -104,6 +112,7 @@ import XCTest
         XCTAssertTrue((app.buttons["row-deadline"].value as? String ?? "").contains("Oct"))
         XCTAssertEqual(app.buttons["row-project"].value as? String, "Release.Next")
         XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+        XCTAssertEqual(app.buttons["row-tags"].value as? String, "release")
         capture("Dates persist independently after relaunch", app)
         openTaskRowParameter("deadline", app: app)
         XCTAssertTrue(app.datePickers["deadline-picker"].waitForExistence(timeout: 5))
@@ -161,6 +170,71 @@ import XCTest
         capture("Upcoming membership applies after collapse", app)
     }
 
+    func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
+        let app = try launch(organized: true)
+        let title = expandTask(app)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "Medium")
+        XCTAssertEqual(app.buttons["row-tags"].value as? String, "review")
+        capture("Populated organization components", app)
+        openTaskRowParameter("tags", app: app)
+        let input = app.textFields["row-tag-input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-tag-review"].value as? String, "Selected")
+        XCTAssertEqual(app.buttons["row-tag-accessibility"].value as? String, "Not selected")
+        app.buttons["row-tag-review"].tap()
+        replaceTaskText(input, with: "access", app: app)
+        app.buttons["row-tag-accessibility"].tap()
+        XCTAssertFalse(app.buttons["row-add-tag"].exists, "Choosing a search result must clear its unfinished query")
+        capture("Existing tags can be removed and selected", app)
+        replaceTaskText(input, with: "bad tag", app: app)
+        app.buttons["row-add-tag"].tap()
+        XCTAssertTrue(app.staticTexts["row-tag-error"].waitForExistence(timeout: 5))
+        app.buttons["close-row-parameter"].tap()
+        XCTAssertTrue(input.exists, "Done must retain invalid tag input")
+        capture("Invalid tag retains picker and input", app)
+        try tapOutsideParameter(app)
+        XCTAssertTrue(input.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(title.exists, "Picker dismissal must leave the task open")
+        closeTaskRow(app)
+        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
+        XCTAssertTrue(title.exists, "Invalid unfinished tag must prevent collapse")
+        openTaskRowParameter("tags", app: app)
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        XCTAssertEqual(input.value as? String, "bad tag")
+        replaceTaskText(input, with: "next", app: app)
+        try tapOutsideParameter(app)
+        XCTAssertTrue(input.waitForNonExistence(timeout: 5))
+        closeTaskRow(app)
+        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        selectAllTasks(app)
+        _ = expandTask(app)
+        XCTAssertEqual(app.buttons["row-tags"].value as? String, "accessibility, next")
+        capture("Tags persist after dismissal and relaunch", app)
+        openTaskRowParameter("project", app: app)
+        tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
+        openTaskRowParameter("priority", app: app)
+        tapTaskPickerOption("None", options: ["None", "Low", "Medium", "High"], app: app)
+        openTaskRowParameter("tags", app: app)
+        app.buttons["row-tag-accessibility"].tap()
+        app.buttons["row-tag-next"].tap()
+        app.buttons["close-row-parameter"].tap()
+        XCTAssertTrue(input.waitForNonExistence(timeout: 5))
+        closeTaskRow(app)
+        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        selectAllTasks(app)
+        _ = expandTask(app)
+        for parameter in ["project", "priority", "tags"] {
+            XCTAssertEqual(app.buttons["row-" + parameter].value as? String, "Not set")
+        }
+        XCTAssertTrue((app.buttons["row-deadline"].value as? String ?? "").contains("Oct"))
+        capture("Cleared organization persists with dates unchanged", app)
+    }
+
     func testOccurrenceFailureRetainsDraftAndLargeTextScrollsInsideRow() throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -181,6 +255,12 @@ import XCTest
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText(" unsaved")
+        openTaskRowParameter("tags", app: app)
+        let tagInput = app.textFields["row-tag-input"]
+        XCTAssertTrue(tagInput.waitForExistence(timeout: 5))
+        replaceTaskText(tagInput, with: "retained", app: app)
+        app.buttons["close-row-parameter"].tap()
+        XCTAssertTrue(tagInput.waitForNonExistence(timeout: 5))
         closeTaskRow(app)
         let error = app.staticTexts["draft-error"]
         XCTAssertTrue(error.waitForExistence(timeout: 10))
@@ -188,6 +268,7 @@ import XCTest
         if !error.isHittable { scroll.swipeUp() }
         capture("Failed occurrence retains draft with internal overflow", app)
         XCTAssertTrue((title.value as? String ?? "").contains("unsaved"))
+        XCTAssertEqual(app.buttons["row-tags"].value as? String, "retained")
         XCTAssertFalse(app.buttons["collapse-task-row"].exists)
     }
 
@@ -201,6 +282,16 @@ import XCTest
             XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.keyboards.firstMatch.exists)
             capture("Expanded " + mode, app)
+            openTaskRowParameter("tags", app: app)
+            let input = app.textFields["row-tag-input"]
+            XCTAssertTrue(input.waitForExistence(timeout: 5))
+            capture("Tags picker " + mode, app)
+            replaceTaskText(input, with: "release-accessibility-review", app: app)
+            capture("Tags input above keyboard " + mode, app)
+            app.buttons["close-row-parameter"].tap()
+            XCTAssertTrue(input.waitForNonExistence(timeout: 5))
+            XCTAssertEqual(app.buttons["row-tags"].value as? String, "release-accessibility-review")
+            capture("Populated tags " + mode, app)
             openTaskRowParameter("scheduled", app: app)
             XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
             capture("Scheduled calendar " + mode, app)
@@ -298,7 +389,7 @@ import XCTest
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
@@ -309,6 +400,14 @@ import XCTest
             ["id": taskID, "attributes": ["description": "Prepare the release with the product team", "status": "pending", "project": "Release", "scheduled": "1792231200", "due": "1792238400", "opaque": "retain"].map { ["key": $0.key, "value": $0.value] }],
             ["id": "A0000000-0000-0000-0000-000000000002", "attributes": [["key": "description", "value": "Review accessibility findings"], ["key": "status", "value": "pending"]]]
         ]
+        if organized {
+            var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
+            attributes += [["key": "priority", "value": "M"], ["key": "tag_review", "value": ""]]
+            records[0]["attributes"] = attributes
+            var otherAttributes = try XCTUnwrap(records[1]["attributes"] as? [[String: String]])
+            otherAttributes.append(["key": "tag_accessibility", "value": ""])
+            records[1]["attributes"] = otherAttributes
+        }
         if longTitle {
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
             let description = try XCTUnwrap(attributes.firstIndex { $0["key"] == "description" })

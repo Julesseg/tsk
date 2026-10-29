@@ -62,8 +62,14 @@ private struct RowUnwritableReplica: TaskReplica {
     let manager = TaskManager(replica: OccurrenceReplica(records: [template, occurrence, sibling]))
     var draft = TaskRowDraft(task: occurrence)
     draft.taskDraft.description = "Only this occurrence"
+    draft.taskDraft.project = "Series.Next"
+    draft.taskDraft.priority = "L"
+    try draft.taskDraft.addTag("next")
     let saved = try await manager.update(id: occurrence.id, changes: draft.changes())
     #expect(saved.description == "Only this occurrence")
+    #expect(saved.project == "Series.Next")
+    #expect(saved.priority == "L")
+    #expect(saved.tags == ["next"])
     #expect(saved.attributes["parent"] == occurrence.attributes["parent"])
     #expect(try await manager.task(id: sibling.id) == sibling)
     #expect(try await manager.task(id: template.id) == template)
@@ -102,4 +108,56 @@ private struct RowUnwritableReplica: TaskReplica {
     draft.taskDraft.priority = ""
     #expect(try draft.changes()["project"] == .some(nil))
     #expect(try draft.changes()["priority"] == .some(nil))
+}
+
+@Test func rowTagEditsPersistAndClearWithoutTouchingOtherAttributes() async throws {
+    let replica = TestReplica()
+    let task = try await replica.create(id: UUID(), attributes: ["description": "Organize", "status": "pending", "tag_old": "x", "tag_keep": "original", "tags": "legacy", "priority": "custom", "wait": "malformed", "opaque": "retain"])
+    let manager = TaskManager(replica: replica)
+    var draft = TaskRowDraft(task: task)
+    draft.taskDraft.removeTag("old")
+    try draft.taskDraft.addTag("next")
+    #expect(try draft.changes() == ["tag_old": nil, "tag_next": ""])
+    let saved = try await manager.update(id: task.id, changes: draft.changes())
+    #expect(saved.tags == ["keep", "next"])
+    #expect(saved.attributes["tag_keep"] == "original")
+    #expect(saved.attributes["tags"] == "keep,next")
+    #expect(saved.priority == "custom")
+    #expect(saved.attributes["wait"] == "malformed")
+    #expect(saved.attributes["opaque"] == "retain")
+    var cleared = TaskRowDraft(task: saved)
+    cleared.taskDraft.removeTag("keep")
+    cleared.taskDraft.removeTag("next")
+    let reopened = try await manager.update(id: task.id, changes: cleared.changes())
+    #expect(reopened.tags.isEmpty)
+    #expect(reopened.attributes["tags"] == nil)
+}
+
+@Test func unfinishedRowTagInputValidatesOnCollapseAndSurvivesFailure() async throws {
+    let task = TaskRecord(id: UUID(), attributes: ["description": "Organize", "status": "pending", "tag_keep": "x"])
+    var draft = TaskRowDraft(task: task)
+    draft.tagInput = "bad tag"
+    #expect(throws: TaskManagementError.invalidTag("bad tag")) { try draft.changes() }
+    #expect(draft.tagInput == "bad tag")
+    #expect(draft.taskDraft.tags == ["keep"])
+    draft.tagInput = "next"
+    let manager = TaskManager(replica: RowUnwritableReplica(task: task))
+    await #expect(throws: TaskManagementError.storage("Read-only disk")) {
+        try await manager.update(id: task.id, changes: draft.changes())
+    }
+    #expect(draft.tagInput == "next")
+    #expect(try draft.changes() == ["tag_next": ""])
+    try draft.addTagInput()
+    #expect(draft.tagInput.isEmpty)
+    #expect(draft.taskDraft.tags == ["keep", "next"])
+}
+
+@Test func rowTagEditingPreservesByteDistinctNamesAndUntouchedMalformedValues() throws {
+    let task = TaskRecord(id: UUID(), attributes: ["description": "Imported", "status": "pending", "tag_é": "composed", "tag_e\u{301}": "decomposed", "tag_BAD": "malformed", "tags": "legacy", "priority": "custom"])
+    var draft = TaskRowDraft(task: task)
+    #expect(try draft.changes().isEmpty)
+    draft.taskDraft.removeTag("é")
+    #expect(try draft.changes() == ["tag_é": nil])
+    #expect(draft.taskDraft.attributes["tag_e\u{301}"] == "decomposed")
+    #expect(draft.taskDraft.attributes["tag_BAD"] == "malformed")
 }

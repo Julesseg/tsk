@@ -70,11 +70,12 @@ final class TaskRowEditing {
 }
 
 enum TaskRowParameter: String, Identifiable, CaseIterable {
-    case project, scheduled, deadline, waiting, priority
+    case project, tags, priority, scheduled, deadline, waiting
     var id: String { rawValue }
     var title: String {
         switch self {
         case .project: "Project"
+        case .tags: "Tags"
         case .scheduled: "Scheduled"
         case .deadline: "Deadline"
         case .waiting: "Waiting date"
@@ -87,6 +88,7 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
     var symbol: String {
         switch self {
         case .project: "folder"
+        case .tags: "tag"
         case .scheduled: "calendar"
         case .deadline: "flag"
         case .waiting: "pause.circle"
@@ -110,6 +112,7 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         }
     }
     func value(in draft: TaskDraft) -> String? {
+        if self == .tags { return draft.tags.isEmpty ? nil : draft.tags.joined(separator: ", ") }
         if let date = date(in: draft) {
             return date.formatted(date: .abbreviated, time: self == .scheduled ? .omitted : .shortened)
         }
