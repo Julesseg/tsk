@@ -246,8 +246,11 @@ struct TaskListRow: View {
         }
         .background {
             GeometryReader { geometry in
+                let frame = geometry.frame(in: .global)
                 Color.clear.preference(key: TaskSelectionRowsKey.self,
-                    value: [identity: TaskSelectionRow(id: task.id, bounds: geometry.frame(in: .global), isEditing: editing != nil)])
+                    value: [identity: TaskSelectionRow(id: task.id,
+                        bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: min(headerHeight, frame.height))),
+                        isEditing: editing != nil)])
             }
         }
         .modifier(TaskRowSpacing(editing: editing))
