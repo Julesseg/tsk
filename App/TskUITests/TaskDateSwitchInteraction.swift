@@ -251,9 +251,14 @@ extension XCTestCase {
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
                 if keyboardRequirement == .visible || keyboardRequirement == .dismissal && snapshot.identifier.hasPrefix("dismiss-") {
-                    let keyboard = try? measured("keyboard.snapshot") { try app.keyboards.firstMatch.snapshot() }
-                    sample.keyboardFrames = keyboard.map { [$0.frame] } ?? []
-                    if let keyboard, !keyboard.frame.isEmpty,
+                    var pending = [application]
+                    var keyboardFrames: [CGRect] = []
+                    while let child = pending.popLast() {
+                        if child.elementType == .keyboard { keyboardFrames.append(child.frame) }
+                        pending.append(contentsOf: child.children.reversed())
+                    }
+                    sample.keyboardFrames = keyboardFrames
+                    if let keyboard = keyboardFrames.first, !keyboard.isEmpty,
                        let assistant = self.taskSnapshot("inputAssistantView", in: application) {
                         sample.keyboardFrames?.append(assistant.frame)
                     }
@@ -310,15 +315,31 @@ extension XCTestCase {
                 element.press(forDuration: 1.1)
                 let started = ProcessInfo.processInfo.systemUptime
                 let deadline = started + 5
-                let menu = app.menuItems["Select All"]
-                let button = app.buttons["Select All"]
-                var selected: XCUIElement?
+                var selected: TaskNativeMenuOptionGeometry?
+                var lastSample = "not sampled"
                 func sample() -> Bool {
                     guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                    if menu.exists { selected = menu; return true }
-                    guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                    if button.exists { selected = button; return true }
-                    return false
+                    selected = nil
+                    do {
+                        let application = try app.snapshot()
+                        var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
+                        var candidates: [TaskNativeMenuOptionGeometry] = []
+                        while let (snapshot, ancestors) = pending.popLast() {
+                            if snapshot.label == "Select All", snapshot.isEnabled,
+                               snapshot.elementType == .menuItem || snapshot.elementType == .button {
+                                candidates.append(TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: ancestors))
+                            }
+                            pending.append(contentsOf: snapshot.children.map { ($0, ancestors + [snapshot.frame]) })
+                        }
+                        let visible = candidates.filter(\.isVisible)
+                        lastSample = "nativeCandidates=\(candidates.count) visibleCandidates=\(visible.count)"
+                        guard visible.count == 1, ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                        selected = visible[0]
+                        return true
+                    } catch {
+                        lastSample = "snapshotError=\(error)"
+                        return false
+                    }
                 }
                 let immediate = sample()
                 var result: XCTWaiter.Result?
@@ -331,11 +352,13 @@ extension XCTestCase {
                 guard immediate || result == .completed, elapsed < 5, let selectAll = selected else {
                     let reason = elapsed >= 5 ? "deadline expired" : selected == nil ? "native menu absent" : "waiter did not complete"
                     let waiter = result.map { String(describing: $0) } ?? "not entered"
-                    recordTaskInteraction(app, detail: "Native Select All was not ready for \(element); reason=\(reason) immediate=\(immediate) waiter=\(waiter) elapsed=\(elapsed)s")
+                    recordTaskInteraction(app, detail: "Native Select All was not ready for \(element); reason=\(reason) immediate=\(immediate) waiter=\(waiter) elapsed=\(elapsed)s \(lastSample)")
                     XCTFail("Text replacement has no ready native Select All control", file: file, line: line)
                     return
                 }
-                selectAll.tap()
+                let origin = selectAll.ancestorFrames[0]
+                app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: selectAll.frame.midX - origin.minX, dy: selectAll.frame.midY - origin.minY)).tap()
             case .commandA:
                 element.typeKey("a", modifierFlags: .command)
             }
