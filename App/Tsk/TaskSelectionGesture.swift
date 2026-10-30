@@ -19,12 +19,14 @@ struct TaskSelectionRowsKey: PreferenceKey {
 
 struct TaskSelectionGesture: UIViewRepresentable {
     let store: TaskStore
+    let scope: TaskSelectionScope
     let viewport: CGRect
     let rows: [String: TaskSelectionRow]
 
     func makeUIView(context: Context) -> SelectionAnchor {
         let view = SelectionAnchor()
         view.recognizer.store = store
+        view.recognizer.scope = scope
         return view
     }
 
@@ -55,6 +57,7 @@ final class SelectionAnchor: UIView {
 
 final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
     weak var store: TaskStore?
+    weak var scope: TaskSelectionScope?
     var viewport = CGRect.zero
     var rows: [TaskSelectionRow] = []
     private var initial = CGPoint.zero
@@ -325,16 +328,28 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        isTaskListContent(touch.view)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] == "0" {
+            var ancestor = touch.view
+            while let current = ancestor {
+                if current.accessibilityIdentifier == "task-list" || current.accessibilityIdentifier == "upcoming-list" {
+                    current.accessibilityIdentifier = nil
+                }
+                ancestor = current.superview
+            }
+        }
+        #endif
+        return isTaskListContent(touch.view)
     }
 
     private func isTaskListContent(_ view: UIView?) -> Bool {
+        guard let list = scope?.list else { return false }
         var ancestor = view
         while let current = ancestor {
             if current is UITextView || current is UITextField { return false }
             if let scroll = current as? UIScrollView,
                scroll.alwaysBounceHorizontal || scroll.contentSize.width > scroll.bounds.width + 1 { return false }
-            if current.accessibilityIdentifier == "task-list" || current.accessibilityIdentifier == "upcoming-list" { return true }
+            if current === list { return true }
             ancestor = current.superview
         }
         return false

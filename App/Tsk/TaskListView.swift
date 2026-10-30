@@ -9,6 +9,7 @@ struct TaskListView: View {
     let edit: (TaskRecord) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectionRows: [String: TaskSelectionRow] = [:]
+    @State private var selectionScope = TaskSelectionScope()
     @State private var keyboardFrame = CGRect.null
 
     var body: some View {
@@ -60,7 +61,7 @@ struct TaskListView: View {
             }
         }
         .background {
-            TaskSelectionGesture(store: store, viewport: geometry.frame(in: .global), rows: selectionRows)
+            TaskSelectionGesture(store: store, scope: selectionScope, viewport: geometry.frame(in: .global), rows: selectionRows)
                 .allowsHitTesting(false)
         }
         .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
@@ -75,6 +76,7 @@ struct TaskListView: View {
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
         .environment(\.taskRowViewport, geometry.frame(in: .global))
         }
+        .environment(\.taskSelectionScope, selectionScope)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.completionFeedback.removingIDs(context: store.completionContext))
         .environment(\.defaultMinListRowHeight, 0)
         .listStyle(.plain)
@@ -254,6 +256,7 @@ struct TaskListRow: View {
                     value: [identity: TaskSelectionRow(id: task.id, rowID: identity,
                         bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: min(headerHeight, frame.height))),
                         isEditing: editing != nil)])
+                    .background { TaskSelectionRowAnchor().allowsHitTesting(false) }
             }
         }
         .modifier(TaskRowSpacing(editing: editing))
