@@ -86,6 +86,7 @@ final class iPadWorkspaceUITests: XCTestCase {
         setDateSwitch("deadline-enabled", to: true, app: app)
         setDateSwitch("waiting-date-enabled", to: true, app: app)
         app.buttons["save-task"].tap()
+        guard waitForTaskSave(app, row: taskRow(named: "Adaptive planned task", app: app), timeout: 10) else { return }
         app.tabBars.buttons["Projects"].tap()
         XCTAssertTrue(app.buttons["project-Workspace"].waitForExistence(timeout: 10))
         capture("iPad Projects list", app: app)
