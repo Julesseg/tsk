@@ -1,19 +1,19 @@
 # Installable PR builds — pipeline internals
 
-The release workflow builds a **signed, installable `.ipa`** for every PR and
+The release workflow builds a **signed, installable `.ipa`** for an explicitly requested PR and
 publishes it to a GitHub Pages site, so you can install any PR's build on your
-iPhone straight from Safari, on GitHub's hosted `macos-15` runner — no
-self-hosted Mac required.
+iPhone straight from Safari. Builds use the repository's `xcode-27` runner.
 
 Setup (Apple Developer console, repo secrets, Pages) is documented in the
-[root README](../README.md#enabling-installable-pr-builds-one-time). This file
+[setup guide](../docs/template-setup.md#enabling-installable-pr-builds-one-time). This file
 covers how the pipeline works.
 
 The pipeline lives at [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 
 ```
-PR opened/updated
-   └─ build  (macos-15)   archive + export an ad-hoc–signed app.ipa
+Manual request with PR number
+   └─ request (Linux)     resolve source and signing configuration
+        └─ build (xcode-27) archive + export an ad-hoc–signed app.ipa
         └─ deploy (ubuntu) upsert this PR's slot, prune to 5, push build-history, deploy Pages
              └─ notify     optional ntfy ping with the install link
 ```
@@ -52,3 +52,20 @@ stays green — the installable build simply doesn't run.
 - **Versioning:** the OTA manifest uses the short commit SHA as the bundle
   version, so reinstalling the same PR after a new push registers as an update.
 - **Xcode:** the build uses the runner's latest-stable Xcode, matching `ci.yml`.
+
+## Request an installable
+
+PR pushes run validation without automatically building/publishing an installable.
+Request one when it is needed:
+
+```sh
+gh workflow run release.yml --repo Julesseg/tsk -f pr_number=<number>
+```
+
+Linux admission resolves the current source of an open same-repository PR and
+checks signing configuration before requesting a Mac. The build uses that exact
+SHA. Device archives build only the arm64 iOS Rust bridge; simulator targets
+remain available through `scripts/build-native.sh simulator` or `apple`.
+TestFlight/tag releases keep their existing explicit triggers. Provisioning and
+actual archive/export checks remain required; simulator CI does not establish
+distribution acceptance.

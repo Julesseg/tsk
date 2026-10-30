@@ -155,7 +155,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Build pinned TaskChampion for iOS
-        run: scripts/build-native.sh apple
+        run: scripts/build-native.sh device
 
       - name: Archive
         env:

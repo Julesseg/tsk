@@ -53,6 +53,12 @@ TEXT = (
     "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
 )
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
+TASK_PARTITION = {
+    'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
+    'TaskActivityUITests', 'TaskAttributeUITests', 'TaskAutomationUITests',
+    'TaskRowEditingUITests', 'TaskScheduledUITests', 'TypedFilterUITests',
+}
+PHONE_TASK_PARTITION = {'TemporalFilterUITests', 'TskDependencyUITests', 'TskUITests', 'TskUpcomingUITests', 'TskWaitingUITests'}
 
 
 def test_methods():
@@ -104,7 +110,8 @@ def selection(suite, family, partition="all"):
         return filters
     selected = selected_methods(filters)
     rows = {test for test in selected if matches(test, "TskUITests/TaskRowEditingUITests")}
-    row_group = rows
+    task_classes = TASK_PARTITION | (PHONE_TASK_PARTITION if family == 'iPhone' else {'WorkspaceSettingsUITests'})
+    row_group = {test for test in selected if test.split('/')[1] in task_classes}
     if partition == "row-editing":
         chosen = row_group
     elif partition == "workspace":
@@ -128,6 +135,10 @@ def requires_sync_peer(filters):
     return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
 
 
+def requires_sync_server(filters):
+    return any(test.split('/')[1] in ('SynchronizationUITests', 'MissedNotificationUITests', 'SpotlightUITests') for test in selected_methods(filters))
+
+
 def requires_native_keyboard(filters):
     selected_methods(filters)
     spec = importlib.util.spec_from_file_location("native_keyboard_owner", pathlib.Path(__file__).with_name("with-native-keyboard-hid.py"))
@@ -147,6 +158,8 @@ def main():
     phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
     peer.add_argument("filters", nargs=argparse.REMAINDER)
+    server = commands.add_parser("sync-server")
+    server.add_argument("filters", nargs=argparse.REMAINDER)
     native = commands.add_parser("native-keyboard")
     native.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -157,6 +170,8 @@ def main():
             output = phases(args.filters)
         elif args.command == "native-keyboard":
             output = ["yes" if requires_native_keyboard(args.filters) else "no"]
+        elif args.command == "sync-server":
+            output = ["yes" if requires_sync_server(args.filters) else "no"]
         else:
             output = ["yes" if requires_sync_peer(args.filters) else "no"]
     except ValueError as error:
