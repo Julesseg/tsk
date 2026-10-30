@@ -66,6 +66,23 @@ final class RecurringTemplateUITests: XCTestCase {
     func testRecordedRealGeneratorOccurrenceEditsAndCompletesWithoutChangingItsTemplate() throws {
         let path = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
         let data = try Data(contentsOf: path)
+        try verifyRecordedOccurrenceEditingAndCompletion(data: data)
+    }
+
+    func testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch() throws {
+        let path = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
+        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [[String: Any]])
+        for index in records.indices {
+            var attributes = try XCTUnwrap(records[index]["attributes"] as? [[String: String]])
+            for position in attributes.indices where attributes[position]["key"] == "imask" {
+                attributes[position]["value"] = try XCTUnwrap(attributes[position]["value"]) + ".000000"
+            }
+            records[index]["attributes"] = attributes
+        }
+        try verifyRecordedOccurrenceEditingAndCompletion(data: JSONSerialization.data(withJSONObject: records))
+    }
+
+    private func verifyRecordedOccurrenceEditingAndCompletion(data: Data) throws {
         let records = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         let child = try XCTUnwrap(records.first { record in
             let attributes = record["attributes"] as? [[String: String]] ?? []
@@ -82,8 +99,11 @@ final class RecurringTemplateUITests: XCTestCase {
         selectAllTasks(app)
         let row = app.buttons["task-" + id]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["complete-task-row-" + id].exists)
+        capture("Recorded occurrence offers its list completion circle", app)
         openTaskInformation(row, app: app)
         XCTAssertTrue(app.staticTexts["occurrence-only-explanation"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["This occurrence has an invalid template link or position."].exists)
         XCTAssertEqual(app.buttons["edit-task"].label, "Edit occurrence")
         capture("Actual generator occurrence offers occurrence-only actions", app)
         app.buttons["edit-task"].tap()

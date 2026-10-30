@@ -82,7 +82,7 @@ extension TaskManager {
             for (key, value) in patch { record.attributes[key] = value }
             moved.append(record)
             updates.append(TaskAtomicUpdate(id: original.id, expected: original.attributes, changes: patch))
-            oldMask[Int(original.attributes["imask"]!)!] = 88
+            oldMask[original.occurrenceIndex!] = 88
             newMask.append((record.waitUntil ?? .distantPast) > instant ? 87 : 45)
         }
         if !newMask.isEmpty { attributes["mask"] = String(decoding: newMask, as: UTF8.self) }
@@ -106,7 +106,7 @@ extension TaskManager {
 
     private func validateRetirementCoverage(_ series: TaskSeriesRecords, cutoff: Date, timeZone: String) throws {
         let mask = Array((series.template.attributes["mask"] ?? "").utf8)
-        let positions = Set(series.children.compactMap { $0.attributes["imask"].flatMap(Int.init) })
+        let positions = Set(series.children.compactMap(\.occurrenceIndex))
         guard mask.enumerated().allSatisfy({ [43, 88].contains($0.element) || positions.contains($0.offset) }),
               let first = series.template.deadline, let rule = series.template.attributes["recur"] else { throw TaskSeriesTransitionError.incompleteGeneratorHorizon }
         let schedule = try TaskRecurrenceSchedule(rule: rule, timeZone: timeZone)

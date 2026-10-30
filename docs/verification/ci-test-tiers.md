@@ -36,7 +36,7 @@ native full-suite results before acceptance. See [the consolidation audit](test-
 for the merged methods and measured baseline.
 
 Smoke uses one worker per family. Full coverage uses disjoint workspace and
-row-editing workers: 63 + 7 methods on iPhone and 54 + 7 on iPad. Each method is
+row-editing workers: 64 + 7 methods on iPhone and 55 + 7 on iPad. Each method is
 selected once per family. Native HID cases remain in the workspace worker with
 their existing identity checks and deadlines. The row-only worker selects no
 native command cases and uses XCTest input. Focused diagnostic dispatches use

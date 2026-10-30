@@ -29,11 +29,10 @@ extension TaskManager {
         guard let rawParent = occurrence.attributes["parent"], let parentID = UUID(uuidString: rawParent), parentID != occurrence.id,
               let parent = records.first(where: { $0.id == parentID }),
               ["recurring", "deleted"].contains(parent.status), parent.attributes["parent"] == nil,
-              let rawIndex = occurrence.attributes["imask"], !rawIndex.isEmpty,
-              rawIndex.utf8.allSatisfy({ (48...57).contains($0) }), let index = Int(rawIndex),
+              let index = occurrence.occurrenceIndex,
               let rawMask = parent.attributes["mask"], rawMask.utf8.allSatisfy({ [45, 87, 43, 88].contains($0) }),
               index < rawMask.utf8.count else { throw TaskManagementError.storage("The occurrence’s parent, index, or series mask is inconsistent. No tasks were changed.") }
-        let siblings = records.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == parentID && Int($0.attributes["imask"] ?? "") == index }
+        let siblings = records.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == parentID && $0.occurrenceIndex == index }
         guard siblings.count == 1 else { throw TaskManagementError.storage("More than one occurrence uses this series position. No tasks were changed.") }
         var mask = Array(rawMask.utf8)
         if occurrence.status == "completed", completing, mask[index] == 43 { return occurrence }
