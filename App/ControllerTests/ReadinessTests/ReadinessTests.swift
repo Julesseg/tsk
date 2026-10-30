@@ -450,6 +450,17 @@ import Testing
 }
 
 @Suite struct TaskNativeMenuGeometryProof {
+    @Test func editMenuUsesObservedWindowWhenTheApplicationRootHasNoFrame() {
+        let window = CGRect(x: 0, y: 0, width: 1032, height: 1376)
+        let menu = CGRect(x: 201, y: 273, width: 96.5, height: 44)
+        let candidate = TaskNativeMenuOptionGeometry(frame: menu, ancestorFrames: [.zero, window, menu])
+        #expect(candidate.visibleInApplication(.zero, windowFrames: [window])?.isVisible == true)
+        #expect(candidate.visibleInApplication(.zero, windowFrames: []) == nil)
+        #expect(candidate.visibleInApplication(.zero, windowFrames: [window.offsetBy(dx: 2000, dy: 0)]) == nil)
+        let invalidParent = TaskNativeMenuOptionGeometry(frame: menu, ancestorFrames: [.zero, window, .zero, menu])
+        #expect(invalidParent.visibleInApplication(.zero, windowFrames: [window]) == nil)
+    }
+
     @Test func recordedPhoneAndPadMenuRowsAreInsideTheirVisiblePanels() {
         for (window, panel, collection, row) in [
             (CGRect(x: 0, y: 0, width: 440, height: 956), CGRect(x: 150, y: 354, width: 250, height: 188), CGRect(x: 150, y: 354, width: 250, height: 956), CGRect(x: 150, y: 406, width: 250, height: 42)),

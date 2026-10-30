@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,21 @@ def test_methods(nodes):
     return result
 
 
+def failure_timing(receipts):
+    events = [event for receipt in receipts for event in receipt.get('events', [])]
+    starts = [event['receivedUTC'] for event in events if event['event'] in ('xcodebuild-start', 'owned-native-hid-owner-start')]
+    failures = [event for event in events if event['event'] == 'first-test-failure']
+    finishes = [receipt['finishedUTC'] for receipt in receipts if receipt.get('finishedUTC')]
+    if not failures or not starts or not finishes:
+        return None
+    failure = min(failures, key=lambda event: event['receivedUTC'])
+    def date(value):
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    return dict(method=failure['method'], utc=failure['receivedUTC'],
+                seconds_to_failure=max(0, (date(failure['receivedUTC']) - min(map(date, starts))).total_seconds()),
+                seconds_after_failure=max(0, (max(map(date, finishes)) - date(failure['receivedUTC'])).total_seconds()))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--family', required=True)
@@ -21,6 +37,13 @@ def main():
     parser.add_argument('--suite', required=True)
     args = parser.parse_args()
     record = dict(source=os.environ.get('GITHUB_SHA'), run=os.environ.get('GITHUB_RUN_ID'), attempt=os.environ.get('GITHUB_RUN_ATTEMPT'), suite=args.suite, family=args.family, partition=args.partition, bundles=[], errors=[])
+    receipts = []
+    for path in Path('.build/eventkit-fixture').rglob('test-aligned-boundaries.json'):
+        try:
+            receipts.append(json.loads(path.read_text()))
+        except (ValueError, OSError) as error:
+            record['errors'].append(dict(path=str(path), error=str(error)))
+    record['first_failure'] = failure_timing(receipts)
     for path in sorted(Path('App').glob('TestResults*.xcresult')):
         bundle = dict(path=str(path))
         for command in ('summary', 'tests'):
@@ -39,6 +62,10 @@ def main():
         summary = bundle.get('summary', {})
         seconds = max(0, summary.get('finishTime', 0) - summary.get('startTime', 0))
         rows.append(f'| {bundle["path"]} | {summary.get("result", "unavailable")} | {summary.get("passedTests", 0)} | {summary.get("failedTests", 0)} | {summary.get("skippedTests", 0)} | {seconds / 60:.1f} min |')
+    if record['first_failure']:
+        failure = record['first_failure']
+        rows += ['', f'First failure: `{failure["method"]}` at {failure["utc"]}.',
+                 f'Time from the first execution wrapper to failure: {failure["seconds_to_failure"] / 60:.1f} min; continued execution/cleanup afterward: {failure["seconds_after_failure"] / 60:.1f} min.']
     methods = [method for bundle in record['bundles'] for method in bundle.get('tests', [])]
     if methods:
         rows += ['', 'Slowest completed methods:', '']

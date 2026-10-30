@@ -20,6 +20,16 @@ struct TaskNativeMenuOptionGeometry: Equatable {
     let frame: CGRect
     let ancestorFrames: [CGRect]
 
+    func visibleInApplication(_ applicationFrame: CGRect, windowFrames: [CGRect]) -> Self? {
+        var frames = ancestorFrames
+        if applicationFrame.isEmpty, frames.first == applicationFrame {
+            guard let window = windowFrames.first(where: { !$0.isEmpty && !$0.isInfinite && $0.contains(frame) }) else { return nil }
+            frames[0] = window
+        }
+        let candidate = Self(frame: frame, ancestorFrames: frames)
+        return candidate.isVisible ? candidate : nil
+    }
+
     var isVisible: Bool {
         func valid(_ frame: CGRect) -> Bool {
             !frame.isNull && !frame.isInfinite && frame.minX.isFinite && frame.minY.isFinite && frame.maxX.isFinite && frame.maxY.isFinite && frame.width > 0 && frame.height > 0

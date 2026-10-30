@@ -331,7 +331,8 @@ extension XCTestCase {
                             }
                             pending.append(contentsOf: snapshot.children.map { ($0, ancestors + [snapshot.frame]) })
                         }
-                        let visible = candidates.filter(\.isVisible)
+                        let windows = application.children.filter { $0.elementType == .window }.map(\.frame)
+                        let visible = candidates.compactMap { $0.visibleInApplication(application.frame, windowFrames: windows) }
                         lastSample = "nativeCandidates=\(candidates.count) visibleCandidates=\(visible.count)"
                         guard visible.count == 1, ProcessInfo.processInfo.systemUptime < deadline else { return false }
                         selected = visible[0]

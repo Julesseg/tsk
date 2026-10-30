@@ -64,7 +64,7 @@ increase was made.
 Local Core: 180 tests passed. Portable routing/selection/shard, build-transfer,
 fixture admission, monitor cleanup, native transport and provisioning regressions
 passed. Workflow syntax passed actionlint with the repository's custom runner
-label declared. Modified Swift files passed syntax parsing. No local simulator
+label declared. The four native-menu geometry host tests passed, including the empty application/visible window regression. Modified Swift files passed syntax parsing. No local simulator
 was booted. These checks establish portable behavior and syntax only.
 
 Canonical evidence must include the actual shared build, smoke gates and full

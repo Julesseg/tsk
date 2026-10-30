@@ -22,10 +22,16 @@ def plan(suite):
                 server=any(worker['server'] for worker in workers), peer=any(worker['peer'] for worker in workers))
 
 
+def validate_source(expected, actual):
+    if expected and expected != actual:
+        raise ValueError('Branch moved before execution; refusing a different source revision')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('suite', choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text'])
     args = parser.parse_args()
+    validate_source(os.environ.get('EXPECTED_SOURCE_SHA'), os.environ.get('GITHUB_SHA'))
     result = plan(args.suite)
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:

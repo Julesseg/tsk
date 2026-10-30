@@ -55,10 +55,16 @@ jobs:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
+          APPLE_WIDGET_PROVISIONING_PROFILE: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$APPLE_CERTIFICATE_P12" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] \
              && [ -n "$APPLE_PROVISIONING_PROFILE" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            if [ -z "$APPLE_SHARE_PROVISIONING_PROFILE" ] || [ -z "$APPLE_WIDGET_PROVISIONING_PROFILE" ]; then
+              echo '::error::Configured installables require both Share and Widget provisioning profiles.'
+              exit 1
+            fi
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"

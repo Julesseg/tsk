@@ -57,7 +57,7 @@ def write_summary(jobs, family, partitions):
     from datetime import datetime
     rows = [f'### {family} UI execution', '', '| Worker | Outcome | Queue | Runner time |', '| --- | --- | ---: | ---: |']
     for job in jobs:
-        if job['name'] not in {f'App · UI shard ({family}, {partition})' for partition in partitions}:
+        if job['name'] not in {f'App · UI shard ({family}, {partition})' for partition in partitions} | {'App · Shared UI products'}:
             continue
         def elapsed(start, end):
             if not start or not end:
