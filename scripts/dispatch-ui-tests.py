@@ -15,6 +15,12 @@ def matching_run(runs, sha, branch, suite, expected_identity=None, load_identity
                       and run['event'] == 'workflow_dispatch' and run['display_title'].startswith('CI · ' + suite + ' · ')), key=lambda run: run['id'], reverse=True)
     for run in matches:
         if run['status'] in ('queued', 'in_progress', 'requested', 'waiting', 'pending'):
+            if expected_identity is not None:
+                actual = load_identity(run)
+                if actual is None:
+                    raise ValueError('Matching active run is awaiting its execution identity: ' + run['html_url'])
+                if actual != expected_identity:
+                    raise ValueError('Matching active run has a different execution identity: ' + run['html_url'])
             return run
         if run['conclusion'] == 'success' and expected_identity is not None and load_identity(run) == expected_identity:
             return run
@@ -49,9 +55,12 @@ def main():
         identity = identity['identity']
     if identity is not None and identity.get('source') != sha:
         parser.error('Expected execution identity belongs to a different source revision')
-    existing = matching_run(runs, sha, args.ref, args.suite, identity, lambda run: run_identity(args.repo, run))
+    try:
+        existing = matching_run(runs, sha, args.ref, args.suite, identity, lambda run: run_identity(args.repo, run))
+    except ValueError as error:
+        parser.error(str(error))
     if existing and not args.force:
-        print('Reusing matching coverage: ' + existing['html_url'])
+        print(('Reusing verified completed coverage: ' if existing['status'] == 'completed' else 'Matching coverage is already pending; verify its result and identity: ') + existing['html_url'])
         return
     failed = [run for run in runs if run['head_branch'] == args.ref and run['display_title'].startswith('CI · ' + args.suite + ' · ') and run['conclusion'] == 'failure']
     if failed and not args.force:
@@ -60,6 +69,7 @@ def main():
         parser.error('Branch moved during admission; resolve the new source before dispatching')
     command = ['gh', 'workflow', 'run', 'ci.yml', '--repo', args.repo, '--ref', args.ref,
                '-f', 'ui_suite=' + ('smoke' if args.suite == 'diagnostic' else args.suite), '-f', 'reason=' + args.reason,
+               '-f', 'expected_sha=' + sha,
                '-f', 'diagnostic_only=' + ('true' if args.suite == 'diagnostic' else 'false')]
     subprocess.run(command, check=True)
     print(f'Requested {args.suite} at {sha}; verify the resulting run SHA before accepting it.')
