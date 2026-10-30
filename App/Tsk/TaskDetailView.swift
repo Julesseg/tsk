@@ -17,7 +17,13 @@ struct TaskDetailView: View {
 
     var body: some View {
         Form {
-            Section("Description") { Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description") }
+            Section("Description") {
+                VStack(alignment: .leading) {
+                    Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("task-detail-identity-" + task.id.uuidString)
+            }
             TaskOrganizationSummary(task: task)
             TaskRecurrenceSection(task: task, store: store, transition: { panel = .transition })
             if let createdSuccessor {
@@ -48,14 +54,11 @@ struct TaskDetailView: View {
             if !task.canEdit, task.recurrenceInspection == nil {
                 Section { Text("These task attributes are preserved. Recurring tasks and unsupported states require their dedicated editor.").font(.footnote) }
             }
-        }
-        .accessibilityIdentifier("task-detail-form")
-        .safeAreaInset(edge: .top) {
             if let error = store.error {
-                Text(error).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
-                    .accessibilityIdentifier("task-action-banner")
+                Section { Text(error).foregroundStyle(.red).accessibilityIdentifier("task-action-error") }
             }
         }
+        .accessibilityIdentifier("task-detail-form")
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

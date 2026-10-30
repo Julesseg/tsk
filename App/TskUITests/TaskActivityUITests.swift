@@ -98,8 +98,9 @@ final class TaskActivityUITests: XCTestCase {
         selectAllTasks(app)
         XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 20)); openTaskInformation(app.buttons["task-" + id], app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
-        XCTAssertTrue(app.staticTexts["task-action-banner"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-action-banner"].label.contains("No tasks were changed"))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))
+        XCTAssertTrue(app.staticTexts["task-action-error"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["task-action-error"].label.contains("No tasks were changed"))
         XCTAssertFalse(app.buttons["stop-task"].exists)
         capture("Invalid recurrence state reports a visible genuine start failure", app)
     }

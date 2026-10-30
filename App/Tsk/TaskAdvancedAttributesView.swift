@@ -20,7 +20,7 @@ struct TaskAdvancedAttributesSection: View {
                     }
                     editButton
                 }
-            } else if !store.attributeDefinitions.isEmpty {
+            } else {
                 editButton
             }
         }
