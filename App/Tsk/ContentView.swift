@@ -99,8 +99,12 @@ struct ContentView: View {
 
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
-            resetNavigation()
-            store.selectWorkspaceView(view)
+            let select = {
+                resetNavigation()
+                store.selectWorkspaceView(view)
+            }
+            if store.rowEditing != nil { closeRow(after: select) }
+            else { select() }
         })
     }
 
