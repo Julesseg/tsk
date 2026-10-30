@@ -5,6 +5,7 @@ import TskNative
 
 struct TaskSelectionRow: Equatable {
     let id: UUID
+    let rowID: String
     let bounds: CGRect
     let isEditing: Bool
 }
@@ -116,6 +117,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             state = .began
         }
         if horizontal, !crossedThreshold {
+            updateSwipeFeedback(at: point)
             let dx = point.x - initial.x
             guard dx >= viewport.width * 0.25 else { return }
             crossedThreshold = true
@@ -162,6 +164,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                 guard selectionGeneration == store.taskSelectionGeneration else { return }
                 self.tracking = true
                 store.addToSelection(self.touched)
+                self.updateSwipeFeedback(at: self.latest)
                 #if DEBUG
                 self.recordProof(touch)
                 if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1", !self.released {
@@ -177,6 +180,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                     } catch { store.error = error.localizedDescription }
                 }
                 #endif
+                guard token == self.generation, !Task.isCancelled else { return }
                 if self.released { self.release() }
             }
         }
@@ -185,6 +189,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             let high = min(viewport.maxY, max(previousY, point.y))
             for row in frozenRows where row.bounds.maxY >= low && row.bounds.minY <= high { touched.insert(row.id) }
             if tracking, store?.isSelectionGestureActive == true { store?.addToSelection(touched) }
+            updateSwipeFeedback(at: point)
             #if DEBUG
             recordProof(touch)
             #endif
@@ -211,6 +216,15 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     func updateRows(_ rows: [TaskSelectionRow]) {
         self.rows = rows
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1" {
+            let token = generation
+            DispatchQueue.main.async { [weak self] in
+                guard let self, token == self.generation else { return }
+                self.recordTranslationProof()
+            }
+        }
+        #endif
         if rowsAreCollapsed {
             collapsedLayout?.resume()
             collapsedLayout = nil
@@ -229,6 +243,16 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     private func recordPosition(_ point: CGPoint) {
         latest = point
         traversedY = min(traversedY.lowerBound, point.y)...max(traversedY.upperBound, point.y)
+    }
+
+    private func updateSwipeFeedback(at point: CGPoint) {
+        guard let store, !released, store.rowEditing == nil, tracking || !crossedThreshold else { return }
+        guard let row = frozenRows.first(where: { $0.bounds.minY <= point.y && $0.bounds.maxY >= point.y }),
+              store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else {
+            store.selectionSwipe = nil
+            return
+        }
+        store.selectionSwipe = TaskSelectionSwipe(rowID: row.rowID, translation: max(0, point.x - initial.x))
     }
 
     func finish() {
@@ -265,6 +289,23 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     }
 
     #if DEBUG
+    private func recordTranslationProof() {
+        guard ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1",
+              !released, store?.isSelectionGestureActive == true else { return }
+        var maximum = proof.maximumRowTranslation
+        for current in rows {
+            guard let original = frozenRows.first(where: { $0.rowID == current.rowID }) else { continue }
+            maximum = max(maximum, current.bounds.minX - original.bounds.minX)
+        }
+        guard maximum > proof.maximumRowTranslation else { return }
+        proof.maximumRowTranslation = maximum
+        publishProof()
+    }
+
+    private func publishProof() {
+        if let data = try? JSONEncoder().encode(proof) { store?.selectionGestureProof = String(decoding: data, as: UTF8.self) }
+    }
+
     private func recordProof(_ touch: UITouch) {
         guard ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1", let store,
               !released, touch.phase != .ended, touch.phase != .cancelled else { return }
@@ -274,10 +315,10 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         proof.scrollingDisabled = !liveScrolls.isEmpty && liveScrolls.allSatisfy { !$0.0.isScrollEnabled }
         proof.offsetsStable = proof.offsetsStable && liveScrolls.allSatisfy { $0.0.contentOffset == $0.2 }
         proof.rowsStable = proof.rowsStable && rows.allSatisfy { current in
-            guard let original = frozenRows.first(where: { $0.id == current.id }) else { return true }
+            guard let original = frozenRows.first(where: { $0.rowID == current.rowID }) else { return true }
             return abs(current.bounds.minY - original.bounds.minY) < 1
         }
-        if let data = try? JSONEncoder().encode(proof) { store.selectionGestureProof = String(decoding: data, as: UTF8.self) }
+        publishProof()
     }
     #endif
 
@@ -314,6 +355,7 @@ private struct TaskSelectionGestureProof: Codable {
     var columnWidth: CGFloat = 0
     var selectedWhileTouchDown = false
     var maximumSelectedWhileTouchDown = 0
+    var maximumRowTranslation: CGFloat = 0
     var scrollingDisabled = false
     var offsetsStable = true
     var rowsStable = true
