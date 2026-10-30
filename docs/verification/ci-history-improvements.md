@@ -50,8 +50,10 @@ introduced.
 
 Run `40976426566`, iPad job `123805621484`, source `4ad146b7`, recorded a 63.98-second
 keyboard snapshot after a full application snapshot had already returned. Keyboard
-geometry now comes from that same captured application hierarchy; missing geometry
-still fails, and the 20-second deadline and two stable samples remain.
+geometry prefers that same captured hierarchy. Canonical smoke at `44598ec`
+showed that some app snapshots omit keyboard descendants; those samples retain
+the original owned keyboard query. Missing geometry still fails, and the
+20-second deadline and two stable samples remain.
 
 Recent inspected annotations and two Spotlight journeys were passing. Their
 ownership protocol, exact native-input assertions and system-delivery checks
@@ -73,3 +75,21 @@ measurements after completion. Product-transfer tests use temporary synthetic
 products; they do not establish an actual signed iOS runner can launch transferred
 bundles. Likewise, source-level release checks do not establish signed archive,
 profile or physical-device acceptance.
+
+## First canonical run
+
+[Smoke run 41142040573](https://github.com/Julesseg/tsk/actions/runs/41142040573)
+proved shared-product installation and execution on both families. The phone
+passed row editing, capture and view ordering, but failed synchronization because
+its app snapshot omitted keyboard descendants. The corrected sample retains the
+owned keyboard query when captured geometry is absent.
+
+The iPad artifact records `(-1, -1)` as XCTest's computed Projects-tab hit point
+after a successful durable task save. That interaction now uses the validated
+center coordinates from the same readiness sample. Its original project/task
+assertions remain. An independent native picker snapshot timed out with its menu
+visible; its deadline remains unchanged and diagnostics retain prior sample state.
+
+The first full run was deliberately cancelled after discovering the keyboard
+regression, rather than spending four more worker executions on known-bad code.
+The revised head still requires smoke/full canonical results.

@@ -93,8 +93,9 @@ not interrupt a blocking XCTest accessibility call.
 Native HID initialization, fixed case/phase sequences, nonce/PID/device/socket
 checks, request deadlines, UP cleanup and public XCTest acceptance remain
 unchanged. Keyboard dismissal still requires visible geometry and two stable
-samples within 20 seconds. Its keyboard frames now come from the same app
-snapshot instead of a redundant keyboard resolution. Native Select All still
+samples within 20 seconds. It prefers keyboard frames from the same app snapshot. If that hierarchy omits
+the keyboard, the original query against the same owning application supplies
+the geometry; absence still fails rather than inventing a keyboard frame. Native Select All still
 requires the real long-press menu, a unique visible enabled native menu item or
 button within five seconds, and actual clear/readback assertions; a single app
 snapshot supplies admitted geometry without re-querying the disappearing menu.
