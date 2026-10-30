@@ -8,7 +8,7 @@ check names remain the branch-protection gates.
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 73 declared methods | 64-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Full | All 74 declared methods | 65-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
@@ -47,6 +47,12 @@ The gates inspect jobs from the current run attempt and require every expected
 worker for their family to complete successfully. Missing, duplicate, skipped,
 cancelled, failed or pending workers fail the gate. Existing workspace artifact
 names remain; full row artifacts add `-row-editing`.
+
+Job-fetch requests retry transient HTTP 429/500/502/503/504 responses and request
+timeouts up to three times, with two- and four-second backoff. Each request has a
+45-second limit and restarts pagination for the same run attempt. Failed or
+malformed responses cannot pass the gate. Authorization failures and failed
+test results are not retried by the gate; this only retries GitHub API reads.
 
 Portable selection, routing, installer, relay, owner and cleanup regressions run
 once in the Linux routing job. Calendar controller regressions run once in the
