@@ -14,7 +14,7 @@ struct TaskSeriesRecords {
         var positions = Set<Int>()
         var affected: [TaskRecord] = []
         for child in children {
-            guard let raw = child.attributes["imask"], !raw.isEmpty, raw.utf8.allSatisfy({ (48...57).contains($0) }), let index = Int(raw),
+            guard let index = child.occurrenceIndex,
                   let mask, index < mask.count, positions.insert(index).inserted else { throw TaskSeriesMetadataError.invalidSeries }
             switch child.status {
             case "pending":

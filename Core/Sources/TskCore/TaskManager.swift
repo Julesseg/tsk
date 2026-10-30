@@ -12,7 +12,7 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
     public var description: String { attributes["description"] ?? "Untitled task" }
     public var status: String { attributes["status"] ?? "unknown" }
     public var isOccurrence: Bool { attributes["parent"] != nil }
-    public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && Int(attributes["imask"] ?? "").map { $0 >= 0 } == true && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
+    public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && occurrenceIndex != nil && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
     public var canComplete: Bool { canEdit && status == "pending" }
     public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }

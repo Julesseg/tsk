@@ -8,6 +8,10 @@ The common `TaskManager.update`, `complete`, rescheduling, annotation, dependenc
 
 Completion changes only the occurrence’s status/end/start/modified fields and its existing parent-mask position to `+`. Ordinary occurrence edits preserve all unrelated attributes and positions; wait changes update `W`/`-` using the saved wait instant, consistent with Taskwarrior’s derived waiting state. A generated due date cannot be cleared. Missing or malformed links, duplicate sibling positions, unknown mask characters, out-of-range positions and disagreeing terminal states fail without inventing or repairing masks. Repeating a completion with a matching `+` is idempotent.
 
+Occurrence positions accept digit strings and whole-number decimal strings such as `1.000000`. Inspection, available actions, occurrence saves, sibling uniqueness and series operations use the same exact parser. Reading a position preserves its raw attribute; parsing never rounds a fraction or uses floating-point conversion. Negative, fractional, malformed and overflowing values remain unsupported. Integer and decimal representations of the same position count as duplicates.
+
+`TaskOccurrenceIndexTests` covers presentation eligibility, editing, activity, atomic completion, series metadata/cadence changes and invalid or duplicate positions. The native `decimalOccurrencePositionSurvivesNativeEditingCompletionAndReopen` regression verifies durable preservation of the decimal attribute. Full iPhone/iPad coverage includes `RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch`, which checks the list completion circle, occurrence details, editing, completion and persisted template mask using isolated fixtures.
+
 Local transaction atomicity and cross-process leases do not make simultaneous offline edits on independent replicas a distributed transaction. TaskChampion still resolves synchronization according to its upstream property-operation semantics. No new mask merge protocol or generation logic is introduced.
 
 ## Verification

@@ -5,6 +5,25 @@ import TskNative
 
 @Suite(.serialized)
 struct OccurrenceTests {
+    @Test @MainActor func decimalOccurrencePositionSurvivesNativeEditingCompletionAndReopen() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let replica = TaskChampionReplica(directory: directory)
+        let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "+-", "recur": "monthly", "due": "200"])
+        let child = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Occurrence", "parent": parent.id.uuidString, "imask": "1.000000", "recur": "monthly", "due": "200"])
+        let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+        let loaded = try await manager.task(id: child.id)
+        #expect(loaded.canComplete && loaded.recurrenceInspection?.issues.isEmpty == true)
+        _ = try await manager.update(id: child.id, changes: ["description": "Edited occurrence"])
+        _ = try await manager.complete(id: child.id)
+        let reopened = try await TaskChampionSession.open(directory: directory)
+        let saved = try await reopened.task(id: child.id)
+        #expect(saved.status == "completed")
+        #expect(saved.description == "Edited occurrence")
+        #expect(saved.attributes["imask"] == "1.000000")
+        #expect(try await reopened.task(id: parent.id).attributes["mask"] == "++")
+    }
+
     @Test @MainActor func nativeOccurrenceCommitIsAtomicAndChecksByteExactSnapshots() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

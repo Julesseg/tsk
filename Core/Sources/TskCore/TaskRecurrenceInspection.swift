@@ -16,7 +16,7 @@ public struct TaskRecurrenceInspection: Sendable {
         rule = task.attributes["recur"]
         firstDue = task.deadline
         parentID = task.attributes["parent"].flatMap(UUID.init(uuidString:))
-        index = task.attributes["imask"].flatMap { raw in raw.utf8.allSatisfy { (48...57).contains($0) } ? Int(raw) : nil }
+        index = task.occurrenceIndex
         mask = task.attributes["mask"]
         var issues: [String] = []
         if rule.flatMap({ try? TaskRecurrenceRule($0) }) == nil { issues.append("The saved recurrence rule is missing or unsupported. Its raw value is preserved.") }
