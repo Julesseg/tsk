@@ -315,9 +315,15 @@ extension XCTestCase {
                 var selected: XCUIElement?
                 func sample() -> Bool {
                     guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                    if menu.exists { selected = menu; return true }
-                    guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                    if button.exists { selected = button; return true }
+                    guard let application = try? app.snapshot(), ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                    var pending: [any XCUIElementSnapshot] = [application]
+                    while let snapshot = pending.popLast() {
+                        if snapshot.label == "Select All", snapshot.isEnabled {
+                            if snapshot.elementType == .menuItem { selected = menu; return true }
+                            if snapshot.elementType == .button { selected = button; return true }
+                        }
+                        pending.append(contentsOf: snapshot.children)
+                    }
                     return false
                 }
                 let immediate = sample()
