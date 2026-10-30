@@ -1,20 +1,29 @@
 # Diagnostic CI dispatch
 
-The CI workflow accepts an optional boolean `diagnostic_only`, default `false`.
-A dispatch with `true` selects only the existing diagnostic iPhone lane and
-skips both Linux jobs, overriding `ui_suite`. Otherwise manual dispatch defaults
-to full coverage. PR and push use smoke coverage; the nightly schedule uses
-full coverage. See [CI test tiers](ci-test-tiers.md) for selections and budgets.
-Dispatch concurrency uses a separate namespace from PR, push and scheduled runs.
-
-After publishing a frozen branch containing the intended source and workflow:
+Use an explicit suite and reason after pushing a frozen source branch:
 
 ```sh
-gh workflow run ci.yml --repo Julesseg/tsk --ref <frozen-branch> -f diagnostic_only=true
+python3 scripts/dispatch-ui-tests.py --ref <branch> --suite diagnostic \
+  --reason 'Compare native transport failure at the frozen source'
 ```
 
-Verify the returned run's `headSha` matches that branch's intended commit before
-using its results. Checkout uses that workflow ref; there is no source-ref input.
-Diagnostic results supplement the selected PR gate. Separate concurrency prevents
-cancellation collisions, but simultaneous simulator jobs can still contend for
-resources. Actual branch dispatch must be verified on GitHub.
+Diagnostic selects the existing 12-method iPhone subset and skips the Linux
+Core/Native jobs. `keyboard` and `text` select focused coverage on both families;
+`full` selects complete coverage with two partitions per family. The manual form
+default is smoke, not full. See [CI test tiers](ci-test-tiers.md).
+
+The helper resolves the branch, checks matching source/branch/suite work before
+dispatch, and rejects a branch move during admission. It can reuse successful
+completed evidence only with a matching explicit toolchain/runtime identity.
+Always verify the actual returned run's SHA. No source-ref override exists.
+
+A failed diagnostic requires a classified, targeted job rerun or a new controlled
+experiment with an explicit reason. Do not repeatedly dispatch full coverage to
+refresh status. At most one targeted retry for an evidenced infrastructure
+failure. Original failures remain part of the evidence.
+
+Manual suite groups preserve in-flight runs; PR/push and nightly use separate
+groups. Concurrent clients can still race, and separate coverage can still
+contend for runners. The helper and concurrency controls are not proof of runner
+capacity. Focused results supplement actual full coverage; they cannot replace
+native input, system-delivery or canonical branch-protection acceptance.

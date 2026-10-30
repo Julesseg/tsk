@@ -1,9 +1,13 @@
 import json
+import importlib.util
 from pathlib import Path
 import subprocess
 import unittest
 
 SCRIPT = Path(__file__).with_name('check-ui-shards.py')
+spec = importlib.util.spec_from_file_location('shards', SCRIPT)
+shards = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(shards)
 
 
 def job(family, partition, conclusion='success', status='completed'):
@@ -11,6 +15,35 @@ def job(family, partition, conclusion='success', status='completed'):
 
 
 class ShardChecksTests(unittest.TestCase):
+    def poll(self, responses, timeout=3):
+        now = [0]
+        calls = []
+        def fetch(remaining):
+            calls.append(remaining)
+            return responses[min(len(calls) - 1, len(responses) - 1)]
+        def sleep(seconds):
+            now[0] += seconds
+        return shards.wait_for_shards(fetch, 'iPad', ['all'], timeout=timeout, interval=1, clock=lambda: now[0], sleep=sleep), calls
+
+    def test_stale_running_or_missing_api_state_converges_without_replaying_tests(self):
+        success = [job('iPad', 'all')]
+        result, calls = self.poll([[], [job('iPad', 'all', None, 'in_progress')], success])
+        self.assertEqual(result, success)
+        self.assertEqual(calls, [3, 2, 1])
+
+    def test_api_staleness_has_a_fixed_deadline(self):
+        with self.assertRaisesRegex(ValueError, 'did not converge'):
+            self.poll([[job('iPad', 'all', None, 'in_progress')]])
+
+    def test_terminal_failure_and_duplicates_are_not_retried(self):
+        for response in ([job('iPad', 'all', 'failure')], [job('iPad', 'all'), job('iPad', 'all')]):
+            with self.subTest(response=response), self.assertRaises(ValueError):
+                self.poll([response, [job('iPad', 'all')]])
+
+    def test_terminal_failure_outranks_another_pending_partition(self):
+        with self.assertRaisesRegex(ValueError, 'completed/failure'):
+            shards.validate([job('iPad', 'row-editing', 'failure')], 'iPad', ['workspace', 'row-editing'])
+
     def check_jobs(self, jobs, partitions='workspace,row-editing'):
         return subprocess.run(['python3', str(SCRIPT), '--family', 'iPad', '--partitions', partitions], input=json.dumps([dict(jobs=jobs)]), capture_output=True, text=True)
 

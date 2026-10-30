@@ -11,6 +11,7 @@ import selectors
 import signal
 import subprocess
 import sys
+import tempfile
 import termios
 import time
 
@@ -22,6 +23,7 @@ SPOTLIGHT_METHODS = {
 }
 WIDGET_METHOD = 'testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError'
 CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests|WidgetUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
+METHOD = re.compile(r"^Test Case '-\[TskUITests\.(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \(([\d.]+) seconds\)\.)$")
 POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
 POST_GROUP_SIGNAL_DRAIN_SECONDS = 0.25
 SEARCH_SURFACE = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual system Search surface before first-run handling'$")
@@ -30,6 +32,63 @@ PROVIDER = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual tsk pr
 
 def utc():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+class DeviceMonitor:
+    def __init__(self, device, record, command=None, clock=time.monotonic):
+        self.device = device
+        self.record = record
+        self.command = command or ['xcrun', 'simctl', 'list', 'devices', '--json']
+        self.clock = clock
+        self.next_check = clock() + 15
+        self.process = None
+        self.output = None
+
+    def poll(self):
+        now = self.clock()
+        if self.process is None and now >= self.next_check:
+            self.output = tempfile.TemporaryFile()
+            try:
+                self.process = subprocess.Popen(self.command, stdout=self.output, stderr=subprocess.DEVNULL)
+            except OSError:
+                self.close()
+                self.next_check = now + 15
+                self.record('device-monitor-inconclusive', reason='query-start-failed')
+                return False
+            self.deadline = now + 3
+        if self.process is None:
+            return False
+        if self.process.poll() is None:
+            if now >= self.deadline:
+                self.close()
+                self.next_check = now + 15
+                self.record('device-monitor-inconclusive', reason='query-timeout')
+            return False
+        unavailable = False
+        try:
+            if self.process.returncode == 0:
+                self.output.seek(0)
+                data = json.load(self.output)
+                states = [item.get('state') for items in data['devices'].values() for item in items if item.get('udid') == self.device]
+                unavailable = states == ['Shutdown']
+                if unavailable:
+                    self.record('owned-device-unavailable', state='Shutdown')
+        except (ValueError, KeyError, TypeError):
+            self.record('device-monitor-inconclusive', reason='invalid-response')
+        finally:
+            self.close()
+            self.next_check = now + 15
+        return unavailable
+
+    def close(self):
+        if self.process is not None:
+            if self.process.poll() is None:
+                self.process.kill()
+            self.process.wait(timeout=3)
+            self.process = None
+        if self.output is not None:
+            self.output.close()
+            self.output = None
 
 
 class BoundaryCapture:
@@ -49,6 +108,7 @@ class BoundaryCapture:
         self.spotlight_pids = {}
         self.spotlight_pids_truncated = set()
         self.search_contexts = set()
+        self.first_failure = None
         try:
             self.evidence.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -108,6 +168,14 @@ class BoundaryCapture:
 
     def line(self, raw):
         line = raw.decode('utf-8', errors='replace').rstrip('\r')
+        method = METHOD.fullmatch(line)
+        if method:
+            suite, name, state, outcome, seconds = method.groups()
+            self.record('method-start' if state == 'started.' else 'method-end', method=suite + '/' + name, outcome=outcome, seconds=float(seconds) if seconds else None)
+            if outcome == 'failed' and self.first_failure is None:
+                self.first_failure = utc()
+                self.record('first-test-failure', method=suite + '/' + name)
+                print('::error title=First UI failure::' + suite + '/' + name + ' failed; remaining independent cases may continue.', flush=True)
         match = CASE.fullmatch(line)
         if match:
             suite, method, outcome = match.groups()
@@ -193,7 +261,7 @@ class BoundaryCapture:
         return [dict((key, value) for key, value in entry.items() if key != 'process') for entry in self.children]
 
 
-def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5):
+def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5, monitor_device=False):
     if cleanup_grace not in (5, 120):
         raise ValueError('Owned cleanup grace must be the default or fixed native HID allowance')
     capture = BoundaryCapture(device, evidence, scripts)
@@ -204,6 +272,8 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
     discarding = False
     pipe_held_open = False
     old_handlers = {}
+    monitor = DeviceMonitor(device, capture.record) if monitor_device else None
+    device_lost = False
 
     def interrupt(number, _frame):
         nonlocal interrupted
@@ -257,6 +327,10 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
             group_killed_at = None
             while selector.get_map():
                 now = time.monotonic()
+                if monitor is not None and not device_lost and monitor.poll():
+                    device_lost = True
+                    interrupted = signal.SIGTERM
+                    print('::error title=Owned simulator unavailable::Stopping UI execution after the owned simulator shut down.', flush=True)
                 if process.poll() is not None and parent_exit_at is None:
                     parent_exit_at = now
                     capture.record('parent-exit-observed', returnCode=process.returncode)
@@ -323,6 +397,8 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
         if process is not None and process.poll() is not None:
             status = process.returncode if process.returncode >= 0 else 128 - process.returncode
     finally:
+        if monitor is not None:
+            monitor.close()
         signal_owned(signal.SIGKILL if pipe_held_open else signal.SIGTERM, include_exited=pipe_held_open)
         if process is not None and process.poll() is None:
             try:
@@ -335,6 +411,8 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
             signal.signal(number, handler)
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
+        if device_lost:
+            status = 74
         try:
             (pathlib.Path(evidence) / 'test-aligned-boundaries.json').write_text(json.dumps(dict(
                 device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events, children=children), indent=2) + '\n')
@@ -348,6 +426,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', required=True)
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--owned-simulator', action='store_true')
+    parser.add_argument('--monitor-device', action='store_true')
     parser.add_argument('--owned-cleanup-grace-seconds', type=int, choices=[5, 120], default=5)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
@@ -358,4 +437,4 @@ if __name__ == '__main__':
         parser.error('Pass the original xcodebuild command after --')
     if arguments.owned_cleanup_grace_seconds == 120 and (len(command) < 2 or pathlib.Path(command[1]).resolve() != pathlib.Path(__file__).with_name('with-native-keyboard-hid.py').resolve() or os.environ.get('TSK_NATIVE_KEYBOARD_HID') != '1'):
         parser.error('Extended owned cleanup is only for the explicit native HID owner')
-    raise SystemExit(run(command, arguments.device, arguments.evidence, cleanup_grace=arguments.owned_cleanup_grace_seconds))
+    raise SystemExit(run(command, arguments.device, arguments.evidence, cleanup_grace=arguments.owned_cleanup_grace_seconds, monitor_device=arguments.monitor_device))
