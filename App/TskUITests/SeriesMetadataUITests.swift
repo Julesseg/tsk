@@ -81,10 +81,14 @@ final class SeriesMetadataUITests: XCTestCase {
         }
         openTemplate(parentID, app: app)
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Revised series metadata")
-        let mask = app.descendants(matching: .any)["raw-attribute-mask"].firstMatch
-        XCTAssertTrue(revealTaskElement(mask, in: "task-detail-form", app: app))
-        XCTAssertEqual(mask.value as? String, "+WW")
-        capture("Reopened template retains recurrence mask and metadata", app)
+        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "task-detail-form", app: app))
+        app.buttons["view-series-occurrences"].tap()
+        for id in futureIDs {
+            XCTAssertTrue(app.buttons["series-history-" + id].waitForExistence(timeout: 10))
+        }
+        XCTAssertTrue(app.staticTexts["Completed history"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
+        capture("Reopened series retains unfinished occurrences and completed history", app)
     }
 
     private func openTemplate(_ id: String, app: XCUIApplication) {

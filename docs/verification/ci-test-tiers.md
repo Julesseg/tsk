@@ -8,7 +8,7 @@ check names remain the branch-protection gates.
 | UI coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 70 declared methods | 61-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
+| Full | All 74 declared methods | 65-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
 | Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
 | Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
 | Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
@@ -36,7 +36,7 @@ native full-suite results before acceptance. See [the consolidation audit](test-
 for the merged methods and measured baseline.
 
 Smoke uses one worker per family. Full coverage uses disjoint workspace and
-row-editing workers: 64 + 7 methods on iPhone and 55 + 7 on iPad. Each method is
+row-editing workers: 64 + 10 methods on iPhone and 55 + 10 on iPad. Each method is
 selected once per family. Native HID cases remain in the workspace worker with
 their existing identity checks and deadlines. The row-only worker selects no
 native command cases and uses XCTest input. Focused diagnostic dispatches use
@@ -47,6 +47,12 @@ The gates inspect jobs from the current run attempt and require every expected
 worker for their family to complete successfully. Missing, duplicate, skipped,
 cancelled, failed or pending workers fail the gate. Existing workspace artifact
 names remain; full row artifacts add `-row-editing`.
+
+Job-fetch requests retry transient HTTP 429/500/502/503/504 responses and request
+timeouts up to three times, with two- and four-second backoff. Each request has a
+45-second limit and restarts pagination for the same run attempt. Failed or
+malformed responses cannot pass the gate. Authorization failures and failed
+test results are not retried by the gate; this only retries GitHub API reads.
 
 Portable selection, routing, installer, relay, owner and cleanup regressions run
 once in the Linux routing job. Calendar controller regressions run once in the
@@ -62,6 +68,12 @@ files under `docs/`. Unknown paths, mixed changes, executable examples, empty
 diffs, missing commits and classification errors run normal tests. Renames
 inspect both paths. Nightly and manual dispatches always run tests. The Release
 workflow also excludes documentation-only changes.
+
+UI test app launches disable OS activity logging. XCTest's injected accessibility
+diagnostics can otherwise produce extensive synchronous app output and block its
+main thread during queries. XCTest steps, screenshots, fixture JSON, native HID
+exchanges, relay ownership checks and system-service logs remain enabled. This
+launch setting applies only to test-created app instances.
 
 UI products build in a separate 20-minute step before simulator creation.
 Execution reuses those signed arm64 products with `--skip-build`. Xcode 27.0

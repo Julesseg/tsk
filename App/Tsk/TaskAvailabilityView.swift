@@ -31,7 +31,7 @@ struct TaskAvailabilityView: View {
             }
         }
         ForEach(availability.diagnostics) { link in
-            Text("\(link.issue?.message ?? "Dependency issue"): \(link.reference.isEmpty ? "<empty reference>" : link.reference)")
+            Text(link.issue?.message ?? "Dependency issue")
                 .accessibilityIdentifier("task-dependency-diagnostic-\(task.id.uuidString)-\(link.id.base64EncodedString())")
         }
     }

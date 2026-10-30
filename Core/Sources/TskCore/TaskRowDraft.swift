@@ -1,14 +1,32 @@
 import Foundation
 
 public struct TaskRowDraft: Equatable, Sendable {
+    private static let editableAttributes = ["project", "priority", "scheduled", "due", "wait"]
     public enum Plan: Sendable { case today, tomorrow, remove }
-    public let original: TaskRecord
+    public private(set) var original: TaskRecord
     public var taskDraft: TaskDraft
     public var tagInput = ""
+    public var noteInput = ""
 
     public init(task: TaskRecord) {
         original = task
         taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
+    }
+
+    public mutating func rebase(on task: TaskRecord) {
+        guard task.id == original.id else { return }
+        let title = taskDraft.description
+        let titleChanged = !title.matchesBytes(original.description)
+        let edits = taskDraft.attributes.changes(comparedTo: original.attributes)
+        original = task
+        taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
+        if titleChanged { taskDraft.description = title }
+        let editedKeys = Self.editableAttributes + edits.keys.filter {
+            $0.utf8.starts(with: "tag_".utf8) || $0.utf8.starts(with: "annotation_".utf8)
+        }
+        for key in editedKeys {
+            if let value = edits[key] { taskDraft.attributes[key] = value }
+        }
     }
 
     public mutating func plan(_ plan: Plan, now: Date, calendar: Calendar = .autoupdatingCurrent) {
@@ -38,10 +56,31 @@ public struct TaskRowDraft: Equatable, Sendable {
         try organization.addTagInput()
         var edited = original.attributes
         if !taskDraft.description.matchesBytes(original.description) { edited["description"] = title }
-        for key in ["project", "priority", "scheduled", "due", "wait"] { edited[key] = taskDraft.attributes[key] }
+        for key in Self.editableAttributes { edited[key] = taskDraft.attributes[key] }
         let tagKeys = Set(original.attributes.keyIdentities).union(organization.taskDraft.attributes.keyIdentities)
             .filter { $0.rawValue.utf8.starts(with: "tag_".utf8) }
         for key in tagKeys { edited[key.rawValue] = organization.taskDraft.attributes[key.rawValue] }
         return edited.changes(comparedTo: original.attributes)
+    }
+}
+
+public extension TaskManager {
+    func updateRow(_ draft: TaskRowDraft) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
+        let changes = try draft.changes()
+        let current = try await task(id: draft.original.id)
+        var notes: TaskAttributePatch = [:]
+        for annotation in draft.original.annotations {
+            let reference = annotation.reference.rawValue
+            let text = draft.taskDraft.attributes[reference] ?? ""
+            guard !text.matchesBytes(annotation.text) else { continue }
+            guard current.attributes[reference] != nil else { throw TaskManagementError.annotationNotFound(reference) }
+            notes.updateValue(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text, forKey: reference)
+        }
+        if !draft.noteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notes[try current.nextAnnotationReference(at: now())] = draft.noteInput
+        }
+        return try await updateTask(id: current.id, changes: changes, annotationChanges: notes)
     }
 }

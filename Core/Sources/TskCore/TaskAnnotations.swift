@@ -34,16 +34,23 @@ public extension TaskManager {
         let source = try await task(id: id)
         guard source.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TaskManagementError.emptyAnnotation }
-        let instant = now().timeIntervalSince1970
+        let date = now()
+        let reference = try source.nextAnnotationReference(at: date)
+        return try await saveTaskMutation(source, changes: [reference: text, "modified": String(Int64(date.timeIntervalSince1970))])
+    }
+}
+
+extension TaskRecord {
+    func nextAnnotationReference(at date: Date) throws -> String {
+        let instant = date.timeIntervalSince1970
         guard instant.isFinite, let initialTimestamp = Int64(exactly: instant.rounded(.towardZero)) else { throw TaskManagementError.invalidAnnotationTimestamp }
         var timestamp = initialTimestamp
-        while source.attributes["annotation_\(timestamp)"] != nil {
+        while attributes["annotation_\(timestamp)"] != nil {
             let next = timestamp.addingReportingOverflow(1)
             guard !next.overflow else { throw TaskManagementError.invalidAnnotationTimestamp }
             timestamp = next.partialValue
         }
-        let saved = try await saveTaskMutation(source, changes: ["annotation_\(timestamp)": text, "modified": String(initialTimestamp)])
-        return saved
+        return "annotation_\(timestamp)"
     }
 }
 

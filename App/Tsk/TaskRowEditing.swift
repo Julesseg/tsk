@@ -5,6 +5,17 @@ import TskCore
 
 @MainActor @Observable
 final class TaskRowEditing {
+    enum SupportingPanel: Identifiable {
+        case dependency, attributes
+
+        var id: String {
+            switch self {
+            case .dependency: "dependency"
+            case .attributes: "attributes"
+            }
+        }
+    }
+
     let rowID: String
     let context: TaskCompletionFeedback.Context
     let tasks: [TaskRecord]
@@ -12,6 +23,7 @@ final class TaskRowEditing {
     let referenceDate: Date
     var draft: TaskRowDraft
     var parameter: TaskRowParameter?
+    var supportingPanel: SupportingPanel?
     var savedTask: TaskRecord?
     var error: String?
     var isExpanded = false
@@ -66,6 +78,34 @@ final class TaskRowEditing {
     func measure(_ bounds: CGRect) {
         self.bounds = bounds
         if !isAnimating { visibilityBounds = bounds }
+    }
+
+    func absorb(_ task: TaskRecord) {
+        draft.rebase(on: task)
+        error = nil
+    }
+
+    func saveAndCollapse(in store: TaskStore, reduceMotion: Bool) async -> Bool {
+        guard !isSaving, !store.isSaving, supportingPanel == nil, isExpanded else { return false }
+        if parameter != nil { parameter = nil; return false }
+        isSaving = true
+        do {
+            _ = try draft.changes()
+            let saved = await store.updateRow(draft)
+            guard let saved else {
+                error = store.error
+                isSaving = false
+                return false
+            }
+            savedTask = saved
+            await setExpanded(false, reduceMotion: reduceMotion)
+            store.rowEditing = nil
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            isSaving = false
+            return false
+        }
     }
 }
 

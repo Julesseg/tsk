@@ -9,19 +9,66 @@ struct TaskRowEditor: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
+    @State private var measuredActionsHeight: CGFloat = 44
+    @State private var linkedTask: TaskRecord?
+    @FocusState private var focusedNote: UTF8String?
+    @Environment(\.taskRowActions) private var rowActions
 
     var body: some View {
-        ScrollView {
-            TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, information: information)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
+        VStack(alignment: .leading, spacing: 8) {
+            ScrollView {
+                TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, focusedNote: $focusedNote)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("task-row-supporting-scroll")
+            VStack(alignment: .leading, spacing: 8) {
+                if editing.supportingPanel == nil, let error = editing.error ?? store.error {
+                    Text(error).font(.callout).foregroundStyle(.red)
+                        .accessibilityIdentifier("draft-error")
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                HStack(alignment: .top) {
+                    Button("More task information", systemImage: "info.circle", action: information)
+                        .accessibilityIdentifier("task-row-information")
+                    Spacer()
+                    Button("Save and close", systemImage: "checkmark", action: rowActions.close)
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .top)
+                        .accessibilityIdentifier("collapse-task-row")
+                    if titleFocused || focusedNote != nil {
+                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false; focusedNote = nil }
+                            .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .top)
+                            .accessibilityIdentifier("dismiss-row-keyboard")
+                    }
+                }
+            }
+            .font(.subheadline)
+            .padding(.bottom, 8)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredActionsHeight = $0 }
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollDismissesKeyboard(.interactively)
-        .frame(height: editing.revealProgress * min(measuredContentHeight, availableHeight), alignment: .top)
+        .frame(height: editing.revealProgress * min(measuredContentHeight + measuredActionsHeight + 8, availableHeight), alignment: .top)
+        .disabled(editing.isSaving || store.isSaving)
         .clipped()
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-row-editor")
+        .sheet(item: $editing.supportingPanel, onDismiss: {
+            store.error = nil
+            if let target = linkedTask { linkedTask = nil; rowActions.reveal(target) }
+        }) { panel in
+            switch panel {
+            case .dependency:
+                TaskDependencySelection(store: store, task: editing.draft.original, onSave: editing.absorb) { target in
+                    linkedTask = target
+                    editing.supportingPanel = nil
+                }
+            case .attributes:
+                TaskAdvancedAttributesEditor(store: store, task: editing.draft.original, onSave: editing.absorb)
+            }
+        }
         .task(id: measuredContentHeight > 0) {
             guard measuredContentHeight > 0 else { return }
             await Task.yield()
@@ -35,10 +82,31 @@ private struct TaskRowEditorContent: View {
     let store: TaskStore
     @Bindable var editing: TaskRowEditing
     @FocusState.Binding var titleFocused: Bool
-    let information: () -> Void
+    @FocusState.Binding var focusedNote: UTF8String?
+
+    private var task: TaskRecord { editing.draft.original }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(task.annotations) { annotation in
+                    TextField("Notes", text: Binding(
+                        get: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] ?? "" },
+                        set: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] = $0 }
+                    ), axis: .vertical)
+                    .focused($focusedNote, equals: annotation.reference)
+                    .accessibilityLabel("Notes")
+                    .accessibilityIdentifier("row-note-\(annotation.reference.rawValue)")
+                }
+                TextField("Notes", text: $editing.draft.noteInput, axis: .vertical)
+                    .focused($focusedNote, equals: UTF8String("new"))
+                    .accessibilityLabel("Notes")
+                    .accessibilityIdentifier("row-note-input")
+            }
+            .textFieldStyle(.plain)
+            .font(.subheadline)
+            .lineLimit(1...5)
+            .padding(.bottom, 4)
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 6) {
                     HStack(spacing: 6) {
@@ -47,8 +115,23 @@ private struct TaskRowEditorContent: View {
                                                  projects: store.availableProjects,
                                                  tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
                                 titleFocused = false
+                                focusedNote = nil
                             }
                         }
+                        Button { open(.dependency) } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.triangle.branch")
+                                if !task.dependencyReferences.isEmpty { Text(task.dependencyReferences.count, format: .number) }
+                            }
+                            .font(.caption)
+                        }
+                        .buttonStyle(TaskRowParameterButtonStyle())
+                        .frame(minWidth: 44, minHeight: 44, alignment: .top)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Dependencies")
+                        .accessibilityValue("\(task.dependencyReferences.count) dependencies")
+                        .accessibilityIdentifier("row-dependencies")
+                        TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
                     }.padding(.horizontal, 4)
                 }
             }
@@ -56,25 +139,24 @@ private struct TaskRowEditorContent: View {
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
-            TaskAvailabilityView(task: editing.draft.original, store: store)
-            if let error = editing.error {
-                Text(error).font(.callout).foregroundStyle(.red)
-                    .accessibilityIdentifier("draft-error")
-                    .accessibilityAddTraits(.updatesFrequently)
+            VStack(alignment: .leading, spacing: 12) {
+                TaskAvailabilityView(task: task, store: store)
+                TaskAdvancedAttributesSection(store: store, task: task, edit: { open(.attributes) })
+                TaskRecurrenceSection(task: task, store: store)
             }
-            HStack(alignment: .top) {
-                Button("More task information", systemImage: "info.circle", action: information)
-                    .accessibilityIdentifier("task-row-information")
-                Spacer()
-                if titleFocused {
-                    Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false }
-                        .labelStyle(.iconOnly)
-                        .accessibilityIdentifier("dismiss-row-keyboard")
-                }
-            }.font(.subheadline)
+            .padding(.vertical, 8)
+
         }
         .padding(.bottom, 8)
-        .disabled(editing.isSaving)
+        .disabled(editing.isSaving || store.isSaving)
+    }
+
+    private func open(_ panel: TaskRowEditing.SupportingPanel) {
+        titleFocused = false
+        focusedNote = nil
+        editing.error = nil
+        store.error = nil
+        editing.supportingPanel = panel
     }
 }
 
@@ -258,7 +340,7 @@ struct TaskRowParameterLabel: View {
     }
 }
 
-private struct TaskRowParameterButtonStyle: ButtonStyle {
+struct TaskRowParameterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.primary)

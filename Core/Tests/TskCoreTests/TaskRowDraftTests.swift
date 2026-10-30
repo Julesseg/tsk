@@ -2,6 +2,54 @@ import Foundation
 import Testing
 @testable import TskCore
 
+@Test func rowNotesSaveWithVisibleEditsAndRetainTimestampIdentity() async throws {
+    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792144800) })
+    let original = try await manager.create(TaskDraft(description: "Original", attributes: ["annotation_01": "Edit me", "annotation_2": "Clear me", "annotation_1792144800": "Keep me", "opaque": "retain"]))
+    var draft = TaskRowDraft(task: original)
+    draft.taskDraft.attributes["annotation_01"] = "Edited inline\nSecond line"
+    draft.taskDraft.attributes["annotation_2"] = ""
+    draft.noteInput = "New inline note"
+    draft.taskDraft.description = " "
+    await #expect(throws: TaskManagementError.emptyDescription) { try await manager.updateRow(draft) }
+    #expect(try await manager.task(id: original.id) == original)
+    draft.taskDraft.description = "Revised"
+    draft.taskDraft.project = "Release"
+    let saved = try await manager.updateRow(draft)
+    #expect(saved.description == "Revised")
+    #expect(saved.project == "Release")
+    #expect(saved.attributes["annotation_01"] == "Edited inline\nSecond line")
+    #expect(saved.attributes["annotation_2"] == nil)
+    #expect(saved.attributes["annotation_1792144800"] == "Keep me")
+    #expect(saved.attributes["annotation_1792144801"] == "New inline note")
+    #expect(saved.attributes["opaque"] == "retain")
+}
+
+@Test func supportingMutationsPreserveUnsavedRowEditsAndFreshHiddenValues() throws {
+    let id = UUID()
+    let original = TaskRecord(id: id, attributes: ["description": "Original", "status": "pending", "project": "Old", "opaque": "retain", "tag_old": "x", "tag_keep": "original", "annotation_10": "Original note"])
+    var draft = TaskRowDraft(task: original)
+    draft.taskDraft.description = "Unsaved title"
+    draft.taskDraft.project = "New"
+    draft.taskDraft.removeTag("old")
+    try draft.taskDraft.addTag("next")
+    draft.tagInput = "pending"
+    draft.taskDraft.attributes["annotation_10"] = "Unsaved note"
+    draft.noteInput = "Unsaved new note"
+    let annotated = TaskRecord(id: id, attributes: ["description": "Original", "status": "pending", "project": "Old", "annotation_1792144800": "Supporting note", "opaque": "updated", "start": "1792144800", "tag_old": "x", "tag_keep": "updated", "tag_remote": "x", "annotation_10": "Original note"])
+    draft.rebase(on: annotated)
+    #expect(draft.original == annotated)
+    #expect(draft.taskDraft.description == "Unsaved title")
+    #expect(draft.taskDraft.attributes["annotation_1792144800"] == "Supporting note")
+    #expect(draft.taskDraft.attributes["opaque"] == "updated")
+    #expect(draft.taskDraft.attributes["start"] == "1792144800")
+    #expect(draft.taskDraft.tags == ["keep", "next", "remote"])
+    #expect(draft.taskDraft.attributes["tag_keep"] == "updated")
+    #expect(draft.tagInput == "pending")
+    #expect(draft.taskDraft.attributes["annotation_10"] == "Unsaved note")
+    #expect(draft.noteInput == "Unsaved new note")
+    #expect(try draft.changes() == ["description": "Unsaved title", "project": "New", "tag_old": nil, "tag_next": "", "tag_pending": ""])
+}
+
 @Test func rowPlanningChangesOnlyScheduledAndPreservesHiddenValues() throws {
     let task = TaskRecord(id: UUID(), attributes: ["description": "Ship", "status": "pending", "due": "1792238400", "wait": "unrecognized", "opaque": "retain"])
     var draft = TaskRowDraft(task: task)

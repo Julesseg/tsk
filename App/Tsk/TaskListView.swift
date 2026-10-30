@@ -129,6 +129,7 @@ struct TaskListRow: View {
     let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.displayScale) private var displayScale
     @FocusState private var titleFocused: Bool
     @State private var headerHeight: CGFloat = 44
     @State private var titleHeight: CGFloat = 44
@@ -186,7 +187,7 @@ struct TaskListRow: View {
                     .disabled(!expanded || editing?.isSaving == true)
                     .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
                     .frame(minHeight: hasMetadata ? 0 : 44, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { titleHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
                     .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
                     .accessibilityHidden(!expanded)
                     if hasMetadata {
@@ -197,7 +198,8 @@ struct TaskListRow: View {
                     }
                 }
                 .frame(minHeight: 44, alignment: .topLeading)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
                 if let editing {
                     TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
                                   information: { rowActions.information(task) })

@@ -22,10 +22,6 @@ struct TaskPlanningSummary: View {
         } else if let raw = task.attributes["wait"] {
             LabeledContent("Waiting date", value: "Unrecognized date: \(raw)")
         }
-        if let date = task.startedAt {
-            LabeledContent("Started") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
-                .accessibilityIdentifier("task-started")
-        }
     }
 }
 

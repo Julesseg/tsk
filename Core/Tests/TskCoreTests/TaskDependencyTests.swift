@@ -2,6 +2,22 @@ import Foundation
 import Testing
 @testable import TskCore
 
+@Test func dependencyOptionsKeepLinkedTasksSeparateAndCompletedTasksLast() {
+    let done = TaskRecord(id: UUID(), attributes: ["description": "Finished prerequisite", "status": "completed"])
+    let pending = TaskRecord(id: UUID(), attributes: ["description": "Pending prerequisite", "status": "pending"])
+    let candidateDone = TaskRecord(id: UUID(), attributes: ["description": "Finished candidate", "status": "completed"])
+    let candidate = TaskRecord(id: UUID(), attributes: ["description": "Pending candidate", "status": "pending"])
+    let deleted = TaskRecord(id: UUID(), attributes: ["description": "Deleted candidate", "status": "deleted"])
+    let source = TaskRecord(id: UUID(), attributes: ["description": "Source", "status": "pending", "dep_\(done.id.uuidString.lowercased())": "x", "dep_\(pending.id.uuidString.lowercased())": "x"])
+    let tasks = [source, candidateDone, done, pending, deleted, candidate]
+    let options = TaskDependencyOptions(task: source, tasks: tasks)
+    #expect(options.links.compactMap(\.task?.id) == [pending.id, done.id])
+    #expect(options.candidates.map(\.id) == [candidate.id, candidateDone.id])
+    let searched = TaskDependencyOptions(task: source, tasks: tasks, search: "finished")
+    #expect(searched.links == options.links)
+    #expect(searched.candidates.map(\.id) == [candidateDone.id])
+}
+
 @Test func dependencySelectionBlocksMatchingTodayTaskAndCompletionKeepsLinkMetadata() async throws {
     let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1791972000) })
     let prerequisite = try await manager.create(TaskDraft(description: "Prerequisite outside Today", attributes: ["project": "Other"]))
