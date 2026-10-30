@@ -160,8 +160,10 @@ extension XCTestCase {
     }
 
     func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, requiresVisibleKeyboard: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { _ in
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        activateTaskControl(element, app: app, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { geometry in
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: geometry.elementFrame.midX - geometry.containmentFrame.minX,
+                                     dy: geometry.elementFrame.midY - geometry.containmentFrame.minY)).tap()
         }
     }
 
@@ -177,8 +179,11 @@ extension XCTestCase {
         let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         var previous: TaskNativeMenuOptionGeometry?
         var lastSample = "not sampled"
+        var sampleCount = 0
         func sample() -> Bool {
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            sampleCount += 1
+            let started = ProcessInfo.processInfo.systemUptime
             do {
                 let application = try app.snapshot()
                 var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
@@ -199,14 +204,14 @@ extension XCTestCase {
                     }
                     pending.append(contentsOf: snapshot.children.map { ($0, frames) })
                 }
-                lastSample = "matchingButtons=\(matches) matchingMenus=\(candidates.count) geometry=\(String(describing: candidates.first))"
+                lastSample = "sample=\(sampleCount) readSeconds=\(ProcessInfo.processInfo.systemUptime - started) matchingButtons=\(matches) matchingMenus=\(candidates.count) geometry=\(String(describing: candidates.first))"
                 guard ProcessInfo.processInfo.systemUptime < deadline, matches == 1, candidates.count == 1,
                       let current = candidates.first, current.isVisible else { previous = nil; return false }
                 let stable = previous == current
                 previous = current
                 return stable
             } catch {
-                lastSample = "snapshotError=\(error)"
+                lastSample += " failedSample=\(sampleCount) readSeconds=\(ProcessInfo.processInfo.systemUptime - started) snapshotError=\(error)"
                 previous = nil
                 return false
             }
@@ -256,6 +261,10 @@ extension XCTestCase {
                     while let child = pending.popLast() {
                         if child.elementType == .keyboard { keyboardFrames.append(child.frame) }
                         pending.append(contentsOf: child.children.reversed())
+                    }
+                    if keyboardFrames.isEmpty,
+                       let keyboard = try? measured("owned-keyboard.snapshot", read: { try app.keyboards.firstMatch.snapshot() }) {
+                        keyboardFrames = [keyboard.frame]
                     }
                     sample.keyboardFrames = keyboardFrames
                     if let keyboard = keyboardFrames.first, !keyboard.isEmpty,
