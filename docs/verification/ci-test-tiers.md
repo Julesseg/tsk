@@ -63,6 +63,12 @@ diffs, missing commits and classification errors run normal tests. Renames
 inspect both paths. Nightly and manual dispatches always run tests. The Release
 workflow also excludes documentation-only changes.
 
+UI test app launches disable OS activity logging. XCTest's injected accessibility
+diagnostics can otherwise produce extensive synchronous app output and block its
+main thread during queries. XCTest steps, screenshots, fixture JSON, native HID
+exchanges, relay ownership checks and system-service logs remain enabled. This
+launch setting applies only to test-created app instances.
+
 UI products build in a separate 20-minute step before simulator creation.
 Execution reuses those signed arm64 products with `--skip-build`. Xcode 27.0
 is explicit. The simulator selector matches the selected SDK's major/minor

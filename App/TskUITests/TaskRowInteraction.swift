@@ -3,6 +3,7 @@ import XCTest
 extension XCTestCase {
     @MainActor func taskTestApplication() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
         return app
