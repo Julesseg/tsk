@@ -16,6 +16,17 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func testSwipeSelectionDoesNotRequireNativeAccessibilityIdentifiers() throws {
+        let app = try launch(animationsEnabled: true, nativeIdentifiers: false)
+        app.buttons["task-" + first].swipeRight()
+        let count = app.staticTexts["task-selection-count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        XCTAssertEqual(count.label, "1 selected")
+        XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Selected")
+        app.buttons["task-selection-done"].tap()
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5))
+    }
+
     func testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably() throws {
         let app = try launch(probe: true)
         let list = app.collectionViews["task-list"]
@@ -142,7 +153,7 @@ import XCTest
         app.buttons["task-selection-done"].tap()
     }
 
-    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false) throws -> XCUIApplication {
+    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
@@ -151,6 +162,8 @@ import XCTest
             app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1"
             app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0"
         }
+        if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
+        if !nativeIdentifiers { app.launchEnvironment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] = "0" }
         if crowded { app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1" }
         var records: [[String: Any]] = []
         func add(_ id: String, _ attributes: [String: String]) {
