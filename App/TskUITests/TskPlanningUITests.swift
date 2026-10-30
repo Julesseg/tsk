@@ -58,7 +58,7 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForExistence(timeout: 10))
         let completionID = String(taskRow(named: "Planned and due independently", app: app).identifier.dropFirst(5))
         app.buttons["complete-task-row-" + completionID].tap()
-        XCTAssertFalse(taskRow(named: "Planned and due independently", app: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForNonExistence(timeout: 2))
         capture("Completed task leaves Today immediately", app: app)
         app.terminate()
         app.launch()
