@@ -13,14 +13,15 @@ public struct TaskRowDraft: Equatable, Sendable {
 
     public mutating func plan(_ plan: Plan, now: Date, calendar: Calendar = .autoupdatingCurrent) {
         switch plan {
-        case .today: taskDraft.plannedDate = calendar.startOfDay(for: now)
-        case .tomorrow: taskDraft.plannedDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
+        case .today: taskDraft.schedule(on: now, calendar: calendar)
+        case .tomorrow:
+            if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) { taskDraft.schedule(on: tomorrow, calendar: calendar) }
         case .remove: taskDraft.plannedDate = nil
         }
     }
 
-    public mutating func choosePlannedDay(_ day: Date, calendar: Calendar = .autoupdatingCurrent) {
-        taskDraft.plannedDate = calendar.startOfDay(for: day)
+    public mutating func chooseScheduledDate(_ date: Date) {
+        taskDraft.plannedDate = date
     }
 
     public mutating func addTagInput() throws {

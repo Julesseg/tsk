@@ -5,7 +5,7 @@ struct TaskPlanningSummary: View {
     let task: TaskRecord
     var body: some View {
         if let date = task.plannedDate {
-            LabeledContent("Scheduled") { Text(date, format: .dateTime.day().month().year()) }
+            LabeledContent("Scheduled") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
                 .accessibilityIdentifier("task-planned-day")
         } else if let raw = task.attributes["scheduled"] {
             LabeledContent("Scheduled", value: "Unrecognized date: \(raw)")
@@ -34,11 +34,19 @@ struct TaskPlanningCaption: View {
     let today: Date
 
     var body: some View {
-        if let offset = task.deadlineDayOffset(relativeTo: today) {
-            Text("\(Image(systemName: "flag")) \(label(offset))")
-                .font(.caption).foregroundStyle(.secondary)
-                .accessibilityLabel("Due \(label(offset))")
-                .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
+        VStack(alignment: .trailing, spacing: 2) {
+            if let date = task.plannedDate {
+                Text("\(Image(systemName: "calendar")) Scheduled \(date.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityLabel("Scheduled \(date.formatted(date: .complete, time: .shortened))")
+                    .accessibilityIdentifier("task-row-scheduled-\(task.id.uuidString)")
+            }
+            if let offset = task.deadlineDayOffset(relativeTo: today) {
+                Text("\(Image(systemName: "flag")) Deadline \(label(offset))")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityLabel("Deadline \(label(offset))")
+                    .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
+            }
         }
     }
 

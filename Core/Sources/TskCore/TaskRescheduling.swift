@@ -8,7 +8,7 @@ extension TaskDateRole {
 
 public enum TaskReschedulingError: Error, Equatable, LocalizedError, Sendable {
     case invalidDate
-    public var errorDescription: String? { "Choose a valid planned day or deadline." }
+    public var errorDescription: String? { "Choose a valid Scheduled date and time or Deadline." }
 }
 
 extension TaskManager {

@@ -32,6 +32,12 @@ public extension TaskDraft {
         set { attributes["scheduled"] = newValue.map { String(Int($0.timeIntervalSince1970)) } }
     }
 
+    mutating func schedule(on day: Date, calendar: Calendar = .autoupdatingCurrent) {
+        let time = plannedDate.map { calendar.dateComponents([.hour, .minute, .second], from: $0) }
+        plannedDate = calendar.date(bySettingHour: time?.hour ?? 0, minute: time?.minute ?? 0,
+                                    second: time?.second ?? 0, of: day)
+    }
+
     var deadline: Date? {
         get { planningDate(attributes["due"]) }
         set { attributes["due"] = newValue.map { String(Int($0.timeIntervalSince1970)) } }

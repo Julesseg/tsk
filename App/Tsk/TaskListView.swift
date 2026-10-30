@@ -142,7 +142,7 @@ struct TaskListRow: View {
     private var expanded: Bool { editing?.isExpanded == true }
     private var hasMetadata: Bool {
         let current = editing?.savedTask ?? task
-        return !current.project.isEmpty || current.deadline != nil
+        return !current.project.isEmpty || current.plannedDate != nil || current.deadline != nil
     }
     private var attributesOverlap: CGFloat { hasMetadata ? max(0, headerHeight - titleHeight - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
@@ -337,7 +337,11 @@ private struct TaskRowFade: ViewModifier {
 
     func body(content: Content) -> some View {
         let progress = editing?.revealProgress ?? 0
-        content.opacity(disappearing ? 1 - progress : progress)
+        if disappearing && progress == 1 {
+            content.hidden()
+        } else {
+            content.opacity(disappearing ? 1 - progress : progress)
+        }
     }
 }
 

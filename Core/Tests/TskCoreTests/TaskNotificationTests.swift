@@ -20,11 +20,12 @@ import TskCore
     #expect(try await manager.task(id: combined.id) == combined)
 }
 
-@Test func midnightFallbackUsesCurrentDeviceZoneAndExplicitDSTResolutionWhileOtherTimesRemainAbsolute() throws {
+@Test(arguments: ["scheduled", "due"])
+func midnightFallbackUsesCurrentDeviceZoneAndExplicitDSTResolutionWhileOtherTimesRemainAbsolute(attribute: String) throws {
     let parser = ISO8601DateFormatter()
     let id = UUID()
     func record(_ text: String, status: String = "pending") throws -> TaskRecord {
-        TaskRecord(id: id, attributes: ["status": status, "due": String(Int(try #require(parser.date(from: text)).timeIntervalSince1970))])
+        TaskRecord(id: id, attributes: ["status": status, attribute: String(Int(try #require(parser.date(from: text)).timeIntervalSince1970))])
     }
     var paris = Calendar(identifier: .gregorian); paris.timeZone = TimeZone(identifier: "Europe/Paris")!
     let now = try #require(parser.date(from: "2026-01-01T00:00:00Z"))
@@ -32,7 +33,7 @@ import TskCore
         let task = try record(original)
         let plan = try TaskManager.notificationPlan(tasks: [task], preferences: TaskNotificationPreferences(hour: 2, minute: 30), calendar: paris, at: now)
         #expect(plan.future.first?.fireDate == parser.date(from: expected))
-        #expect(plan.future.first?.events.first?.storedSeconds == Int64(task.attributes["due"]!))
+        #expect(plan.future.first?.events.first?.storedSeconds == Int64(task.attributes[attribute]!))
     }
     let absolute = try record("2026-03-29T10:15:00Z")
     #expect(try TaskManager.notificationPlan(tasks: [absolute], calendar: paris, at: now).future.first?.fireDate == parser.date(from: "2026-03-29T10:15:00Z"))

@@ -205,7 +205,7 @@ struct TaskRowParameterPicker: View {
                 TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
             default:
                 DatePicker(parameter.title, selection: $selectedDate,
-                           displayedComponents: parameter == .scheduled ? [.date] : [.date, .hourAndMinute])
+                           displayedComponents: [.date, .hourAndMinute])
                     .datePickerStyle(.graphical)
                     .labelsHidden()
                     .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
