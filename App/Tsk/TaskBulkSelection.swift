@@ -42,6 +42,7 @@ extension TaskStore {
     }
 
     func endSelectionGesture() {
+        selectionSwipe = nil
         isSelectionGestureActive = false
         selectionGestureTasks = nil
         selectionGestureDays = nil
@@ -101,6 +102,8 @@ extension TaskStore {
 
 struct TaskSelectionBar: View {
     let store: TaskStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -113,6 +116,8 @@ struct TaskSelectionBar: View {
                     .accessibilityIdentifier("task-selection-done")
                 Spacer()
                 Text("\(store.selectedTaskIDs.count) selected")
+                    .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
+                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
                     .monospacedDigit().accessibilityIdentifier("task-selection-count")
                     #if DEBUG
                     .accessibilityValue(store.selectionGestureProof)
@@ -124,6 +129,9 @@ struct TaskSelectionBar: View {
             }
         }
         .padding().background(.bar)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: reduceMotion || appeared ? 0 : 12)
+        .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
         .disabled(store.isSaving || store.isSelectionGestureActive)
     }
 }

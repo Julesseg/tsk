@@ -158,6 +158,7 @@ struct TaskListRow: View {
     private var attributesOverlap: CGFloat { hasMetadata ? max(0, headerHeight - titleHeight - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
+    private var selected: Bool { store.selectedTaskIDs.contains(task.id) }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
     var body: some View {
@@ -172,6 +173,8 @@ struct TaskListRow: View {
                         .font(.title2).foregroundStyle(.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
+                        .scaleEffect(selected ? 1.06 : 1)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.18), value: selected)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -248,12 +251,13 @@ struct TaskListRow: View {
             GeometryReader { geometry in
                 let frame = geometry.frame(in: .global)
                 Color.clear.preference(key: TaskSelectionRowsKey.self,
-                    value: [identity: TaskSelectionRow(id: task.id,
+                    value: [identity: TaskSelectionRow(id: task.id, rowID: identity,
                         bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: min(headerHeight, frame.height))),
                         isEditing: editing != nil)])
             }
         }
         .modifier(TaskRowSpacing(editing: editing))
+        .modifier(TaskSelectionRowFeedback(rowID: identity, selected: selected, swipe: store.selectionSwipe))
         .background {
             if expanded {
                 Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [

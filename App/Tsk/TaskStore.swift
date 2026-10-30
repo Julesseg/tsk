@@ -29,6 +29,7 @@ final class TaskStore {
     var selectionGestureProof = ""
     #endif
     var isSelectionSwipeActive = false
+    var selectionSwipe: TaskSelectionSwipe?
     var taskSelectionGeneration = 0
     var isSelectingTasks = false
     var selectedTaskIDs: Set<UUID> = []

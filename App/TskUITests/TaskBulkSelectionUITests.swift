@@ -38,6 +38,7 @@ import XCTest
         XCTAssertEqual(proof["offsetsStable"] as? Bool, true)
         XCTAssertEqual(proof["rowsStable"] as? Bool, true)
         XCTAssertEqual(proof["refreshWhileTouchDown"] as? Bool, true)
+        XCTAssertGreaterThan(try XCTUnwrap(proof["maximumRowTranslation"] as? Double), 8, "The touched row follows the finger horizontally")
         let width = try XCTUnwrap(proof["columnWidth"] as? Double)
         let crossing = try XCTUnwrap(proof["crossingDistance"] as? Double)
         XCTAssertEqual(width, list.frame.width, accuracy: 2)
@@ -45,6 +46,7 @@ import XCTest
         XCTAssertGreaterThanOrEqual(crossing, width * 0.25)
         XCTAssertLessThan(crossing, width * 0.45)
         XCTAssertTrue(taskRow(named: "Arrived while selecting", app: app).waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["task-" + first].frame.minX, initial.minX, accuracy: 1, "Rows settle back after release")
         let reverseStart = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: app.buttons["task-" + third].frame.midY))
         reverseStart.press(forDuration: 0.05, thenDragTo: reverseStart.withOffset(CGVector(dx: list.frame.width * 0.5, dy: app.buttons["task-" + first].frame.midY - app.buttons["task-" + third].frame.midY)))
         XCTAssertEqual(count.label, "3 selected", "Repeated contact adds without toggling")
@@ -145,7 +147,10 @@ import XCTest
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
-        if probe { app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1" }
+        if probe {
+            app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1"
+            app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0"
+        }
         if crowded { app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1" }
         var records: [[String: Any]] = []
         func add(_ id: String, _ attributes: [String: String]) {
