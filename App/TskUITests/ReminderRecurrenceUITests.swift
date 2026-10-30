@@ -56,11 +56,11 @@ final class ReminderRecurrenceUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
         XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["recurrence-rule-value"].firstMatch, in: "task-detail-form", app: app))
         XCTAssertTrue(app.descendants(matching: .any)["recurrence-rule-value"].firstMatch.label.contains("1week"))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-status"], in: "task-detail-form", app: app))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Recurring"))
         for identifier in ["task-planned-day", "task-deadline"] {
             XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)[identifier].firstMatch, in: "task-detail-form", app: app))
         }
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-status"], in: "task-detail-form", app: app))
-        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Recurring"))
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         XCTAssertFalse(app.buttons["complete-task"].exists)
     }
