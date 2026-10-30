@@ -2,10 +2,10 @@ import Foundation
 import Testing
 import TskCore
 
-@Test func bulkCompletionCombinesSiblingMasksAndDeduplicatesTasks() async throws {
+@Test(arguments: ["1", "1.0", "1.000"]) func bulkCompletionCombinesSiblingMasksAndDeduplicatesTasks(position: String) async throws {
     let parent = TaskRecord(id: UUID(), attributes: ["status": "recurring", "mask": "-W-", "opaque": "e\u{301}"])
     let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "First", "parent": parent.id.uuidString, "imask": "0", "start": "10"])
-    let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Second", "parent": parent.id.uuidString, "imask": "1"])
+    let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Second", "parent": parent.id.uuidString, "imask": position])
     let plain = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Plain", "opaque": "keep"])
     let replica = OccurrenceReplica(records: [parent, first, second, plain])
     let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
@@ -15,6 +15,7 @@ import TskCore
     #expect(try await manager.task(id: parent.id).attributes["mask"] == "++-")
     #expect(try await manager.task(id: parent.id).attributes["opaque"]?.matchesBytes("e\u{301}") == true)
     #expect(try await manager.task(id: plain.id).attributes["opaque"] == "keep")
+    #expect(try await manager.task(id: second.id).attributes["imask"] == position)
     #expect(await replica.batches == 1)
 }
 
