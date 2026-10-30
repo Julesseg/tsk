@@ -18,27 +18,29 @@ extension TaskStore {
         }
     }
 
-    func beginSelectionGesture(_ ids: Set<UUID>) async -> Bool {
+    func beginSelectionGesture(_ ids: Set<UUID>, selecting: Bool) async -> Bool {
         let generation = taskSelectionGeneration
         let context = completionContext
         guard !isSaving, await finishRowEditingForSelection(), !Task.isCancelled,
               generation == taskSelectionGeneration, context == completionContext else { return false }
-        return activateSelectionGesture(ids)
+        return activateSelectionGesture(ids, selecting: selecting)
     }
 
-    func activateSelectionGesture(_ ids: Set<UUID>) -> Bool {
+    func activateSelectionGesture(_ ids: Set<UUID>, selecting: Bool) -> Bool {
         guard !isSaving else { return false }
         selectionGestureTasks = visibleTasks
         selectionGestureDays = upcomingDays
         isSelectingTasks = true
         isSelectionGestureActive = true
-        addToSelection(ids)
+        applySelectionGesture(ids, selecting: selecting)
         return true
     }
 
-    func addToSelection(_ ids: Set<UUID>) {
+    func applySelectionGesture(_ ids: Set<UUID>, selecting: Bool) {
         let eligible = Set(visibleTasks.filter(\.canComplete).map(\.id))
-        selectedTaskIDs.formUnion(ids.intersection(eligible))
+        let touched = ids.intersection(eligible)
+        if selecting { selectedTaskIDs.formUnion(touched) }
+        else { selectedTaskIDs.subtract(touched) }
     }
 
     func endSelectionGesture() {

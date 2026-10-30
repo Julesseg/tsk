@@ -66,6 +66,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     private var previousY: CGFloat = 0
     private var frozenRows: [TaskSelectionRow] = []
     private var touched: Set<UUID> = []
+    private var selectsTouchedRows = true
     private var scrollViews: [(UIScrollView, Bool, CGPoint)] = []
     #if DEBUG
     private var proof = TaskSelectionGestureProof()
@@ -96,6 +97,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         guard viewport.contains(initial), let row = rows.first(where: { $0.bounds.contains(initial) }),
               store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else { state = .failed; return }
         touched = [row.id]
+        selectsTouchedRows = !store.selectedTaskIDs.contains(row.id)
         frozenRows = rows
         previousY = initial.y
         released = false
@@ -133,8 +135,9 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             let selectionGeneration = store?.taskSelectionGeneration
             let wasEditing = store?.rowEditing != nil
             let initialIDs = touched
+            let selecting = selectsTouchedRows
             if !wasEditing {
-                guard store?.activateSelectionGesture(initialIDs) == true else { state = .cancelled; finish(); return }
+                guard store?.activateSelectionGesture(initialIDs, selecting: selecting) == true else { state = .cancelled; finish(); return }
                 tracking = true
             }
             preparation = Task { [weak self] in
@@ -148,7 +151,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                     #endif
                     guard token == self.generation, !Task.isCancelled,
                           selectionGeneration == store.taskSelectionGeneration else { return }
-                    let ready = await store.beginSelectionGesture(initialIDs)
+                    let ready = await store.beginSelectionGesture(initialIDs, selecting: selecting)
                     guard token == self.generation else { return }
                     if !ready { self.state = .cancelled; self.finish(); return }
                     await self.waitForCollapsedRows()
@@ -166,7 +169,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                 }
                 guard selectionGeneration == store.taskSelectionGeneration else { return }
                 self.tracking = true
-                store.addToSelection(self.touched)
+                store.applySelectionGesture(self.touched, selecting: selecting)
                 self.updateSwipeFeedback(at: self.latest)
                 #if DEBUG
                 self.recordProof(touch)
@@ -191,7 +194,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             let low = max(viewport.minY, min(previousY, point.y))
             let high = min(viewport.maxY, max(previousY, point.y))
             for row in frozenRows where row.bounds.maxY >= low && row.bounds.minY <= high { touched.insert(row.id) }
-            if tracking, store?.isSelectionGestureActive == true { store?.addToSelection(touched) }
+            if tracking, store?.isSelectionGestureActive == true { store?.applySelectionGesture(touched, selecting: selectsTouchedRows) }
             updateSwipeFeedback(at: point)
             #if DEBUG
             recordProof(touch)
