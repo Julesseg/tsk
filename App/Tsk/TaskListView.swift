@@ -198,6 +198,7 @@ struct TaskListRow: View {
                     }
                 }
                 .frame(minHeight: 44, alignment: .topLeading)
+                .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
                 if let editing {
                     TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
