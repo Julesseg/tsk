@@ -5,6 +5,17 @@ enum TaskControlReadinessPolicy {
     static let accessibilityAdmissionTimeout: TimeInterval = 20
 }
 
+struct TaskRowControlIdentity: Equatable {
+    let rawValue: String
+
+    init?(_ value: String) {
+        guard value.count >= 41, UUID(uuidString: String(value.suffix(36))) != nil else { return nil }
+        let prefix = String(value.dropLast(36))
+        guard prefix == "task-" || prefix.range(of: "^upcoming-(planned|deadline)--?[0-9]+-$", options: .regularExpression) != nil else { return nil }
+        rawValue = value
+    }
+}
+
 enum TaskControlReadinessFailure: String {
     case missing, disabled, unhittable, unsampled, snapshotFailed, nonpositiveFrame, outsideApp
     case deadlineExpired, waiterIncomplete, alreadyFinished

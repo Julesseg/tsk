@@ -93,3 +93,22 @@ visible; its deadline remains unchanged and diagnostics retain prior sample stat
 The first full run was deliberately cancelled after discovering the keyboard
 regression, rather than spending four more worker executions on known-bad code.
 The revised head still requires smoke/full canonical results.
+
+## Row query isolation
+
+At `8a6f31a`, the iPad smoke lane passed. The one targeted phone retry made
+the earlier row-editing failure pass, but capture failed at the same information
+helper after a fresh relaunch, before any row editor had opened. Its selected
+control had valid enabled/hittable geometry: the broad label/UUID-pattern snapshot
+took 14.8 seconds, then the same query's hittability read took 22.2 seconds. The
+application snapshot took 1.7 seconds. This does not support an expanded-editor
+layout loop as a common explanation for those two failures.
+
+The next controlled revision resolves the original row once and binds subsequent
+readiness checks and the actual native tap to its exact full accessibility
+identifier. Task and Upcoming identifiers retain their UUID and appearance context;
+malformed identities fail. The same 20-second deadline starts before broad-row
+resolution and is forwarded to readiness, so preparation cannot hide outside the
+budget. Hittability, containment and actual information/editor assertions remain.
+36 readiness/menu/row-identity host tests passed. Runtime benefit still requires
+the next canonical smoke result; no further same-source retry was requested.

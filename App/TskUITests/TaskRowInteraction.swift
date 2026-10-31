@@ -58,8 +58,24 @@ extension XCTestCase {
 }
 
 extension XCTestCase {
-    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication) {
-        tapTaskControl(row, app: app)
+    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let started = ProcessInfo.processInfo.systemUptime
+        let deadline = started + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        let identity: TaskRowControlIdentity
+        do {
+            let snapshot = try row.snapshot()
+            guard snapshot.elementType == .button, let selected = TaskRowControlIdentity(snapshot.identifier),
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                XCTFail("Task information requires an observed row identity within its readiness deadline", file: file, line: line)
+                return
+            }
+            identity = selected
+        } catch {
+            XCTFail("Task row identity snapshot failed: \(error)", file: file, line: line)
+            return
+        }
+        print("Task row identity admission: \(identity.rawValue); readSeconds=\(ProcessInfo.processInfo.systemUptime - started)")
+        tapTaskControl(app.buttons[identity.rawValue], app: app, deadline: deadline, file: file, line: line)
         let information = app.buttons["task-row-information"]
         if information.waitForExistence(timeout: 2) {
             let editor = app.scrollViews["task-row-editor"]
