@@ -26,14 +26,8 @@ extension TaskManager {
 
     func saveOccurrence(_ occurrence: TaskRecord, changes: TaskAttributePatch, completing: Bool = false) async throws -> TaskRecord {
         let records = try await replica.tasks()
-        guard let rawParent = occurrence.attributes["parent"], let parentID = UUID(uuidString: rawParent), parentID != occurrence.id,
-              let parent = records.first(where: { $0.id == parentID }),
-              ["recurring", "deleted"].contains(parent.status), parent.attributes["parent"] == nil,
-              let index = occurrence.occurrenceIndex,
-              let rawMask = parent.attributes["mask"], rawMask.utf8.allSatisfy({ [45, 87, 43, 88].contains($0) }),
-              index < rawMask.utf8.count else { throw TaskManagementError.storage("The occurrence’s parent, index, or series mask is inconsistent. No tasks were changed.") }
-        let siblings = records.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == parentID && $0.occurrenceIndex == index }
-        guard siblings.count == 1 else { throw TaskManagementError.storage("More than one occurrence uses this series position. No tasks were changed.") }
+        let (parent, index) = try occurrencePosition(occurrence, in: records)
+        let rawMask = parent.attributes["mask"]!
         var mask = Array(rawMask.utf8)
         if occurrence.status == "completed", completing, mask[index] == 43 { return occurrence }
         guard occurrence.status == "pending", [45, 87].contains(mask[index]) else { throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.") }
@@ -54,5 +48,20 @@ extension TaskManager {
         guard let result = saved.first(where: { $0.id == occurrence.id }) else { throw TaskManagementError.storage("The atomic save returned no occurrence.") }
         await localChangeWasCommitted(tasks: saved)
         return result
+    }
+
+    func occurrencePosition(_ occurrence: TaskRecord, in records: [TaskRecord]) throws -> (TaskRecord, Int) {
+        guard let rawParent = occurrence.attributes["parent"], let parentID = UUID(uuidString: rawParent), parentID != occurrence.id,
+              let parent = records.first(where: { $0.id == parentID }),
+              ["recurring", "deleted"].contains(parent.status), parent.attributes["parent"] == nil,
+              let index = occurrence.occurrenceIndex,
+              let rawMask = parent.attributes["mask"], rawMask.utf8.allSatisfy({ [45, 87, 43, 88].contains($0) }),
+              index < rawMask.utf8.count else {
+            throw TaskManagementError.storage("The occurrence’s parent, index, or series mask is inconsistent. No tasks were changed.")
+        }
+        guard records.filter({ UUID(uuidString: $0.attributes["parent"] ?? "") == parentID && $0.occurrenceIndex == index }).count == 1 else {
+            throw TaskManagementError.storage("More than one occurrence uses this series position. No tasks were changed.")
+        }
+        return (parent, index)
     }
 }

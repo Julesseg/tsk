@@ -8,6 +8,8 @@ struct TaskListView: View {
     let calendar: TodayCalendarController
     let edit: (TaskRecord) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var selectionRows: [String: TaskSelectionRow] = [:]
+    @State private var selectionScope = TaskSelectionScope()
     @State private var keyboardFrame = CGRect.null
 
     var body: some View {
@@ -58,12 +60,23 @@ struct TaskListView: View {
                 }
             }
         }
+        .background {
+            TaskSelectionGesture(store: store, scope: selectionScope, viewport: geometry.frame(in: .global), rows: selectionRows)
+                .allowsHitTesting(false)
+        }
+        .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
+        .scrollDisabled(store.isSelectionGestureActive)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if store.isSelectingTasks { TaskSelectionBar(store: store) }
+        }
+        .onChange(of: store.completionContext) { _, _ in store.endTaskSelection() }
         .modifier(TaskRowFocusOffset(editing: store.rowEditing))
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
         .environment(\.taskRowViewport, geometry.frame(in: .global))
         }
+        .environment(\.taskSelectionScope, selectionScope)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.completionFeedback.removingIDs(context: store.completionContext))
         .environment(\.defaultMinListRowHeight, 0)
         .listStyle(.plain)
@@ -147,19 +160,23 @@ struct TaskListRow: View {
     private var attributesOverlap: CGFloat { hasMetadata ? max(0, headerHeight - titleHeight - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
+    private var selected: Bool { store.selectedTaskIDs.contains(task.id) }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
             if task.canComplete {
                 Button {
+                    if store.isSelectingTasks { store.toggleSelection(task.id); return }
                     guard store.rowEditing == nil, !store.isSaving else { return }
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
                 } label: {
-                    Image(systemName: checked ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: store.isSelectingTasks ? (store.selectedTaskIDs.contains(task.id) ? "checkmark.circle.fill" : "circle") : checked ? "checkmark.circle.fill" : "circle")
                         .font(.title2).foregroundStyle(.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
+                        .scaleEffect(selected ? 1.06 : 1)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.18), value: selected)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -168,8 +185,8 @@ struct TaskListRow: View {
                 .disabled(phase != nil)
                 .allowsHitTesting(!store.isSaving && store.rowEditing == nil)
                 .accessibilityRespondsToUserInteraction(store.rowEditing == nil)
-                .accessibilityLabel("\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
-                .accessibilityValue(checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
+                .accessibilityLabel(store.isSelectingTasks ? "\(store.selectedTaskIDs.contains(task.id) ? "Deselect task" : "Select task"): \(task.description)" : "\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
+                .accessibilityValue(store.isSelectingTasks ? (store.selectedTaskIDs.contains(task.id) ? "Selected" : "Not selected") : checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
             }
             VStack(alignment: .leading, spacing: 0) {
@@ -188,6 +205,7 @@ struct TaskListRow: View {
                     .frame(minHeight: hasMetadata ? 0 : 44, alignment: .leading)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { titleHeight = $0 }
                     .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
+                    .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                     .accessibilityHidden(!expanded)
                     if hasMetadata {
                         TaskListMetadata(task: editing?.savedTask ?? task, store: store)
@@ -212,7 +230,8 @@ struct TaskListRow: View {
             .overlay {
                 if !expanded {
                     Button {
-                        if task.canEdit { expand() } else { edit(task) }
+                        if store.isSelectingTasks { store.toggleSelection(task.id) }
+                        else if task.canEdit { expand() } else { edit(task) }
                     } label: { Color.clear.contentShape(Rectangle()) }
                         .buttonStyle(.plain)
                         .disabled(phase != nil || editing != nil)
@@ -224,15 +243,28 @@ struct TaskListRow: View {
                             .accessibilityElement(children: .combine)
                         }
                         .accessibilityIdentifier(identity)
-                        .accessibilityHint(task.canEdit ? "Expand to edit title and attributes" : "Show task information")
+                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
                         .accessibilityAction(named: "Edit title and attributes", expand)
+                        .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                 }
             }
         }
+        .background {
+            GeometryReader { geometry in
+                let frame = geometry.frame(in: .global)
+                Color.clear.preference(key: TaskSelectionRowsKey.self,
+                    value: [identity: TaskSelectionRow(id: task.id, rowID: identity,
+                        bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: min(headerHeight, frame.height))),
+                        isEditing: editing != nil)])
+                    .background { TaskSelectionRowAnchor().allowsHitTesting(false) }
+            }
+        }
         .modifier(TaskRowSpacing(editing: editing))
+        .modifier(TaskSelectionRowFeedback(rowID: identity, selected: selected, swipe: store.selectionSwipe))
         .background {
             if expanded {
                 Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
+                    TaskKeyboardCommand(id: "select", input: "s", modifiers: [.command, .shift], title: "Select Task", action: { store.toggleSelection(task.id) }),
                     TaskKeyboardCommand(id: "collapse", input: "\u{1b}", modifiers: [], title: "Close Task Editor", action: rowActions.close)
                 ])
                 .allowsHitTesting(false)
@@ -278,18 +310,21 @@ struct TaskListRow: View {
         .tag(task.id)
         .contextMenu {
             if !expanded {
-            TaskActivityButton(task: task, store: store).disabled(phase != nil)
-            if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil) }
-            if task.canComplete {
-                Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } }.disabled(store.isSaving || phase != nil)
+                if task.canComplete {
+                    Button(store.selectedTaskIDs.contains(task.id) ? "Deselect" : "Select", systemImage: "checkmark.circle") { store.toggleSelection(task.id) }
+                        .disabled(store.isSaving || phase != nil)
+                }
+                if !store.isSelectingTasks {
+                    TaskActivityButton(task: task, store: store).disabled(phase != nil)
+                    if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil) }
+                    if task.canComplete {
+                        Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } }.disabled(store.isSaving || phase != nil)
+                    }
+                }
             }
-            }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            if !expanded { TaskActivityButton(task: task, store: store).tint(.orange).disabled(phase != nil) }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if task.canEdit && !expanded {
+            if task.canEdit && !expanded && !store.isSelectingTasks {
                 Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil)
             }
         }

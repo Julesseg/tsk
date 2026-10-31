@@ -77,21 +77,8 @@ struct ContentView: View {
     private func closeRow(after: (() -> Void)? = nil) {
         guard let editing = store.rowEditing, !editing.isSaving, editing.isExpanded else { return }
         if editing.parameter != nil { dismissRowParameter(); return }
-        editing.isSaving = true
         Task {
-            do {
-                let changes = try editing.draft.changes()
-                let saved = changes.isEmpty ? editing.draft.original : await store.update(id: editing.draft.original.id, changes: changes)
-                guard let saved else {
-                    editing.error = store.error
-                    editing.isSaving = false
-                    return
-                }
-                editing.savedTask = saved
-                await editing.setExpanded(false, reduceMotion: reduceMotion)
-                store.rowEditing = nil
-                after?()
-            } catch { editing.error = error.localizedDescription; editing.isSaving = false }
+            if await store.finishRowEditing(reduceMotion: reduceMotion) { after?() }
         }
     }
 
@@ -491,15 +478,16 @@ struct ContentView: View {
         #endif
         return TaskWorkspaceActions(
             capture: capture,
-            edit: selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
-            complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
+            edit: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
+            complete: store.isSelectingTasks ? { Task { await store.completeSelection() } } : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
                 if isProjectWorkspace { projectPath.append(task.id) }
                 else if presentation != .columns { path = [task.id] }
             } },
             openView: openView,
-            refresh: { Task { await store.reload() } }
+            refresh: { Task { await store.reload() } },
+            select: selectedTask.flatMap { task in task.canComplete ? { store.toggleSelection(task.id) } : nil }
         )
     }
 
