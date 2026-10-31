@@ -4,6 +4,27 @@ import TskCore
 import TskNative
 import AppIntents
 
+struct TaskNotificationRegistrationEvidence: Codable {
+    struct Pending: Codable {
+        let identifier: String
+        let request: TaskNotificationRequest?
+        let nextTriggerDate: Date?
+        let contentMatchesRequest: Bool
+    }
+
+    let expected: [TaskNotificationRequest]
+    let pending: [Pending]
+    let preferences: TaskNotificationPreferences
+    let report: TaskNotificationReport?
+
+    init(expected: [TaskNotificationRequest], pending: [PendingTaskNotification], state: TaskNotificationState) {
+        self.expected = expected
+        self.pending = pending.map { Pending(identifier: $0.identifier, request: $0.request, nextTriggerDate: $0.nextTriggerDate, contentMatchesRequest: $0.contentMatchesRequest) }
+        preferences = state.preferences
+        report = state.lastReport
+    }
+}
+
 private struct NotificationFixtureEvidence: Codable {
     var task: TaskRecord?
     var fireDate: Date?
@@ -15,6 +36,7 @@ private struct NotificationFixtureEvidence: Codable {
     var deniedTask: TaskRecord?
     var midnightTask: TaskRecord?
     var midnightRegisteredDate: Date?
+    var midnightRegistration: TaskNotificationRegistrationEvidence?
     var errors: [String] = []
 }
 
@@ -79,7 +101,10 @@ struct TaskNotificationFixtureControls: View {
         guard try await manager.task(id: task.id) == task else { throw TaskManagementError.storage("Alert preferences changed stored task attributes.") }
         let state = try await manager.notificationState(using: LocalTaskNotificationStore(directory: controller.store.directory))
         let expected = try await manager.notificationPlan(preferences: state.preferences).future.first { $0.taskID == task.id }
-        let actual = try await UNTaskNotificationCenter().pending().first { $0.request?.taskID == task.id }
+        let pending = try await UNTaskNotificationCenter().pending()
+        evidence.midnightRegistration = TaskNotificationRegistrationEvidence(expected: expected.map { [$0] } ?? [], pending: pending, state: state)
+        try save(evidence, token)
+        let actual = pending.first { $0.request?.taskID == task.id }
         guard let expected, actual?.request == expected, actual?.nextTriggerDate == expected.fireDate else { throw TaskManagementError.storage("Actual midnight registration does not match saved preferences.") }
         evidence.midnightRegisteredDate = expected.fireDate
         try save(evidence, token)

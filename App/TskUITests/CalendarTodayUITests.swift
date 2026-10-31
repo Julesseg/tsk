@@ -99,7 +99,8 @@ import XCTest
     }
 
     private func assertCalendarHidden(_ app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Tasks · Today"].waitForExistence(timeout: 10))
+        assertTodayTaskList(app)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch.exists)
         XCTAssertFalse(app.buttons["calendar-request-access"].exists)
         XCTAssertFalse(app.buttons["calendar-refresh"].exists)
         XCTAssertFalse(app.staticTexts["calendar-read-error"].exists)

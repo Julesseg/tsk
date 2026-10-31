@@ -165,7 +165,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["save-task"].isHittable)
         app.buttons["save-task"].tap()
-        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Durable work while automatic sync fails", app: app), timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, named: "Durable work while automatic sync fails", timeout: 10))
         XCTAssertTrue(taskRow(named: "Durable work while automatic sync fails", app: app).isHittable)
         XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
         XCTAssertFalse(app.buttons["retry-task-sync"].exists)

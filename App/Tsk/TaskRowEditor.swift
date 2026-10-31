@@ -91,33 +91,9 @@ private struct TaskRowParameterPill: View {
         let value = parameter.value(in: editing.draft.taskDraft)
         Group {
             if parameter == .project || parameter == .priority {
-                Menu {
-                    if parameter == .project {
-                        Picker("Project", selection: Binding(
-                            get: { UTF8String(editing.draft.taskDraft.project) },
-                            set: { editing.draft.taskDraft.project = $0.rawValue }
-                        )) {
-                            Text("No project").tag(UTF8String(""))
-                            ForEach(Set((projects + [editing.draft.taskDraft.project]).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted(), id: \.self) { project in
-                                Text(project.rawValue).tag(project)
-                            }
-                        }
-                        Button("New project…", systemImage: "folder.badge.plus", action: openPicker)
-                            .accessibilityIdentifier("row-new-project")
-                    } else {
-                        Picker("Priority", selection: $editing.draft.taskDraft.priority) {
-                            ForEach(["", "L", "M", "H"], id: \.self) { priority in
-                                Text(TaskRowParameter.priorityTitle(priority)).tag(priority)
-                            }
-                            if !["", "L", "M", "H"].contains(editing.draft.taskDraft.priority) {
-                                Text(editing.draft.taskDraft.priority).tag(editing.draft.taskDraft.priority)
-                            }
-                        }
-                    }
-                } label: {
-                    label
-                }
-                .simultaneousGesture(TapGesture().onEnded { unfocus() })
+                TaskRowMenuButton(editing: editing, parameter: parameter, projects: projects,
+                                  unfocus: unfocus, openPicker: openPicker)
+                    .fixedSize()
             } else {
                 Button(action: openPicker) { label }
             }
@@ -258,14 +234,21 @@ struct TaskRowParameterLabel: View {
     }
 }
 
-private struct TaskRowParameterButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+struct TaskRowParameterPillAppearance: ViewModifier {
+    func body(content: Content) -> some View {
+        content
             .foregroundStyle(.primary)
             .padding(.horizontal, 9)
             .frame(minHeight: 26)
             .background(.background, in: Capsule())
             .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
+    }
+}
+
+private struct TaskRowParameterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(TaskRowParameterPillAppearance())
             .opacity(configuration.isPressed ? 0.65 : 1)
     }
 }
