@@ -2,6 +2,23 @@ import Foundation
 import CoreGraphics
 import Testing
 
+@Suite struct TaskRowControlIdentityProof {
+    @Test func exactTaskAndUpcomingAppearancesRetainTheirFullUUIDAndContext() {
+        let id = "A0000000-0000-0000-0000-000000000001"
+        for prefix in ["task-", "upcoming-planned-1792144800-", "upcoming-deadline-1792144800-", "upcoming-planned--123-"] {
+            #expect(TaskRowControlIdentity(prefix + id)?.rawValue == prefix + id)
+        }
+        #expect(TaskRowControlIdentity("upcoming-planned-1792144800-" + id) != TaskRowControlIdentity("upcoming-deadline-1792144800-" + id))
+    }
+
+    @Test func partialUUIDsOtherControlsAndMalformedAppearanceIdentitiesCannotBindARow() {
+        let id = "A0000000-0000-0000-0000-000000000001"
+        for value in [id, "task-" + id.dropLast(), "complete-task-row-" + id, "task-row-information", "upcoming-planned-unknown-" + id, "upcoming-other-1792144800-" + id, "prefix-task-" + id] {
+            #expect(TaskRowControlIdentity(value) == nil)
+        }
+    }
+}
+
 @Suite struct TaskControlReadinessProof {
     final class Clock { var now = 0.0 }
     let appFrame = CGRect(origin: CGPoint(x: 20, y: 30), size: CGSize(width: 400, height: 800))
