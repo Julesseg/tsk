@@ -43,8 +43,8 @@ large-text, completion and durable-edit assertions remain.
 Run `41022221277`, iPad job `123952080434`, source `8d38e65a`, captured a native
 Select All menu that was visible/enabled even though its accessibility lookup
 consumed 5.64 seconds and failed the unchanged five-second deadline. Selection
-now finds both supported native control types in one app snapshot, validates
-unique enabled/contained geometry and performs one native tap. Actual clearing
+now finds both supported native control types through one unique control query,
+validates enabled/hittable/contained geometry and performs one native tap. Actual clearing
 and final value assertions remain; no Command-A fallback or model mutation was
 introduced.
 
@@ -66,8 +66,8 @@ increase was made.
 Local Core: 180 tests passed. Portable routing/selection/shard, build-transfer,
 fixture admission, monitor cleanup, native transport and provisioning regressions
 passed. Workflow syntax passed actionlint with the repository's custom runner
-label declared. The four native-menu geometry host tests passed, including the empty application/visible window regression. Modified Swift files passed syntax parsing. No local simulator
-was booted. These checks establish portable behavior and syntax only.
+label declared. The four native-menu geometry host tests passed, including the empty application/visible window regression. Modified Swift files passed syntax parsing. Later focused local simulator probes are recorded below; those runs do not
+replace canonical CI. These initial checks establish portable behavior and syntax only.
 
 Canonical evidence must include the actual shared build, smoke gates and full
 coverage on both families at the PR head. Record their run links and method/job
@@ -112,3 +112,85 @@ resolution and is forwarded to readiness, so preparation cannot hide outside the
 budget. Hittability, containment and actual information/editor assertions remain.
 36 readiness/menu/row-identity host tests passed. Runtime benefit still requires
 the next canonical smoke result; no further same-source retry was requested.
+
+## Full-suite findings at 2acb582
+
+[Smoke run 41149065954](https://github.com/Julesseg/tsk/actions/runs/41149065954)
+passed both families after one targeted phone retry. The exact-row identity
+reads took about 0.12 seconds on iPhone and 0.15–0.22 seconds on iPad. This
+establishes those executions, rather than a guarantee for every later query.
+
+[Full run 41153213953](https://github.com/Julesseg/tsk/actions/runs/41153213953)
+failed: 99 methods passed, 31 failed and three iPad-only methods were skipped on
+iPhone. Its shared build passed in 5m30s. Four workers occupied roughly 4.68 Mac
+hours; the complete run took 83m01s including queueing. No successful full-suite
+speedup is established. The artifacts identify source `2acb58296d9468de5a9291d01802ceb00c2b3ba4`,
+tree `f90cb501836f2285207a5c39252337a09f5f3770`, Xcode 27.0 (27A266a),
+SDK 27.0 (24A430), arm64 and runtime 27.0 (24A434).
+
+The follow-up changes address observed boundaries without removing selected
+methods or widening acknowledgement/admission deadlines:
+
+- Calendar journeys require the current Today title and task list, retain absence
+  of the removed section heading, and reach information through the expanded row.
+- Compact-row assertions require the current Deadline wording and Scheduled clock
+  time while retaining status exclusions, full identities and durable completion.
+- Completion waits observe disappearance rather than requiring absence at the
+  instant an existence wait first samples the still-visible feedback row.
+- Scheduled picker reveals account for the actual keyboard toolbar inset. The
+  failing drag had dismissed the sheet before reaching its date control.
+- Save acknowledgement captures editor absence and a unique, full-UUID saved row
+  in one application snapshot. The affected synchronization journey first admits
+  keyboard dismissal and the actual Save control.
+- Native Select All admission queries its unique control rather than traversing
+  the entire app on every sample. It retains the five-second budget, enabled and
+  hittable checks, visible containment, one native touch and actual value readback.
+- Date switches bind the native child to the observed accessibility element once.
+  The failing anonymous descendant query had blocked for 94.6 seconds. Binding,
+  diagnostics and readiness share the original 20-second budget; native thumb
+  targeting, hittability and the five-second outer-switch acknowledgement remain.
+- Notification fixtures save expected requests, actual native pending requests,
+  decoded payloads, trigger dates, content agreement, preferences and the last
+  registration report before the unchanged failing guards. These are diagnostic
+  additions; they do not establish a registration fix.
+
+A separately dispatched failed full run must block acceptance even when the PR's
+smoke rollup remains green. Audit every CI run at the exact head, including its
+execution manifest and both families' complete selections, before reporting
+verification.
+
+## Retained native row menu candidate
+
+The unchanged-source close/reopen probe reproduced a missing New project action
+while its admitted point remained inside the native menu cell. The cell and its
+content were replaced during the touch; the editor action did not run. App,
+window and native-element tap variants did not fix it. A SwiftUI Equatable wrapper
+did not prevent menu reconstruction during accessibility work. Replacing Picker
+choices with native checked actions also lost New project on its tenth reopen;
+that alternative was discarded.
+
+Project and Priority now use a native button whose menu is retained until the
+editing owner, UTF8 selection or available options change. Current callbacks are
+refreshed separately; old actions reject changed owners/configurations and disabled
+controls. Checkmarks, fixed option order, unknown priorities, New project identity,
+the existing popover and 44-point hit targets remain. Menu and non-menu pills
+share their appearance modifier. The label uses a native content-configuration
+view with matching erased view types, rather than an unattached hosting controller.
+
+The first local retained-menu build passed 20 New project close/reopen cycles.
+Its compact-label revision passed the full iPhone durable-edit journey (252.676s)
+and installed Share journey (206.137s). The native content-view revision passed
+High plus three New project opens. These are local treatment evidence, not
+canonical acceptance or quantified flake-rate improvement.
+
+**Known performance risk:** the retained-menu local builds incur one approximately
+60-second XCTest animation-idle timeout before the first High selection. Changing
+label hosting, pressed-opacity animation and a no-op focus assignment did not
+remove it; the latter two changes were reverted. The focus receipt was false
+before and after the callback. The delay is not repaired by widening an admission
+budget or disabling XCTest idle checks. Canonical Xcode 27.0 must establish this
+candidate's behavior and cost before acceptance; local probes use Xcode 27.1 beta
+against runtime 27.0. A passing smoke/full conclusion alone must not be described
+as a measured performance improvement. Probe methods and instrumentation are
+excluded from the branch. Existing durable journeys now check that reselecting
+High and No project preserves their native selected state and saved value.

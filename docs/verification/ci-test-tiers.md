@@ -96,9 +96,11 @@ unchanged. Keyboard dismissal still requires visible geometry and two stable
 samples within 20 seconds. It prefers keyboard frames from the same app snapshot. If that hierarchy omits
 the keyboard, the original query against the same owning application supplies
 the geometry; absence still fails rather than inventing a keyboard frame. Native Select All still
-requires the real long-press menu, a unique visible enabled native menu item or
-button within five seconds, and actual clear/readback assertions; a single app
-snapshot supplies admitted geometry without re-querying the disappearing menu.
+requires the real long-press menu, a unique visible enabled/hittable native menu
+item or button within five seconds, and actual clear/readback assertions. Each
+sample binds the unique native candidate from one scoped query; its observed
+geometry supplies the touch without re-querying the disappearing menu. Empty
+application frames require containment in an actual owned window.
 
 ## Dispatch and retries
 
