@@ -5,6 +5,17 @@ enum TaskControlReadinessPolicy {
     static let accessibilityAdmissionTimeout: TimeInterval = 20
 }
 
+struct TaskRowControlIdentity: Equatable {
+    let rawValue: String
+
+    init?(_ value: String) {
+        guard value.count >= 41, UUID(uuidString: String(value.suffix(36))) != nil else { return nil }
+        let prefix = String(value.dropLast(36))
+        guard prefix == "task-" || prefix.range(of: "^upcoming-(planned|deadline)--?[0-9]+-$", options: .regularExpression) != nil else { return nil }
+        rawValue = value
+    }
+}
+
 enum TaskControlReadinessFailure: String {
     case missing, disabled, unhittable, unsampled, snapshotFailed, nonpositiveFrame, outsideApp
     case deadlineExpired, waiterIncomplete, alreadyFinished
@@ -19,6 +30,16 @@ struct TaskControlReadinessGeometry {
 struct TaskNativeMenuOptionGeometry: Equatable {
     let frame: CGRect
     let ancestorFrames: [CGRect]
+
+    func visibleInApplication(_ applicationFrame: CGRect, windowFrames: [CGRect]) -> Self? {
+        var frames = ancestorFrames
+        if applicationFrame.isEmpty, frames.first == applicationFrame {
+            guard let window = windowFrames.first(where: { !$0.isEmpty && !$0.isInfinite && $0.contains(frame) }) else { return nil }
+            frames[0] = window
+        }
+        let candidate = Self(frame: frame, ancestorFrames: frames)
+        return candidate.isVisible ? candidate : nil
+    }
 
     var isVisible: Bool {
         func valid(_ frame: CGRect) -> Bool {

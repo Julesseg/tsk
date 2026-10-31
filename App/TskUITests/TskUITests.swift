@@ -85,7 +85,7 @@ final class TskUITests: XCTestCase {
         screenshot("Organization after relaunch", app: app)
         let completionID = String(taskRow(named: "Project fixture", app: app).identifier.dropFirst(5))
         app.buttons["complete-task-row-" + completionID].tap()
-        XCTAssertFalse(taskRow(named: "Project fixture", app: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(taskRow(named: "Project fixture", app: app).waitForNonExistence(timeout: 2))
         selectDoneTasks(app)
         XCTAssertTrue(taskRow(named: "Project fixture", app: app).waitForExistence(timeout: 10))
         screenshot("Completed task in project view", app: app)

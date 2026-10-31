@@ -1,6 +1,15 @@
 import XCTest
 
 extension XCTestCase {
+    @MainActor func assertTodayTaskList(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let title = app.staticTexts["workspace-title-text"]
+            return title.exists && title.label == "Today" && app.collectionViews["task-list"].exists
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed, "Today must show its task list", file: file, line: line)
+        XCTAssertFalse(app.staticTexts["Tasks · Today"].exists, file: file, line: line)
+    }
+
     @MainActor func taskTestApplication() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
@@ -58,13 +67,36 @@ extension XCTestCase {
 }
 
 extension XCTestCase {
-    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication) {
-        tapTaskControl(row, app: app)
-        let information = app.buttons["task-row-information"]
-        if information.waitForExistence(timeout: 2) {
+    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let started = ProcessInfo.processInfo.systemUptime
+        let deadline = started + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        let identity: TaskRowControlIdentity
+        do {
+            let snapshot = try row.snapshot()
+            guard snapshot.elementType == .button, let selected = TaskRowControlIdentity(snapshot.identifier),
+                  ProcessInfo.processInfo.systemUptime < deadline else {
+                XCTFail("Task information requires an observed row identity within its readiness deadline", file: file, line: line)
+                return
+            }
+            identity = selected
+        } catch {
+            XCTFail("Task row identity snapshot failed: \(error)", file: file, line: line)
+            return
+        }
+        print("Task row identity admission: \(identity.rawValue); readSeconds=\(ProcessInfo.processInfo.systemUptime - started)")
+        tapTaskControl(app.buttons[identity.rawValue], app: app, deadline: deadline, file: file, line: line)
+        let informationQuery = app.buttons.matching(identifier: "task-row-information")
+        if informationQuery.firstMatch.waitForExistence(timeout: 2) {
+            let informationDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+            let controls = informationQuery.allElementsBoundByAccessibilityElement
+            guard controls.count == 1, let information = controls.first,
+                  ProcessInfo.processInfo.systemUptime < informationDeadline else {
+                XCTFail("Task information requires one native control within its readiness deadline", file: file, line: line)
+                return
+            }
             let editor = app.scrollViews["task-row-editor"]
             if !information.isHittable { editor.swipeUp() }
-            tapTaskControl(information, app: app)
+            tapTaskControl(information, app: app, deadline: informationDeadline, file: file, line: line)
             XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
         }
     }

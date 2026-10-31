@@ -1,15 +1,12 @@
 name: Release
 
 on:
-  pull_request:
-    branches: [main]
-    # Skip building an installable when the PR only touches docs. The run is
-    # skipped only if EVERY changed file matches one of these patterns.
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - 'LICENSE.txt'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Open PR to build an installable for
+        type: number
+        required: true
 
 # The only project-specific values in this workflow. APP_NAME must match the
 # Xcode project/scheme on disk; BUNDLE_ID must match PRODUCT_BUNDLE_IDENTIFIER
@@ -19,46 +16,77 @@ env:
   APP_NAME: Tsk
   BUNDLE_ID: com.julesseguin.tsk
 
-# Supersede only an OLDER build of the SAME PR — a new push to PR #X cancels
-# PR #X's in-flight run (we keep just the latest build per PR anyway). Different
-# PRs have different groups, so they build in parallel and never cancel each
-# other. The shared publish step is serialized separately, on the deploy job.
 concurrency:
-  group: release-pr-${{ github.event.pull_request.number }}
+  group: release-pr-${{ inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build signed .ipa
-    runs-on: xcode-27
-    # Exposed so the deploy job can no-op when signing isn't configured yet.
+  request:
+    name: Resolve requested installable
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
+      number: ${{ steps.pr.outputs.number }}
+      sha: ${{ steps.pr.outputs.sha }}
+      title: ${{ steps.pr.outputs.title }}
       configured: ${{ steps.preflight.outputs.configured }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Resolve current PR source
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,title,headRefOid,state,isCrossRepository > "$RUNNER_TEMP/pr.json"
+          python3 - <<'PYTHON'
+          import json, os
+          pr = json.load(open(os.environ['RUNNER_TEMP'] + '/pr.json'))
+          if pr['state'] != 'OPEN' or pr['isCrossRepository']:
+              raise SystemExit('Installables require an open PR from this repository')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('number=' + str(pr['number']) + '\nsha=' + pr['headRefOid'] + '\ntitle=' + json.dumps(pr['title']) + '\n')
+          PYTHON
 
-      # Without the signing secrets there is nothing to build that you could
-      # install, so leave the rest of the job inert and keep the PR check green.
-      # Set the four required secrets (see README.md) to turn it on.
       - name: Check signing secrets
         id: preflight
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
+          APPLE_WIDGET_PROVISIONING_PROFILE: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$APPLE_CERTIFICATE_P12" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] \
              && [ -n "$APPLE_PROVISIONING_PROFILE" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            if [ -z "$APPLE_SHARE_PROVISIONING_PROFILE" ] || [ -z "$APPLE_WIDGET_PROVISIONING_PROFILE" ]; then
+              echo '::error::Configured installables require both Share and Widget provisioning profiles.'
+              exit 1
+            fi
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "::notice title=Release skipped::Signing secrets not set — skipping the installable build. See README.md to enable it."
           fi
 
+  build:
+    needs: request
+    if: needs.request.outputs.configured == 'true'
+    name: Build signed .ipa
+    runs-on: xcode-27
+    # Exposed so the deploy job can no-op when signing isn't configured yet.
+    outputs:
+      configured: ${{ needs.request.outputs.configured }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.request.outputs.sha }}
+
       - name: Select Xcode 27
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "27.0"
@@ -66,7 +94,7 @@ jobs:
       # Import the distribution certificate into a throwaway keychain that lives
       # only for this run — the GitHub-hosted runner starts clean every time.
       - name: Import signing certificate
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         env:
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -100,7 +128,7 @@ jobs:
           echo "Imported identity: $IDENTITY"
 
       - name: Install target-specific provisioning profiles
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         env:
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
           APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
@@ -112,14 +140,14 @@ jobs:
       # depends on Core as a local SwiftPM package, which xcodebuild resolves on
       # its own — there are no CocoaPods here.
       - uses: dtolnay/rust-toolchain@1.99.0
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
 
       - name: Build pinned TaskChampion for iOS
-        if: steps.preflight.outputs.configured == 'true'
-        run: scripts/build-native.sh apple
+        if: needs.request.outputs.configured == 'true'
+        run: scripts/build-native.sh device
 
       - name: Archive
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -139,7 +167,7 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
 
       - name: Export .ipa
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -154,7 +182,7 @@ jobs:
       # Hand the signed .ipa to the deploy job, which publishes it. The build
       # itself touches nothing shared, so it stays per-PR parallel.
       - name: Upload .ipa artifact
-        if: steps.preflight.outputs.configured == 'true'
+        if: needs.request.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ipa
@@ -165,12 +193,12 @@ jobs:
       # The keychain lives in RUNNER_TEMP and the runner is ephemeral, but delete
       # it explicitly so a leaked log line can't outlive the run.
       - name: Clean up keychain
-        if: ${{ always() && steps.preflight.outputs.configured == 'true' }}
+        if: ${{ always() && needs.request.outputs.configured == 'true' }}
         run: security delete-keychain "$KEYCHAIN_PATH" || true
 
   deploy:
     name: Publish & Deploy
-    needs: build
+    needs: [request, build]
     if: needs.build.outputs.configured == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -218,9 +246,9 @@ jobs:
       - name: Assemble build history
         env:
           SITE_DIR: /tmp/site
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ needs.request.outputs.number }}
+          PR_TITLE: ${{ fromJSON(needs.request.outputs.title) }}
+          COMMIT_SHA: ${{ needs.request.outputs.sha }}
           IPA_PATH: /tmp/ipa/app.ipa
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           RETENTION: '5'
@@ -240,6 +268,8 @@ jobs:
       - name: Push build-history branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ needs.request.outputs.number }}
+          PR_TITLE: ${{ fromJSON(needs.request.outputs.title) }}
         run: |
           cd /tmp/site
           git init -q
@@ -247,7 +277,7 @@ jobs:
           git add -A
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-              commit -q -m "Publish PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+              commit -q -m "Publish PR #${PR_NUMBER}: ${PR_TITLE}"
           git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" build-history
 
       - name: Deploy to GitHub Pages
@@ -256,16 +286,16 @@ jobs:
 
   notify:
     name: Notify
-    needs: [build, deploy]
+    needs: [request, build, deploy]
     runs-on: ubuntu-latest
     if: ${{ always() && needs.build.outputs.configured == 'true' }}
     steps:
       - name: Send ntfy notification
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          SHORT_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ fromJSON(needs.request.outputs.title) }}
+          SHORT_SHA: ${{ needs.request.outputs.sha }}
+          PR_NUMBER: ${{ needs.request.outputs.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$NTFY_TOPIC" ]; then

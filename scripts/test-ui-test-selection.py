@@ -52,7 +52,20 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 7)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 29)
+
+    def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
+        for family, counts in (('iPhone', (41, 30)), ('iPad', (33, 29))):
+            for partition, count in zip(('workspace', 'row-editing'), counts):
+                filters = selection.selection('full', family, partition)
+                self.assertEqual(len(selection.selected_methods(filters)), count)
+                self.assertEqual(selection.requires_sync_server(filters), partition == 'workspace')
+        for family in ('iPhone', 'iPad'):
+            filters = selection.selection('smoke', family)
+            self.assertEqual(selection.requires_sync_server(filters), family == 'iPhone')
+        for case in ('SpotlightUITests', 'MissedNotificationUITests', 'SynchronizationUITests'):
+            self.assertTrue(selection.requires_sync_server(['-only-testing:TskUITests/' + case]))
+        self.assertFalse(selection.requires_sync_server(selection.selection('text', 'iPhone')))
 
     def test_smoke_covers_task_round_trip_without_hardware_or_installed_system_tours(self):
         for family in ("iPhone", "iPad"):

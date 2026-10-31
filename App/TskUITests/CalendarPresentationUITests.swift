@@ -34,8 +34,9 @@ import XCTest
             XCTAssertTrue(revealTaskElement(task, in: "task-list", app: app, requireFullVisibility: true))
             XCTAssertGreaterThan(task.frame.minY, spanning.frame.minY)
             capture("Tasks below Calendar \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
-            tapTaskControl(task, app: app)
+            openTaskInformation(task, app: app)
             XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
+            XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Prepare the release")
             capture("Task detail regression \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
             app.terminate()
         }
@@ -44,7 +45,7 @@ import XCTest
     func testEmptyCalendarDisappearsWithAndWithoutTasks() throws {
         for hasTask in [true, false] {
             let app = try launch("empty", hasTask: hasTask)
-            XCTAssertTrue(app.staticTexts["Tasks · Today"].waitForExistence(timeout: 10))
+            assertTodayTaskList(app)
             XCTAssertFalse(app.staticTexts["calendar-empty"].exists)
             XCTAssertFalse(app.staticTexts["Calendar · Today"].exists)
             XCTAssertFalse(app.buttons["calendar-request-access"].exists)
@@ -59,7 +60,6 @@ import XCTest
     func testMissingAccessHidesCalendarAndEnablesFromSettings() throws {
         for state in ["notDetermined", "denied", "restricted", "writeOnly", "unavailable"] {
             let app = try launch(state)
-            XCTAssertTrue(app.staticTexts["Tasks · Today"].waitForExistence(timeout: 10))
             assertCalendarHidden(app)
             XCTAssertTrue(taskRow(named: "Prepare the release", app: app).isHittable)
             capture("Hidden Calendar access \(state)", app)
@@ -82,7 +82,6 @@ import XCTest
     func testReadFailureHidesCalendarAndSettingsRetryRecoversWithTasksUsable() throws {
         for largeText in [false, true] {
             let failed = try launch("failure", largeText: largeText)
-            XCTAssertTrue(failed.staticTexts["Tasks · Today"].waitForExistence(timeout: 10))
             assertCalendarHidden(failed)
             XCTAssertTrue(taskRow(named: "Prepare the release", app: failed).isHittable)
             capture("Hidden Calendar read failure \(largeText ? "accessibility XXXL" : "light")", failed)
@@ -107,7 +106,7 @@ import XCTest
         let task = taskRow(named: "Prepare the release", app: app)
         XCTAssertTrue(revealTaskElement(task, in: "task-list", app: app, initialScrollUp: true))
         capture("Many events tasks remain reachable", app)
-        tapTaskControl(task, app: app)
+        openTaskInformation(task, app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         tapTaskControl(app.buttons["complete-task"], app: app)
         XCTAssertTrue(task.waitForNonExistence(timeout: 10))
@@ -155,6 +154,7 @@ import XCTest
     }
 
     private func assertCalendarHidden(_ app: XCUIApplication) {
+        assertTodayTaskList(app)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch.exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'calendar-event-'")).firstMatch.exists)
         XCTAssertFalse(app.buttons["calendar-request-access"].exists)
