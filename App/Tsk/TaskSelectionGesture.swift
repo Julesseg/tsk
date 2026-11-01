@@ -62,11 +62,15 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     var rows: [TaskSelectionRow] = []
     private var initial = CGPoint.zero
     private var latest = CGPoint.zero
-    private var traversedY: ClosedRange<CGFloat> = 0...0
+    private var positions: [CGPoint] = []
     private var previousY: CGFloat = 0
     private var frozenRows: [TaskSelectionRow] = []
-    private var touched: Set<UUID> = []
-    private var selectsTouchedRows = true
+    private var initialTaskID: UUID?
+    private var initialRowID: String?
+    private var initialSelection: Set<UUID> = []
+    private var enteredTaskIDs: [UUID] = []
+    private var currentRowID: String?
+    private let feedback = UISelectionFeedbackGenerator()
     private var scrollViews: [(UIScrollView, Bool, CGPoint)] = []
     #if DEBUG
     private var proof = TaskSelectionGestureProof()
@@ -93,11 +97,15 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         collapsedLayout = nil
         initial = touch.location(in: nil)
         latest = initial
-        traversedY = initial.y...initial.y
+        positions = [initial]
         guard viewport.contains(initial), let row = rows.first(where: { $0.bounds.contains(initial) }),
               store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else { state = .failed; return }
-        touched = [row.id]
-        selectsTouchedRows = !store.selectedTaskIDs.contains(row.id)
+        initialTaskID = row.id
+        initialRowID = row.rowID
+        initialSelection = store.selectedTaskIDs
+        enteredTaskIDs = []
+        currentRowID = row.rowID
+        feedback.prepare()
         frozenRows = rows
         previousY = initial.y
         released = false
@@ -134,11 +142,11 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             let token = generation
             let selectionGeneration = store?.taskSelectionGeneration
             let wasEditing = store?.rowEditing != nil
-            let initialIDs = touched
-            let selecting = selectsTouchedRows
             if !wasEditing {
-                guard store?.activateSelectionGesture(initialIDs, selecting: selecting) == true else { state = .cancelled; finish(); return }
+                guard store?.activateSelectionGesture() == true else { state = .cancelled; finish(); return }
                 tracking = true
+                replayPositions()
+                applySelection()
             }
             preparation = Task { [weak self] in
                 guard let self, token == self.generation, let store = self.store,
@@ -151,25 +159,19 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                     #endif
                     guard token == self.generation, !Task.isCancelled,
                           selectionGeneration == store.taskSelectionGeneration else { return }
-                    let ready = await store.beginSelectionGesture(initialIDs, selecting: selecting)
+                    let ready = await store.beginSelectionGesture()
                     guard token == self.generation else { return }
                     if !ready { self.state = .cancelled; self.finish(); return }
                     await self.waitForCollapsedRows()
                     guard token == self.generation, !Task.isCancelled,
                           selectionGeneration == store.taskSelectionGeneration else { return }
                     self.frozenRows = self.rows
-                    self.touched = initialIDs
-                    let low = max(self.viewport.minY, self.traversedY.lowerBound)
-                    let high = min(self.viewport.maxY, self.traversedY.upperBound)
-                    for row in self.frozenRows where row.bounds.maxY >= low && row.bounds.minY <= high {
-                        self.touched.insert(row.id)
-                    }
-                    self.previousY = self.latest.y
+                    self.replayPositions()
                     if !self.released { self.freezeScrolling(in: self.view) }
                 }
                 guard selectionGeneration == store.taskSelectionGeneration else { return }
                 self.tracking = true
-                store.applySelectionGesture(self.touched, selecting: selecting)
+                self.applySelection()
                 self.updateSwipeFeedback(at: self.latest)
                 #if DEBUG
                 self.recordProof(touch)
@@ -191,10 +193,10 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
             }
         }
         if state == .began || state == .changed {
-            let low = max(viewport.minY, min(previousY, point.y))
-            let high = min(viewport.maxY, max(previousY, point.y))
-            for row in frozenRows where row.bounds.maxY >= low && row.bounds.minY <= high { touched.insert(row.id) }
-            if tracking, store?.isSelectionGestureActive == true { store?.applySelectionGesture(touched, selecting: selectsTouchedRows) }
+            if tracking, store?.isSelectionGestureActive == true {
+                recordRowEntries(from: previousY, to: point.y)
+                applySelection()
+            }
             updateSwipeFeedback(at: point)
             #if DEBUG
             recordProof(touch)
@@ -205,7 +207,13 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let touch = touches.first { recordPosition(touch.location(in: nil)) }
+        if let touch = touches.first {
+            recordPosition(touch.location(in: nil))
+            if tracking, store?.isSelectionGestureActive == true {
+                recordRowEntries(from: previousY, to: latest.y)
+                applySelection()
+            }
+        }
         if state == .began || state == .changed { state = .ended; release() }
         else { state = .failed }
     }
@@ -248,7 +256,35 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     private func recordPosition(_ point: CGPoint) {
         latest = point
-        traversedY = min(traversedY.lowerBound, point.y)...max(traversedY.upperBound, point.y)
+        positions.append(point)
+    }
+
+    private func replayPositions() {
+        enteredTaskIDs = []
+        currentRowID = initialRowID
+        for (from, to) in zip(positions, positions.dropFirst()) {
+            recordRowEntries(from: from.y, to: to.y)
+        }
+        previousY = latest.y
+    }
+
+    private func recordRowEntries(from: CGFloat, to: CGFloat) {
+        let low = max(viewport.minY, min(from, to))
+        let high = min(viewport.maxY, max(from, to))
+        let crossed = frozenRows.filter { $0.bounds.maxY > low && $0.bounds.minY <= high }
+            .sorted { from <= to ? $0.bounds.minY < $1.bounds.minY : $0.bounds.minY > $1.bounds.minY }
+        for row in crossed where row.rowID != currentRowID {
+            enteredTaskIDs.append(row.id)
+            currentRowID = row.rowID
+        }
+        currentRowID = frozenRows.first { $0.bounds.minY <= to && to < $0.bounds.maxY && viewport.minY <= to && to < viewport.maxY }?.rowID
+    }
+
+    private func applySelection() {
+        guard let initialTaskID, let store,
+              store.applySelectionGesture(startingAt: initialTaskID, from: initialSelection, entering: enteredTaskIDs) else { return }
+        feedback.selectionChanged()
+        feedback.prepare()
     }
 
     private func updateSwipeFeedback(at point: CGPoint) {

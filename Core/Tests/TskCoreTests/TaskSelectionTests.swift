@@ -2,6 +2,23 @@ import Foundation
 import Testing
 import TskCore
 
+@Test(arguments: [false, true])
+func sweepReentryReversesChangedRowsWhileKeepingItsStartingTaskFixed(deselecting: Bool) async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let first = try await manager.create(TaskDraft(description: "Starting task"))
+    let second = try await manager.create(TaskDraft(description: "Crossed task"))
+    let third = try await manager.create(TaskDraft(description: "Already in the intended state"))
+    let fourth = try await manager.create(TaskDraft(description: "Last task"))
+    let tasks = [first, second, third, fourth]
+    let baseline: Set<UUID> = deselecting ? [first.id, second.id, fourth.id] : [third.id]
+    let forward = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id])
+    #expect(forward == (deselecting ? [] : Set(tasks.map(\.id))))
+    let returned = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id, third.id, second.id, first.id])
+    #expect(returned == (deselecting ? [second.id] : [first.id, third.id, fourth.id]))
+    let repeated = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id, third.id, second.id, first.id, second.id])
+    #expect(repeated == (deselecting ? [] : Set(tasks.map(\.id))))
+}
+
 @Test func keyboardSelectionCompletesOnlyTheChosenTaskAndKeepsItsAttributes() async throws {
     let manager = TaskManager(replica: TestReplica())
     let first = try await manager.create(TaskDraft(description: "First", attributes: ["opaque": "retain first"]))
