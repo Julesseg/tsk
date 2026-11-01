@@ -194,3 +194,37 @@ against runtime 27.0. A passing smoke/full conclusion alone must not be describe
 as a measured performance improvement. Probe methods and instrumentation are
 excluded from the branch. Existing durable journeys now check that reselecting
 High and No project preserves their native selected state and saved value.
+
+## Presentation lifecycle diagnostic control
+
+At `11826cb`, canonical smoke passed all four iPhone methods. The iPad passed
+its workspace journey but rejected a valid enabled/hittable Select All sample
+at 5.045723 seconds, beyond the unchanged five-second budget. The same native
+query took about 0.3 seconds earlier in that journey; other reads also slowed
+before validation. This remains separate from a missing menu or a proved
+provider fault. No same-head retry or full run was spent.
+
+The 60-second first-High animation-idle wait reproduced in canonical iPhone
+smoke; it did not reproduce on iPad. The iPhone row journey passed in 431.957
+seconds. This confirms that the local stall is not just a local toolchain gap;
+functional smoke success does not establish performance acceptance.
+
+The next head is a temporary observation-only control. A valid simulator UI-test
+session explicitly enables bounded menu presentation/end callbacks, animator
+completion timestamps, window/responder/keyboard observations and aggregate
+layout/intrinsic/configuration counters. Public UIKit delegate overrides call
+super. The recorder does not add AX queries, wait for a new callback, force an
+animation to finish, replace the menu delegate or change input/deadlines. At most
+256 event records persist in the existing participant-fixture artifact collection.
+It is disabled outside Debug simulator sessions. This diagnostic must be removed
+before final acceptance.
+
+Two local controls were aborted before menu admission when the Mac developed
+severe load and swap pressure. They provide no lifecycle verdict; owned devices
+were shut down/deleted, and a pre-existing device was left alone. Canonical smoke
+will provide the controlled phone/iPad comparison. Full dispatch is held until the
+known stall is resolved or the UIKit candidate is rolled back. If this control
+provides an actionable lifecycle boundary, permit one treatment at that boundary;
+otherwise roll the candidate back while preserving independent CI/test fixes and
+record the original SwiftUI lost-action problem as unresolved. Rollback itself is
+not full-suite acceptance.
