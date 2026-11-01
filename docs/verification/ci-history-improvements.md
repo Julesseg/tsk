@@ -159,7 +159,7 @@ smoke rollup remains green. Audit every CI run at the exact head, including its
 execution manifest and both families' complete selections, before reporting
 verification.
 
-## Retained native row menu candidate
+## Rejected native row menu candidate
 
 The unchanged-source close/reopen probe reproduced a missing New project action
 while its admitted point remained inside the native menu cell. The cell and its
@@ -169,12 +169,12 @@ did not prevent menu reconstruction during accessibility work. Replacing Picker
 choices with native checked actions also lost New project on its tenth reopen;
 that alternative was discarded.
 
-Project and Priority now use a native button whose menu is retained until the
+The rejected candidate used a native button whose menu was retained until the
 editing owner, UTF8 selection or available options change. Current callbacks are
 refreshed separately; old actions reject changed owners/configurations and disabled
 controls. Checkmarks, fixed option order, unknown priorities, New project identity,
 the existing popover and 44-point hit targets remain. Menu and non-menu pills
-share their appearance modifier. The label uses a native content-configuration
+shared their appearance modifier. The label used a native content-configuration
 view with matching erased view types, rather than an unattached hosting controller.
 
 The first local retained-menu build passed 20 New project close/reopen cycles.
@@ -228,3 +228,76 @@ provides an actionable lifecycle boundary, permit one treatment at that boundary
 otherwise roll the candidate back while preserving independent CI/test fixes and
 record the original SwiftUI lost-action problem as unresolved. Rollback itself is
 not full-suite acceptance.
+
+
+### Canonical control result at `7438dc0`
+
+[Smoke 41329009190](https://github.com/Julesseg/tsk/actions/runs/41329009190)
+passed all four iPhone and both iPad methods on attempt one. This was the only
+workflow run at that head; no full suite was dispatched. Both consumer receipts
+identify merge checkout `d47401733e3dd7b7734bb2467e5e69987cfaaf12`, tree
+`6afb1631c6fafebd8a4b8dce54562b002f9c8bab`, identical to the head tree.
+Products were built with Xcode 27.0 (27A266a), SDK 27.0 (24A430), and executed
+on arm64 runtime 27.0 (24A434). The shared producer and both Linux lanes passed.
+
+The control reproduced the blocking iPhone animation-idle warning: first High
+tap entry 46.38s, warning 106.44s, synthesis 116.24s. The additional delay after
+the warning includes slow accessibility operations; the whole 69.86s is not an
+animation timeout. The durable-row method passed in 510.651s on iPhone and
+367.653s on iPad. Smoke success does not establish performance acceptance.
+
+Each raw lifecycle artifact contains 78 records from the original row-editing
+process, below the 256-record cap. First iPhone presentation completed 85.682s
+after `willDisplay`, after its choice action at 84.006s and dismissal. Later
+presentations completed before their actions: High in 1.726s, Project in 1.427s
+and 1.355s. On iPad the first High presentation completed in 2.742s, before its
+action at 7.022s; later completions took 1.420s, 1.337s and 1.368s.
+
+Before first iPhone presentation versus its choice action, button/window/menu/
+superview identity and button/label geometry were unchanged. Intrinsic-size
+reads stayed at two; layouts increased from one to two; size/frame changes and
+menu/label assignments stayed at one. Representable updates rose from 15 to 89,
+which alone does not establish sustained layout or configuration churn. No
+attachment change was recorded during that interval.
+
+`TaskKeyboardController` remained the observed native first responder on both
+families. Keyboard show completion occurred 2.463s after first iPhone
+`willDisplay`, versus 2.557s on iPad. The next phone keyboard events were hide
+notifications immediately before the choice action. Thus the phone has a late
+menu animator completion with stable measured attachment/geometry, while both
+families show keyboard lifecycle activity. This does not prove that the keyboard
+controller caused the stall or that all other app animation work was idle.
+The iPad Select All sequence passed under its original five-second admission
+budget; one pass does not resolve the earlier variable accessibility slowdown.
+
+The raw participant artifacts and XCTest logs are retained with this run.
+The rollback decision below supersedes the temporary hold. This control does
+not establish performance or full-suite acceptance.
+
+
+### Rollback decision
+
+The control established a late first presentation callback without identifying
+an actionable ownership or attachment transition. Both families and later phone
+menus retained the same native keyboard-controller responder and keyboard
+notification sequence. Making the button first responder would therefore test
+a new hypothesis rather than repair an observed ownership change. No responder
+or label treatment was applied.
+
+The UIKit menu candidate and temporary lifecycle recorder are removed. Project
+and Priority return to their original SwiftUI Menu/Picker implementation, with
+the original label style, popover, unfocus gesture and hit targets. The existing
+High and No project selected-state/reselection assertions remain, along with
+all independent CI, full-suite journey, native-admission and geometry corrections.
+
+This restores the known SwiftUI native-cell replacement/lost-action failure.
+That defect remains unresolved; rollback is not a menu fix. New exact-head smoke
+and full coverage on both families are required. Full will be dispatched only
+when the rollback head passes smoke, with all native postconditions and original
+deadlines intact. Source removal alone does not prove that the measured idle
+stall is absent or that the full suite is reliable.
+
+Rollback source verification: local generic-simulator `build-for-testing` passed
+with Xcode 27.1 beta; all 22 selection/partition regressions passed. The restored
+row editor is byte-identical to its pre-candidate `2acb582` version. These checks
+did not boot a simulator and do not establish canonical runtime acceptance.
