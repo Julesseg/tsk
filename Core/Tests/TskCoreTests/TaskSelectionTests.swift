@@ -11,12 +11,30 @@ func sweepReentryReversesChangedRowsWhileKeepingItsStartingTaskFixed(deselecting
     let fourth = try await manager.create(TaskDraft(description: "Last task"))
     let tasks = [first, second, third, fourth]
     let baseline: Set<UUID> = deselecting ? [first.id, second.id, fourth.id] : [third.id]
-    let forward = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id])
+    func selection(entering path: [UUID]) -> Set<UUID> {
+        manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: path.map { TaskSelectionVisit(rowID: $0.uuidString, taskID: $0) })
+    }
+    let forward = selection(entering: [second.id, third.id, fourth.id])
     #expect(forward == (deselecting ? [] : Set(tasks.map(\.id))))
-    let returned = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id, third.id, second.id, first.id])
+    let returned = selection(entering: [second.id, third.id, fourth.id, third.id, second.id, first.id])
     #expect(returned == (deselecting ? [second.id] : [first.id, third.id, fourth.id]))
-    let repeated = manager.selectedTasks(in: tasks, from: baseline, startingAt: first.id, entering: [second.id, third.id, fourth.id, third.id, second.id, first.id, second.id])
+    let repeated = selection(entering: [second.id, third.id, fourth.id, third.id, second.id, first.id, second.id])
     #expect(repeated == (deselecting ? [] : Set(tasks.map(\.id))))
+}
+
+@Test(arguments: [false, true])
+func sweepDistinguishesUpcomingAppearancesFromReturningOverTheSameRow(deselecting: Bool) async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let first = try await manager.create(TaskDraft(description: "Starting task"))
+    let second = try await manager.create(TaskDraft(description: "Scheduled and due"))
+    let baseline: Set<UUID> = deselecting ? [first.id, second.id] : []
+    let scheduled = TaskSelectionVisit(rowID: "scheduled", taskID: second.id)
+    let due = TaskSelectionVisit(rowID: "due", taskID: second.id)
+    let duplicateStart = TaskSelectionVisit(rowID: "starting-task-due", taskID: first.id)
+    let forward = manager.selectedTasks(in: [first, second], from: baseline, startingAt: first.id, entering: [scheduled, due, duplicateStart])
+    #expect(forward == (deselecting ? [] : [first.id, second.id]))
+    let returned = manager.selectedTasks(in: [first, second], from: baseline, startingAt: first.id, entering: [scheduled, due, duplicateStart, scheduled])
+    #expect(returned == (deselecting ? [second.id] : [first.id]))
 }
 
 @Test func keyboardSelectionCompletesOnlyTheChosenTaskAndKeepsItsAttributes() async throws {

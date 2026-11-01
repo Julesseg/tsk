@@ -35,7 +35,7 @@ extension TaskStore {
         return true
     }
 
-    func applySelectionGesture(startingAt initial: UUID, from selection: Set<UUID>, entering path: [UUID]) -> Bool {
+    func applySelectionGesture(startingAt initial: UUID, from selection: Set<UUID>, entering path: [TaskSelectionVisit]) -> Bool {
         let updated = manager.selectedTasks(in: visibleTasks, from: selection, startingAt: initial, entering: path)
         guard updated != selectedTaskIDs else { return false }
         selectedTaskIDs = updated

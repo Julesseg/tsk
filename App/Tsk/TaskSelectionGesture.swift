@@ -68,7 +68,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     private var initialTaskID: UUID?
     private var initialRowID: String?
     private var initialSelection: Set<UUID> = []
-    private var enteredTaskIDs: [UUID] = []
+    private var rowVisits: [TaskSelectionVisit] = []
     private var currentRowID: String?
     private let feedback = UISelectionFeedbackGenerator()
     private var scrollViews: [(UIScrollView, Bool, CGPoint)] = []
@@ -103,7 +103,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         initialTaskID = row.id
         initialRowID = row.rowID
         initialSelection = store.selectedTaskIDs
-        enteredTaskIDs = []
+        rowVisits = []
         currentRowID = row.rowID
         feedback.prepare()
         frozenRows = rows
@@ -260,7 +260,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     }
 
     private func replayPositions() {
-        enteredTaskIDs = []
+        rowVisits = []
         currentRowID = initialRowID
         for (from, to) in zip(positions, positions.dropFirst()) {
             recordRowEntries(from: from.y, to: to.y)
@@ -274,7 +274,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         let crossed = frozenRows.filter { $0.bounds.maxY > low && $0.bounds.minY <= high }
             .sorted { from <= to ? $0.bounds.minY < $1.bounds.minY : $0.bounds.minY > $1.bounds.minY }
         for row in crossed where row.rowID != currentRowID {
-            enteredTaskIDs.append(row.id)
+            rowVisits.append(TaskSelectionVisit(rowID: row.rowID, taskID: row.id))
             currentRowID = row.rowID
         }
         currentRowID = frozenRows.first { $0.bounds.minY <= to && to < $0.bounds.maxY && viewport.minY <= to && to < viewport.maxY }?.rowID
@@ -282,7 +282,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     private func applySelection() {
         guard let initialTaskID, let store,
-              store.applySelectionGesture(startingAt: initialTaskID, from: initialSelection, entering: enteredTaskIDs) else { return }
+              store.applySelectionGesture(startingAt: initialTaskID, from: initialSelection, entering: rowVisits) else { return }
         feedback.selectionChanged()
         feedback.prepare()
     }
