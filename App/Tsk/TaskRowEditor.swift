@@ -138,7 +138,6 @@ private struct TaskRowEditorContent: View {
             .scrollIndicators(.hidden)
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
-            .modifier(TaskNativeScrollTrace())
             .transition(.opacity)
             VStack(alignment: .leading, spacing: 12) {
                 TaskAvailabilityView(task: task, store: store)
@@ -209,13 +208,7 @@ private struct TaskRowParameterPill: View {
         .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
         .popover(isPresented: Binding(
             get: { editing.parameter == parameter },
-            set: { presented in
-                if TaskNativeInteractionTrace.enabled {
-                    TaskNativeInteractionTrace.event("popover.binding", ["parameter": parameter.rawValue, "presented": presented,
-                                                                         "active": editing.parameter?.rawValue ?? "nil"])
-                }
-                if !presented && editing.parameter == parameter { editing.parameter = nil }
-            }
+            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
         ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
                 .frame(width: 340)
@@ -234,10 +227,6 @@ private struct TaskRowParameterPill: View {
     }
 
     private func openPicker() {
-        if TaskNativeInteractionTrace.enabled {
-            TaskNativeInteractionTrace.event("parameter.action", ["parameter": parameter.rawValue,
-                                                                   "owner": String(describing: ObjectIdentifier(editing))])
-        }
         unfocus()
         editing.parameter = parameter
     }

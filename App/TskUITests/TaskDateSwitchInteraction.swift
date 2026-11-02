@@ -351,8 +351,7 @@ extension XCTestCase {
             beforeSample?(deadline)
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
             if let prepareKeyboard {
-                guard app.keyboards.firstMatch.exists, ProcessInfo.processInfo.systemUptime < deadline,
-                      prepareKeyboard(deadline), ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                guard prepareKeyboard(deadline), ProcessInfo.processInfo.systemUptime < deadline else { return false }
             }
             return app.keyboards.firstMatch.exists && ProcessInfo.processInfo.systemUptime < deadline
         }

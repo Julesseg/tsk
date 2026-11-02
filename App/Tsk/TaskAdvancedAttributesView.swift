@@ -56,14 +56,8 @@ struct TaskAdvancedAttributesEditor: View {
                 ForEach(store.attributeDefinitions) { definition in
                     Section(definition.label.isEmpty ? definition.name.rawValue : definition.label) {
                         Toggle("Set value", isOn: Binding(get: { value(definition) != nil }, set: { enabled in
-                            let before = TaskNativeInteractionTrace.enabled ? value(definition) : nil
                             focusedAttribute = nil
                             edits.updateValue(enabled ? initialValue(definition) : nil, forKey: definition.name.rawValue)
-                            if TaskNativeInteractionTrace.enabled {
-                                TaskNativeInteractionTrace.event("attribute.binding", ["definition": definition.name.rawValue,
-                                                                                       "enabled": enabled, "before": before ?? "nil",
-                                                                                       "after": value(definition) ?? "nil"])
-                            }
                         }))
                         .disabled(!task.canEdit || store.isSaving)
                         .accessibilityIdentifier("uda-enabled-\(definition.name.rawValue)")
@@ -131,7 +125,7 @@ struct TaskAdvancedAttributesEditor: View {
             .sheet(isPresented: $isDefining, onDismiss: { Task { await load() } }) { TaskAttributeDefinitionsView(store: store) }
             .task { await load() }
             .interactiveDismissDisabled(store.isSaving)
-            .modifier(TaskWorkspacePanel(store: store, nativeTraceScope: "advanced-attributes"))
+            .modifier(TaskWorkspacePanel(store: store))
         }
     }
 
@@ -159,6 +153,5 @@ struct TaskAdvancedAttributesEditor: View {
     private func load() async {
         do { try await store.loadAttributeDefinitions(); error = nil }
         catch { self.error = error.localizedDescription }
-        TaskNativeInteractionTrace.refreshOwnedWindows("attributes.loaded")
     }
 }

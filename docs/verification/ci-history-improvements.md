@@ -301,3 +301,68 @@ Rollback source verification: local generic-simulator `build-for-testing` passed
 with Xcode 27.1 beta; all 22 selection/partition regressions passed. The restored
 row editor is byte-identical to its pre-candidate `2acb582` version. These checks
 did not boot a simulator and do not establish canonical runtime acceptance.
+
+### Remaining native control at `d6c78dd`
+
+[Smoke 41458894620](https://github.com/Julesseg/tsk/actions/runs/41458894620)
+finished with iPhone 4/4 and iPad 1/2. The iPad failure occurred before the
+rebase push: the selected High option was absent after reopening Priority.
+It was a test failure, not a superseded/cancelled result.
+[Regression 41458934757](https://github.com/Julesseg/tsk/actions/runs/41458934757)
+finished with iPhone 2/5 and iPad 3/6. Every selected method ran exactly once;
+Share ran in its installed-extension phase on both families. Both runs' producers,
+Linux lanes and source/runtime admission passed. No full run or test retry was
+requested at this source.
+
+Smoke products identify PR merge `ed46fde488b512df7dd8b80f5d4115c1473ca460`;
+regression products identify head `d6c78dd38012d8dd262e3bb5284420c7758e9ab7`.
+Both trees are `9afe2e07d7ee063086a7f6caf690fa6bba008495`, matching the head.
+All four workers identify arm64 runtime 27.0 (24A434), Xcode 27.0 (27A266a),
+and SDK 27.0 (24A430). Immutable result artifact IDs are 13154451933 and
+13155047634 for smoke, 13156477323 and 13156614265 for regression, ordered
+by iPhone then iPad. An artifact-transfer HTTP 503 account-egress limit was
+retried successfully; that was a read retry, not another test execution.
+
+- Calendar's repaired iPad keyboard journey passed in 111.634s, including its
+  native input and persistent reopen assertions. This is runtime evidence at
+  this old source, not acceptance of a subsequent rebase.
+- View reordering passed on both families in regression (82.227s/90.302s), and
+  on iPhone smoke (134.557s). The native drag and persisted ordering assertions
+  remain. Finite passes do not establish general reliability.
+- Share failed both families before Select All. The first post-focus keyboard
+  existence read exhausted the original five-second aggregate budget before
+  the preparation callback could run. The phone recording shows the focused
+  field and native keyboard education screen with Continue replacing ordinary
+  keys. Requiring an ordinary keyboard before dismissing that screen prevents
+  preparation. The correction runs the existing known-prompt callback after
+  field focus, then requires the keyboard; all preparation, native input,
+  dismissal and final reads remain charged to the same five seconds.
+- The iPad durable row failed its second admitted New-project option tap at
+  48.03s. The same process recorded the first action and expected dismissal,
+  but no second action entry, parameter assignment or subsequent nil reset.
+  This demotes action-then-reset for that failure. Event-time option ownership
+  was not captured, so it does not establish which native delivery boundary
+  failed and does not justify a UIKit/responder or presentation workaround.
+- Scheduled's original twelve-drag failure was not reached: iPad stopped at
+  New project. Passing/earlier scroll samples do not distinguish ancestor
+  swipe actions, child menu ownership or content sizing. No scrolling treatment
+  was selected.
+- iPad typed attributes stopped at Effort before Review. Note has a binding
+  update plus observed native valueChanged/up events; passing Score has a
+  binding update without those callbacks, exposing incomplete replacement
+  coverage. Effort has no setter event, but absence of native callbacks cannot
+  establish lost input with that coverage gap. The phone recorded successful
+  initial bindings for all five types, then exceeded its ten-minute method
+  allowance after relaunch. Neither result proves a binding-reset defect.
+- Phone organization stopped earlier at Select All admission, before the
+  No-project reopening check. Its failure does not verify or reject that
+  specific opener correction.
+
+No behavioral treatment was selected from the inconclusive native controls.
+Their raw per-session/PID participant JSON, registration metadata, eviction
+counts, XCTest bundles and logs remain in the immutable artifacts above.
+Temporary native observers, geometry callbacks, binding logs and launch flags
+are removed before the next clean verification source. The concrete 44-point
+inner hit area, 26-point capsule and fresh five-second reorder acknowledgement
+remain. The next native run checks the Share ordering correction and all affected
+journeys; clean exact-head smoke and full on both families still gate acceptance.

@@ -179,13 +179,6 @@ final class TaskKeyboardRouter {
 
     #if DEBUG && targetEnvironment(simulator)
     fileprivate func editingNotification(_ notification: Notification) {
-        if TaskNativeInteractionTrace.enabled,
-           notification.name == UITextView.textDidBeginEditingNotification || notification.name == UITextView.textDidEndEditingNotification
-            || notification.name == UITextField.textDidBeginEditingNotification || notification.name == UITextField.textDidEndEditingNotification,
-           let view = notification.object as? UIView, let window = view.window,
-           controllers.values.contains(where: { $0.value?.viewIfLoaded?.window === window }) {
-            TaskNativeInteractionTrace.refresh(window, reason: notification.name.rawValue)
-        }
         guard editingDiagnosticCount < 32, let view = notification.object as? UIView, let window = view.window,
               controllers.values.contains(where: { $0.value?.viewIfLoaded?.window === window }) else { return }
         let identity = ObjectIdentifier(view)
@@ -314,10 +307,7 @@ private struct TaskKeyboardScope: UIViewRepresentable {
         view.register()
     }
 
-    static func dismantleUIView(_ view: ScopeView, coordinator: ()) {
-        view.router?.remove(view.id)
-        TaskNativeInteractionTrace.removeScope(view)
-    }
+    static func dismantleUIView(_ view: ScopeView, coordinator: ()) { view.router?.remove(view.id) }
 
     final class ScopeView: UIView {
         let id = UUID()
@@ -326,10 +316,7 @@ private struct TaskKeyboardScope: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            if window == nil {
-                router?.remove(id)
-                TaskNativeInteractionTrace.removeScope(self)
-            }
+            if window == nil { router?.remove(id) }
             else {
                 register()
                 DispatchQueue.main.async { [weak self] in self?.register() }
@@ -337,12 +324,7 @@ private struct TaskKeyboardScope: UIViewRepresentable {
         }
 
         func register() {
-            guard let window else { return }
-            if commands.contains(where: { $0.id == "collapse" }) {
-                TaskNativeInteractionTrace.refresh(window, reason: "keyboard-scope", scope: self)
-            } else {
-                TaskNativeInteractionTrace.removeScope(self)
-            }
+            guard window != nil else { return }
             var responder: UIResponder? = self
             while let next = responder?.next {
                 if let controller = next as? UIViewController {

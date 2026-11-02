@@ -64,7 +64,6 @@ final class TaskAttributeUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
-        app.launchEnvironment["TSK_DEBUG_PR77_NATIVE_TRACE"] = "1"
         app.launch()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
