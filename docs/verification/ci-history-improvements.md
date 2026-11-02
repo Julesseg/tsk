@@ -770,3 +770,50 @@ The generic arm64 test build and strict metadata/entitlement/App Shortcut
 verifier pass with Xcode27.1 beta. Both source review axes found no actionable
 defects. No local simulator was booted. Remove all temporary observation before
 clean exact-head smoke/full acceptance on both families.
+
+### Registration control result and outer-container candidate
+
+At `1fb284434892fd662a59259c66f41253c70b48f2`, focused41527821188 reproduced
+the iPad native option failure on cycle10 after nine complete cycles, at line322
+after 202.339s. PID12066 exported 175 records, 18 parameter writes and zero
+evictions. Startup applies1–5 have complete linked main-request brackets.
+The last apply is at receipt uptime798.273; the failed option ends at941.810.
+The same touch starts in `row-new-project`, reports the menu container before
+ended dispatch and produces no project write. Apply/request ordinals remain5/5
+through the preceding Done, opener and failed selection. No new apply occurred
+for143.537s. This valid negative control demotes contemporaneous app registration
+as the explanation for this failure. Do not disable keyboard commands or retain
+an unbounded theory about an old main-menu request.
+
+Phone native assertions completed fourteen cycles before cycle15 field failure,
+at line322 after 417.377s. Its PID5974 trace has 223 records, 26 writes and zero
+evictions, but stops after cycle13 Done at21:36:32, before a later passing cycle14.
+Thus it lacks late observer/export coverage; it cannot establish the failed
+phone touch route or absence of later registration. Zero evictions alone is
+insufficient. Both families passed High/reselection and neither reached focus20.
+
+Smoke41527798547 passed phone4/4 and failed iPad1/2: its first New-project field
+was absent at line191 after 172.625s; adaptive navigation passed. The smoke merge
+source `8253012e` has the same tree as the head. All four consumers match exact
+product source/tree, Xcode27.0/27A266a, SDK24A430 and arm64 runtime24A434.
+Exactly two head workflows ran, both terminal failure. No full or retry ran.
+
+The next single treatment removes only the outer `GlassEffectContainer` around
+the existing parameter HStack. Keep spacing6, horizontal padding4, child order,
+both scroll views, capsule/hit geometry, focus callbacks, native Menu/Picker,
+popover and both zoom modifiers unchanged. Keep the same diagnostic observer
+for one treatment execution; no keyboard behavior or observer change is stacked.
+This follows the preselected negative-control branch and tests an ancestor
+participation hypothesis, not a proven glass cause. No explicit glass-effect
+modifier was found on these pills; that does not establish container inertness.
+
+Require the same native twenty-cycle/High/reselection/focus journey, geometry,
+values, Done behavior and original budgets on both families. Recurring native
+option loss rejects this treatment and requires reverting it before another
+seam. Known focus/read-budget failures retain their own coverage boundaries.
+Inspect actual layout, capsule/group appearance, anchors and opening/closing
+motion; source equivalence does not establish visual compliance. Functional
+success is bounded evidence, not cause proof or clean acceptance. The generic
+arm64 test build and strict artifact verifier pass, both source review axes are
+clear, and no local simulator was booted. Remove all temporary observation before
+clean exact-head smoke and full acceptance on both families.
