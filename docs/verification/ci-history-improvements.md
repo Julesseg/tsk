@@ -892,3 +892,67 @@ diagnostic sample dictionary. Standards review also caught moved-event sampling;
 that work is now restricted to the planned boundaries, and both review axes
 are clear. No simulator was booted locally. This remains diagnostic-only; remove
 all temporary observers before clean exact-head smoke/full/design acceptance.
+
+### Weak-origin result and project gesture-composition experiment
+
+At `3cbc079e3e499283cf52691cf270c009e915ca3e`, focused41536761171 captured
+a complete phone failure on cycle18 after seventeen complete cycles, at line322
+after 296.334s. PID30410 exported 287 records, 34 parameter writes and zero
+evictions, drops or relevant touch truncation. Capture284/after285 retain the
+original option recipient. Before-ended286 reports the menu container with no
+assignment; the original leaf/content/cell/collection remain alive, attached,
+in their original frames, and the original collection slot still returns the
+same cell at `[1,0]`. The preceding opener control280 matches the captured
+candidate at `(100,194)` and retains its direct attachment and frame.
+
+Crucial correction: this is not fully unchanged visibility. The original
+collection's model alpha is1 at284/285 and0 at286/287, while its child views'
+own alpha remains1. All seventeen successful pre-ended selections have
+collection alpha1 and deliver the project write. The first audit summary
+incorrectly called the entire original subtree visible; it checked attachment
+and hidden/enabled state but missed the ancestor alpha. This corrected public
+property observation demotes persistent destructive replacement and establishes
+a pre-action opacity/routing discriminator. It does not measure presentation-
+layer opacity, establish the ordering of fade versus retarget between samples,
+prove rendered pixels disappeared, or identify a consuming gesture.
+
+iPad PID7176 exported 315 records and 38 parameter writes with zero evictions.
+Nineteen complete native selections passed, then the original focused-cycle20
+keyboard-nonexistence assertion failed at line316 after 328.423s, before option20.
+High selection/reselection passed on both families. Registration/request ordinals
+remain5/5. Product and consumers identify the exact head/tree, Xcode27.0/27A266a,
+SDK24A430 and arm64 runtime24A434. Smoke41536609400 passed all four phone and
+two iPad methods; its merge source has the identical head tree. All four workers
+are accounted for. Exactly two head workflows ran, with focused failure and
+smoke success; no full or retry ran.
+
+The next single treatment structurally omits the extra simultaneous TapGesture
+from the fixed Project Menu branch only. Priority retains the original gesture.
+This is different from the rejected `890a4db` enabled-condition experiment,
+which still invoked the gesture modifier; neither source proves native
+recognizer topology. Keep Menu/Picker/options/bindings, styling/hit region,
+popover host/anchor/zoom, namespace, glass, scrolling and observer unchanged.
+`openPicker` still unfocuses before assigning project after actual selection.
+No alternate gesture, new focus mechanism, responder operation or input variant
+is combined with this experiment.
+
+Use one exact-head focused treatment on each family. A recurring attempted
+native option drop rejects omission and requires reverting it before another
+seam. Track collection alpha, routing and action separately; alpha0 with a
+successful action would change the proposed mechanism, not fail correctness.
+Every existing admission, value/Done and timing assertion remains. The project
+opener's unfocus callback is intentionally absent in this diagnostic, so keep
+focused-cycle20's keyboard prerequisite asserted before option selection.
+If ordinary selections pass but only that prerequisite fails, record nineteen
+attempted passes and no option20 result; provisional retention is experimental,
+not proof of repair. The phone control never reached focus20, so do not relabel
+a newly exposed phone focus failure as proven baseline behavior. Final repair
+still requires opener dismissal before native option selection using an
+evidence-selected public mechanism, followed by the complete native journey.
+
+The generic arm64 test build and unchanged strict artifact verifier pass with
+Xcode27.1 beta, and both source review axes found no unintended defects. No
+local simulator was booted. The expected opener-focus deficit is explicitly
+diagnostic and remains an acceptance blocker until the full native focus journey
+passes. Keep observers only through controlled diagnosis, then verify clean
+exact-head smoke/full on both families before final acceptance.
