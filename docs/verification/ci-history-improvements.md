@@ -690,3 +690,23 @@ four-App-Shortcut verifier pass with Xcode27.1 beta. The first local invocation
 omitted the arm64 restriction and failed linking the unsupported Intel slice
 against the arm64-only Native artifact; the corrected build uses `ARCHS=arm64`
 as canonical CI does. This is build evidence only; no simulator was booted.
+
+### Matched zoom elimination rejected at `c0eac67`
+
+Focused menu41523293565 reproduced the native action defect on phone cycle8
+after seven complete New-project/Release/Done cycles. The case failed at line322
+after 162.209s. Its producer identifies head `c0eac67c386ea5013191fd33a372d2452f3d97a8`,
+tree `ec2109785dfc5ea1aeade76263af8bc27fc4d4e3`, Xcode27.0/27A266a,
+SDK24A430 and arm64 runtime24A434; consumer source and runtime match.
+PID11012 exported 132 records and 14 parameter writes with zero evictions.
+Cycle8 began inside the real `row-new-project` cell at `(185,308)`, then the
+same touch reported the menu container before ended dispatch, with no project
+write. High selection/reselection passed; focused cycle20 was not reached.
+
+This rejects project matched-source/zoom omission as a sufficient repair of
+the captured failure. Restore both original transition modifiers before any
+next treatment, thereby also restoring the required project motion. The result
+does not prove all transition machinery innocent or identify cell removal,
+private recognizer behavior or control consumption. Remaining family/smoke
+outcomes are retained and audited independently. No unchanged-source retry or
+full dispatch follows this red diagnostic.
