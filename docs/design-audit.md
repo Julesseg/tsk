@@ -193,8 +193,10 @@ Accepted selection gesture:
   tasks.
 - The initial task chooses select or deselect mode and stays fixed during the
   gesture. Re-entering another row changed by the gesture reverses it; dwelling
-  within a row does not toggle repeatedly. Distinct Upcoming appearances share
-  task selection but are not mistaken for re-entry into the same row.
+  within a row does not toggle repeatedly. Crossing back into the preceding row
+  also reverses the turning-point row, so returning to the initial row undoes
+  the sweep. Distinct Upcoming appearances share task selection; reversing
+  between two appearances of the same task changes that task only once.
 - Provide light selection haptics when selection changes.
 - Disable list scrolling during the selection gesture.
 

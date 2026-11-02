@@ -250,7 +250,7 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
         let crossed = frozenRows.filter { $0.bounds.maxY > low && $0.bounds.minY <= high }
             .sorted { from <= to ? $0.bounds.minY < $1.bounds.minY : $0.bounds.minY > $1.bounds.minY }
         for row in crossed where row.rowID != currentRowID {
-            rowVisits.append(TaskSelectionVisit(rowID: row.rowID, taskID: row.id))
+            rowVisits.append(TaskSelectionVisit(rowID: row.rowID, taskID: row.id, moving: from <= to ? .next : .previous))
             currentRowID = row.rowID
         }
         currentRowID = frozenRows.first { $0.bounds.minY <= to && to < $0.bounds.maxY && viewport.minY <= to && to < viewport.maxY }?.rowID
