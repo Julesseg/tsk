@@ -33,8 +33,12 @@ enum TaskNativeTouchDiagnostics {
     private static var exportPending = false
     private static var lastExportedSequence = 0
     private static var expandedOwner: String?
+    private static var keyboardApplyOrdinals: [String: Int] = [:]
+    private static var mainRebuildRequestOrdinals: [String: Int] = [:]
     private static var destination: URL?
     private static let output = DispatchQueue(label: "tsk.pr77.native-touch-export", qos: .utility)
+
+    static var isRecording: Bool { installed }
 
     static func installIfRequested(application: UIApplication) {
         let environment = ProcessInfo.processInfo.environment
@@ -73,6 +77,25 @@ enum TaskNativeTouchDiagnostics {
         exportAfterDispatch()
     }
 
+    static func keyboardRegistrationWillApply(router: UUID, ordinal: Int, details: [String: String]) {
+        guard installed else { return }
+        keyboardApplyOrdinals[router.uuidString] = max(keyboardApplyOrdinals[router.uuidString] ?? 0, ordinal)
+        append("keyboard-registration.apply", details: details.merging([
+            "router": router.uuidString, "applyOrdinal": String(ordinal)
+        ]) { _, current in current })
+        exportAfterDispatch()
+    }
+
+    static func mainRebuildRequest(router: UUID, applyOrdinal: Int, requestOrdinal: Int, phase: String) {
+        guard installed else { return }
+        mainRebuildRequestOrdinals[router.uuidString] = max(mainRebuildRequestOrdinals[router.uuidString] ?? 0, requestOrdinal)
+        append("main-rebuild.request." + phase, details: [
+            "router": router.uuidString, "applyOrdinal": String(applyOrdinal),
+            "requestOrdinal": String(requestOrdinal), "menuSystem": "main"
+        ])
+        exportAfterDispatch()
+    }
+
     static func receive(_ event: UIEvent, stage: String) {
         guard installed, event.type == .touches else { return }
         for touch in (event.allTouches ?? []).prefix(4) {
@@ -106,6 +129,8 @@ enum TaskNativeTouchDiagnostics {
                 "phase": String(touch.phase.rawValue), "type": String(touch.type.rawValue),
                 "tapCount": String(touch.tapCount), "location": NSCoder.string(for: location),
                 "view": touch.view.map(identity) ?? "nil", "window": touch.window.map(identity) ?? "nil",
+                "keyboardApplyOrdinals": ordinalSignature(keyboardApplyOrdinals),
+                "mainRebuildRequestOrdinals": ordinalSignature(mainRebuildRequestOrdinals),
                 "ancestorLimitReached": String(view != nil),
                 "recognizersTruncated": String((touch.gestureRecognizers?.count ?? 0) > 16)
             ], ancestors: ancestors, recognizers: recognizers)
@@ -149,6 +174,10 @@ enum TaskNativeTouchDiagnostics {
     }
 
     private static func identity(_ object: AnyObject) -> String { String(describing: ObjectIdentifier(object)) }
+
+    private static func ordinalSignature(_ values: [String: Int]) -> String {
+        values.sorted { $0.key < $1.key }.map { $0.key + ":" + String($0.value) }.joined(separator: ",")
+    }
 }
 
 extension UIApplication {

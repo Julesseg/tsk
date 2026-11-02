@@ -710,3 +710,63 @@ does not prove all transition machinery innocent or identify cell removal,
 private recognizer behavior or control consumption. Remaining family/smoke
 outcomes are retained and audited independently. No unchanged-source retry or
 full dispatch follows this red diagnostic.
+
+The completed iPad case failed at line322 after 352.997s on cycle16, after
+fifteen complete New-project/Release/Done cycles. PID18978 exported 240 records,
+30 parameter writes and zero evictions, but its final records cover the cycle16
+opener only. XCTest reports the option synthesis at321.05s; there is no matching
+captured option touch or assignment. This does not establish the same retarget
+mechanism on iPad or prove missing UIKit delivery: the unmatched input/export
+boundary remains unresolved. Both families passed High selection/reselection;
+neither reached focused cycle20. Video samples show the successful ordinary
+anchored picker and the still-visible native menu around failure, with the
+keyboard visible. They do not resolve the short touch interval or establish
+keyboard causality. No animation-completion warning appears in these logs.
+
+Smoke41523270337 passed phone4/4, including the reorder that previously failed,
+and failed iPad1/2. The iPad durable journey executed native project/tag editing,
+Scheduled reveal/calendar selection, validation and relaunch persistence, then
+failed the original five-second stable completion-circle geometry admission
+after expanding the plain row, at line549. Accessibility reads were slow; no
+specific ownership or geometry cause is established. Adaptive navigation passed.
+These executions add Scheduled coverage on this diagnostic head but do not
+resolve its historical intermittency on a clean candidate. The smoke product
+uses PR merge source `1b384cde`, whose tree matches `c0eac67`. All four workers
+match canonical source/tree/runtime. Exactly two head workflows are terminal;
+no full or retry ran. The zoom omission is reverted in `42e847f`.
+
+### Observe actual keyboard-command registration
+
+With the original row editor, popover, zoom and glass structure restored, add
+one observation seam at actual `TaskKeyboardRouter.applyRegistration` entry.
+The existing opt-in bounded touch recorder receives router/apply ordinal,
+effective scope, scope-to-controller identities, previous installed weak-host
+liveness, current unique hosts and complete old/new declaration signatures.
+Nil and empty titles remain distinct. Linked before/after records bracket only
+the existing main-menu rebuild request; touch records carry cumulative apply
+and request ordinals. No ordinary refresh polling, responder capture, hierarchy
+scan, extra UIKit hook or forced synchronous diagnostic is introduced.
+
+Apple distinguishes the [main and context menu systems](https://developer.apple.com/documentation/uikit/uimenusystem).
+The app calls `.main.setNeedsRebuild()`. A request timestamp is neither a
+context-menu rebuild nor UIKit completion. Reconciliation, key removal/addition,
+scope resolution, focus, gestures and the original request order remain intact.
+This control measures native mutations hidden by the older diagnostic's
+class-name deduplication; it does not assume that such mutations cause the drop.
+
+Use one canonical focused run on each family with the original native input,
+twenty cycles, High/reselection, focused cycle20 and deadlines. Require matching
+session/PID, startup apply coverage, complete request brackets, cumulative
+ordinals and no relevant eviction before interpreting an absent registration.
+A valid failed option with no apply from the previous Done through selection
+demotes contemporaneous app registration; do not retain an unbounded theory
+about an old main request. Temporal host/declaration churn selects a boundary
+for further investigation, not permission to disable commands or menu rebuilds.
+Only passes, unrelated focus/read-budget failures or missing trace coverage
+remain inconclusive. Do not combine this control with glass removal or another
+behavior change, and do not retry unchanged source or dispatch full on known red.
+
+The generic arm64 test build and strict metadata/entitlement/App Shortcut
+verifier pass with Xcode27.1 beta. Both source review axes found no actionable
+defects. No local simulator was booted. Remove all temporary observation before
+clean exact-head smoke/full acceptance on both families.

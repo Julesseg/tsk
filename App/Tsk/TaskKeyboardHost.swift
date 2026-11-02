@@ -33,6 +33,9 @@ final class TaskKeyboardRouter {
     private var installationCount = 0
     private var removalCount = 0
     private var menuRebuildCount = 0
+    private var registrationApplyCount = 0
+    private var registrationRequestCount = 0
+    private var lastAppliedDeclarations: [TaskKeyboardDeclaration] = []
     #endif
 
     init() {
@@ -68,6 +71,31 @@ final class TaskKeyboardRouter {
     }
 
     private func applyRegistration() {
+        #if DEBUG && targetEnvironment(simulator)
+        registrationApplyCount += 1
+        let applyOrdinal = registrationApplyCount
+        let currentDeclarations = commands.map { TaskKeyboardDeclaration(id: $0.id, input: $0.input, modifiers: $0.modifiers.rawValue, title: $0.title) }
+        if TaskNativeTouchDiagnostics.isRecording {
+            func hostDescription(_ controller: UIViewController?) -> String {
+                controller.map { String(describing: ObjectIdentifier($0)) + ":" + String(describing: type(of: $0)) } ?? "nil"
+            }
+            func declarationSignature(_ declarations: [TaskKeyboardDeclaration]) -> String {
+                declarations.map {
+                    "id=" + String(reflecting: $0.id) + ";input=" + String(reflecting: $0.input)
+                    + ";modifiers=" + String($0.modifiers) + ";title=" + ($0.title.map { String(reflecting: $0) } ?? "nil")
+                }.joined(separator: "|")
+            }
+            TaskNativeTouchDiagnostics.keyboardRegistrationWillApply(router: id, ordinal: applyOrdinal, details: [
+                "routerObject": String(describing: ObjectIdentifier(self)), "activeScope": order.last?.uuidString ?? "nil",
+                "scopeHosts": order.map { $0.uuidString + "=" + hostDescription(controllers[$0]?.value) }.joined(separator: "|"),
+                "previousHosts": installed.map { String(describing: $0.key) + "=" + hostDescription($0.value.0.value) }.sorted().joined(separator: "|"),
+                "currentHosts": Set(controllers.values.compactMap(\.value).map { hostDescription($0) }).sorted().joined(separator: "|"),
+                "previousDeclarations": declarationSignature(lastAppliedDeclarations),
+                "currentDeclarations": declarationSignature(currentDeclarations)
+            ])
+        }
+        lastAppliedDeclarations = currentDeclarations
+        #endif
         for (_, (controller, keys)) in installed {
             guard let controller = controller.value else { continue }
             keys.forEach(controller.removeKeyCommand)
@@ -91,8 +119,14 @@ final class TaskKeyboardRouter {
             #endif
             installed[identity] = (WeakKeyboardController(controller), keys)
         }
+        #if DEBUG && targetEnvironment(simulator)
+        registrationRequestCount += 1
+        let requestOrdinal = registrationRequestCount
+        TaskNativeTouchDiagnostics.mainRebuildRequest(router: id, applyOrdinal: applyOrdinal, requestOrdinal: requestOrdinal, phase: "before")
+        #endif
         UIMenuSystem.main.setNeedsRebuild()
         #if DEBUG && targetEnvironment(simulator)
+        TaskNativeTouchDiagnostics.mainRebuildRequest(router: id, applyOrdinal: applyOrdinal, requestOrdinal: requestOrdinal, phase: "after")
         menuRebuildCount += 1
         #endif
     }
