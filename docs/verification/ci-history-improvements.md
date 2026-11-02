@@ -562,3 +562,55 @@ stacked onto this correction. Generic direct-layout test build and the unchanged
 real metadata/entitlement verifier pass; both review axes are clear. No local
 simulator was booted. Native recording coverage remains unverified, and the
 observer must still be removed before clean exact-head smoke/full acceptance.
+
+### Valid touch control and project presentation ownership candidate
+
+At `7e6ec5fa80fa91a0dac6975dd9549cbf1bef6419`, smoke41515274355 passed
+all four phone and two iPad methods. Its PR merge source `3188492e` has the
+same tree `73923571dcb5a5ff9d3a0598cc5493b5826b2882` as the head. Focused
+menu41515362524 failed both families with different boundaries. Both products
+and consumers match Xcode27.0/27A266a, SDK27.0/24A430 and arm64
+runtime27.0/24A434. All head workflows are accounted for; no full or retry ran.
+No matching-snapshot or animation-completion warning appears in these logs.
+
+Phone PID11384 exported 48 records with zero evictions. Cycle1's actual
+New-project touch remained in its option-cell ancestry through before-ended
+dispatch, then wrote project on the active expanded editing owner. Its nil
+touch view after successful dispatch is normal. Cycle2 began on the same native
+option and point, but the same touch reported the menu container before ended
+dispatch, with no project write. The method failed at field appearance, line322,
+after 86.457s. This locates the captured defect before parameter assignment;
+it does not prove cell removal, control consumption or a particular recognizer
+as the cause. Private class names identify observations only.
+
+iPad PID9331 exported 300 records, zero evictions and 38 parameter writes.
+Nineteen complete New-project/Release/Done cycles passed. At cycle20 the focused
+title remained first responder after the project opener, and the original
+five-second keyboard-nonexistence assertion failed at line316, after 355.038s.
+No cycle20 option tap occurred. This is a separate baseline focus blocker,
+not evidence of an option drop. High selection/reselection passed on both
+families. Missing later keyboard diagnostics do not establish absence of host
+replacement because those receipts deduplicate host class names.
+
+The next single treatment separates only the project popover presenter from
+its native Menu source. An always-present passive background anchor owns the
+project popover binding and parameter observation. The native Menu retains its
+Picker, option order, UTF8 selection, New-project action, label, gesture and
+44-point hit region. The visible source retains the same namespace and matched
+transition source; the sibling presenter retains the original zoom, 340-point
+content, bounds anchor, top arrow and compact adaptation. Nonproject controls
+keep their existing path. No focus repair is combined with this experiment.
+The generic direct-layout test build and strict artifact verifier pass, and
+Standards and Spec reviews found no actionable source defects. This does not
+establish runtime effectiveness or presented-content interaction.
+
+Retain the existing temporary observer for one treatment execution on each
+family with unchanged input, geometry, twenty cycles, High/reselection and
+deadlines. Any repeated option drop rejects this candidate; revert it before
+another ownership treatment. A repeat of the baseline iPad cycle20 focus
+failure after nineteen completed cycles remains a separate blocker and provides
+no cycle20 option coverage. Phone twenty-cycle success would be bounded positive
+evidence, not proof of reliability; nineteen passing iPad cycles alone would
+not distinguish treatment from control. Address focus separately after this
+experiment. Remove the temporary observer before clean exact-head smoke and
+full acceptance on both families. Share and Scheduled coverage gaps also remain.
