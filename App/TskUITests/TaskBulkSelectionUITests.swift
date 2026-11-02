@@ -16,18 +16,19 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testSwipeSelectionDoesNotRequireNativeAccessibilityIdentifiers() throws {
+    func testLongPressSelectionDoesNotRequireNativeAccessibilityIdentifiers() throws {
         let app = try launch(animationsEnabled: true, nativeIdentifiers: false)
-        app.buttons["task-" + first].swipeRight()
+        app.buttons["task-" + first].press(forDuration: 0.8)
         let count = app.staticTexts["task-selection-count"]
         XCTAssertTrue(count.waitForExistence(timeout: 5))
         XCTAssertEqual(count.label, "1 selected")
+        XCTAssertFalse(app.buttons["start-task-" + first].exists, "Long press must select without presenting the former row menu")
         XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Selected")
-        app.buttons["task-" + first].swipeRight()
-        XCTAssertEqual(count.label, "0 selected", "A swipe starting on a selected row deselects it")
+        app.buttons["task-" + first].press(forDuration: 0.8)
+        XCTAssertEqual(count.label, "0 selected", "A long press starting on a selected row deselects it")
         XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Not selected")
-        app.buttons["task-" + first].swipeRight()
-        XCTAssertEqual(count.label, "1 selected", "A fresh swipe uses its own starting state")
+        app.buttons["task-" + first].press(forDuration: 0.8)
+        XCTAssertEqual(count.label, "1 selected", "A fresh long press uses its own starting state")
         app.buttons["task-selection-done"].tap()
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
     }
