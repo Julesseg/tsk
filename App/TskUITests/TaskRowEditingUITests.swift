@@ -13,6 +13,140 @@ import XCTest
         XCUIDevice.shared.appearance = .light
     }
 
+    func testSupportingInformationEditsKeepTheExpandedDraftAndPersist() throws {
+        let app = try launch(supporting: true)
+        let title = expandTask(app)
+        let editor = app.scrollViews["task-row-supporting-scroll"]
+        let annotation = app.descendants(matching: .any)["row-note-annotation_1792144800"].firstMatch
+        XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
+        XCTAssertEqual(annotation.value as? String, "Review the accessibility findings\nKeep the release checklist nearby")
+        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["custom-field-note"].firstMatch, in: editor, app: app))
+        XCTAssertFalse(app.staticTexts["Identity"].exists)
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
+        capture("Supporting information is available inside the expanded row", app)
+        replaceTaskText(title, with: "Unsaved supporting draft", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
+        replaceTaskText(annotation, with: "Edited supporting note", app: app)
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: editor, app: app))
+        replaceTaskText(note, with: "New supporting note", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        tapTaskRowPill("stop-task", app: app)
+        XCTAssertTrue(app.buttons["start-task"].waitForExistence(timeout: 10))
+        XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
+        XCTAssertEqual(annotation.value as? String, "Edited supporting note")
+        XCTAssertEqual(note.value as? String, "New supporting note")
+        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
+        app.buttons["advanced-attributes"].tap()
+        setDateSwitch("uda-enabled-score", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
+        let score = app.descendants(matching: .any)["uda-value-score"].firstMatch
+        XCTAssertTrue(revealTaskElement(score, in: "advanced-attributes-form", app: app))
+        replaceTaskText(score, with: "invalid", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-attributes-keyboard"], app: app)
+        app.buttons["save-advanced-attributes"].tap()
+        XCTAssertTrue(app.staticTexts["advanced-attributes-error"].waitForExistence(timeout: 10))
+        capture("Typed custom field validation keeps the nested editor open", app)
+        app.buttons["Cancel"].tap()
+        XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
+        XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
+        app.buttons["collapse-task-row"].tap()
+        XCTAssertTrue(taskRow(named: "Unsaved supporting draft", app: app).waitForExistence(timeout: 10))
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
+        app.launch()
+        selectAllTasks(app)
+        app.buttons["task-" + taskID].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
+        let savedNote = app.descendants(matching: .any)["row-note-annotation_1792144801"].firstMatch
+        XCTAssertTrue(revealTaskElement(savedNote, in: editor, app: app))
+        XCTAssertEqual(savedNote.value as? String, "New supporting note")
+        XCTAssertEqual(annotation.value as? String, "Edited supporting note")
+        openTaskRowParameter("dependencies", app: app)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-task-")).count, 1)
+        app.buttons["close-dependencies"].tap()
+        capture("Supporting mutations and row title survive durable reopen", app)
+    }
+
+    func testSupportingInformationOverflowAndEmptyActionsAtAccessibilitySize() throws {
+        let app = try launch(largeText: true, supporting: true)
+        _ = expandTask(app)
+        let editor = app.scrollViews["task-row-supporting-scroll"]
+        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
+        capture("Populated supporting information at accessibility XXXL", app)
+        XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
+        app.buttons["collapse-task-row"].tap()
+        XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
+        app.buttons["task-A0000000-0000-0000-0000-000000000002"].tap()
+        XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["row-note-input"].firstMatch.exists)
+        openTaskRowParameter("dependencies", app: app)
+        let candidates = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-candidate-"))
+        XCTAssertTrue(candidates.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(revealTaskElement(app.buttons["dependency-candidate-A0000000-0000-0000-0000-000000000003"], in: "dependency-selection-list", app: app))
+        XCTAssertTrue(candidates.allElementsBoundByIndex.last!.label.contains("Completed dependency"))
+        app.buttons["close-dependencies"].tap()
+        XCTAssertFalse(app.staticTexts["No annotations"].exists)
+        XCTAssertFalse(app.staticTexts["No prerequisites"].exists)
+        capture("Empty supporting sections reduce to reachable actions", app)
+    }
+
+    func testDependencyLinksSaveSourceAndExpandTargetWithReturnRoute() throws {
+        let app = try launch(supporting: true)
+        let title = expandTask(app)
+        let link = app.buttons["dependency-task-A0000000-0000-0000-0000-000000000002"]
+        replaceTaskText(title, with: " ", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        openTaskRowParameter("dependencies", app: app)
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
+        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["back-from-linked-task"].exists)
+        replaceTaskText(title, with: "Source saved before following prerequisite", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        openTaskRowParameter("dependencies", app: app)
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
+        let back = app.buttons["back-from-linked-task"]
+        XCTAssertTrue(back.waitForExistence(timeout: 10))
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "Review accessibility findings")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "task-row-editor").count, 1)
+        capture("Dependency opens its containing list with the prerequisite expanded", app)
+        replaceTaskText(title, with: " ", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        back.tap()
+        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
+        XCTAssertTrue(back.exists)
+        replaceTaskText(title, with: "Changed prerequisite", app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        back.tap()
+        XCTAssertTrue(back.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "Source saved before following prerequisite", app: app).waitForExistence(timeout: 10))
+        app.buttons["task-" + taskID].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        openTaskRowParameter("dependencies", app: app)
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        XCTAssertTrue(link.label.contains("Changed prerequisite"))
+        let candidate = app.buttons["dependency-candidate-A0000000-0000-0000-0000-000000000004"]
+        XCTAssertTrue(candidate.exists)
+        XCTAssertLessThan(link.frame.minY, candidate.frame.minY)
+        candidate.tap()
+        let added = app.buttons["dependency-task-A0000000-0000-0000-0000-000000000004"]
+        XCTAssertTrue(added.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["close-dependencies"].exists)
+        let remove = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "remove-dependency-")).firstMatch
+        XCTAssertTrue(remove.exists)
+        remove.tap()
+        XCTAssertTrue(link.waitForNonExistence(timeout: 10))
+        app.buttons["close-dependencies"].tap()
+        XCTAssertEqual(app.buttons["row-dependencies"].value as? String, "1 dependencies")
+        XCTAssertEqual(title.value as? String, "Source saved before following prerequisite")
+        capture("Return route and dependency removal preserve the source task", app)
+    }
+
     func testMiddleRowOpensSpaceAroundItsFixedHeader() throws {
         let app = try launch(neighbors: true)
         let rows = app.collectionViews["task-list"].cells
@@ -269,7 +403,7 @@ import XCTest
         capture("Failed occurrence retains draft with internal overflow", app)
         XCTAssertTrue((title.value as? String ?? "").contains("unsaved"))
         XCTAssertEqual(app.buttons["row-tags"].value as? String, "retained")
-        XCTAssertFalse(app.buttons["collapse-task-row"].exists)
+        XCTAssertTrue(app.buttons["collapse-task-row"].exists)
     }
 
     func testAppearanceAndAccessibilityOverflow() throws {
@@ -383,13 +517,16 @@ import XCTest
         XCTAssertEqual(title.frame.minX, compact.minX, accuracy: 1)
         XCTAssertEqual(title.frame.minY, compact.minY, accuracy: 1)
         XCTAssertEqual(checkbox.frame.minY, circle.minY, accuracy: 1)
-        XCTAssertLessThanOrEqual(app.buttons["row-project"].frame.minY, title.frame.maxY + 6)
+        let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
+        XCTAssertTrue(notes.exists)
+        XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 6)
+        XCTAssertGreaterThan(app.buttons["row-project"].frame.minY, notes.frame.minY)
         XCTAssertTrue(checkbox.isEnabled)
-        XCTAssertFalse(app.buttons["collapse-task-row"].exists)
+        XCTAssertTrue(app.buttons["collapse-task-row"].exists)
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
@@ -407,6 +544,23 @@ import XCTest
             var otherAttributes = try XCTUnwrap(records[1]["attributes"] as? [[String: String]])
             otherAttributes.append(["key": "tag_accessibility", "value": ""])
             records[1]["attributes"] = otherAttributes
+        }
+        if supporting {
+            app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+            app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
+            var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
+            attributes += [
+                ["key": "annotation_1792144800", "value": "Review the accessibility findings\nKeep the release checklist nearby"],
+                ["key": "dep_a0000000-0000-0000-0000-000000000002", "value": "x"],
+                ["key": "depends", "value": "a0000000-0000-0000-0000-000000000002"],
+                ["key": "note", "value": "Focused work"],
+                ["key": "start", "value": "1792141200"]
+            ]
+            records[0]["attributes"] = attributes
+            records += [
+                ["id": "A0000000-0000-0000-0000-000000000003", "attributes": [["key": "description", "value": "Completed dependency"], ["key": "status", "value": "completed"]]],
+                ["id": "A0000000-0000-0000-0000-000000000004", "attributes": [["key": "description", "value": "Available prerequisite"], ["key": "status", "value": "pending"]]]
+            ]
         }
         if longTitle {
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])

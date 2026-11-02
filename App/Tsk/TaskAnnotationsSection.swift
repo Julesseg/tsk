@@ -8,31 +8,38 @@ struct TaskAnnotationsSection: View {
     let edit: (TaskAnnotation?) -> Void
 
     var body: some View {
-        Section("Annotations") {
-            if task.annotations.isEmpty { Text("No annotations").foregroundStyle(.secondary) }
-            ForEach(task.annotations) { annotation in
-                VStack(alignment: .leading, spacing: 8) {
-                    if let entry = annotation.entry {
-                        Text(entry, format: .dateTime.year().month().day().hour().minute().second())
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("Unrecognized timestamp: \(annotation.reference.rawValue)")
-                            .font(.caption).foregroundStyle(.secondary)
+        if task.annotations.isEmpty {
+            addButton
+        } else {
+            Section("Annotations") {
+                ForEach(task.annotations) { annotation in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let entry = annotation.entry {
+                            Text(entry, format: .dateTime.year().month().day().hour().minute().second())
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            Text("Date unavailable")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Text(annotation.text).textSelection(.enabled)
+                            .accessibilityIdentifier("annotation-text-\(annotation.reference.rawValue)")
+                        if task.canEdit {
+                            Button("Edit annotation", systemImage: "pencil") { edit(annotation) }
+                                .buttonStyle(.borderless).disabled(store.isSaving)
+                                .accessibilityIdentifier("edit-\(annotation.reference.rawValue)")
+                        }
                     }
-                    Text(annotation.text).textSelection(.enabled)
-                        .accessibilityIdentifier("annotation-text-\(annotation.reference.rawValue)")
-                    if task.canEdit {
-                        Button("Edit annotation", systemImage: "pencil") { edit(annotation) }
-                            .buttonStyle(.borderless).disabled(store.isSaving)
-                            .accessibilityIdentifier("edit-\(annotation.reference.rawValue)")
-                    }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                addButton
             }
-            if task.canEdit {
-                Button("Add annotation", systemImage: "plus.bubble") { edit(nil) }
-                    .disabled(store.isSaving).accessibilityIdentifier("add-annotation")
-            }
+        }
+    }
+
+    @ViewBuilder private var addButton: some View {
+        if task.canEdit {
+            Button("Add annotation", systemImage: "plus.bubble") { edit(nil) }
+                .disabled(store.isSaving).accessibilityIdentifier("add-annotation")
         }
     }
 }
@@ -69,7 +76,7 @@ struct TaskAnnotationEditor: View {
                 if let original {
                     Section("Original timestamp") {
                         if let entry = original.entry { Text(entry, format: .dateTime.year().month().day().hour().minute().second()) }
-                        else { Text(original.reference.rawValue).font(.caption.monospaced()) }
+                        else { Text("Date unavailable") }
                         Text("Editing keeps this annotation's original timestamp.").font(.footnote).foregroundStyle(.secondary)
                     }
                 }

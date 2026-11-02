@@ -136,6 +136,44 @@ class ArmedLogTests(unittest.TestCase):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_recorded_non_keyboard_timeout_restart_preserves_failure_and_remaining_cases(self):
+        protocol = relay.Protocol(TOKEN)
+        interrupted = 'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences'
+        following = 'SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate'
+        protocol.line(boundary(interrupted))
+        protocol.line(("Test Case '-[TskUITests." + interrupted.replace('/', ' ') + "]' exceeded execution time allowance of 10 minutes. The test may have hung; check Xcode's test report for additional diagnostics.").encode())
+        protocol.line(b'Restarting after unexpected exit, crash, or test timeout; summary will include totals from previous launches.')
+        protocol.line(boundary(following))
+        protocol.line(boundary(following, 'passed (1.0 seconds).'))
+        protocol.line(boundary(relay.CASE))
+        value = request()
+        self.assertEqual(protocol.line(marker(value).rstrip(b'\n')), value)
+        protocol.acknowledged(value)
+        protocol.line(boundary(relay.CASE, 'passed (1.0 seconds).'))
+        self.assertEqual(protocol.interrupted_cases, [interrupted])
+        self.assertIsNone(protocol.active)
+        with self.assertRaisesRegex(ValueError, 'Timed-out XCTest'):
+            protocol.finish()
+        with self.assertRaises(ValueError):
+            protocol.line(boundary(interrupted))
+
+    def test_restart_without_matching_non_keyboard_timeout_fails_closed(self):
+        for active in [None, relay.CASE, 'OtherTests/testOrdinary']:
+            protocol = relay.Protocol(TOKEN)
+            if active:
+                protocol.line(boundary(active))
+            with self.subTest(active=active), self.assertRaises(ValueError):
+                protocol.line(b'Restarting after unexpected exit, crash, or test timeout; summary will include totals from previous launches.')
+
+    def test_keyboard_or_mismatched_timeout_cannot_release_case_ownership(self):
+        for active, timed_out, pending in [(relay.CASE, relay.CASE, False), (relay.CASE, relay.CASE, True), ('OtherTests/testOrdinary', 'OtherTests/testDifferent', False)]:
+            protocol = relay.Protocol(TOKEN)
+            protocol.line(boundary(active))
+            if pending:
+                protocol.line(marker(request()).rstrip(b'\n'))
+            with self.subTest(active=active, pending=pending), self.assertRaises(ValueError):
+                protocol.line(("Test Case '-[TskUITests." + timed_out.replace('/', ' ') + "]' exceeded execution time allowance of 10 minutes. The test may have hung.").encode())
+
     def test_fixed_order_and_atomic_matching_ack_are_required_before_next_phase(self):
         protocol=relay.Protocol(TOKEN); protocol.line(boundary(relay.ANNOTATIONS))
         first=request(relay.ANNOTATIONS,'secondNoteCommandN'); protocol.line(marker(first).rstrip(b'\n'))
@@ -333,6 +371,52 @@ class ClientConnectionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RunTests(unittest.IsolatedAsyncioTestCase):
+    async def test_timeout_restart_keeps_relay_alive_until_owner_stops_then_retains_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            log, socket, stop, receipt_path = root / 'live.log', root / 'owned.sock', root / 'stop', root / 'relay.json'
+            log.touch(); socket.touch()
+            args = SimpleNamespace(log=str(log), socket=str(socket), udid=str(uuid.uuid4()), companion_pid=123, relay_token=TOKEN, receipt=str(receipt_path), stop_file=str(stop))
+            armed, continued = asyncio.Event(), asyncio.Event()
+            original_save = relay.save_receipt
+            def save(path, value):
+                original_save(path, value)
+                if value['state'] == 'waiting':
+                    armed.set()
+            observed = []
+            async def start_case(containers, name):
+                observed.append(name)
+                if observed == ['OtherTests/testTimedOut', None, 'OtherTests/testFollowing', None]:
+                    continued.set()
+            send = mock.AsyncMock()
+            with mock.patch.object(relay, 'make_sender', return_value=sender_context(send)), mock.patch.object(relay.stat, 'S_ISSOCK', return_value=True), mock.patch.object(relay, 'save_receipt', side_effect=save), mock.patch.object(relay.RunnerContainers, 'start_case', new=start_case):
+                task = asyncio.create_task(relay.run(args))
+                try:
+                    await asyncio.wait_for(armed.wait(), 1)
+                    with log.open('ab', buffering=0) as writer:
+                        writer.write(b'\n'.join([
+                            boundary('OtherTests/testTimedOut'),
+                            b"Test Case '-[TskUITests.OtherTests testTimedOut]' exceeded execution time allowance of 10 minutes. The test may have hung.",
+                            relay.RESTART,
+                            boundary('OtherTests/testFollowing'),
+                            boundary('OtherTests/testFollowing', 'passed (1.0 seconds).'),
+                        ]) + b'\n')
+                    await asyncio.wait_for(continued.wait(), 1)
+                    self.assertFalse(task.done())
+                    stop.touch()
+                    with self.assertRaisesRegex(ValueError, 'Timed-out XCTest'):
+                        await asyncio.wait_for(task, 1)
+                finally:
+                    if not task.done():
+                        task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+            receipt = json.loads(receipt_path.read_text())
+            self.assertEqual(receipt['state'], 'failed')
+            self.assertEqual(receipt['interruptedCases'], ['OtherTests/testTimedOut'])
+            self.assertEqual(receipt['cases'], {})
+            self.assertEqual(receipt['exchanges'], [])
+            send.assert_awaited_once_with(relay.RELEASES)
+
     async def test_one_sender_initializes_only_up_then_arms_with_sticky_same_process_proof(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)

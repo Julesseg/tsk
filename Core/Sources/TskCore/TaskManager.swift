@@ -182,14 +182,14 @@ public actor TaskManager {
         return try await updateTask(id: id, changes: changes)
     }
 
-    func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false) async throws -> TaskRecord {
+    func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false, annotationChanges: TaskAttributePatch = [:]) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let reserved = Set(["uuid", "id", "status", "entry", "modified", "start", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
         if let key = changes.keys.sorted().first(where: { reserved.contains($0) || $0.utf8.starts(with: "dep_".utf8) || $0.utf8.starts(with: "annotation_".utf8) }) {
             throw TaskManagementError.reservedAttribute(key)
         }
-        guard !changes.isEmpty else { return task }
+        guard !changes.isEmpty || !annotationChanges.isEmpty else { return task }
         var patch = try await normalizedUserAttributes(changes, requireDefinitions: userAttributesOnly)
         if changes.keys.contains("description") {
             let description = (changes["description"] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -197,6 +197,7 @@ public actor TaskManager {
             patch["description"] = description
         }
         patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
+        for (key, value) in annotationChanges { patch.updateValue(value, forKey: key) }
         patch["modified"] = String(Int(now().timeIntervalSince1970))
         if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)

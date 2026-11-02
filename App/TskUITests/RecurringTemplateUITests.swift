@@ -133,10 +133,15 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertFalse(row.waitForExistence(timeout: 2))
         openTemplates(app)
         app.collectionViews["recurring-template-list"].buttons["recurring-template-" + parentID].tap()
-        XCTAssertTrue(revealTaskElement(app.otherElements["raw-attribute-mask"], in: "task-detail-form", app: app) || revealTaskElement(app.staticTexts["raw-attribute-mask"], in: "task-detail-form", app: app))
-        let mask = app.descendants(matching: .any)["raw-attribute-mask"].firstMatch
-        XCTAssertEqual(mask.value as? String, "WW+")
-        capture("Occurrence completion mask persists after reopening shared storage", app)
+        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "task-detail-form", app: app))
+        app.buttons["view-series-occurrences"].tap()
+        let history = app.buttons["series-history-" + id]
+        XCTAssertTrue(history.waitForExistence(timeout: 10))
+        history.tap()
+        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
+        XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
+        capture("Completed occurrence remains in reopened series history", app)
     }
 
     func testMalformedSeriesMaskExposesAnErrorAndKeepsTheOccurrencePending() throws {

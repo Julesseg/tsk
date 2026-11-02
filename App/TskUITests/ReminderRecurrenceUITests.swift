@@ -54,11 +54,14 @@ final class ReminderRecurrenceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Weekly current anchor")
         XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
-        for (key, expected) in [("recur", "1week"), ("due", "1896598800"), ("scheduled", "1896598800"), ("status", "recurring")] {
-            let field = app.descendants(matching: .any).matching(identifier: "raw-attribute-" + key).firstMatch
-            XCTAssertTrue(revealTaskElement(field, in: "task-detail-form", app: app))
-            XCTAssertEqual(field.value as? String, expected)
+        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["recurrence-rule-value"].firstMatch, in: "task-detail-form", app: app))
+        XCTAssertTrue(app.descendants(matching: .any)["recurrence-rule-value"].firstMatch.label.contains("1week"))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-status"], in: "task-detail-form", app: app))
+        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Recurring"))
+        for identifier in ["task-planned-day", "task-deadline"] {
+            XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)[identifier].firstMatch, in: "task-detail-form", app: app))
         }
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         XCTAssertFalse(app.buttons["complete-task"].exists)
     }
 

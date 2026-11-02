@@ -44,6 +44,8 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["task-planned-day"].firstMatch, in: "task-detail-form", app: app))
         app.buttons["edit-task"].tap()
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(revealTaskElement(app.datePickers["planned-day-picker"], in: "task-editor-form", app: app))
         let tomorrow = app.buttons["plan-tomorrow"]
         XCTAssertTrue(revealTaskElement(tomorrow, in: "task-editor-form", app: app, initialScrollUp: false))
@@ -86,6 +88,8 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(" shared")
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(revealTaskElement(app.datePickers["planned-day-picker"], in: "task-editor-form", app: app))
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))

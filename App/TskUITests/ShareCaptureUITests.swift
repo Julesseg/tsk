@@ -76,8 +76,8 @@ import XCTest
         let note = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Full shared text café e\u{301}")).firstMatch
         XCTAssertTrue(revealTaskElement(note, in: "task-detail-form", app: app))
         XCTAssertTrue(note.label.contains("https://example.com/tsk-share?fixture=" + token))
-        for key in ["scheduled", "due"] {
-            XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["raw-attribute-" + key].firstMatch, in: "task-detail-form", app: app))
+        for identifier in ["task-planned-day", "task-deadline"] {
+            XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)[identifier].firstMatch, in: "task-detail-form", app: app))
         }
         capture("Main app retains exact shared annotation, project, tag and separate saved dates", app)
     }

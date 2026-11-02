@@ -269,5 +269,5 @@ jobs:
           UI_PARTITIONS: ${{ !inputs.diagnostic_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.ui_suite == 'full') && 'workspace,row-editing' || 'all' }}
         run: |
           set -euo pipefail
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" | \
-            python3 scripts/check-ui-shards.py --family "$UI_FAMILY" --partitions "$UI_PARTITIONS"
+          python3 scripts/check-ui-shards.py --family "$UI_FAMILY" --partitions "$UI_PARTITIONS" \
+            --jobs-endpoint "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs"

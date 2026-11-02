@@ -159,8 +159,8 @@ extension XCTestCase {
         }
     }
 
-    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, requiresVisibleKeyboard: Bool = false, file: StaticString = #filePath, line: UInt = #line) {
-        activateTaskControl(element, app: app, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { _ in
+    func tapTaskControlAtCenter(_ element: XCUIElement, app: XCUIApplication, requiresVisibleKeyboard: Bool = false, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        activateTaskControl(element, app: app, beforeSample: beforeSample, keyboardRequirement: requiresVisibleKeyboard ? .visible : .dismissal, file: file, line: line) { _ in
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
     }

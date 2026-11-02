@@ -3,6 +3,7 @@ import XCTest
 extension XCTestCase {
     @MainActor func taskTestApplication() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
         return app
@@ -62,7 +63,7 @@ extension XCTestCase {
         tapTaskControl(row, app: app)
         let information = app.buttons["task-row-information"]
         if information.waitForExistence(timeout: 2) {
-            let editor = app.scrollViews["task-row-editor"]
+            let editor = app.scrollViews["task-row-supporting-scroll"]
             if !information.isHittable { editor.swipeUp() }
             tapTaskControl(information, app: app)
             XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
@@ -72,8 +73,12 @@ extension XCTestCase {
 
 extension XCTestCase {
     @MainActor func openTaskRowParameter(_ identifier: String, app: XCUIApplication) {
+        tapTaskRowPill("row-" + identifier, app: app)
+    }
+
+    @MainActor func tapTaskRowPill(_ identifier: String, app: XCUIApplication) {
         let parameters = app.scrollViews["row-date-parameters"]
-        let button = app.buttons["row-" + identifier]
+        let button = app.buttons[identifier]
         guard button.waitForExistence(timeout: 5) else {
             XCTFail("Attribute pill is missing: \(identifier)")
             return
@@ -96,7 +101,7 @@ extension XCTestCase {
             let end = start.withOffset(CGVector(dx: direction * distance, dy: 0))
             start.press(forDuration: 0.1, thenDragTo: end)
         }
-        XCTFail("Attribute pill could not be reached: \(identifier)")
+        XCTFail("Attribute pill could not be reached: \(identifier); frame=\(button.frame); viewport=\(parameters.frame)")
     }
 }
 

@@ -36,6 +36,8 @@ CHORDS = {
     WORKSPACE: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33)},
 }
 BOUNDARY = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \([\d.,]+ seconds\)\.)$")
+TIMEOUT = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' exceeded execution time allowance of [\d.,]+ (?:seconds|minutes)\. .+$")
+RESTART = b'Restarting after unexpected exit, crash, or test timeout; summary will include totals from previous launches.'
 
 
 def unique_object(pairs):
@@ -163,14 +165,31 @@ class Protocol:
         self.pending = None
         self.cases = {}
         self.requests = set()
+        self.timed_out = None
+        self.interrupted_cases = []
 
     def line(self, raw):
+        timeout = TIMEOUT.fullmatch(raw)
+        if timeout:
+            suite, method = timeout.groups()
+            name = suite.decode() + '/' + method.decode()
+            if self.active != name or name in CHORDS or self.pending is not None or self.timed_out is not None:
+                raise ValueError('Unexpected or keyboard XCTest timeout')
+            self.timed_out = name
+            self.interrupted_cases.append(name)
+            return None
+        if raw == RESTART:
+            if self.timed_out is None or self.active != self.timed_out or self.pending is not None:
+                raise ValueError('XCTest restart lacks a matching non-keyboard timeout')
+            self.active = None
+            self.timed_out = None
+            return None
         boundary = BOUNDARY.fullmatch(raw)
         if boundary:
             suite, method, outcome, result = boundary.groups()
             name = suite.decode() + '/' + method.decode()
             if outcome == b'started.':
-                if self.active is not None or self.pending is not None or name in self.cases:
+                if self.active is not None or self.pending is not None or name in self.cases or name in self.interrupted_cases:
                     raise ValueError('Overlapping or repeated XCTest case')
                 self.active = name
                 if name in CHORDS:
@@ -178,12 +197,15 @@ class Protocol:
             else:
                 if self.active != name or self.pending is not None:
                     raise ValueError('Unexpected XCTest case completion')
+                if self.timed_out is not None and result != b'failed':
+                    raise ValueError('Timed-out XCTest case cannot pass')
                 if name in CHORDS:
                     record = self.cases[name]
                     record['result'] = result.decode()
                     if result == b'passed' and record['completed'] != list(CHORDS[name]):
                         raise ValueError('Passed keyboard case lacks its complete command sequence')
                 self.active = None
+                self.timed_out = None
             return None
         if ABORT in raw:
             request = parse_marker(raw + b'\n', self.token, ABORT)
@@ -215,6 +237,8 @@ class Protocol:
     def finish(self):
         if self.pending is not None or self.active is not None:
             raise ValueError('Incomplete XCTest case or HID exchange')
+        if self.interrupted_cases:
+            raise ValueError('Timed-out XCTest cases remain failed')
 
 
 def releases(events):
@@ -417,7 +441,7 @@ async def run(args):
     with receipt_path.open('x'):
         pass
     protocol = Protocol(args.relay_token)
-    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayPID=os.getpid(), relayToken=args.relay_token, cases=protocol.cases, exchanges=[])
+    receipt = dict(state='preparing', udid=args.udid, socket=args.socket, companionPID=args.companion_pid, relayPID=os.getpid(), relayToken=args.relay_token, cases=protocol.cases, interruptedCases=protocol.interrupted_cases, exchanges=[])
     save_receipt(receipt_path, receipt)
     task = asyncio.current_task()
     loop = asyncio.get_running_loop()

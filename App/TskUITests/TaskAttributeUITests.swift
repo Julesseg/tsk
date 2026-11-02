@@ -128,10 +128,25 @@ final class TaskAttributeUITests: XCTestCase {
         XCTAssertTrue(scoreDefinition.waitForNonExistence(timeout: 10))
         app.navigationBars.buttons["Done"].tap()
         app.buttons["Cancel"].tap()
-        let storedScore = app.descendants(matching: .any).matching(identifier: "raw-attribute-score").firstMatch
-        XCTAssertTrue(revealTaskElement(storedScore, in: "task-detail-form", app: app))
-        XCTAssertEqual(storedScore.value as? String, "-1.25")
-        capture("Removing a local definition keeps the raw task value", app: app)
+        XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-score"].firstMatch.exists)
+        XCTAssertFalse(app.descendants(matching: .any)["custom-field-score"].firstMatch.exists)
+        openAdvanced(app)
+        app.buttons["manage-attribute-definitions"].tap()
+        app.buttons["new-attribute-definition"].tap()
+        let restoredName = app.textFields["attribute-definition-name"]
+        XCTAssertTrue(restoredName.waitForExistence(timeout: 5))
+        restoredName.tap()
+        restoredName.typeText("score")
+        tapTaskControlAtCenter(app.buttons["dismiss-definition-keyboard"], app: app)
+        app.buttons["attribute-definition-type"].tap()
+        tapTaskMenuItem(app.buttons["Numeric"], app: app)
+        app.buttons["save-attribute-definition"].tap()
+        XCTAssertTrue(restoredName.waitForNonExistence(timeout: 10))
+        app.navigationBars["Attribute definitions"].buttons["Done"].tap()
+        let restoredScore = field("uda-value-score", app: app)
+        XCTAssertTrue(revealTaskElement(restoredScore, in: "advanced-attributes-form", app: app))
+        XCTAssertEqual(restoredScore.value as? String, "-1.25")
+        capture("Restoring a definition reveals its preserved value through the typed control", app: app)
     }
 
     private func openDefinitions(_ app: XCUIApplication) {

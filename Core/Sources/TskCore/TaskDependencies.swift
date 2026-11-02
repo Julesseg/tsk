@@ -14,6 +14,22 @@ public struct TaskDependencyLink: Identifiable, Equatable, Sendable {
     public var id: Data { Data(reference.utf8) }
 }
 
+public struct TaskDependencyOptions: Sendable {
+    public let links: [TaskDependencyLink]
+    public let candidates: [TaskRecord]
+
+    public init(task: TaskRecord, tasks: [TaskRecord], search: String = "") {
+        let linked = task.dependencyLinks(in: tasks)
+        links = linked.filter { $0.task?.status != "completed" } + linked.filter { $0.task?.status == "completed" }
+        let references = Set(task.dependencyReferences)
+        let available = tasks.filter {
+            $0.id != task.id && $0.status != "deleted" && !references.contains($0.id.uuidString.lowercased()) &&
+                (search.isEmpty || $0.description.localizedCaseInsensitiveContains(search))
+        }
+        candidates = available.filter { $0.status != "completed" } + available.filter { $0.status == "completed" }
+    }
+}
+
 public extension TaskRecord {
     var dependencyReferences: [String] {
         attributes.keys.compactMap { key in

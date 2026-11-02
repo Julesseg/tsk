@@ -41,6 +41,7 @@ struct ContentView: View {
     @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
+    @State private var linkedTaskIDs: Set<UUID> = []
     @State private var sidebarError: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var projectPath = NavigationPath()
@@ -67,31 +68,15 @@ struct ContentView: View {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
         }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
-    }
-
-    private func dismissRowParameter() {
-        store.rowEditing?.parameter = nil
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }, reveal: { task in
+            closeRow { linkedTaskIDs.insert(task.id); showInformation(task) }
+        }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {
-        guard let editing = store.rowEditing, !editing.isSaving, editing.isExpanded else { return }
-        if editing.parameter != nil { dismissRowParameter(); return }
-        editing.isSaving = true
+        guard let editing = store.rowEditing else { return }
         Task {
-            do {
-                let changes = try editing.draft.changes()
-                let saved = changes.isEmpty ? editing.draft.original : await store.update(id: editing.draft.original.id, changes: changes)
-                guard let saved else {
-                    editing.error = store.error
-                    editing.isSaving = false
-                    return
-                }
-                editing.savedTask = saved
-                await editing.setExpanded(false, reduceMotion: reduceMotion)
-                store.rowEditing = nil
-                after?()
-            } catch { editing.error = error.localizedDescription; editing.isSaving = false }
+            if await editing.saveAndCollapse(in: store, reduceMotion: reduceMotion) { after?() }
         }
     }
 
@@ -107,11 +92,19 @@ struct ContentView: View {
     }
 
     private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects && store.customView == nil }
+    private var isShowingLinkedColumn: Bool {
+        presentation == .columns && !isProjectWorkspace && selectedTask?.canEdit == true
+            && selectedTaskID.map(linkedTaskIDs.contains) == true
+    }
 
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
-            resetNavigation()
-            store.selectWorkspaceView(view)
+            let select = {
+                resetNavigation()
+                store.selectWorkspaceView(view)
+            }
+            if store.rowEditing != nil { closeRow(after: select) }
+            else { select() }
         })
     }
 
@@ -255,8 +248,7 @@ struct ContentView: View {
     private var selectedTaskDetail: some View {
         Group {
             if let task = selectedTask {
-                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-                    .id(task.id)
+                taskDestination(task.id).id(task.id)
             } else {
                 ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
                     .accessibilityIdentifier("workspace-detail-empty")
@@ -267,7 +259,11 @@ struct ContentView: View {
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
         if let task = store.allTasks.first(where: { $0.id == id }) {
-            TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+            if linkedTaskIDs.contains(id), task.canEdit {
+                TaskLinkedTaskList(source: store, taskID: id, onBack: isShowingLinkedColumn ? { selectedTaskID = nil } : nil)
+            } else {
+                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
+            }
         } else {
             ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
         }
@@ -399,6 +395,8 @@ struct ContentView: View {
 
     private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
         TaskListView(store: store, selection: selection, calendar: calendar, edit: { showInformation($0) })
+            .disabled(isShowingLinkedColumn)
+            .accessibilityHidden(isShowingLinkedColumn)
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -410,7 +408,7 @@ struct ContentView: View {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
+                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
@@ -485,7 +483,8 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+        guard !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
+              !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
         #endif
@@ -543,7 +542,7 @@ private enum TaskWorkspacePresentation: Equatable {
     case columns, accessibilityColumns, compact
 }
 
-private struct TaskRowDismissalOverlay: View {
+struct TaskRowDismissalOverlay: View {
     let editing: TaskRowEditing?
     let close: () -> Void
     @Environment(\.colorScheme) private var colorScheme

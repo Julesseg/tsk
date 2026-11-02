@@ -17,7 +17,13 @@ struct TaskDetailView: View {
 
     var body: some View {
         Form {
-            Section("Description") { Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description") }
+            Section("Description") {
+                VStack(alignment: .leading) {
+                    Text(task.description).textSelection(.enabled).accessibilityIdentifier("task-detail-description")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("task-detail-identity-" + task.id.uuidString)
+            }
             TaskOrganizationSummary(task: task)
             TaskRecurrenceSection(task: task, store: store, transition: { panel = .transition })
             if let createdSuccessor {
@@ -45,16 +51,6 @@ struct TaskDetailView: View {
             Section("Planning") { TaskPlanningSummary(task: task) }
             TaskAnnotationsSection(store: store, task: task, edit: { panel = .annotation($0) })
             TaskAdvancedAttributesSection(store: store, task: task, edit: { panel = .attributes })
-            Section("Attributes") {
-                ForEach(task.attributes.keyIdentities) { key in
-                    LabeledContent(key.rawValue, value: task.attributes[key.rawValue] ?? "")
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(key.rawValue)
-                        .accessibilityValue(task.attributes[key.rawValue] ?? "")
-                        .accessibilityIdentifier("raw-attribute-\(key.rawValue)")
-                }
-            }
-            Section("Identity") { Text(task.id.uuidString).font(.caption).textSelection(.enabled) }
             if !task.canEdit, task.recurrenceInspection == nil {
                 Section { Text("These task attributes are preserved. Recurring tasks and unsupported states require their dedicated editor.").font(.footnote) }
             }
@@ -63,12 +59,6 @@ struct TaskDetailView: View {
             }
         }
         .accessibilityIdentifier("task-detail-form")
-        .safeAreaInset(edge: .top) {
-            if let error = store.error {
-                Text(error).font(.footnote).padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
-                    .accessibilityIdentifier("task-action-banner")
-            }
-        }
         .navigationTitle("Task")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

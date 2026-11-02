@@ -21,7 +21,6 @@ struct TaskRecurrenceSection: View {
                     let children = store.allTasks.filter { UUID(uuidString: $0.attributes["parent"] ?? "") == task.id }
                     NavigationLink("View occurrences (\(children.count))") { TaskSeriesOccurrencesView(store: store, template: task) }.accessibilityIdentifier("view-series-occurrences")
                     if task.attributes["until"] != nil { Text("Taskwarrior 3.5 can generate the first occurrence beyond the Until date. Review the generator's result before relying on a precise series end.").font(.footnote) }
-                    LabeledContent("Generated positions", value: String(recurrence.mask?.count ?? 0))
                 } else if recurrence.kind == .occurrence {
                     if let id = recurrence.parentID {
                         if let template = store.allTasks.first(where: { $0.id == id }) {
