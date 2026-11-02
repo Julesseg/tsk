@@ -12,15 +12,14 @@ final class TaskScheduledUITests: XCTestCase {
         app.tabBars.buttons["Today"].tap()
         let todayRow = app.buttons["task-" + taskID]
         XCTAssertTrue(todayRow.waitForExistence(timeout: 10))
-        XCTAssertTrue(todayRow.label.contains("Scheduled"))
-        XCTAssertTrue(todayRow.label.contains(time(1792170900)))
-        XCTAssertTrue(todayRow.label.contains("Deadline"))
+        XCTAssertTrue(todayRow.label.contains("Scheduled Today"))
+        XCTAssertTrue(todayRow.label.contains("Deadline Today"))
         app.tabBars.buttons["Upcoming"].tap()
         XCTAssertTrue(app.collectionViews["upcoming-list"].waitForExistence(timeout: 10))
         let future = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-planned-1792250100-")).firstMatch
         XCTAssertTrue(future.waitForExistence(timeout: 5))
-        XCTAssertTrue(future.label.contains("Scheduled"))
-        XCTAssertTrue(future.label.contains(time(1792250100)))
+        XCTAssertTrue(future.label.contains("Scheduled Tomorrow"))
+        XCTAssertTrue(future.label.contains("Deadline Tomorrow"))
         let midnight = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-planned-", "A6400000-0000-0000-0000-000000000002")).firstMatch
         XCTAssertTrue(midnight.exists)
         XCTAssertLessThan(midnight.frame.minY, future.frame.minY)
@@ -101,10 +100,6 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, expected)
         app.terminate()
-    }
-
-    private func time(_ seconds: TimeInterval) -> String {
-        Date(timeIntervalSince1970: seconds).formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(Locale(identifier: "en_US")))
     }
 
     private func formatted(_ seconds: TimeInterval) -> String {

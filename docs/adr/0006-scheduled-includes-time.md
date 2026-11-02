@@ -4,4 +4,6 @@ Scheduled expresses an intended work date and time throughout tsk, including tas
 
 Preserve existing timestamps and display their time, including midnight, without inferring replacement times or changing the storage format. Today still includes all unfinished work scheduled for today or earlier, including times later today; Upcoming remains grouped by local calendar day and ordered by actual timestamps. Waiting until remains a separate constraint.
 
+Collapsed task-list captions show only the calendar or flag icon and a relative calendar-day value for Scheduled and Deadline. Full dates and times remain available in the editors and task information; accessibility labels retain the field names.
+
 Existing notification preferences remain effective, including the configurable default-time substitution for midnight alerts; other Scheduled times retain their specified alert time. Day shortcuts retain the existing local clock time when changing the day; newly enabled dates start at midnight. Calendar resolution applies when that clock time does not exist on a DST transition day. Verification and the required iPhone/iPad evidence are tracked in [#64](https://github.com/Julesseg/tsk/issues/64).
