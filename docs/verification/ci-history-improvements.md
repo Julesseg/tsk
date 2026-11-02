@@ -532,3 +532,33 @@ including all four App Shortcuts and embedded Share/Widget checks. This local
 result validates the candidate's layout and artifact contents, not the canonical
 Xcode27.0 outcome or native UI reliability. Standards and Spec reviews cleared
 the hidden-artifact inclusion correction. No simulator was booted locally.
+
+
+### Recorder startup correction after `42d1041`
+
+The direct-layout candidate passed canonical metadata/entitlement admission in
+both smoke41512468845 and focused menu41512549122 producers. The focused product
+identifies head `42d1041a4a7cc85b63b23c426e104bc471d484fb`, tree
+`0118c3578c12a25d426e8f2c2fa29f09358b2c7f`, Xcode27.0/27A266a,
+SDK27.0/24A430 and arm64 runtime27.0/24A434. Consumer identities/runtime match.
+This is admission evidence, not proof of a metadata root cause or UI acceptance.
+
+Both focused methods failed during recorder startup: iPad71.022s and phone45.136s.
+No High/reselection or New-project cycle ran, and no touch receipt was exported.
+The iPad crash shows `swift_getObjectType` with null x0, called by
+`TaskNativeTouchDiagnostics.installIfRequested` from `TskApp.init`; x17 identifies
+`+[UIApplication sharedApplication]`. The observer attempted `type(of:
+UIApplication.shared)` before UIKit had created the application. This is an
+instrumentation bug introduced here, not evidence of native menu failure or
+missing touch delivery. First-red logs, result bundles and the crash are retained.
+
+Installation now runs from the existing app-delegate
+`application(_:didFinishLaunchingWithOptions:)` callback, using its nonoptional
+application argument for the class receipt. The SwiftUI app initializer no
+longer accesses the recorder. Isolation/UUID gates, idempotence, original-event
+forwarding, buffering/export and native test contracts remain unchanged. The
+App editor remains byte-identical to `01a0681`; no native behavior treatment is
+stacked onto this correction. Generic direct-layout test build and the unchanged
+real metadata/entitlement verifier pass; both review axes are clear. No local
+simulator was booted. Native recording coverage remains unverified, and the
+observer must still be removed before clean exact-head smoke/full acceptance.

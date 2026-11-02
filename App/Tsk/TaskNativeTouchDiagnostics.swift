@@ -36,7 +36,7 @@ enum TaskNativeTouchDiagnostics {
     private static var destination: URL?
     private static let output = DispatchQueue(label: "tsk.pr77.native-touch-export", qos: .utility)
 
-    static func installIfRequested() {
+    static func installIfRequested(application: UIApplication) {
         let environment = ProcessInfo.processInfo.environment
         guard !installed,
               environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
@@ -51,7 +51,7 @@ enum TaskNativeTouchDiagnostics {
         destination = directory.appendingPathComponent("participant-fixture-pr77-touch-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
         method_exchangeImplementations(original, observer)
         installed = true
-        append("installed", details: ["applicationClass": NSStringFromClass(type(of: UIApplication.shared))])
+        append("installed", details: ["applicationClass": NSStringFromClass(type(of: application))])
         exportAfterDispatch()
     }
 
