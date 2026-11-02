@@ -25,12 +25,20 @@ import XCTest
         XCTAssertFalse(app.buttons["start-task-" + first].exists, "Long press must select without presenting the former row menu")
         XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Selected")
         app.buttons["task-" + first].press(forDuration: 0.8)
-        XCTAssertEqual(count.label, "0 selected", "A long press starting on a selected row deselects it")
-        XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Not selected")
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Deselecting the last task exits selection mode automatically")
+        XCTAssertFalse(app.buttons["task-selection-done"].exists)
+        XCTAssertFalse(app.buttons["complete-task-selection"].exists)
+        XCTAssertEqual(app.buttons["complete-task-row-" + first].value as? String, "Not completed")
         app.buttons["task-" + first].press(forDuration: 0.8)
         XCTAssertEqual(count.label, "1 selected", "A fresh long press uses its own starting state")
         app.buttons["task-selection-done"].tap()
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
+        app.buttons["task-" + first].press(forDuration: 0.8)
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        app.buttons["complete-task-row-" + first].tap()
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Tapping the last selected circle also exits selection mode")
+        app.buttons["task-" + first].tap()
+        XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5), "Ordinary task editing resumes after selection ends")
     }
 
     func testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably() throws {
@@ -75,8 +83,9 @@ import XCTest
             start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
         }
         sweepBack()
-        XCTAssertEqual(count.label, "0 selected", "Starting on a selected row removes touched rows without selecting the unselected row between them")
-        XCTAssertFalse(app.buttons["complete-task-selection"].isEnabled)
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Deselecting every touched row exits selection mode")
+        XCTAssertFalse(app.buttons["task-selection-done"].exists)
+        XCTAssertFalse(app.buttons["complete-task-selection"].exists)
         sweepBack()
         XCTAssertEqual(count.label, "3 selected", "A new gesture starting on an unselected row adds every touched row")
         XCTAssertEqual(circles.firstMatch.value as? String, "Selected")
@@ -113,13 +122,14 @@ import XCTest
         XCTAssertEqual(circles.count, 2)
         for circle in circles.allElementsBoundByIndex { XCTAssertEqual(circle.value as? String, "Selected") }
         start.press(forDuration: 0.8)
-        XCTAssertEqual(count.label, "0 selected", "Deselecting one Upcoming appearance deselects the task everywhere")
-        for circle in circles.allElementsBoundByIndex { XCTAssertEqual(circle.value as? String, "Not selected") }
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Deselecting the last Upcoming task exits selection mode everywhere")
+        for circle in circles.allElementsBoundByIndex { XCTAssertEqual(circle.value as? String, "Not completed") }
         start.press(forDuration: 0.8)
         XCTAssertEqual(count.label, "1 selected")
         circles.element(boundBy: 1).tap()
-        XCTAssertEqual(count.label, "0 selected")
-        circles.element(boundBy: 0).tap()
+        XCTAssertTrue(count.waitForNonExistence(timeout: 5))
+        start.press(forDuration: 0.8)
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
         app.buttons["complete-task-selection"].tap()
         XCTAssertTrue(app.staticTexts["task-selection-error"].waitForExistence(timeout: 10))
         XCTAssertEqual(count.label, "1 selected")

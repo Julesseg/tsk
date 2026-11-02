@@ -13,7 +13,6 @@ extension TaskStore {
                   await finishRowEditingForSelection(), generation == taskSelectionGeneration,
                   context == completionContext else { return }
             guard visibleTasks.contains(where: { $0.id == id && $0.canComplete }) else { return }
-            isSelectingTasks = true
             if !selectedTaskIDs.insert(id).inserted { selectedTaskIDs.remove(id) }
         }
     }
@@ -30,7 +29,6 @@ extension TaskStore {
         guard !isSaving else { return false }
         selectionGestureTasks = visibleTasks
         selectionGestureDays = upcomingDays
-        isSelectingTasks = true
         isSelectionGestureActive = true
         return true
     }
@@ -52,7 +50,6 @@ extension TaskStore {
         isSelectionPressActive = false
         taskSelectionGeneration += 1
         selectedTaskIDs = []
-        isSelectingTasks = false
         endSelectionGesture()
     }
 

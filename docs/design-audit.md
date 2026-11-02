@@ -200,10 +200,12 @@ Accepted selection gesture:
 - Provide light selection haptics when selection changes.
 - Disable list scrolling during the selection gesture.
 
-Accepted: selection mode persists after release and scrolling resumes, allowing
-selection through multiple gestures. Tapping a selection circle toggles that
-task. Done exits selection mode. Upcoming's repeated appearances share one
-selection and count as one task.
+Accepted: selection mode persists after release while at least one task is
+selected, and scrolling resumes, allowing selection through multiple gestures.
+Deselecting the last task exits selection mode and hides the bottom controls.
+A held gesture continues tracking until release, so reversing can select tasks
+again. Tapping a selection circle toggles that task. Done exits selection mode.
+Upcoming's repeated appearances share one selection and count as one task.
 
 Show a bottom action bar with selected count and access to Plan, Deadline,
 Project, Tags, Priority and Complete. Each action opens focused controls rather

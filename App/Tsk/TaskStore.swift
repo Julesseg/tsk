@@ -29,7 +29,7 @@ final class TaskStore {
     #endif
     var isSelectionPressActive = false
     var taskSelectionGeneration = 0
-    var isSelectingTasks = false
+    var isSelectingTasks: Bool { !selectedTaskIDs.isEmpty }
     var selectedTaskIDs: Set<UUID> = []
     var isSelectionGestureActive = false
     var selectionGestureTasks: [TaskRecord]?
