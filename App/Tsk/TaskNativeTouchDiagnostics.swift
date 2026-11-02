@@ -11,6 +11,7 @@ private struct NativeTouchRecord: Codable, Sendable {
     let details: [String: String]
     let ancestors: [[String: String]]
     let recognizers: [[String: String]]
+    let origins: [[String: String]]
 }
 
 private struct NativeTouchExport: Codable, Sendable {
@@ -35,6 +36,9 @@ enum TaskNativeTouchDiagnostics {
     private static var expandedOwner: String?
     private static var keyboardApplyOrdinals: [String: Int] = [:]
     private static var mainRebuildRequestOrdinals: [String: Int] = [:]
+    private static var touchOrigins: [ObjectIdentifier: TouchOrigin] = [:]
+    private static var sourceCandidates: [SourceCandidate] = []
+    private static var droppedOriginCaptures = 0
     private static var destination: URL?
     private static let output = DispatchQueue(label: "tsk.pr77.native-touch-export", qos: .utility)
 
@@ -55,7 +59,7 @@ enum TaskNativeTouchDiagnostics {
         destination = directory.appendingPathComponent("participant-fixture-pr77-touch-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
         method_exchangeImplementations(original, observer)
         installed = true
-        append("installed", details: ["applicationClass": NSStringFromClass(type(of: application))])
+        append("installed", details: ["applicationClass": NSStringFromClass(type(of: application)), "originProbe": "weak-v1"])
         exportAfterDispatch()
     }
 
@@ -102,8 +106,10 @@ enum TaskNativeTouchDiagnostics {
             guard touch.phase != .stationary else { continue }
             let location = touch.location(in: touch.window)
             var ancestors: [[String: String]] = []
+            var originAncestors: [UIView] = []
             var view = touch.view
             while let current = view, ancestors.count < 16 {
+                if stage == "touch.before", touch.phase == .began { originAncestors.append(current) }
                 ancestors.append([
                     "id": identity(current), "class": NSStringFromClass(type(of: current)),
                     "identifier": String((current.accessibilityIdentifier ?? "").prefix(160)),
@@ -114,6 +120,31 @@ enum TaskNativeTouchDiagnostics {
                     "interactionEnabled": String(current.isUserInteractionEnabled)
                 ])
                 view = current.superview
+            }
+            let touchID = ObjectIdentifier(touch)
+            if stage == "touch.before", touch.phase == .began,
+               touchOrigins[touchID]?.beganTimestamp != touch.timestamp {
+                if touchOrigins.removeValue(forKey: touchID) != nil { droppedOriginCaptures += 1 }
+                if touchOrigins.count < 4 {
+                    let captureSequence = sequence + 1
+                    if let control = originAncestors.first(where: { $0 is UIControl }) {
+                        sourceCandidates.append(SourceCandidate(sequence: captureSequence, timestamp: touch.timestamp,
+                                                                location: location, leaf: touch.view, control: control, window: touch.window))
+                        sourceCandidates = Array(sourceCandidates.suffix(4))
+                    }
+                    touchOrigins[touchID] = TouchOrigin(sequence: captureSequence, timestamp: touch.timestamp,
+                                                       location: location, ancestors: originAncestors, window: touch.window,
+                                                       sources: sourceCandidates)
+                } else {
+                    droppedOriginCaptures += 1
+                }
+            }
+            originAncestors.removeAll()
+            let origin = touchOrigins[touchID]
+            let samplesBoundary = touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled
+            var originSamples = samplesBoundary ? origin?.samples() ?? [] : []
+            if let origin, origin.isNewProject, samplesBoundary {
+                originSamples += origin.sources.flatMap { $0.samples() }
             }
             let recognizers = (touch.gestureRecognizers ?? []).prefix(16).map { recognizer in
                 [
@@ -132,8 +163,17 @@ enum TaskNativeTouchDiagnostics {
                 "keyboardApplyOrdinals": ordinalSignature(keyboardApplyOrdinals),
                 "mainRebuildRequestOrdinals": ordinalSignature(mainRebuildRequestOrdinals),
                 "ancestorLimitReached": String(view != nil),
-                "recognizersTruncated": String((touch.gestureRecognizers?.count ?? 0) > 16)
-            ], ancestors: ancestors, recognizers: recognizers)
+                "recognizersTruncated": String((touch.gestureRecognizers?.count ?? 0) > 16),
+                "originCaptureSequence": origin.map { String($0.captureSequence) } ?? "unavailable",
+                "originBeganTimestamp": origin.map { String($0.beganTimestamp) } ?? "unavailable",
+                "originDroppedCaptures": String(droppedOriginCaptures),
+                "originTouchesTruncated": String((event.allTouches?.count ?? 0) > 4),
+                "sourceCandidateSequences": origin?.sources.map { String($0.sequence) }.joined(separator: ",") ?? "unavailable",
+                "sourceAssociation": origin?.sources.isEmpty == false ? "unverified-candidates" : "unavailable"
+            ], ancestors: ancestors, recognizers: recognizers, origins: originSamples)
+            if stage == "touch.after", touch.phase == .ended || touch.phase == .cancelled {
+                touchOrigins.removeValue(forKey: touchID)
+            }
         }
     }
 
@@ -162,7 +202,7 @@ enum TaskNativeTouchDiagnostics {
         }
     }
 
-    private static func append(_ stage: String, details: [String: String], ancestors: [[String: String]] = [], recognizers: [[String: String]] = []) {
+    private static func append(_ stage: String, details: [String: String], ancestors: [[String: String]] = [], recognizers: [[String: String]] = [], origins: [[String: String]] = []) {
         sequence += 1
         if records.count == 512 {
             records.removeFirst()
@@ -170,13 +210,127 @@ enum TaskNativeTouchDiagnostics {
         }
         records.append(NativeTouchRecord(sequence: sequence, stage: stage,
                                          uptime: ProcessInfo.processInfo.systemUptime, wallTime: Date().timeIntervalSince1970,
-                                         details: details, ancestors: ancestors, recognizers: recognizers))
+                                         details: details, ancestors: ancestors, recognizers: recognizers, origins: origins))
     }
 
     private static func identity(_ object: AnyObject) -> String { String(describing: ObjectIdentifier(object)) }
 
     private static func ordinalSignature(_ values: [String: Int]) -> String {
         values.sorted { $0.key < $1.key }.map { $0.key + ":" + String($0.value) }.joined(separator: ",")
+    }
+
+    @MainActor
+    private final class WeakOriginView {
+        weak var view: UIView?
+        let captured: [String: String]
+
+        init(_ role: String, _ view: UIView?) {
+            self.view = view
+            captured = [
+                "role": role, "captured": String(view != nil), "capturedID": view.map(TaskNativeTouchDiagnostics.identity) ?? "nil",
+                "capturedClass": view.map { NSStringFromClass(type(of: $0)) } ?? "nil",
+                "capturedIdentifier": String((view?.accessibilityIdentifier ?? "").prefix(160)),
+                "capturedWindow": view?.window.map(TaskNativeTouchDiagnostics.identity) ?? "nil",
+                "capturedSuperview": view?.superview.map(TaskNativeTouchDiagnostics.identity) ?? "nil",
+                "capturedFrame": view.map { NSCoder.string(for: $0.convert($0.bounds, to: $0.window)) } ?? "unavailable"
+            ]
+        }
+
+        func sample(in window: UIWindow?, point: CGPoint) -> [String: String] {
+            guard let view else { return captured.merging(["alive": "false"]) { _, value in value } }
+            var chain: [String] = []
+            var ancestor: UIView? = view
+            while let current = ancestor, chain.count < 16 {
+                chain.append(TaskNativeTouchDiagnostics.identity(current))
+                ancestor = current.superview
+            }
+            let frame = window.map { view.convert(view.bounds, to: $0) }
+            var sample = captured
+            sample["alive"] = "true"
+            sample["currentWindow"] = view.window.map(TaskNativeTouchDiagnostics.identity) ?? "nil"
+            sample["currentSuperview"] = view.superview.map(TaskNativeTouchDiagnostics.identity) ?? "nil"
+            sample["currentIdentifier"] = String((view.accessibilityIdentifier ?? "").prefix(160))
+            sample["originalWindowAvailable"] = String(window != nil)
+            sample["sameOriginalWindow"] = String(window != nil && view.window === window)
+            sample["currentFrameInOriginalWindow"] = frame.map { NSCoder.string(for: $0) } ?? "unavailable"
+            sample["containsOriginalTouchPoint"] = frame.map { String($0.contains(point)) } ?? "unavailable"
+            sample["hidden"] = String(view.isHidden)
+            sample["alpha"] = String(describing: view.alpha)
+            sample["interactionEnabled"] = String(view.isUserInteractionEnabled)
+            sample["currentAncestorIDs"] = chain.joined(separator: ",")
+            sample["currentAncestorsTruncated"] = String(ancestor != nil)
+            return sample
+        }
+    }
+
+    @MainActor
+    private struct SourceCandidate {
+        let sequence: Int
+        let timestamp: TimeInterval
+        let location: CGPoint
+        let window: WeakOriginView
+        let views: [WeakOriginView]
+
+        init(sequence: Int, timestamp: TimeInterval, location: CGPoint, leaf: UIView?, control: UIView, window: UIWindow?) {
+            self.sequence = sequence
+            self.timestamp = timestamp
+            self.location = location
+            self.window = WeakOriginView("sourceWindow", window)
+            var views = [WeakOriginView("sourceControl", control), WeakOriginView("sourceParent", control.superview)]
+            if leaf !== control { views.append(WeakOriginView("sourceLeaf", leaf)) }
+            self.views = views
+        }
+
+        func samples() -> [[String: String]] {
+            views.map { $0.sample(in: window.view as? UIWindow, point: location).merging([
+                "sourceCaptureSequence": String(sequence), "sourceBeganTimestamp": String(timestamp),
+                "sourceLocation": NSCoder.string(for: location), "sourceAssociation": "candidate"
+            ]) { _, value in value } }
+        }
+    }
+
+    @MainActor
+    private struct TouchOrigin {
+        let captureSequence: Int
+        let beganTimestamp: TimeInterval
+        let location: CGPoint
+        let views: [WeakOriginView]
+        let originalIndexPath: IndexPath?
+        let sources: [SourceCandidate]
+        let isNewProject: Bool
+
+        init(sequence: Int, timestamp: TimeInterval, location: CGPoint, ancestors: [UIView], window: UIWindow?, sources: [SourceCandidate]) {
+            captureSequence = sequence
+            beganTimestamp = timestamp
+            self.location = location
+            self.sources = sources
+            let content = ancestors.first { $0.accessibilityIdentifier == "row-new-project" }
+            let cell = ancestors.compactMap { $0 as? UICollectionViewCell }.first
+            let collection = ancestors.compactMap { $0 as? UICollectionView }.first
+            isNewProject = content != nil
+            originalIndexPath = cell.flatMap { collection?.indexPath(for: $0) }
+            views = [WeakOriginView("leaf", ancestors.first), WeakOriginView("optionContent", content),
+                     WeakOriginView("cell", cell), WeakOriginView("collection", collection), WeakOriginView("window", window)]
+        }
+
+        func samples() -> [[String: String]] {
+            let window = views[4].view as? UIWindow
+            var samples = views.map { $0.sample(in: window, point: location) }
+            samples[2]["originalIndexPath"] = originalIndexPath.map { String(describing: $0) } ?? "unavailable"
+            if views[2].view != nil {
+                samples[0]["descendsFromOriginalCell"] = String(samples[0]["currentAncestorIDs"]?.components(separatedBy: ",").contains(views[2].captured["capturedID"] ?? "nil") == true)
+            }
+            if let collection = views[3].view as? UICollectionView {
+                if let cell = views[2].view as? UICollectionViewCell {
+                    samples[2]["descendsFromOriginalCollection"] = String(samples[2]["currentAncestorIDs"]?.components(separatedBy: ",").contains(TaskNativeTouchDiagnostics.identity(collection)) == true)
+                    samples[2]["currentIndexPathForOriginalCell"] = collection.indexPath(for: cell).map { String(describing: $0) } ?? "nil"
+                }
+                if let originalIndexPath {
+                    samples[2]["currentCellAtOriginalIndexPath"] = collection.cellForItem(at: originalIndexPath).map(TaskNativeTouchDiagnostics.identity) ?? "nil"
+                }
+            }
+            return samples
+        }
     }
 }
 

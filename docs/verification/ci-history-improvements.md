@@ -836,3 +836,59 @@ reselection passed, and focused cycle20 was not reached. The failure still does
 not establish that the original cell detached, was deallocated or lost ownership
 through a particular recognizer. Remaining iPad/smoke outcomes are audited as
 they finish. No unchanged-source retry or full is dispatched for this result.
+
+The iPad also reproduced the action defect, on cycle2 after one complete cycle,
+at line322 after 83.476s. PID44017 exported 63 records and two parameter writes,
+with zero evictions. Its actual option touch likewise retargeted before ended
+with no write; apply/main-request ordinals stayed5/5. Neither family reached
+focused cycle20. Actual video samples retain the native option menu and the
+successful Project/Release/Done popover; they provide no final appearance credit
+for this rejected candidate or resolution of the short touch interval.
+
+Smoke41531541490 passed all four phone and two iPad methods. Its PR merge source
+`bcb39f07` has the head tree. Both products and all four consumers match exact
+source/tree and canonical Xcode/SDK/runtime. Exactly two head workflows ran;
+no full or retry ran. Green smoke does not rescue the failed repeated-menu
+candidate. The original container is restored in `01c84f3`.
+
+### Observe original native-view lifetime
+
+Extend only the existing opt-in sendEvent trace while the complete original row
+editor, glass, popover, zoom and gesture implementation remains restored. At the
+first before-began receipt, keep weak boxes for the original leaf, public
+`row-new-project` content, nearest public UICollectionViewCell/UICollectionView
+and original window, with scalar capture sequence/generation/IDs/frames and
+index path. Keep at most four active touch identities and four prior UIControl
+breadcrumbs. Breadcrumbs are unverified source candidates associated offline
+through their original sequence and native opener point, not guessed from
+private class names or an absent native accessibility identifier.
+
+Resample those same original weak references at began and terminal boundaries
+on both sides of dispatch. Record liveness, attachment, window-relative geometry,
+visibility, current public identifier, bounded ancestry and public original-cell
+index/slot association. A nil cell returned for a slot is not deallocation.
+Unavailable public class matches remain unavailable. Export only strings and
+values; temporary strong view arrays die before original dispatch. Clear active
+entries after terminal dispatch and expose dropped/truncated capture flags.
+No extra weak-origin work runs during moved events. There is no new global hook,
+recognizer, hitTest, AX read, forced layout, input variant or synchronous I/O.
+
+One exact-head canonical focused observation on both families keeps all twenty
+cycles, High/reselection, focused cycle20 and deadlines. Require an actual
+original capture, matching generation/sequence across phases, pre-ended samples,
+adjacent successful controls and complete late export coverage. Original view
+loss/detachment/replacement before a failed action selects a lifetime boundary,
+not its cause. Intact original objects at failed pre-ended dispatch demote
+persistent destruction/reparenting and point toward routing/arbitration;
+they do not prove gesture consumption or exclude a transient change between
+samples. After-ended loss following a successful write is normal. Green-only,
+nondiscriminating lifetime changes, missing roles/drop/eviction or stale export
+remain inconclusive and do not authorize another identical retry or guessed
+ancestor removal.
+
+The corrected generic arm64 test build and strict artifact verifier pass with
+Xcode27.1 beta. An initial compiler expression limit was fixed by splitting the
+diagnostic sample dictionary. Standards review also caught moved-event sampling;
+that work is now restricted to the planned boundaries, and both review axes
+are clear. No simulator was booted locally. This remains diagnostic-only; remove
+all temporary observers before clean exact-head smoke/full/design acceptance.
