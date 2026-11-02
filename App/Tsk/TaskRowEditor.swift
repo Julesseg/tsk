@@ -172,45 +172,28 @@ private struct TaskRowParameterPill: View {
     var body: some View {
         let value = parameter.value(in: editing.draft.taskDraft)
         Group {
-            if parameter == .project {
-                TaskRowProjectMenu(editing: editing, projects: projects, unfocus: unfocus, open: openPicker)
-                    .buttonStyle(TaskRowParameterButtonStyle())
-                    .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
-                    .background {
-                        TaskRowProjectPresentationAnchor(editing: editing, tags: tags, now: now, namespace: presentationNamespace)
-                    }
-            } else {
-                parameterControl
-                    .buttonStyle(TaskRowParameterButtonStyle())
-                    .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
-                    .popover(isPresented: Binding(
-                        get: { editing.parameter == parameter },
-                        set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
-                    ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                        TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
-                            .frame(width: 340)
-                            .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
-                            .presentationCompactAdaptation(.popover)
-                    }
-            }
-        }
-        .frame(minWidth: 44, minHeight: 44, alignment: .top)
-        .contentShape(Rectangle())
-        .accessibilityLabel(parameter.title)
-        .accessibilityValue(value ?? "Not set")
-        .accessibilityIdentifier("row-" + parameter.identifier)
-    }
-
-    private var parameterControl: some View {
-        Group {
-            if parameter == .priority {
+            if parameter == .project || parameter == .priority {
                 Menu {
-                    Picker("Priority", selection: $editing.draft.taskDraft.priority) {
-                        ForEach(["", "L", "M", "H"], id: \.self) { priority in
-                            Text(TaskRowParameter.priorityTitle(priority)).tag(priority)
+                    if parameter == .project {
+                        Picker("Project", selection: Binding(
+                            get: { UTF8String(editing.draft.taskDraft.project) },
+                            set: { editing.draft.taskDraft.project = $0.rawValue }
+                        )) {
+                            Text("No project").tag(UTF8String(""))
+                            ForEach(Set((projects + [editing.draft.taskDraft.project]).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted(), id: \.self) { project in
+                                Text(project.rawValue).tag(project)
+                            }
                         }
-                        if !["", "L", "M", "H"].contains(editing.draft.taskDraft.priority) {
-                            Text(editing.draft.taskDraft.priority).tag(editing.draft.taskDraft.priority)
+                        Button("New project…", systemImage: "folder.badge.plus", action: openPicker)
+                            .accessibilityIdentifier("row-new-project")
+                    } else {
+                        Picker("Priority", selection: $editing.draft.taskDraft.priority) {
+                            ForEach(["", "L", "M", "H"], id: \.self) { priority in
+                                Text(TaskRowParameter.priorityTitle(priority)).tag(priority)
+                            }
+                            if !["", "L", "M", "H"].contains(editing.draft.taskDraft.priority) {
+                                Text(editing.draft.taskDraft.priority).tag(editing.draft.taskDraft.priority)
+                            }
                         }
                     }
                 } label: {
@@ -221,6 +204,22 @@ private struct TaskRowParameterPill: View {
                 Button(action: openPicker) { label }
             }
         }
+        .buttonStyle(TaskRowParameterButtonStyle())
+        .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
+        .popover(isPresented: Binding(
+            get: { editing.parameter == parameter },
+            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
+        ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
+                .frame(width: 340)
+                .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
+                .presentationCompactAdaptation(.popover)
+        }
+        .frame(minWidth: 44, minHeight: 44, alignment: .top)
+        .contentShape(Rectangle())
+        .accessibilityLabel(parameter.title)
+        .accessibilityValue(value ?? "Not set")
+        .accessibilityIdentifier("row-" + parameter.identifier)
     }
 
     private var label: some View {
@@ -230,54 +229,6 @@ private struct TaskRowParameterPill: View {
     private func openPicker() {
         unfocus()
         editing.parameter = parameter
-    }
-}
-
-private struct TaskRowProjectMenu: View {
-    @Bindable var editing: TaskRowEditing
-    let projects: [String]
-    let unfocus: () -> Void
-    let open: () -> Void
-
-    var body: some View {
-        Menu {
-            Picker("Project", selection: Binding(
-                get: { UTF8String(editing.draft.taskDraft.project) },
-                set: { editing.draft.taskDraft.project = $0.rawValue }
-            )) {
-                Text("No project").tag(UTF8String(""))
-                ForEach(Set((projects + [editing.draft.taskDraft.project]).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted(), id: \.self) { project in
-                    Text(project.rawValue).tag(project)
-                }
-            }
-            Button("New project…", systemImage: "folder.badge.plus", action: open)
-                .accessibilityIdentifier("row-new-project")
-        } label: {
-            TaskRowParameterLabel(parameter: .project, value: TaskRowParameter.project.value(in: editing.draft.taskDraft))
-        }
-        .simultaneousGesture(TapGesture().onEnded { unfocus() })
-    }
-}
-
-private struct TaskRowProjectPresentationAnchor: View {
-    @Bindable var editing: TaskRowEditing
-    let tags: [String]
-    let now: Date
-    let namespace: Namespace.ID
-
-    var body: some View {
-        Color.clear
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-            .popover(isPresented: Binding(
-                get: { editing.parameter == .project },
-                set: { if !$0 && editing.parameter == .project { editing.parameter = nil } }
-            ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                TaskRowParameterPicker(editing: editing, parameter: .project, tags: tags, now: now) { editing.parameter = nil }
-                    .frame(width: 340)
-                    .navigationTransition(.zoom(sourceID: TaskRowParameter.project.id, in: namespace))
-                    .presentationCompactAdaptation(.popover)
-            }
     }
 }
 

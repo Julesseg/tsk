@@ -614,3 +614,23 @@ evidence, not proof of reliability; nineteen passing iPad cycles alone would
 not distinguish treatment from control. Address focus separately after this
 experiment. Remove the temporary observer before clean exact-head smoke and
 full acceptance on both families. Share and Scheduled coverage gaps also remain.
+
+### Presenter separation rejected at `1bb2f98`
+
+Focused menu41520217565 reproduced the target defect on iPad cycle3, after two
+complete New-project/Release/Done cycles. The method failed at line322 after
+90.524s. Producer and consumer identify head `1bb2f984f2766e512be57806d1f09ae01228f221`,
+tree `cc8338594475db8cb6f949414c402e107b05cbe7` and the same canonical
+Xcode27.0/SDK24A430/runtime24A434 identity. PID5673 exported 62 records with
+zero evictions. Successful cycles wrote project on the active expanded owner
+and cleared it through Done. Failed cycle3 began inside `row-new-project` at
+the admitted native center `(172,262)`; before ended dispatch the same touch
+reported the menu container instead, with no project write. The first hit
+was correct; no post-assignment reset explains this captured failure.
+
+This recurrence rejects the project-only presenter separation as a sufficient
+repair. Restore the original presentation path before selecting another seam;
+do not combine it with another ownership, focus or gesture treatment. The
+failure preceded cycle20, so it provides no new focused-title keyboard result.
+Other family/workflow outcomes are audited separately as they finish. No
+unchanged-source test retry or full suite is justified by this result.
