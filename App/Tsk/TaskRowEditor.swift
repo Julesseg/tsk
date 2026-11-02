@@ -199,7 +199,7 @@ private struct TaskRowParameterPill: View {
                 } label: {
                     label
                 }
-                .modifier(TaskRowMenuUnfocusGesture(parameter: parameter, unfocus: unfocus))
+                .simultaneousGesture(TapGesture().onEnded { unfocus() })
             } else {
                 Button(action: openPicker) { label }
             }
@@ -229,19 +229,6 @@ private struct TaskRowParameterPill: View {
     private func openPicker() {
         unfocus()
         editing.parameter = parameter
-    }
-}
-
-private struct TaskRowMenuUnfocusGesture: ViewModifier {
-    let parameter: TaskRowParameter
-    let unfocus: () -> Void
-
-    func body(content: Content) -> some View {
-        if parameter == .project {
-            content
-        } else {
-            content.simultaneousGesture(TapGesture().onEnded { unfocus() })
-        }
     }
 }
 

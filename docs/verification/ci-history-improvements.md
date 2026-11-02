@@ -956,3 +956,34 @@ local simulator was booted. The expected opener-focus deficit is explicitly
 diagnostic and remains an acceptance blocker until the full native focus journey
 passes. Keep observers only through controlled diagnosis, then verify clean
 exact-head smoke/full on both families before final acceptance.
+
+### Structural Project gesture omission rejected
+
+At `8d627bc4a73076003a4e75d9654a5bacb1f64ac2`, focused41540993369
+failed on both families. The phone completed five native New-project/Release/Done
+cycles, then the sixth admitted native option failed to open its field at line322
+after132.177s. PID6685 exported119 records, ten parameter writes and zero
+evictions or origin drops. Records116/117 begin on the real option;118 before
+ended has the menu container as recipient, with the original collection model
+alpha changing from1 to0 and no project assignment. Original leaf/content/cell
+and collection remain attached with the original cell still occupying its slot.
+High selection/reselection passed; focused-cycle20 was not reached. This target
+recurrence rejects Project-only gesture omission as a sufficient routing repair.
+Restore the original Project opener gesture before choosing another seam.
+
+The iPad stopped earlier in the unchanged Priority prefix: the first High tap
+did not yield a selected High row after reopening, failing line521 after56.318s.
+PID37630 exported33 records with zero evictions. Its first option touch also
+retargets to the container with original collection model alpha0 before ended;
+the original cell remains attached. Priority retained its gesture. There are
+zero attempted Project selections and no focused-cycle20 coverage on this
+worker. The Project parameter-write hook cannot establish whether a Priority
+binding setter ran. Keep this failure distinct from the phone Project drop.
+
+Product identity matches head tree`c45d657bd6b35396e30aa0935282840a7f7e3672`,
+Xcode27.0/27A266a, SDK24A430 and arm64 runtime24A434. Smoke41540858329
+is being audited separately. No full or test retry was dispatched. Collection
+model alpha and actual routing are measured; their exact ordering between
+samples, rendered opacity, and initiating operation remain unresolved. No
+keyboard-command suppression, input change or wider ancestor treatment follows
+from this result.
