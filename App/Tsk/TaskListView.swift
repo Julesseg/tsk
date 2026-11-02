@@ -169,12 +169,10 @@ struct TaskListRow: View {
                     guard store.rowEditing == nil, !store.isSaving else { return }
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
                 } label: {
-                    Image(systemName: store.isSelectingTasks ? (store.selectedTaskIDs.contains(task.id) ? "checkmark.circle.fill" : "circle") : checked ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                         .font(.title2).foregroundStyle(.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
-                        .scaleEffect(selected ? 1.06 : 1)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.22, bounce: 0.18), value: selected)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }

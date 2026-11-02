@@ -189,8 +189,8 @@ Accepted selection gesture:
 - A normal tap still edits the task. Movement before the hold is recognized
   remains ordinary scrolling or a swipe. The task-row long-press menu is removed;
   activity, editing and completion remain available through their other controls.
-- Completion circles on every task become selection circles, filled for selected
-  tasks.
+- The selected row background is the only visual selection indicator. Completion
+  circles stay visually unchanged by selection; checkmarks indicate completion.
 - The initial task chooses select or deselect mode and stays fixed during the
   gesture. Re-entering another row changed by the gesture reverses it; dwelling
   within a row does not toggle repeatedly. Crossing back into the preceding row
@@ -204,7 +204,8 @@ Accepted: selection mode persists after release while at least one task is
 selected, and scrolling resumes, allowing selection through multiple gestures.
 Deselecting the last task exits selection mode and hides the bottom controls.
 A held gesture continues tracking until release, so reversing can select tasks
-again. Tapping a selection circle toggles that task. Done exits selection mode.
+again. Tapping a row or its leading circle toggles that task during selection.
+Done exits selection mode.
 Upcoming's repeated appearances share one selection and count as one task.
 
 Show a bottom action bar with selected count and access to Plan, Deadline,
