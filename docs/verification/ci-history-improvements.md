@@ -817,3 +817,22 @@ success is bounded evidence, not cause proof or clean acceptance. The generic
 arm64 test build and strict artifact verifier pass, both source review axes are
 clear, and no local simulator was booted. Remove all temporary observation before
 clean exact-head smoke and full acceptance on both families.
+
+### Outer glass-container elimination rejected at `868b153`
+
+Focused menu41531638666 reproduced the phone action failure on cycle7 after six
+complete New-project/Release/Done cycles, at line322 after 115.893s. Product and
+consumer identify head `868b15381baf5c14707df778b3a3f4c8e693e5a5`, tree
+`7afa59667ea2e389d022753269d86ea85e575761` and canonical
+Xcode27.0/27A266a, SDK24A430, arm64 runtime24A434. PID2774 exported 133 records,
+12 parameter writes and zero evictions. Cycle7 begins in the actual option
+cell at `(185,308)`; before ended dispatch it reports the menu container, with
+no project write. Apply/main-request ordinals remain5/5 throughout the preceding
+Done, opener and failed touch. No fresh registration explains this failure.
+
+This recurrence rejects removal of the outer glass container as sufficient
+repair. Restore the original container before another seam. High selection and
+reselection passed, and focused cycle20 was not reached. The failure still does
+not establish that the original cell detached, was deallocated or lost ownership
+through a particular recognizer. Remaining iPad/smoke outcomes are audited as
+they finish. No unchanged-source retry or full is dispatched for this result.

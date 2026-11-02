@@ -108,30 +108,32 @@ private struct TaskRowEditorContent: View {
             .lineLimit(1...5)
             .padding(.bottom, 4)
             ScrollView(.horizontal) {
-                HStack(spacing: 6) {
-                    ForEach(TaskRowParameter.allCases) { parameter in
-                        TaskRowParameterPill(editing: editing, parameter: parameter,
-                                             projects: store.availableProjects,
-                                             tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
-                            titleFocused = false
-                            focusedNote = nil
+                GlassEffectContainer(spacing: 6) {
+                    HStack(spacing: 6) {
+                        ForEach(TaskRowParameter.allCases) { parameter in
+                            TaskRowParameterPill(editing: editing, parameter: parameter,
+                                                 projects: store.availableProjects,
+                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
+                                titleFocused = false
+                                focusedNote = nil
+                            }
                         }
-                    }
-                    Button { open(.dependency) } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "arrow.triangle.branch")
-                            if !task.dependencyReferences.isEmpty { Text(task.dependencyReferences.count, format: .number) }
+                        Button { open(.dependency) } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.triangle.branch")
+                                if !task.dependencyReferences.isEmpty { Text(task.dependencyReferences.count, format: .number) }
+                            }
+                            .font(.caption)
                         }
-                        .font(.caption)
-                    }
-                    .buttonStyle(TaskRowParameterButtonStyle())
-                    .frame(minWidth: 44, minHeight: 44, alignment: .top)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("Dependencies")
-                    .accessibilityValue("\(task.dependencyReferences.count) dependencies")
-                    .accessibilityIdentifier("row-dependencies")
-                    TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
-                }.padding(.horizontal, 4)
+                        .buttonStyle(TaskRowParameterButtonStyle())
+                        .frame(minWidth: 44, minHeight: 44, alignment: .top)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Dependencies")
+                        .accessibilityValue("\(task.dependencyReferences.count) dependencies")
+                        .accessibilityIdentifier("row-dependencies")
+                        TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
+                    }.padding(.horizontal, 4)
+                }
             }
             .scrollIndicators(.hidden)
             .clipped()
