@@ -34,6 +34,8 @@ def wait_for_shards(fetch, family, partitions, timeout=90, interval=2, clock=tim
     deadline = clock() + timeout
     while True:
         jobs = fetch(max(0, deadline - clock()))
+        if clock() >= deadline:
+            raise ValueError('Shard status did not converge before deadline')
         try:
             validate(jobs, family, partitions)
             return jobs
@@ -94,7 +96,7 @@ def fetch_pages(endpoint, remaining=None):
         if budget <= 0:
             raise ValueError('GitHub jobs request exceeded gate deadline')
         try:
-            result = subprocess.run(['gh', 'api', '--paginate', '--slurp', endpoint], capture_output=True, text=True, timeout=max(0.1, min(45, budget)))
+            result = subprocess.run(['gh', 'api', '--paginate', '--slurp', endpoint], capture_output=True, text=True, timeout=min(45, budget))
         except subprocess.TimeoutExpired:
             error = 'GitHub jobs request timed out'
         except OSError as error:

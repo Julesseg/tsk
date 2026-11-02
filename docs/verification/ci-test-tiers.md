@@ -110,9 +110,9 @@ sample binds the unique native candidate from one scoped query; its observed
 geometry supplies the touch without re-querying the disappearing menu. Empty
 application frames require containment in an actual owned window.
 
-Transient GitHub jobs-API HTTP429/500/502/503/504 responses and request timeouts
+Transient GitHub jobs-API HTTP 429/500/502/503/504 responses and request timeouts
 retain upstream retries, up to three attempts. Requests and backoff consume the
-same90-second run-ID convergence budget. Authorization errors, malformed responses
+same 90-second run-ID convergence budget. Authorization errors, malformed responses
 and terminal test failures fail immediately; API retries never replay tests.
 
 ## Dispatch and retries

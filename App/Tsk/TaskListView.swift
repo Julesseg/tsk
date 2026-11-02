@@ -136,7 +136,6 @@ struct TaskListRow: View {
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @Environment(\.taskRowAvailableHeight) private var availableHeight
-    @Environment(\.displayScale) private var displayScale
     @Environment(\.taskRowViewport) private var viewport
     @Environment(\.taskRowActions) private var rowActions
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }

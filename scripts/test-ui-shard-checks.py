@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).with_name('check-ui-shards.py')
 spec = importlib.util.spec_from_file_location('shards', SCRIPT)
@@ -41,6 +42,14 @@ class ShardChecksTests(unittest.TestCase):
         for response in ([job('iPad', 'all', 'failure')], [job('iPad', 'all'), job('iPad', 'all')]):
             with self.subTest(response=response), self.assertRaises(ValueError):
                 self.poll([response, [job('iPad', 'all')]])
+
+    def test_late_success_cannot_pass_the_convergence_deadline(self):
+        now = [0]
+        def fetch(remaining):
+            now[0] += remaining + 1
+            return [job('iPad', 'all')]
+        with self.assertRaisesRegex(ValueError, 'did not converge before deadline'):
+            shards.wait_for_shards(fetch, 'iPad', ['all'], timeout=3, clock=lambda: now[0])
 
     def test_terminal_failure_outranks_another_pending_partition(self):
         with self.assertRaisesRegex(ValueError, 'completed/failure'):
@@ -136,8 +145,24 @@ sys.exit(response.get('code', 0))
             {'pages': [{'jobs': [job('iPad', 'workspace')]}]},
         ])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('row-editing): expected one result, found 0', result.stderr)
+        self.assertIn('row-editing): missing', result.stderr)
         self.assertEqual(len(calls), 2)
+
+    def test_transient_fetch_backoff_stays_within_gate_budget(self):
+        now = [0]
+        def request(*args, **kwargs):
+            now[0] += 2
+            raise subprocess.TimeoutExpired(args[0], kwargs['timeout'])
+        def sleep(seconds):
+            now[0] += seconds
+        with patch.object(shards.time, 'monotonic', side_effect=lambda: now[0]), \
+             patch.object(shards.time, 'sleep', side_effect=sleep), \
+             patch.object(shards.subprocess, 'run', side_effect=request) as run:
+            with self.assertRaisesRegex(ValueError, 'exceeded gate deadline'):
+                shards.fetch_jobs('Julesseg/tsk', 77, 1, 3)
+        self.assertEqual(now[0], 3)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.kwargs['timeout'], 3)
 
 
 if __name__ == '__main__':
