@@ -13,6 +13,7 @@ using the dispatch helper.
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 11 methods | 9 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
+| Regression | 5 methods | 6 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -21,6 +22,13 @@ permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full coverage on both
 families is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.
+
+Regression coverage retains the installed Share, durable/organization row editing,
+typed-attribute validation and view-reorder journeys on both families, plus the
+iPad keyboard/calendar journey. It is a focused diagnostic loop for the observed
+failures, with original input, assertions and deadlines. It does not replace
+smoke or full acceptance. Only its iPad worker needs the native keyboard fixture;
+neither worker needs the synchronization server or peer.
 
 ## Build once, execute selected coverage
 
@@ -101,6 +109,11 @@ item or button within five seconds, and actual clear/readback assertions. Each
 sample binds the unique native candidate from one scoped query; its observed
 geometry supplies the touch without re-querying the disappearing menu. Empty
 application frames require containment in an actual owned window.
+
+Transient GitHub jobs-API HTTP429/500/502/503/504 responses and request timeouts
+retain upstream retries, up to three attempts. Requests and backoff consume the
+same90-second run-ID convergence budget. Authorization errors, malformed responses
+and terminal test failures fail immediately; API retries never replay tests.
 
 ## Dispatch and retries
 

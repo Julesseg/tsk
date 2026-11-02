@@ -138,6 +138,7 @@ private struct TaskRowEditorContent: View {
             .scrollIndicators(.hidden)
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
+            .modifier(TaskNativeScrollTrace())
             .transition(.opacity)
             VStack(alignment: .leading, spacing: 12) {
                 TaskAvailabilityView(task: task, store: store)
@@ -208,7 +209,13 @@ private struct TaskRowParameterPill: View {
         .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
         .popover(isPresented: Binding(
             get: { editing.parameter == parameter },
-            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
+            set: { presented in
+                if TaskNativeInteractionTrace.enabled {
+                    TaskNativeInteractionTrace.event("popover.binding", ["parameter": parameter.rawValue, "presented": presented,
+                                                                         "active": editing.parameter?.rawValue ?? "nil"])
+                }
+                if !presented && editing.parameter == parameter { editing.parameter = nil }
+            }
         ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
                 .frame(width: 340)
@@ -227,6 +234,10 @@ private struct TaskRowParameterPill: View {
     }
 
     private func openPicker() {
+        if TaskNativeInteractionTrace.enabled {
+            TaskNativeInteractionTrace.event("parameter.action", ["parameter": parameter.rawValue,
+                                                                   "owner": String(describing: ObjectIdentifier(editing))])
+        }
         unfocus()
         editing.parameter = parameter
     }
@@ -340,7 +351,7 @@ struct TaskRowParameterLabel: View {
     }
 }
 
-private struct TaskRowParameterButtonStyle: ButtonStyle {
+struct TaskRowParameterButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.primary)
@@ -349,5 +360,7 @@ private struct TaskRowParameterButtonStyle: ButtonStyle {
             .background(.background, in: Capsule())
             .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
             .opacity(configuration.isPressed ? 0.65 : 1)
+            .frame(minWidth: 44, minHeight: 44, alignment: .top)
+            .contentShape(Rectangle())
     }
 }

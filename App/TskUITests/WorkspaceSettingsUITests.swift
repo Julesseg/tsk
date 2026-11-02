@@ -115,8 +115,41 @@ final class WorkspaceSettingsUITests: XCTestCase {
             .press(forDuration: 1,
                    thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)),
                    withVelocity: .slow, thenHoldForDuration: 1)
-        let reordered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in source.frame.minY < first.frame.minY }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [reordered], timeout: 5), .completed)
+        let reorderDeadline = ProcessInfo.processInfo.systemUptime + 5
+        let movedIdentifier = "saved-view-" + id
+        var lastOrder = "not sampled"
+        func reordered() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < reorderDeadline else { return false }
+            do {
+                let snapshot = try app.collectionViews["views-list"].snapshot()
+                var pending: [(any XCUIElementSnapshot, CGRect?)] = [(snapshot, nil)]
+                var rows: [String: [CGRect]] = [:]
+                while let (item, inheritedRow) = pending.popLast() {
+                    let row = item.elementType == .cell ? item.frame : inheritedRow
+                    if item.elementType == .button,
+                       item.identifier == movedIdentifier || item.identifier == "view-today",
+                       let row, !row.isEmpty {
+                        rows[item.identifier, default: []].append(row)
+                    }
+                    pending.append(contentsOf: item.children.map { ($0, row) })
+                }
+                lastOrder = String(describing: rows)
+                guard ProcessInfo.processInfo.systemUptime < reorderDeadline,
+                      rows[movedIdentifier]?.count == 1, rows["view-today"]?.count == 1,
+                      let moved = rows[movedIdentifier]?.first, let today = rows["view-today"]?.first else { return false }
+                return moved.minY < today.minY
+            } catch {
+                lastOrder = String(describing: error)
+                return false
+            }
+        }
+        var orderAcknowledged = reordered()
+        let remaining = reorderDeadline - ProcessInfo.processInfo.systemUptime
+        if !orderAcknowledged, remaining > 0 {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reordered() }, object: nil)
+            orderAcknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < reorderDeadline
+        }
+        XCTAssertTrue(orderAcknowledged, "Native reorder did not put the saved view before Today within five seconds: \(lastOrder)")
         capture("Views reordered custom tab first")
         tapTaskControl(app.buttons["close-views"], app: app)
         app.terminate()

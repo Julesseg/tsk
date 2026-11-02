@@ -22,7 +22,15 @@ final class TaskRowEditing {
     let upcomingDays: [UpcomingDay]
     let referenceDate: Date
     var draft: TaskRowDraft
-    var parameter: TaskRowParameter?
+    var parameter: TaskRowParameter? {
+        didSet {
+            if TaskNativeInteractionTrace.enabled {
+                TaskNativeInteractionTrace.event("parameter.changed", ["before": oldValue?.rawValue ?? "nil",
+                                                                        "after": parameter?.rawValue ?? "nil",
+                                                                        "owner": String(describing: ObjectIdentifier(self))])
+            }
+        }
+    }
     var supportingPanel: SupportingPanel?
     var savedTask: TaskRecord?
     var error: String?

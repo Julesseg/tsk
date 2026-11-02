@@ -134,7 +134,7 @@ class SelectionTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("hid_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
-        for suite, family in (("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad"), ("text", "iPhone"), ("text", "iPad")):
+        for suite, family in (("full", "iPhone"), ("full", "iPad"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("keyboard", "iPad"), ("text", "iPhone"), ("text", "iPad"), ("regression", "iPad")):
             with self.subTest(suite=suite, family=family):
                 command = [
                     "xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",
@@ -143,6 +143,34 @@ class SelectionTests(unittest.TestCase):
                     "-skip-testing:TskUITests/ShareCaptureUITests",
                 ]
                 owner.validate_command(command, "owned")
+
+    def test_regression_selection_covers_failed_journeys_without_replacing_full(self):
+        common = {
+            "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+            "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+            "TskUITests/TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
+            "TskUITests/TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
+            "TskUITests/WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
+        }
+        calendar = "TskUITests/iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen"
+        for family in ("iPhone", "iPad"):
+            filters = selection.selection("regression", family)
+            expected = common | ({calendar} if family == "iPad" else set())
+            self.assertEqual(selection.selected_methods(filters), expected)
+            self.assertEqual(len(filters), len(expected))
+            self.assertLess(expected, selection.selected_methods(selection.selection("full", family)))
+            self.assertEqual(selection.phases(filters), ["share", "main"])
+            self.assertFalse(selection.requires_sync_peer(filters))
+            self.assertFalse(selection.requires_sync_server(filters))
+            self.assertEqual(selection.requires_native_keyboard(filters), family == "iPad")
+        spec = importlib.util.spec_from_file_location("regression_plan", ROOT / "scripts/plan-ui-tests.py")
+        planner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(planner)
+        planned = planner.plan("regression")
+        self.assertEqual(planned["families"], ["iPhone", "iPad"])
+        self.assertEqual(planned["partitions"], ["all"])
+        self.assertFalse(planned["server"])
+        self.assertFalse(planned["peer"])
 
     def test_transport_selection_matches_owner_for_every_declared_case_and_partition(self):
         spec = importlib.util.spec_from_file_location("transport_owner", ROOT / "scripts/with-native-keyboard-hid.py")

@@ -52,6 +52,13 @@ TEXT = (
     "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
     "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
 )
+REGRESSION = (
+    "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
+    "TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
+    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
+)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
@@ -88,7 +95,9 @@ def selected_methods(filters):
 
 
 def selection(suite, family, partition="all"):
-    if suite == "text":
+    if suite == "regression":
+        tests = REGRESSION + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
+    elif suite == "text":
         tests = TEXT
     elif suite == "keyboard":
         tests = KEYBOARD + (PHONE_KEYBOARD if family == "iPhone" else ())
@@ -151,7 +160,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")
