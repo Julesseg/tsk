@@ -16,6 +16,7 @@ private struct MissedNotificationEvidence: Codable {
     var delivered: [String] = []
     var deliveredDates: [String: Date] = [:]
     var pending: [String] = []
+    var futureRegistration: TaskNotificationRegistrationEvidence?
     var repeated = false
     var cancellationVerified = false
     var errors: [String] = []
@@ -91,10 +92,12 @@ struct MissedNotificationFixtureControls: View {
         guard Set(accepted.map(\.event)) == Set([TaskNotificationEvent(taskID: learned.id, source: .planned, storedSeconds: Int64(past)!), TaskNotificationEvent(taskID: learned.id, source: .due, storedSeconds: Int64(past)!)]), state.pendingMissed?.isEmpty != false, state.attemptingMissed?.isEmpty != false else { throw TaskManagementError.storage("The genuine final snapshot did not accept exactly the new missed constituents.") }
         let snapshot = try await receipt()
         guard snapshot.tasks.contains(learned), snapshot.tasks.contains(completed), snapshot.tasks.contains(deleted), try await manager.task(id: learned.id) == learned else { throw TaskManagementError.storage("The final successful snapshot or raw task identity was changed.") }
+        let expected = try await manager.notificationPlan(preferences: state.preferences).future.filter { $0.taskID == future.id }
         let pending = try await UNTaskNotificationCenter().pending()
-        guard pending.contains(where: { $0.request?.taskID == future.id }) else { throw TaskManagementError.storage("The actual future request is missing.") }
-        let evidence = MissedNotificationEvidence(token: token, learned: learned, completed: completed, deleted: deleted, future: future, locallyKnown: local, initialReceipt: snapshot, accepted: accepted, pending: pending.map(\.identifier))
+        var evidence = MissedNotificationEvidence(token: token, learned: learned, completed: completed, deleted: deleted, future: future, locallyKnown: local, initialReceipt: snapshot, accepted: accepted, pending: pending.map(\.identifier))
+        evidence.futureRegistration = TaskNotificationRegistrationEvidence(expected: expected, pending: pending, state: state, effectWarning: try TaskNotificationEffect.warning(directory: controller.store.directory))
         try save(evidence)
+        guard pending.contains(where: { $0.request?.taskID == future.id }) else { throw TaskManagementError.storage("The actual future request is missing.") }
         return "SYNCED missed=2 completed=0 deleted=0 local=0"
     }
     private func delivered(_ token: UUID) async throws -> String {
