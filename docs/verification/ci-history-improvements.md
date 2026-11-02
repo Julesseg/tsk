@@ -987,3 +987,63 @@ model alpha and actual routing are measured; their exact ordering between
 samples, rendered opacity, and initiating operation remain unresolved. No
 keyboard-command suppression, input change or wider ancestor treatment follows
 from this result.
+
+Smoke41540858329 passed all four phone methods. The iPad durable case reached
+detail completion, then failed to terminate app PID8718 at232.87s for its final
+relaunch; the method failed after359.467s. That termination failure does not
+establish a native option drop or its cause. Final durable reopen was not
+verified. The independent iPad adaptive-navigation method passed. Both smoke
+consumers used merge source`e6e12f12a261a911613ea815d693e7017f6f2c4b` with
+the identical candidate tree and canonical toolchain/runtime. Every job in both
+terminal head workflows is accounted for; no separately dispatched regression,
+full or test retry exists. The verifier was captured and killed.
+
+### Alpha writer and close/save attribution control
+
+The next single observation keeps restored production gestures, focus, menus,
+popover/zoom, glass, scrolling, input and deadlines unchanged. The opt-in
+Debug/simulator trace now intercepts the public UIView alpha setter. Every
+call forwards its original receiver/value exactly once. A constant-time lookup
+checks a bounded weak collection target and live receiver identity; generic
+public cell/collection captures are classified against the actual native option
+journey offline. No private class predicate identifies a target. Keep at most
+four recent weak targets so successful post-action fades remain observable.
+Record up to four mutations per capture and64 total, exposing dropped counts.
+
+For a tracked alpha decrease or subsequent restoration, buffer old/requested
+values and pre-call state/timestamp, then forward the setter. After it returns,
+record actual model alpha, return time and at most24 raw return addresses, with
+observation duration. No symbolication, file I/O, layout, AX, responder, gesture
+or animation mutation runs in the setter. The existing serial export queue
+resolves address symbols; a startup asynchronous snapshot supplies public Mach-O
+image UUIDs/load addresses outside input dispatch. The setter hook is removable
+diagnostic instrumentation, not a supported UIKit extension point or repair.
+Subclass/direct-layer bypass remains possible: observed alpha0 without a
+matching setter receipt means incomplete interception, not absence of mutation.
+
+Minimal correlated breadcrumbs cover the existing outside-tap callback and
+its guard, close request and scheduled task, and save entry/guard, saving before
+its first await, and exit outcome. They preserve original guards, state writes
+and asynchronous ordering. Weak editing/store context supplies state at each
+alpha receipt. Absence of earlier expansion/parameter writes did not rule out
+a queued or unsuccessful close/save operation. A callback that starts during
+ended dispatch cannot explain an alpha change already sampled before it.
+
+Use one canonical focused execution on each family after auditing the completed
+8d workflows. Compare a failed pre-ended mutation with passing selection fades
+and app requests in the same process/session/generation. An earlier accepted
+close/save operation or a synchronous app caller can select a concrete repair
+boundary; a framework-only asynchronous endpoint does not establish its earlier
+initiator. Same paths/order in passing and failing cases, missing/bypassed
+setter coverage, relevant cap/drop/eviction, stale export, green-only or focus
+prerequisite failure remain inconclusive. Do not suppress native alpha, commands
+or main-menu rebuild requests, change input/deadlines, or retry unchanged source.
+Remove every temporary observer before clean exact-head smoke/full acceptance
+on both families.
+
+The final generic arm64 test build and strict artifact verifier pass with
+Xcode27.1 beta; no local simulator was booted. Review identified and resolved
+an off-main Objective-C actor-thunk forwarding hazard and bounded the Mach-O
+load-command parser. Both source-review axes are clear. This is build/source
+evidence only; canonical execution must establish interception coverage and
+measure any new timing disturbance before interpreting the trace.

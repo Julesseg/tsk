@@ -2,6 +2,8 @@
 import Foundation
 import ObjectiveC
 import UIKit
+import MachO
+import Darwin
 
 private struct NativeTouchRecord: Codable, Sendable {
     let sequence: Int
@@ -20,7 +22,25 @@ private struct NativeTouchExport: Codable, Sendable {
     let replica: String
     let processID: Int32
     let evictedRecords: Int
+    let alphaMutationCount: Int
+    let alphaDroppedMutations: Int
     let records: [NativeTouchRecord]
+    let images: [NativeTouchImage]
+    var symbols: [NativeTouchSymbol] = []
+}
+
+private struct NativeTouchSymbol: Codable, Sendable {
+    let address: String
+    let image: String?
+    let imageAddress: String?
+    let symbol: String?
+    let symbolAddress: String?
+}
+
+private struct NativeTouchImage: Codable, Sendable {
+    let path: String
+    let address: String
+    let uuid: String?
 }
 
 @MainActor
@@ -39,10 +59,166 @@ enum TaskNativeTouchDiagnostics {
     private static var touchOrigins: [ObjectIdentifier: TouchOrigin] = [:]
     private static var sourceCandidates: [SourceCandidate] = []
     private static var droppedOriginCaptures = 0
+    private static var alphaTargets: [ObjectIdentifier: AlphaTarget] = [:]
+    private static var alphaTargetOrder: [ObjectIdentifier] = []
+    private static var alphaInProgress = false
+    private static var alphaMutationCount = 0
+    private static var alphaDroppedMutations = 0
+    private static var lastEventStage = "none"
+    private static var lastEventPhase = "none"
+    private static var images: [NativeTouchImage] = []
+    private static weak var activeEditing: TaskRowEditing?
+    private static weak var activeStore: TaskStore?
+    private static var outsideRequest: Int?
     private static var destination: URL?
     private static let output = DispatchQueue(label: "tsk.pr77.native-touch-export", qos: .utility)
 
     static var isRecording: Bool { installed }
+
+    static func register(store: TaskStore) {
+        guard installed || ProcessInfo.processInfo.environment["TSK_TEST_NATIVE_TOUCH_TRACE"] != nil else { return }
+        activeStore = store
+    }
+
+    static func outsideTap(_ point: CGPoint, editing: TaskRowEditing?) -> Int {
+        guard installed else { return 0 }
+        let request = sequence + 1
+        outsideRequest = request
+        append("outside.callback", details: state(editing).merging([
+            "request": String(request), "point": NSCoder.string(for: point),
+            "bounds": editing.map { NSCoder.string(for: $0.bounds) } ?? "unavailable",
+            "accepted": String(editing.map { $0.isExpanded && !$0.bounds.contains(point) } ?? false)
+        ]) { _, value in value })
+        return request
+    }
+
+    static func outsideFinished(_ request: Int) {
+        if outsideRequest == request { outsideRequest = nil }
+    }
+
+    static func closeRequested(_ editing: TaskRowEditing) -> Int? {
+        guard installed else { return nil }
+        let request = sequence + 1
+        append("close.request", details: state(editing).merging([
+            "request": String(request), "outsideRequest": outsideRequest.map(String.init) ?? "none"
+        ]) { _, value in value })
+        return request
+    }
+
+    static func closeTaskStarted(_ request: Int?, editing: TaskRowEditing) {
+        guard installed else { return }
+        append("close.task", details: state(editing).merging([
+            "request": request.map(String.init) ?? "none"
+        ]) { _, value in value })
+    }
+
+    static func save(_ stage: String, editing: TaskRowEditing, request: Int?, outcome: String = "none") {
+        guard installed else { return }
+        append("save." + stage, details: state(editing).merging([
+            "request": request.map(String.init) ?? "none", "outcome": outcome
+        ]) { _, value in value })
+        exportAfterDispatch()
+    }
+
+    private static func state(_ editing: TaskRowEditing? = activeEditing) -> [String: String] {
+        ["owner": editing.map(identity) ?? "unavailable", "expandedOwner": expandedOwner ?? "nil",
+         "editingSaving": editing.map { String($0.isSaving) } ?? "unavailable",
+         "storeSaving": activeStore.map { String($0.isSaving) } ?? "unavailable",
+         "expanded": editing.map { String($0.isExpanded) } ?? "unavailable",
+         "supportingPanel": editing.map { $0.supportingPanel?.id ?? "nil" } ?? "unavailable",
+         "parameter": editing.map { $0.parameter?.rawValue ?? "nil" } ?? "unavailable"]
+    }
+
+    private static func trackAlpha(_ collection: UICollectionView, touch: String, sequence: Int, generation: TimeInterval) {
+        let key = ObjectIdentifier(collection)
+        alphaTargets[key] = AlphaTarget(collection, touch: touch, sequence: sequence, generation: generation)
+        alphaTargetOrder.removeAll { $0 == key }
+        alphaTargetOrder.append(key)
+        if alphaTargetOrder.count > 4 { alphaTargets.removeValue(forKey: alphaTargetOrder.removeFirst()) }
+    }
+
+    static func alphaWillChange(_ view: UIView, requested: CGFloat) -> AlphaMutation? {
+        guard installed, let target = alphaTargets[ObjectIdentifier(view)], target.collection === view else { return nil }
+        guard !alphaInProgress else { alphaDroppedMutations += 1; return nil }
+        let old = view.alpha
+        guard old != requested, requested < old || target.mutations > 0 else { return nil }
+        guard target.mutations < 4, alphaMutationCount < 64 else {
+            alphaDroppedMutations += 1
+            exportAfterDispatch()
+            return nil
+        }
+        alphaInProgress = true
+        target.mutations += 1
+        alphaMutationCount += 1
+        let details = state().merging([
+            "mutation": String(alphaMutationCount), "collection": identity(view),
+            "captureSequence": String(target.sequence), "beganGeneration": String(target.generation),
+            "touch": target.touch, "oldAlpha": String(describing: old), "requestedAlpha": String(describing: requested),
+            "eventStage": lastEventStage, "eventPhase": lastEventPhase,
+            "lastReceiptSequence": String(sequence), "droppedMutations": String(alphaDroppedMutations)
+        ]) { _, value in value }
+        append("alpha.setter.before", details: details)
+        return AlphaMutation(details: details, started: ProcessInfo.processInfo.systemUptime)
+    }
+
+    static func alphaDidChange(_ view: UIView, mutation: AlphaMutation) {
+        let returned = ProcessInfo.processInfo.systemUptime
+        let actual = view.alpha
+        let stack = Thread.callStackReturnAddresses.prefix(24).map { String($0.uintValue, radix: 16) }
+        append("alpha.setter.after", details: mutation.details.merging([
+            "actualAlpha": String(describing: actual), "setterReturnedUptime": String(returned),
+            "setterSeconds": String(returned - mutation.started), "stack": stack.joined(separator: ","),
+            "observationSeconds": String(ProcessInfo.processInfo.systemUptime - returned),
+            "stackLimitReached": String(stack.count == 24)
+        ]) { _, value in value })
+        alphaInProgress = false
+        exportAfterDispatch()
+    }
+
+    struct AlphaMutation: Sendable {
+        let details: [String: String]
+        let started: TimeInterval
+    }
+
+    private final class AlphaTarget {
+        weak var collection: UICollectionView?
+        let touch: String
+        let sequence: Int
+        let generation: TimeInterval
+        var mutations = 0
+
+        init(_ collection: UICollectionView, touch: String, sequence: Int, generation: TimeInterval) {
+            self.collection = collection
+            self.touch = touch
+            self.sequence = sequence
+            self.generation = generation
+        }
+    }
+
+    private static func loadedImages() -> [NativeTouchImage] {
+        (0..<_dyld_image_count()).compactMap { index in
+            guard let header = _dyld_get_image_header(index), let name = _dyld_get_image_name(index) else { return nil }
+            var uuid: String?
+            if header.pointee.magic == MH_MAGIC_64 {
+                var cursor = UnsafeRawPointer(header).advanced(by: MemoryLayout<mach_header_64>.size)
+                var remaining = Int(UnsafeRawPointer(header).load(as: mach_header_64.self).sizeofcmds)
+                for _ in 0..<header.pointee.ncmds {
+                    guard remaining >= MemoryLayout<load_command>.size else { break }
+                    let command = cursor.load(as: load_command.self)
+                    let size = Int(command.cmdsize)
+                    guard size >= MemoryLayout<load_command>.size, size <= remaining else { break }
+                    if command.cmd == LC_UUID {
+                        guard size >= MemoryLayout<uuid_command>.size else { break }
+                        uuid = UUID(uuid: cursor.load(as: uuid_command.self).uuid).uuidString
+                        break
+                    }
+                    cursor = cursor.advanced(by: size)
+                    remaining -= size
+                }
+            }
+            return NativeTouchImage(path: String(cString: name), address: String(UInt(bitPattern: header), radix: 16), uuid: uuid)
+        }
+    }
 
     static func installIfRequested(application: UIApplication) {
         let environment = ProcessInfo.processInfo.environment
@@ -53,13 +229,21 @@ enum TaskNativeTouchDiagnostics {
               let token = environment["TSK_UI_TEST_SESSION"], UUID(uuidString: token) != nil,
               let original = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.sendEvent(_:))),
               let observer = class_getInstanceMethod(UIApplication.self, #selector(UIApplication.tsk_pr77_sendEvent(_:))),
+              let alphaSetter = class_getInstanceMethod(UIView.self, #selector(setter: UIView.alpha)),
+              let alphaObserver = class_getInstanceMethod(UIView.self, #selector(UIView.tsk_pr77_setAlpha(_:))),
               let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         session = token
         replica = requested
         destination = directory.appendingPathComponent("participant-fixture-pr77-touch-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
         method_exchangeImplementations(original, observer)
+        method_exchangeImplementations(alphaSetter, alphaObserver)
         installed = true
-        append("installed", details: ["applicationClass": NSStringFromClass(type(of: application)), "originProbe": "weak-v1"])
+        append("installed", details: ["applicationClass": NSStringFromClass(type(of: application)), "originProbe": "weak-v1", "alphaProbe": "setter-v1"])
+        DispatchQueue.main.async {
+            images = loadedImages()
+            append("alpha.images", details: ["count": String(images.count), "snapshotOutsideDispatch": "true"])
+            exportAfterDispatch()
+        }
         exportAfterDispatch()
     }
 
@@ -75,7 +259,7 @@ enum TaskNativeTouchDiagnostics {
     static func expansionChanged(_ editing: TaskRowEditing, expanded: Bool) {
         guard installed else { return }
         let owner = identity(editing)
-        if expanded { expandedOwner = owner }
+        if expanded { expandedOwner = owner; activeEditing = editing }
         else if expandedOwner == owner { expandedOwner = nil }
         append("row.expanded", details: ["owner": owner, "rowID": editing.rowID, "expanded": String(expanded)])
         exportAfterDispatch()
@@ -102,8 +286,10 @@ enum TaskNativeTouchDiagnostics {
 
     static func receive(_ event: UIEvent, stage: String) {
         guard installed, event.type == .touches else { return }
+        lastEventStage = stage
         for touch in (event.allTouches ?? []).prefix(4) {
             guard touch.phase != .stationary else { continue }
+            lastEventPhase = String(touch.phase.rawValue)
             let location = touch.location(in: touch.window)
             var ancestors: [[String: String]] = []
             var originAncestors: [UIView] = []
@@ -135,6 +321,10 @@ enum TaskNativeTouchDiagnostics {
                     touchOrigins[touchID] = TouchOrigin(sequence: captureSequence, timestamp: touch.timestamp,
                                                        location: location, ancestors: originAncestors, window: touch.window,
                                                        sources: sourceCandidates)
+                    if let collection = originAncestors.compactMap({ $0 as? UICollectionView }).first,
+                       originAncestors.contains(where: { $0 is UICollectionViewCell }) {
+                        trackAlpha(collection, touch: identity(touch), sequence: captureSequence, generation: touch.timestamp)
+                    }
                 } else {
                     droppedOriginCaptures += 1
                 }
@@ -168,6 +358,7 @@ enum TaskNativeTouchDiagnostics {
                 "originBeganTimestamp": origin.map { String($0.beganTimestamp) } ?? "unavailable",
                 "originDroppedCaptures": String(droppedOriginCaptures),
                 "originTouchesTruncated": String((event.allTouches?.count ?? 0) > 4),
+                "alphaMutationCount": String(alphaMutationCount), "alphaDroppedMutations": String(alphaDroppedMutations),
                 "sourceCandidateSequences": origin?.sources.map { String($0.sequence) }.joined(separator: ",") ?? "unavailable",
                 "sourceAssociation": origin?.sources.isEmpty == false ? "unverified-candidates" : "unavailable"
             ], ancestors: ancestors, recognizers: recognizers, origins: originSamples)
@@ -185,10 +376,13 @@ enum TaskNativeTouchDiagnostics {
             let exportedSequence = sequence
             let packet = NativeTouchExport(schema: 1, session: session, replica: replica,
                                            processID: ProcessInfo.processInfo.processIdentifier,
-                                           evictedRecords: evictedRecords, records: records)
+                                           evictedRecords: evictedRecords, alphaMutationCount: alphaMutationCount,
+                                           alphaDroppedMutations: alphaDroppedMutations, records: records, images: images)
             output.async {
                 do {
-                    let data = try JSONEncoder().encode(packet)
+                    var enriched = packet
+                    enriched.symbols = symbolize(packet.records)
+                    let data = try JSONEncoder().encode(enriched)
                     try data.write(to: destination, options: .atomic)
                 } catch {
                     NSLog("[PR77-TOUCH] Export failed: %@", String(describing: error))
@@ -214,6 +408,21 @@ enum TaskNativeTouchDiagnostics {
     }
 
     private static func identity(_ object: AnyObject) -> String { String(describing: ObjectIdentifier(object)) }
+
+    nonisolated private static func symbolize(_ records: [NativeTouchRecord]) -> [NativeTouchSymbol] {
+        let addresses = Set(records.flatMap { $0.details["stack"]?.split(separator: ",").map(String.init) ?? [] })
+        return addresses.sorted().compactMap { address in
+            guard let number = UInt(address, radix: 16), let pointer = UnsafeRawPointer(bitPattern: number) else { return nil }
+            var info = Dl_info()
+            guard dladdr(pointer, &info) != 0 else {
+                return NativeTouchSymbol(address: address, image: nil, imageAddress: nil, symbol: nil, symbolAddress: nil)
+            }
+            return NativeTouchSymbol(address: address, image: info.dli_fname.map { String(cString: $0) },
+                                     imageAddress: info.dli_fbase.map { String(UInt(bitPattern: $0), radix: 16) },
+                                     symbol: info.dli_sname.map { String(cString: $0) },
+                                     symbolAddress: info.dli_saddr.map { String(UInt(bitPattern: $0), radix: 16) })
+        }
+    }
 
     private static func ordinalSignature(_ values: [String: Int]) -> String {
         values.sorted { $0.key < $1.key }.map { $0.key + ":" + String($0.value) }.joined(separator: ",")
@@ -340,6 +549,22 @@ extension UIApplication {
         tsk_pr77_sendEvent(event)
         TaskNativeTouchDiagnostics.receive(event, stage: "touch.after")
         TaskNativeTouchDiagnostics.exportAfterDispatch()
+    }
+}
+
+extension UIView {
+    @objc nonisolated dynamic func tsk_pr77_setAlpha(_ value: CGFloat) {
+        guard Thread.isMainThread else {
+            tsk_pr77_setAlpha(value)
+            return
+        }
+        let mutation = MainActor.assumeIsolated {
+            TaskNativeTouchDiagnostics.alphaWillChange(self, requested: value)
+        }
+        tsk_pr77_setAlpha(value)
+        if let mutation {
+            MainActor.assumeIsolated { TaskNativeTouchDiagnostics.alphaDidChange(self, mutation: mutation) }
+        }
     }
 }
 #endif

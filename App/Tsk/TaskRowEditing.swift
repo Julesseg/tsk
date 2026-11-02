@@ -94,14 +94,32 @@ final class TaskRowEditing {
         error = nil
     }
 
-    func saveAndCollapse(in store: TaskStore, reduceMotion: Bool) async -> Bool {
+    func saveAndCollapse(in store: TaskStore, reduceMotion: Bool, diagnosticRequest: Int? = nil) async -> Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        var diagnosticOutcome = "guard-rejected"
+        TaskNativeTouchDiagnostics.save("entry", editing: self, request: diagnosticRequest)
+        defer { TaskNativeTouchDiagnostics.save("exit", editing: self, request: diagnosticRequest, outcome: diagnosticOutcome) }
+        #endif
         guard !isSaving, !store.isSaving, supportingPanel == nil, isExpanded else { return false }
-        if parameter != nil { parameter = nil; return false }
+        if parameter != nil {
+            #if DEBUG && targetEnvironment(simulator)
+            diagnosticOutcome = "parameter-dismissed"
+            #endif
+            parameter = nil
+            return false
+        }
         isSaving = true
+        #if DEBUG && targetEnvironment(simulator)
+        diagnosticOutcome = "validation-or-store-failed"
+        TaskNativeTouchDiagnostics.save("saving", editing: self, request: diagnosticRequest)
+        #endif
         do {
             _ = try draft.changes()
             let saved = await store.updateRow(draft)
             guard let saved else {
+                #if DEBUG && targetEnvironment(simulator)
+                diagnosticOutcome = "store-update-failed"
+                #endif
                 error = store.error
                 isSaving = false
                 return false
@@ -109,8 +127,14 @@ final class TaskRowEditing {
             savedTask = saved
             await setExpanded(false, reduceMotion: reduceMotion)
             store.rowEditing = nil
+            #if DEBUG && targetEnvironment(simulator)
+            diagnosticOutcome = "saved-collapsed"
+            #endif
             return true
         } catch {
+            #if DEBUG && targetEnvironment(simulator)
+            diagnosticOutcome = "validation-failed"
+            #endif
             self.error = error.localizedDescription
             isSaving = false
             return false
