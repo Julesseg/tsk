@@ -366,3 +366,40 @@ are removed before the next clean verification source. The concrete 44-point
 inner hit area, 26-point capsule and fresh five-second reorder acknowledgement
 remain. The next native run checks the Share ordering correction and all affected
 journeys; clean exact-head smoke and full on both families still gate acceptance.
+
+### Focus-gesture candidate after `01a0681`
+
+The user renewed the instruction to continue until all failures are fixed. The
+next app candidate changes one interaction rule: the Menu's simultaneous
+unfocus tap gesture is enabled only while the row's title or note has text focus.
+The callback remains active while it has focus to dismiss. Native Menu/Picker,
+selection/reselection, popover presentation, styling and existing test inputs and
+deadlines remain. This does not revive the rejected UIKit bridge or change
+responder ownership.
+
+The ranked explanations remain (1) redundant gesture competition during native
+menu selection, (2) action/view replacement caused by another SwiftUI update,
+and (3) another native presentation/touch-routing boundary. The candidate tests
+only the first. Apple's public
+[simultaneous gesture API](https://developer.apple.com/documentation/swiftui/view/simultaneousgesture(_:isenabled:))
+permits disabling the added gesture; this documents the mechanism being changed,
+not the cause of the observed failure. A failed native action rejects this
+candidate before another behavior treatment is applied.
+
+The new native regression retains the original High selected/reselected prefix,
+then opens and dismisses New project twenty times in one process. Every cycle
+requires its real input field within five seconds, its disappearance within five
+seconds, and unchanged Release selection. The final cycle first focuses the
+row title and requires keyboard dismissal after opening the menu. It neither
+replays touches nor changes the existing durable method's two-opening assertions.
+Full coverage now contains 75 iPhone/66 iPad methods; all previous methods remain.
+The focused menu dispatch selects this case alone on both families without
+server, peer, HID or installed-extension fixtures. Regression also includes it;
+smoke remains 4/2. A passing focused run still cannot establish full acceptance.
+
+An owned local simulator attempt used checksum/signature-verified CI products
+from `01a0681`, runtime 27.0 and the local Xcode27.1-beta driver. Boot/migration
+raised host load from14.88 to331.59. The attempt was interrupted for host health;
+its device was shut down/deleted and no simulator remained booted. This supplies
+no valid control verdict or native acceptance evidence. Generic builds do not
+boot a simulator; canonical CI supplies the runtime verdicts.

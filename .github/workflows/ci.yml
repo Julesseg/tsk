@@ -12,7 +12,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [smoke, full, keyboard, text, regression]
+        options: [smoke, full, keyboard, text, regression, menu]
         required: true
         default: smoke
       reason:
@@ -37,7 +37,7 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text","regression"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text","regression","menu"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
@@ -291,7 +291,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || 'Regression', matrix.family) || matrix.family == 'iPhone' && 'App · XCUITest (macOS)' || 'App · XCUITest (iPad)' }}
+    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || matrix.family == 'iPhone' && 'App · XCUITest (macOS)' || 'App · XCUITest (iPad)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -52,8 +52,10 @@ TEXT = (
     "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
     "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
 )
+MENU = ("TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",)
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+    "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
     "TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
@@ -95,7 +97,9 @@ def selected_methods(filters):
 
 
 def selection(suite, family, partition="all"):
-    if suite == "regression":
+    if suite == "menu":
+        tests = MENU
+    elif suite == "regression":
         tests = REGRESSION + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
     elif suite == "text":
         tests = TEXT
@@ -160,7 +164,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")

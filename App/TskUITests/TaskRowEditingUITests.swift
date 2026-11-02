@@ -183,15 +183,7 @@ import XCTest
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "task-row-editor").count, 1)
         capture("Expanded without keyboard", app)
         XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
-        openTaskRowParameter("priority", app: app)
-        capture("Native priority menu", app)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        openTaskRowParameter("priority", app: app)
-        let selectedHigh = app.buttons.matching(NSPredicate(format: "label == %@", "High")).firstMatch
-        XCTAssertTrue(selectedHigh.waitForExistence(timeout: 5))
-        XCTAssertTrue(selectedHigh.isSelected)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+        selectHighPriorityAndVerifyReselection(app)
         openTaskRowParameter("project", app: app)
         capture("Native project menu", app)
         tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
@@ -308,6 +300,35 @@ import XCTest
         XCTAssertTrue(app.buttons[identifier].waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
         capture("Upcoming membership applies after collapse", app)
+    }
+
+    func testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
+        let app = try launch()
+        let title = expandTask(app)
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        selectHighPriorityAndVerifyReselection(app)
+        for cycle in 1...20 {
+            XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
+                if cycle == 20 { focusTaskText(title, app: app) }
+                openTaskRowParameter("project", app: app)
+                if cycle == 20 {
+                    let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+                    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                    XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+                }
+                tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+                let field = app.textFields["row-project-input"]
+                let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                XCTAssertEqual(field.value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+                app.buttons["close-row-parameter"].tap()
+                let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+                XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+            }
+        }
     }
 
     func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
@@ -488,6 +509,18 @@ import XCTest
         XCTAssertTrue((title.value as? String ?? "").contains("scroll retained"))
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
+    }
+
+    private func selectHighPriorityAndVerifyReselection(_ app: XCUIApplication) {
+        openTaskRowParameter("priority", app: app)
+        capture("Native priority menu", app)
+        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
+        openTaskRowParameter("priority", app: app)
+        let selectedHigh = app.buttons.matching(NSPredicate(format: "label == %@", "High")).firstMatch
+        XCTAssertTrue(selectedHigh.waitForExistence(timeout: 5))
+        XCTAssertTrue(selectedHigh.isSelected)
+        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
     }
 
     private func visibleCompletionCircleFrame(_ id: String, app: XCUIApplication) throws -> CGRect {

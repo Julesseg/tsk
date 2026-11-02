@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo', default='Julesseg/tsk')
     parser.add_argument('--ref', required=True)
-    parser.add_argument('--suite', required=True, choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression'])
+    parser.add_argument('--suite', required=True, choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression', 'menu'])
     parser.add_argument('--reason', required=True)
     parser.add_argument('--identity', type=Path)
     parser.add_argument('--force', action='store_true')

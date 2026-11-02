@@ -40,7 +40,7 @@ class SelectionTests(unittest.TestCase):
                     methods = [selection.selected_methods(group) for group in groups]
                     self.assertEqual(methods[0] | methods[1], original)
                     self.assertFalse(methods[0] & methods[1])
-                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 10)
+                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 11)
                     self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
                     self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
                     self.assertFalse(owner.selected_cases(groups[1]))
@@ -52,10 +52,10 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 32)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 33)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (41, 33)), ('iPad', (33, 32))):
+        for family, counts in (('iPhone', (41, 34)), ('iPad', (33, 33))):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -84,11 +84,11 @@ class SelectionTests(unittest.TestCase):
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(phone), 74)
+        self.assertEqual(len(phone), 75)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 65)
+        self.assertEqual(len(pad), 66)
         for methods in (phone, pad):
             self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", methods)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
@@ -147,6 +147,7 @@ class SelectionTests(unittest.TestCase):
     def test_regression_selection_covers_failed_journeys_without_replacing_full(self):
         common = {
             "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+            "TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
             "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
             "TskUITests/TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
             "TskUITests/TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
@@ -171,6 +172,17 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(planned["partitions"], ["all"])
         self.assertFalse(planned["server"])
         self.assertFalse(planned["peer"])
+
+    def test_menu_selection_preserves_the_repeated_native_case_without_unrelated_fixtures(self):
+        expected = {"TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal"}
+        for family in ("iPhone", "iPad"):
+            filters = selection.selection("menu", family)
+            self.assertEqual(selection.selected_methods(filters), expected)
+            self.assertEqual(selection.phases(filters), ["main"])
+            self.assertFalse(selection.requires_sync_peer(filters))
+            self.assertFalse(selection.requires_sync_server(filters))
+            self.assertFalse(selection.requires_native_keyboard(filters))
+            self.assertLess(expected, selection.selected_methods(selection.selection("full", family)))
 
     def test_transport_selection_matches_owner_for_every_declared_case_and_partition(self):
         spec = importlib.util.spec_from_file_location("transport_owner", ROOT / "scripts/with-native-keyboard-hid.py")
