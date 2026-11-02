@@ -96,6 +96,13 @@ still require visible keyboard geometry and two stable samples inside the
 and two stable, finite, ancestor-contained row snapshots, then performs one tap
 at that admitted position without resolving the disappearing menu button again.
 
+After an explicitly reported non-keyboard method timeout, the relay recognizes
+XCTest's restart boundary and permits the remaining methods to run. It retains
+the timed-out method in its receipt and rejects the run at completion. A missing
+timeout boundary, a mismatched method, a keyboard-case timeout, an outstanding
+HID exchange or a repeated timed-out method still fails closed. This preserves
+the original failure while allowing XCTest to finish its result bundle.
+
 Run full coverage on both families before accepting system integrations,
 workflow changes, or behavior outside smoke coverage:
 
