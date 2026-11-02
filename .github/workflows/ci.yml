@@ -184,6 +184,7 @@ jobs:
       - name: Validate target-specific release profile rules
         run: python3 scripts/test-provisioning-profiles.py
       - name: Build UI test products
+        id: ui_build
         timeout-minutes: 20
         working-directory: App
         run: |
@@ -192,9 +193,24 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -parallel-testing-enabled NO -derivedDataPath ../.build/ui \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES TSK_APP_DEBUG_DYLIB=NO
       - name: Verify simulator intent metadata and shared storage entitlement
+        id: admission
         run: python3 scripts/verify-intents-artifact.py ".build/ui/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
+      - name: Retain rejected UI build admission evidence
+        if: failure() && steps.ui_build.outcome == 'success' && steps.admission.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-build-admission-diagnostics
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .build/ui/Build/Products/Debug-iphonesimulator/${{ env.APP_NAME }}.app
+            .build/ui/Build/Intermediates.noindex/${{ env.APP_NAME }}.build/Debug-iphonesimulator/${{ env.APP_NAME }}.build/Objects-normal/arm64/${{ env.APP_NAME }}_dependency_info.dat
+            .build/ui/Build/Intermediates.noindex/${{ env.APP_NAME }}.build/Debug-iphonesimulator/${{ env.APP_NAME }}.build/Objects-normal/arm64/${{ env.APP_NAME }}.SwiftConstValuesFileList
+            .build/ui/Build/Intermediates.noindex/${{ env.APP_NAME }}.build/Debug-iphonesimulator/${{ env.APP_NAME }}.build/${{ env.APP_NAME }}.DependencyMetadataFileList
+            .build/ui/Build/Intermediates.noindex/${{ env.APP_NAME }}.build/Debug-iphonesimulator/${{ env.APP_NAME }}.build/${{ env.APP_NAME }}.DependencyStaticMetadataFileList
       - name: Package signed products and execution identity
         run: python3 scripts/ui-build-products.py pack --archive .build/ui-products.tar.gz
       - uses: actions/upload-artifact@v4

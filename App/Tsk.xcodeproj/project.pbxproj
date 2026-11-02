@@ -394,6 +394,7 @@
 				OTHER_LDFLAGS = "$(inherited) -ltsk_taskchampion -liconv -lc++ -framework Security -framework SystemConfiguration";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = "$(TSK_APP_DEBUG_DYLIB)";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = tsk;
@@ -413,6 +414,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TSK_APP_DEBUG_DYLIB = YES;
 			};
 			name = Debug;
 		};

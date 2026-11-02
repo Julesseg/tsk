@@ -482,3 +482,53 @@ observer and launch opt-in before clean exact-head smoke/full acceptance.
 The generic simulator test build passes. Standards and Spec reviews cleared the
 export backlog correction; no native runtime result is claimed for this control.
 No local simulator was booted.
+
+
+### Build-admission interruption at `60262af`
+
+[Focused menu41509968846](https://github.com/Julesseg/tsk/actions/runs/41509968846)
+ran no UI tests. Producer125499304156 compiled successfully, then the strict
+verifier rejected the absent `Tsk.app/Metadata.appintents/extract.actionsdata`.
+The extractor reported no AppIntents.framework dependency. Packaging and both
+UI workers were skipped; there are no native touch receipts to classify and no
+menu correctness/performance verdict. The separately requested smoke producer
+125498761894 on the same head wrote metadata and passed admission. Its native
+workers remain independently audited. Neither an unchanged-source test retry
+nor a full run is requested.
+
+Both producer linker logs show a Debug executor whose entry point loads
+`Tsk.debug.dylib`; extraction names the executor as its binary input. Local
+Mach-O inspection confirms that the executor depends on that dylib and libSystem,
+while the dylib contains the AppIntents dependency. The passing producer uses
+the same layout. Therefore Debug-stub dependency detection, dependency-file
+ordering and extractor nondeterminism remain ranked hypotheses, not a proven
+GitHub-infrastructure or source-code cause.
+
+The bounded build candidate tests the first hypothesis by making the Tsk Debug
+executable direct in CI. Only that target's `ENABLE_DEBUG_DYLIB` reads a custom
+`TSK_APP_DEBUG_DYLIB` setting, whose default remains `YES`; the producer supplies
+`NO`. Other targets and developer Preview defaults remain unchanged. This uses
+Apple's documented [per-target Debug layout override](https://developer.apple.com/documentation/xcode/understanding-build-product-layout-changes).
+No native menu, observer, test input, geometry, assertion or deadline changes.
+If canonical extraction still fails with a direct AppIntents-dependent main
+binary, that result rejects this layout explanation before another build
+behavior treatment. A successful extraction is admission evidence, not proof
+that layout caused the prior intermittent failure or that the native menu works.
+
+The metadata/entitlement gate remains strict and precedes packaging. After a
+successful compile but rejected admission, a separate seven-day
+`ui-build-admission-diagnostics` artifact retains the rejected app and extraction
+dependency inputs. Hidden `.build` files are included and an empty upload fails;
+this artifact is never named or admitted as `ui-products`. This preserves the
+next red build for inspection without retrying extraction or fabricating output.
+Local build-setting queries confirm Tsk resolves `NO` under the CI override and
+`YES` by default. Ten execution and twelve routing checks pass; fresh generic
+build and real artifact-verifier results are recorded with this candidate.
+
+The fresh-derived-data generic test build passed with Xcode27.1 beta and the CI
+override. Its main executable directly links AppIntents, contains no separate
+`Tsk.debug.dylib`, and passes the unchanged real metadata/App Group verifier,
+including all four App Shortcuts and embedded Share/Widget checks. This local
+result validates the candidate's layout and artifact contents, not the canonical
+Xcode27.0 outcome or native UI reliability. Standards and Spec reviews cleared
+the hidden-artifact inclusion correction. No simulator was booted locally.
