@@ -91,29 +91,61 @@ struct TaskSelectionBar: View {
         VStack(spacing: 8) {
             if let error = store.error {
                 Text(error).font(.callout).foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
                     .accessibilityIdentifier("task-selection-error")
             }
-            HStack {
-                Button("Done") { store.endTaskSelection() }
-                    .accessibilityIdentifier("task-selection-done")
-                Spacer()
-                Text("\(store.selectedTaskIDs.count) selected")
-                    .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
-                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
-                    .monospacedDigit().accessibilityIdentifier("task-selection-count")
-                    #if DEBUG
-                    .accessibilityValue(store.selectionGestureProof)
-                    #endif
-                Spacer()
-                Button("Complete", systemImage: "checkmark") { Task { await store.completeSelection() } }
-                    .disabled(store.selectedTaskIDs.isEmpty)
-                    .accessibilityIdentifier("complete-task-selection")
+            GlassEffectContainer(spacing: 8) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        doneButton
+                        selectionCount
+                        completeButton
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                    VStack(spacing: 10) {
+                        doneButton
+                        selectionCount
+                        completeButton
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .controlSize(.large)
+                .buttonBorderShape(.capsule)
             }
         }
-        .padding().background(.bar)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16).padding(.vertical, 8)
         .opacity(appeared ? 1 : 0)
         .offset(y: reduceMotion || appeared ? 0 : 12)
         .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
         .disabled(store.isSaving || store.isSelectionGestureActive)
+    }
+
+    private var doneButton: some View {
+        Button("Done") { store.endTaskSelection() }
+            .buttonStyle(.glass)
+            .accessibilityIdentifier("task-selection-done")
+    }
+
+    private var selectionCount: some View {
+        Text("\(store.selectedTaskIDs.count) selected")
+            .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
+            .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
+            .monospacedDigit()
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .glassEffect(.regular, in: Capsule())
+            .accessibilityIdentifier("task-selection-count")
+            #if DEBUG
+            .accessibilityValue(store.selectionGestureProof)
+            #endif
+    }
+
+    private var completeButton: some View {
+        Button("Complete", systemImage: "checkmark") { Task { await store.completeSelection() } }
+            .buttonStyle(.glassProminent)
+            .disabled(store.selectedTaskIDs.isEmpty)
+            .accessibilityIdentifier("complete-task-selection")
     }
 }

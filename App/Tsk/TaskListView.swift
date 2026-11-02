@@ -293,10 +293,16 @@ struct TaskListRow: View {
         }
         .onChange(of: viewport) { _, bounds in editing?.viewport = bounds }
         .mask {
-            VStack(spacing: 0) {
-                LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)
-                Rectangle().fill(.white)
-                LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .bottom).frame(height: 6)
+            Group {
+                if selected {
+                    Rectangle().fill(.white)
+                } else {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)
+                        Rectangle().fill(.white)
+                        LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .bottom).frame(height: 6)
+                    }
+                }
             }
             .padding(.horizontal, -12)
             .scaleEffect(x: 1, y: visibility)
