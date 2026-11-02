@@ -55,7 +55,7 @@ final class SelectionAnchor: UIView {
     }
 }
 
-final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureRecognizerDelegate {
     weak var store: TaskStore?
     weak var scope: TaskSelectionScope?
     var viewport = CGRect.zero
@@ -79,18 +79,21 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     private var collapsedLayout: CheckedContinuation<Void, Never>?
     private var generation = 0
     private var released = false
-    private var horizontal = false
-    private var crossedThreshold = false
+    private var pressStartedAt: TimeInterval = 0
+    private weak var activeTouch: UITouch?
     private var tracking = false
 
     init() {
         super.init(target: nil, action: nil)
         delegate = self
         cancelsTouchesInView = true
+        minimumPressDuration = 0.5
+        allowableMovement = 10
+        addTarget(self, action: #selector(handlePress))
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard touches.count == 1, let touch = touches.first, let store, !store.isSaving else { state = .failed; return }
+        guard activeTouch == nil, touches.count == 1, let touch = touches.first, let store, !store.isSaving else { state = state == .possible ? .failed : .cancelled; finish(); return }
         generation += 1
         preparation?.cancel()
         collapsedLayout?.resume()
@@ -100,6 +103,8 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         positions = [initial]
         guard viewport.contains(initial), let row = rows.first(where: { $0.bounds.contains(initial) }),
               store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else { state = .failed; return }
+        activeTouch = touch
+        pressStartedAt = touch.timestamp
         initialTaskID = row.id
         initialRowID = row.rowID
         initialSelection = store.selectedTaskIDs
@@ -109,41 +114,32 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         frozenRows = rows
         previousY = initial.y
         released = false
-        horizontal = false
-        crossedThreshold = false
         tracking = false
         #if DEBUG
         proof = TaskSelectionGestureProof()
         #endif
+        super.touchesBegan(touches, with: event)
     }
 
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard let touch = touches.first, state != .failed else { return }
+    @objc private func handlePress() {
+        guard let touch = activeTouch else { return }
         let point = touch.location(in: nil)
         recordPosition(point)
-        if state == .possible {
-            let dx = point.x - initial.x, dy = point.y - initial.y
-            guard max(abs(dx), abs(dy)) > 10 else { return }
-            guard dx > abs(dy) else { state = .failed; return }
-            horizontal = true
-            store?.isSelectionSwipeActive = true
-            state = .began
-        }
-        if horizontal, !crossedThreshold {
-            updateSwipeFeedback(at: point)
-            let dx = point.x - initial.x
-            guard dx >= viewport.width * 0.25 else { return }
-            crossedThreshold = true
+        if state == .began {
+            guard let store, let initialTaskID,
+                  store.visibleTasks.contains(where: { $0.id == initialTaskID && $0.canComplete }) else { state = .cancelled; finish(); return }
+            store.isSelectionPressActive = true
             freezeScrolling(in: view)
             #if DEBUG
-            proof.crossingDistance = dx
+            proof.activationDuration = ProcessInfo.processInfo.systemUptime - pressStartedAt
+            proof.activationDistance = hypot(point.x - initial.x, point.y - initial.y)
             proof.columnWidth = viewport.width
             #endif
             let token = generation
-            let selectionGeneration = store?.taskSelectionGeneration
-            let wasEditing = store?.rowEditing != nil
+            let selectionGeneration = store.taskSelectionGeneration
+            let wasEditing = store.rowEditing != nil
             if !wasEditing {
-                guard store?.activateSelectionGesture() == true else { state = .cancelled; finish(); return }
+                guard store.activateSelectionGesture() else { state = .cancelled; finish(); return }
                 tracking = true
                 replayPositions()
                 applySelection()
@@ -172,7 +168,6 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                 guard selectionGeneration == store.taskSelectionGeneration else { return }
                 self.tracking = true
                 self.applySelection()
-                self.updateSwipeFeedback(at: self.latest)
                 #if DEBUG
                 self.recordProof(touch)
                 if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1", !self.released {
@@ -197,30 +192,20 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
                 recordRowEntries(from: previousY, to: point.y)
                 applySelection()
             }
-            updateSwipeFeedback(at: point)
             #if DEBUG
             recordProof(touch)
             #endif
             previousY = point.y
-            state = .changed
         }
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-        if let touch = touches.first {
-            recordPosition(touch.location(in: nil))
+        if state == .ended {
             if tracking, store?.isSelectionGestureActive == true {
-                recordRowEntries(from: previousY, to: latest.y)
+                recordRowEntries(from: previousY, to: point.y)
                 applySelection()
             }
+            release()
+        } else if state == .cancelled || state == .failed {
+            finish()
         }
-        if state == .began || state == .changed { state = .ended; release() }
-        else { state = .failed }
-    }
-
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
-        state = .cancelled
-        finish()
     }
 
     override func reset() {
@@ -230,15 +215,6 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     func updateRows(_ rows: [TaskSelectionRow]) {
         self.rows = rows
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1" {
-            let token = generation
-            DispatchQueue.main.async { [weak self] in
-                guard let self, token == self.generation else { return }
-                self.recordTranslationProof()
-            }
-        }
-        #endif
         if rowsAreCollapsed {
             collapsedLayout?.resume()
             collapsedLayout = nil
@@ -287,16 +263,6 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         feedback.prepare()
     }
 
-    private func updateSwipeFeedback(at point: CGPoint) {
-        guard let store, !released, store.rowEditing == nil, tracking || !crossedThreshold else { return }
-        guard let row = frozenRows.first(where: { $0.bounds.minY <= point.y && $0.bounds.maxY >= point.y }),
-              store.visibleTasks.contains(where: { $0.id == row.id && $0.canComplete }) else {
-            store.selectionSwipe = nil
-            return
-        }
-        store.selectionSwipe = TaskSelectionSwipe(rowID: row.rowID, translation: max(0, point.x - initial.x))
-    }
-
     func finish() {
         generation += 1
         collapsedLayout?.resume()
@@ -308,13 +274,14 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     private func release() {
         released = true
+        activeTouch = nil
         for (scroll, enabled, _) in scrollViews { scroll.isScrollEnabled = enabled }
         scrollViews = []
         store?.endSelectionGesture()
         let token = generation
         DispatchQueue.main.async { [weak self] in
             guard let self, token == self.generation else { return }
-            self.store?.isSelectionSwipeActive = false
+            self.store?.isSelectionPressActive = false
         }
     }
 
@@ -331,19 +298,6 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     }
 
     #if DEBUG
-    private func recordTranslationProof() {
-        guard ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1",
-              !released, store?.isSelectionGestureActive == true else { return }
-        var maximum = proof.maximumRowTranslation
-        for current in rows {
-            guard let original = frozenRows.first(where: { $0.rowID == current.rowID }) else { continue }
-            maximum = max(maximum, current.bounds.minX - original.bounds.minX)
-        }
-        guard maximum > proof.maximumRowTranslation else { return }
-        proof.maximumRowTranslation = maximum
-        publishProof()
-    }
-
     private func publishProof() {
         if let data = try? JSONEncoder().encode(proof) { store?.selectionGestureProof = String(decoding: data, as: UTF8.self) }
     }
@@ -358,7 +312,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         proof.offsetsStable = proof.offsetsStable && liveScrolls.allSatisfy { $0.0.contentOffset == $0.2 }
         proof.rowsStable = proof.rowsStable && rows.allSatisfy { current in
             guard let original = frozenRows.first(where: { $0.rowID == current.rowID }) else { return true }
-            return abs(current.bounds.minY - original.bounds.minY) < 1
+            return abs(current.bounds.minY - original.bounds.minY) < 1 && abs(current.bounds.minX - original.bounds.minX) < 1
         }
         publishProof()
     }
@@ -405,11 +359,11 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
 #if DEBUG
 private struct TaskSelectionGestureProof: Codable {
-    var crossingDistance: CGFloat = 0
+    var activationDuration: TimeInterval = 0
+    var activationDistance: CGFloat = 0
     var columnWidth: CGFloat = 0
     var selectedWhileTouchDown = false
     var maximumSelectedWhileTouchDown = 0
-    var maximumRowTranslation: CGFloat = 0
     var scrollingDisabled = false
     var offsetsStable = true
     var rowsStable = true

@@ -242,7 +242,7 @@ struct TaskListRow: View {
                             .accessibilityElement(children: .combine)
                         }
                         .accessibilityIdentifier(identity)
-                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
+                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? "Tap to edit title and attributes, or long press and drag to select" : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
                         .accessibilityAction(named: "Edit title and attributes", expand)
                         .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                 }
@@ -259,7 +259,7 @@ struct TaskListRow: View {
             }
         }
         .modifier(TaskRowSpacing(editing: editing))
-        .modifier(TaskSelectionRowFeedback(rowID: identity, selected: selected, swipe: store.selectionSwipe))
+        .modifier(TaskSelectionRowFeedback(selected: selected))
         .background {
             if expanded {
                 Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
@@ -307,21 +307,6 @@ struct TaskListRow: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .tag(task.id)
-        .contextMenu {
-            if !expanded {
-                if task.canComplete {
-                    Button(store.selectedTaskIDs.contains(task.id) ? "Deselect" : "Select", systemImage: "checkmark.circle") { store.toggleSelection(task.id) }
-                        .disabled(store.isSaving || phase != nil)
-                }
-                if !store.isSelectingTasks {
-                    TaskActivityButton(task: task, store: store).disabled(phase != nil)
-                    if task.canEdit { Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil) }
-                    if task.canComplete {
-                        Button(task.isOccurrence ? "Complete occurrence" : "Complete", systemImage: "checkmark") { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } }.disabled(store.isSaving || phase != nil)
-                    }
-                }
-            }
-        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if task.canEdit && !expanded && !store.isSelectingTasks {
                 Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil)

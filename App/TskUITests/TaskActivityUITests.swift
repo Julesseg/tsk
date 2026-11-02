@@ -5,8 +5,7 @@ import XCTest
 final class TaskActivityUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testOrdinaryTaskListStartDetailStopPersistentReopenAndCompletionClearActiveState() throws {
-
+    func testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState() throws {
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -23,11 +22,9 @@ final class TaskActivityUITests: XCTestCase {
         let row = taskRow(named: "Act on independent plans", app: app)
         XCTAssertTrue(waitForTaskSave(app, row: row, timeout: 15))
         let id = String(row.identifier.dropFirst(5))
-        row.press(forDuration: 1)
-        XCTAssertTrue(app.buttons["start-task-" + id].waitForExistence(timeout: 5)); app.buttons["start-task-" + id].tap()
-        XCTAssertFalse(taskRow(named: "Act on independent plans", app: app).label.contains("Active"))
-        capture("List context action starts work while the task row stays minimal", app)
         openTaskInformation(row, app: app)
+        XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app))
+        app.buttons["start-task"].tap()
         XCTAssertTrue(revealTaskElement(app.buttons["stop-task"], in: "task-detail-form", app: app))
         let caption = app.descendants(matching: .any).matching(identifier: "task-activity-" + id).firstMatch
         XCTAssertTrue(caption.label.contains("Active"))

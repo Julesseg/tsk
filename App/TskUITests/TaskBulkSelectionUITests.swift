@@ -39,11 +39,11 @@ import XCTest
         let initial = app.buttons["task-" + first].frame
         let last = app.buttons["task-" + third].frame
         let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: initial.midY))
-        let end = start.withOffset(CGVector(dx: list.frame.width * 0.7, dy: last.midY - initial.midY))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.15, dy: 0)))
+        let end = start.withOffset(CGVector(dx: 0, dy: last.midY - initial.midY))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.7, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
         XCTAssertFalse(app.staticTexts["task-selection-count"].exists)
-        XCTAssertFalse(app.textFields["task-description"].exists, "A short swipe must not open the editor")
-        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2)
+        XCTAssertFalse(app.textFields["task-description"].exists, "A swipe without a hold must not select or open the editor")
+        start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2)
         let count = app.staticTexts["task-selection-count"]
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         XCTAssertEqual(count.label, "3 selected")
@@ -59,22 +59,20 @@ import XCTest
         XCTAssertEqual(proof["offsetsStable"] as? Bool, true)
         XCTAssertEqual(proof["rowsStable"] as? Bool, true)
         XCTAssertEqual(proof["refreshWhileTouchDown"] as? Bool, true)
-        XCTAssertGreaterThan(try XCTUnwrap(proof["maximumRowTranslation"] as? Double), 8, "The touched row follows the finger horizontally")
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(proof["activationDuration"] as? Double), 0.5)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(proof["activationDistance"] as? Double), 10, "Selection activates during the stationary hold, before vertical dragging")
         let width = try XCTUnwrap(proof["columnWidth"] as? Double)
-        let crossing = try XCTUnwrap(proof["crossingDistance"] as? Double)
         XCTAssertEqual(width, list.frame.width, accuracy: 2)
         if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertLessThan(width, app.frame.width * 0.75) }
-        XCTAssertGreaterThanOrEqual(crossing, width * 0.25)
-        XCTAssertLessThan(crossing, width * 0.45)
         XCTAssertTrue(taskRow(named: "Arrived while selecting", app: app).waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["task-" + first].frame.minX, initial.minX, accuracy: 1, "Rows settle back after release")
+        XCTAssertEqual(app.buttons["task-" + first].frame.minX, initial.minX, accuracy: 1, "Rows stay horizontally fixed during selection")
         let circles = app.buttons.matching(identifier: "complete-task-row-" + second)
         circles.firstMatch.tap()
         XCTAssertEqual(count.label, "2 selected")
         func sweepBack() {
             let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: app.buttons["task-" + third].frame.midY))
-            let end = start.withOffset(CGVector(dx: list.frame.width * 0.5, dy: app.buttons["task-" + first].frame.midY - app.buttons["task-" + third].frame.midY))
-            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
+            let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + first].frame.midY - app.buttons["task-" + third].frame.midY))
+            start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
         }
         sweepBack()
         XCTAssertEqual(count.label, "0 selected", "Starting on a selected row removes touched rows without selecting the unselected row between them")
@@ -107,17 +105,17 @@ import XCTest
         XCTAssertTrue(planned.waitForExistence(timeout: 10))
         let list = app.collectionViews["upcoming-list"]
         let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: planned.frame.midY))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.4, dy: 0)))
+        start.press(forDuration: 0.8)
         let count = app.staticTexts["task-selection-count"]
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         XCTAssertEqual(count.label, "1 selected")
         let circles = app.buttons.matching(identifier: "complete-task-row-" + first)
         XCTAssertEqual(circles.count, 2)
         for circle in circles.allElementsBoundByIndex { XCTAssertEqual(circle.value as? String, "Selected") }
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.4, dy: 0)))
+        start.press(forDuration: 0.8)
         XCTAssertEqual(count.label, "0 selected", "Deselecting one Upcoming appearance deselects the task everywhere")
         for circle in circles.allElementsBoundByIndex { XCTAssertEqual(circle.value as? String, "Not selected") }
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.4, dy: 0)))
+        start.press(forDuration: 0.8)
         XCTAssertEqual(count.label, "1 selected")
         circles.element(boundBy: 1).tap()
         XCTAssertEqual(count.label, "0 selected")
@@ -128,7 +126,7 @@ import XCTest
         XCTAssertTrue(planned.exists)
         app.buttons["task-selection-done"].tap()
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.4, dy: 0)))
+        start.press(forDuration: 0.8)
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         selectAllTasks(app)
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
@@ -147,7 +145,7 @@ import XCTest
         func selectExpandedRow(continuingVertically: Bool = false) {
             let circle = app.buttons["complete-task-row-" + first]
             let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 24, dy: circle.frame.midY))
-            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * (continuingVertically ? 0.7 : 0.4), dy: continuingVertically ? 104 : 0)), withVelocity: .slow, thenHoldForDuration: 1)
+            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: 0, dy: continuingVertically ? 104 : 0)), withVelocity: .slow, thenHoldForDuration: 1)
         }
         selectExpandedRow()
         XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 10))
@@ -166,7 +164,7 @@ import XCTest
         XCTAssertEqual(title.value as? String, "Saved before selecting")
         let circle = app.buttons["complete-task-row-" + first]
         let quickStart = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 24, dy: circle.frame.midY))
-        quickStart.press(forDuration: 0.05, thenDragTo: quickStart.withOffset(CGVector(dx: list.frame.width * 0.4, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
+        quickStart.press(forDuration: 0.8)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         XCTAssertEqual(app.staticTexts["task-selection-count"].label, "1 selected")
         let row = app.buttons["task-" + first]

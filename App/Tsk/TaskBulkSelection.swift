@@ -5,7 +5,7 @@ import TskCore
 
 extension TaskStore {
     func toggleSelection(_ id: UUID) {
-        guard !isSelectionSwipeActive, !isSaving else { return }
+        guard !isSelectionPressActive, !isSaving else { return }
         let generation = taskSelectionGeneration
         let context = completionContext
         Task {
@@ -43,14 +43,13 @@ extension TaskStore {
     }
 
     func endSelectionGesture() {
-        selectionSwipe = nil
         isSelectionGestureActive = false
         selectionGestureTasks = nil
         selectionGestureDays = nil
     }
 
     func endTaskSelection() {
-        isSelectionSwipeActive = false
+        isSelectionPressActive = false
         taskSelectionGeneration += 1
         selectedTaskIDs = []
         isSelectingTasks = false

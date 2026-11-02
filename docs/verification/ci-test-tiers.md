@@ -17,8 +17,8 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 | Menu | 6 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
-view ordering/capacity and real-server sync on iPhone. It also covers continuous
-swipe selection, held-touch stability during refresh, atomic completion, Upcoming
+view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
+vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
 duplicates, failure retention, view changes and editor validation. Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
