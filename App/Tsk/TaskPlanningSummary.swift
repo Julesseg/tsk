@@ -31,14 +31,14 @@ struct TaskPlanningCaption: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
-            if let date = task.plannedDate {
-                Text("\(Image(systemName: "calendar")) Scheduled \(date.formatted(date: .abbreviated, time: .shortened))")
+            if let offset = task.scheduledDayOffset(relativeTo: today) {
+                Text("\(Image(systemName: "calendar")) \(label(offset))")
                     .font(.caption).foregroundStyle(.secondary)
-                    .accessibilityLabel("Scheduled \(date.formatted(date: .complete, time: .shortened))")
+                    .accessibilityLabel("Scheduled \(label(offset))")
                     .accessibilityIdentifier("task-row-scheduled-\(task.id.uuidString)")
             }
             if let offset = task.deadlineDayOffset(relativeTo: today) {
-                Text("\(Image(systemName: "flag")) Deadline \(label(offset))")
+                Text("\(Image(systemName: "flag")) \(label(offset))")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityLabel("Deadline \(label(offset))")
                     .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
