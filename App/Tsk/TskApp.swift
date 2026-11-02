@@ -7,6 +7,7 @@ struct TskApp: App {
     @UIApplicationDelegateAdaptor(SynchronizationAppDelegate.self) private var synchronizationDelegate
     init() {
         #if DEBUG && targetEnvironment(simulator)
+        TaskNativeTouchDiagnostics.installIfRequested()
         let environment = ProcessInfo.processInfo.environment
         if environment["TSK_UI_DISABLE_ANIMATIONS"] == "1",
            let session = environment["TSK_UI_TEST_SESSION"], UUID(uuidString: session) != nil {

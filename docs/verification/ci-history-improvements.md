@@ -436,3 +436,49 @@ remained absent through231.07s. Neither family reached the final focused-title
 cycle. Both manifests retain source `890a4db` and arm64 runtime27.0/24A434.
 The producer source tree matches Git. The generic simulator test build passes
 with the candidate removed; no local UI runtime verdict is claimed.
+
+
+### Native touch-delivery control after the gesture rollback
+
+[Smoke41498940040](https://github.com/Julesseg/tsk/actions/runs/41498940040)
+finished with iPhone4/4 and iPad1/2. The iPad durable method again failed its
+second New-project field check at line197 in75.457s; workspace navigation passed
+in86.210s. Phone synchronization, durable row, capture and reorder passed in
+77.891s/214.824s/36.556s/88.645s. Both consumers identify merge `f280ce6`, whose
+parent includes `890a4db` and whose tree matches it, with the same canonical
+Xcode/SDK/runtime as the menu run. Neither worker logged an animation-completion
+warning. These finite passes do not repair the separately reproduced menu drop.
+Only smoke and focused menu ran at this head; both workflows failed.
+
+The next control keeps the reverted `TaskRowEditor.swift` unchanged. A temporary
+observer exchanges the public `UIApplication.sendEvent` implementation only in
+Debug simulator builds when isolated-simulator admission, replica UUID, matching
+diagnostic opt-in and session UUID are present. Only the retained menu regression
+opts in. The wrapper reads actual incoming touch view/window/phase/timestamps,
+bounded native ancestor identities/attachment/geometry and existing associated
+recognizer state before and after forwarding the original event exactly once.
+It installs no recognizer or target, changes no delegate/gesture flags, calls no
+hit test, and invokes no action or focus behavior.
+
+Parameter old/new writes and expanded-owner identity are recorded at existing
+`TaskRowEditing` seams. The trace retains scalar values in a512-record ring,
+with an eviction count. One export can be in flight; changed evidence is
+coalesced into the latest follow-up. Encoding and atomic writing run on a serial
+background queue after input dispatch. The existing artifact collector preserves
+`participant-fixture-pr77-touch-<session>-<pid>.json` without changing collection.
+No view, touch, recognizer or editing object is retained by the recorder.
+
+The unchanged focused test must capture preceding successful option touches and
+the first failed selection on each family. Actual recipient/phase/attachment
+plus parameter writes partition delivery, routing/cancellation, native action
+and presentation failures; a touch recipient alone does not prove consumption.
+Missing receipts or a pass-only run are inconclusive. The observed scrollbar AX
+rectangle overlaps the failed iPad point, but this does not establish hit-test
+ownership or justify moving the tap. Neither coordinates nor deadlines change.
+The original High selected/reselected checks, all20 cycles and focused-title
+cycle20 remain. No unchanged-source retry or full is requested. Remove this
+observer and launch opt-in before clean exact-head smoke/full acceptance.
+
+The generic simulator test build passes. Standards and Spec reviews cleared the
+export backlog correction; no native runtime result is claimed for this control.
+No local simulator was booted.

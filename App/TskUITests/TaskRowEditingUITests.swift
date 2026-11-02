@@ -303,7 +303,7 @@ import XCTest
     }
 
     func testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
-        let app = try launch()
+        let app = try launch(nativeTouchTrace: true)
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         selectHighPriorityAndVerifyReselection(app)
@@ -572,11 +572,16 @@ import XCTest
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false, nativeTouchTrace: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        if nativeTouchTrace {
+            XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
+            app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+            app.launchEnvironment["TSK_TEST_NATIVE_TOUCH_TRACE"] = app.launchEnvironment["TSK_TEST_REPLICA_NAME"]
+        }
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
         var records: [[String: Any]] = [

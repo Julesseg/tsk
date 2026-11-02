@@ -22,7 +22,13 @@ final class TaskRowEditing {
     let upcomingDays: [UpcomingDay]
     let referenceDate: Date
     var draft: TaskRowDraft
-    var parameter: TaskRowParameter?
+    var parameter: TaskRowParameter? {
+        didSet {
+            #if DEBUG && targetEnvironment(simulator)
+            TaskNativeTouchDiagnostics.parameterChanged(self, previous: oldValue, current: parameter)
+            #endif
+        }
+    }
     var supportingPanel: SupportingPanel?
     var savedTask: TaskRecord?
     var error: String?
@@ -50,6 +56,9 @@ final class TaskRowEditing {
         motion = nil
         isAnimating = true
         isExpanded = expanded
+        #if DEBUG && targetEnvironment(simulator)
+        TaskNativeTouchDiagnostics.expansionChanged(self, expanded: expanded)
+        #endif
         let target: CGFloat = expanded ? 1 : 0
         let initial = revealProgress
         let duration = (expanded ? 0.18 : 0.14) * Double(abs(target - initial))
