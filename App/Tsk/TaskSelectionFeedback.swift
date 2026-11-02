@@ -7,6 +7,7 @@ struct TaskSelectionRowFeedback: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .padding(.trailing, 8)
             .background {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.accentColor.opacity(selected ? (colorScheme == .dark ? 0.26 : 0.13) : 0))
