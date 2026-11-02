@@ -403,3 +403,36 @@ raised host load from14.88 to331.59. The attempt was interrupted for host health
 its device was shut down/deleted and no simulator remained booted. This supplies
 no valid control verdict or native acceptance evidence. Generic builds do not
 boot a simulator; canonical CI supplies the runtime verdicts.
+
+
+### Focus-gesture candidate rejected at `890a4db`
+
+[Focused menu run41498951963](https://github.com/Julesseg/tsk/actions/runs/41498951963)
+rejected the candidate on iPad. The exact-head producer identifies tree
+`657f8bbc49730a4d25e57835aa3ac153cfd8fb51`, Xcode27.0/27A266a,
+SDK27.0/24A430 and arm64 runtime27.0/24A434. The consumer manifest selects
+only the new twenty-cycle method, which failed at line322 in183.625s.
+
+High selection/reselection and six New-project open/close cycles succeeded.
+Cycle seven admitted the native option and requested its center at(172,262):
+tap entry162.39s, synthesis163.43s. The input field remained absent through
+171.73s after the original five-second wait began at165.69s. This is an absent
+field failure, not rejection solely for a late elapsed-time sample. The
+remaining cycles and final focused-title dismissal were not exercised. The
+recording retains the native menu at the failure; it does not identify the
+actual event recipient or prove a responder, animation or system-service cause.
+
+The active-focus condition and its extra property are reverted before any
+further behavior treatment. The App editor is byte-identical to its `01a0681`
+version; the twenty-cycle regression and focused routing remain. Six passing
+cycles cannot establish reliability or credit the rejected candidate as a fix.
+No unchanged-head test retry or full run was dispatched. Other current-head
+workers are audited separately as they finish; this record is not acceptance.
+
+The iPhone consumer also failed this method at line322 in240.286s. High
+selection/reselection and fifteen open/close cycles passed; cycle sixteen
+requested(185,308), tap entry224.26s and synthesis224.71s, then the field
+remained absent through231.07s. Neither family reached the final focused-title
+cycle. Both manifests retain source `890a4db` and arm64 runtime27.0/24A434.
+The producer source tree matches Git. The generic simulator test build passes
+with the candidate removed; no local UI runtime verdict is claimed.

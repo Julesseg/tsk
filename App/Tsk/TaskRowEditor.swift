@@ -113,8 +113,7 @@ private struct TaskRowEditorContent: View {
                         ForEach(TaskRowParameter.allCases) { parameter in
                             TaskRowParameterPill(editing: editing, parameter: parameter,
                                                  projects: store.availableProjects,
-                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate,
-                                                 isTextFocused: titleFocused || focusedNote != nil) {
+                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
                                 titleFocused = false
                                 focusedNote = nil
                             }
@@ -167,7 +166,6 @@ private struct TaskRowParameterPill: View {
     let projects: [String]
     let tags: [String]
     let now: Date
-    let isTextFocused: Bool
     let unfocus: () -> Void
     @Namespace private var presentationNamespace
 
@@ -201,7 +199,7 @@ private struct TaskRowParameterPill: View {
                 } label: {
                     label
                 }
-                .simultaneousGesture(TapGesture().onEnded { unfocus() }, isEnabled: isTextFocused)
+                .simultaneousGesture(TapGesture().onEnded { unfocus() })
             } else {
                 Button(action: openPicker) { label }
             }
