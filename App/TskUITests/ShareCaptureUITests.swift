@@ -215,9 +215,23 @@ import XCTest
     }
     private func replace(_ field: XCUIElement, with value: String) {
         let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
-        let tutorial = host.buttons["Continue"]
-        if tutorial.exists, host.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
-        replaceTaskText(field, with: value, app: host)
+        var dismissedOnboarding = false
+        replaceTaskText(field, with: value, app: host, prepareKeyboard: { [self] deadline in
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            let tutorial = host.buttons["Continue"]
+            let visible = tutorial.exists
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            guard visible else { return true }
+            guard !dismissedOnboarding else { return false }
+            let onboarding = host.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            guard onboarding else { return true }
+            dismissedOnboarding = true
+            tapTaskControlAtCenter(tutorial, app: host, deadline: deadline)
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            let dismissed = !tutorial.exists
+            return dismissed && ProcessInfo.processInfo.systemUptime < deadline
+        })
     }
     private func capture(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)

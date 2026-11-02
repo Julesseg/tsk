@@ -337,18 +337,23 @@ extension XCTestCase {
         }
     }
 
-    func focusTaskText(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+    func focusTaskText(_ element: XCUIElement, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, prepareKeyboard: ((TimeInterval) -> Bool)? = nil, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: 5), file: file, line: line)
         tapTaskControl(element, app: app, beforeSample: beforeSample, file: file, line: line)
-        guard let beforeSample else {
+        guard beforeSample != nil || prepareKeyboard != nil else {
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Text input has no keyboard: \(element)", file: file, line: line)
             return
         }
-        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        let allowance: TimeInterval = beforeSample == nil ? 5 : TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        let deadline = ProcessInfo.processInfo.systemUptime + allowance
         func sample() -> Bool {
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-            beforeSample(deadline)
+            beforeSample?(deadline)
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            if let prepareKeyboard {
+                guard app.keyboards.firstMatch.exists, ProcessInfo.processInfo.systemUptime < deadline,
+                      prepareKeyboard(deadline), ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            }
             return app.keyboards.firstMatch.exists && ProcessInfo.processInfo.systemUptime < deadline
         }
         var ready = sample()
@@ -360,8 +365,8 @@ extension XCTestCase {
         XCTAssertTrue(ready, "Text input has no keyboard: \(element)", file: file, line: line)
     }
 
-    func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, selection: TaskTextSelection = .editMenu, file: StaticString = #filePath, line: UInt = #line) {
-        focusTaskText(element, app: app, file: file, line: line)
+    func replaceTaskText(_ element: XCUIElement, with value: String, app: XCUIApplication, selection: TaskTextSelection = .editMenu, prepareKeyboard: ((TimeInterval) -> Bool)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        focusTaskText(element, app: app, prepareKeyboard: prepareKeyboard, file: file, line: line)
         let previous = element.value as? String ?? ""
         if !previous.isEmpty && previous != element.placeholderValue {
             switch selection {
