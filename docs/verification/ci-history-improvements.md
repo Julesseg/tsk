@@ -634,3 +634,59 @@ do not combine it with another ownership, focus or gesture treatment. The
 failure preceded cycle20, so it provides no new focused-title keyboard result.
 Other family/workflow outcomes are audited separately as they finish. No
 unchanged-source test retry or full suite is justified by this result.
+
+The completed phone focused case failed after 225.123s at line324 on cycle12.
+Eleven complete cycles passed; the twelfth option retained its native target
+through before-ended dispatch and wrote project on the active owner. The field
+and its Release value were observed, but the aggregate appearance/value read
+crossed the unchanged five-second deadline. This is a separate read-budget
+failure, not a missing twelfth action. Its trace has 189 records, 23 parameter
+writes and zero evictions. Neither family reached the final focused cycle.
+
+Smoke41520200036 also failed: phone2/4 and iPad1/2. The phone's first and iPad's
+second New-project field did not appear. The phone reorder failed with a fresh
+snapshot showing the custom view still below Today. The app's actual
+`workspace.views.move` receipt moved index2 to4, taking Projects below the custom
+view instead of moving the custom view first. Thus the fresh-snapshot correction
+exposed an actual wrong-order result; a stale retained-cell acknowledgement is
+not sufficient to explain this failure. Input target versus reorder callback
+mapping remains to be diagnosed separately. Sync, capture and adaptive-navigation
+methods passed. Both smoke consumers identify PR merge source `003e4bae`, whose
+tree exactly matches head `1bb2f98`; all four workers match canonical runtime.
+All two head workflows are terminal and retained. No full or retry was dispatched.
+
+### Project-only matched zoom elimination experiment
+
+After reverting presenter separation in `d8ba8c8`, omit the project pill's
+matched transition source and its matching popover zoom destination together.
+Both modifiers remain for every other fixed parameter kind, with the existing
+namespace. The original project popover stays on its original owner with the
+same binding, guarded reset, bounds anchor, arrow, width and compact adaptation.
+Menu/Picker content, selected state, labels, actual input, unfocus gesture,
+44-point hit region, glass/scroll ancestors and every deadline remain unchanged.
+No focus correction or second behavior treatment is stacked.
+
+This tests whether explicit project transition registration contributes to the
+pre-action routing failure; neither the prior control nor detached-presenter
+candidate removed that registration. It does not establish a private recognizer
+cause, cell removal or an active animation during the failed touch. Both source
+review axes found no actionable defects. Keep the same bounded observer for one
+exact-head treatment on both families and compare began/before-ended/action
+receipts with successful selections in that execution. A repeated missing action
+rejects this treatment; revert it before another seam. Preserve all existing
+timing assertions and classify any late read separately from absent action.
+
+This diagnostic intentionally substitutes the system's ordinary anchored popover
+transition for the project's explicit zoom. It does not satisfy the design
+audit's source-pill morph requirement by source inspection alone. Inspect actual
+opening/closing video and geometry; a functional pass is only bounded evidence
+for transition involvement. Final appearance compliance, the baseline focused
+keyboard blocker and clean exact-head smoke/full on both families remain
+required. Do not silently waive the morph requirement or launch full coverage
+while known controls remain red; remove the temporary observer before acceptance.
+
+The generic arm64 test build and unchanged real App/Share/Widget entitlement and
+four-App-Shortcut verifier pass with Xcode27.1 beta. The first local invocation
+omitted the arm64 restriction and failed linking the unsupported Intel slice
+against the arm64-only Native artifact; the corrected build uses `ARCHS=arm64`
+as canonical CI does. This is build evidence only; no simulator was booted.

@@ -205,14 +205,14 @@ private struct TaskRowParameterPill: View {
             }
         }
         .buttonStyle(TaskRowParameterButtonStyle())
-        .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
+        .modifier(TaskRowParameterZoomSource(parameter: parameter, namespace: presentationNamespace))
         .popover(isPresented: Binding(
             get: { editing.parameter == parameter },
             set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
         ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
             TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
                 .frame(width: 340)
-                .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
+                .modifier(TaskRowParameterZoomDestination(parameter: parameter, namespace: presentationNamespace))
                 .presentationCompactAdaptation(.popover)
         }
         .frame(minWidth: 44, minHeight: 44, alignment: .top)
@@ -229,6 +229,32 @@ private struct TaskRowParameterPill: View {
     private func openPicker() {
         unfocus()
         editing.parameter = parameter
+    }
+}
+
+private struct TaskRowParameterZoomSource: ViewModifier {
+    let parameter: TaskRowParameter
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if parameter == .project {
+            content
+        } else {
+            content.matchedTransitionSource(id: parameter.id, in: namespace)
+        }
+    }
+}
+
+private struct TaskRowParameterZoomDestination: ViewModifier {
+    let parameter: TaskRowParameter
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        if parameter == .project {
+            content
+        } else {
+            content.navigationTransition(.zoom(sourceID: parameter.id, in: namespace))
+        }
     }
 }
 
