@@ -3,7 +3,7 @@ import SwiftUI
 import TskCore
 
 enum NativeMenuFocusControlGate {
-    enum Mode: String { case bare, hosted = "keyboard-host" }
+    enum Mode: String { case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host" }
 
     static func mode(_ environment: [String: String]) -> Mode? {
         guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
@@ -13,6 +13,30 @@ enum NativeMenuFocusControlGate {
               token == replica else { return nil }
         return Mode(rawValue: environment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] ?? "bare")
     }
+}
+
+struct NativeMenuDefaultKeyboardHost<Content: View>: UIViewControllerRepresentable {
+    @ViewBuilder let content: () -> Content
+
+    func makeUIViewController(context: Context) -> NativeMenuDefaultKeyboardController {
+        let controller = NativeMenuDefaultKeyboardController(rootView: AnyView(EmptyView()))
+        controller.rootView = AnyView(content().environment(\.taskKeyboardRouter, controller.router))
+        TaskMenuFocusDiagnostics.record("fixture.host.constructed", details: [
+            "fixtureMode": NativeMenuFocusControlGate.Mode.defaultBehavior.rawValue,
+            "controllerClass": NSStringFromClass(type(of: controller)),
+            "controller": String(describing: ObjectIdentifier(controller)),
+            "router": String(describing: ObjectIdentifier(controller.router))
+        ])
+        return controller
+    }
+
+    func updateUIViewController(_ controller: NativeMenuDefaultKeyboardController, context: Context) {
+        controller.rootView = AnyView(content().environment(\.taskKeyboardRouter, controller.router))
+    }
+}
+
+final class NativeMenuDefaultKeyboardController: UIHostingController<AnyView> {
+    let router = TaskKeyboardRouter()
 }
 
 struct NativeMenuFocusControlView: View {

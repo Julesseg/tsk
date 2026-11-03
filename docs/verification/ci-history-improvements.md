@@ -1520,3 +1520,86 @@ Standards and Spec reviews report zero findings for the paired add-back delta.
 The generic arm64 test build, strict App/Share/Widget/Shortcuts artifact admission
 and all24 routing checks pass. No local simulator was booted. This is build/
 source evidence only; the paired canonical runtime comparison remains pending.
+
+
+### Empty keyboard host is sufficient in the reduced focus fixture
+
+Atb1b833064fd927885794a819ec15164ef7871e41 all six menu methods actually ran
+on both families. Bare Notes/title pass on phone28.881s/29.552s and iPad29.430s/
+30.202s. The unmodified TaskKeyboardHost arm fails the original five-second
+keyboard-before-option assertion in both fields on both families: phone Notes/
+title30.372s/20.560s, iPad49.723s/24.012s. No hosted option was attempted after
+that failed prerequisite; field/Done/returned-typing coverage is absent there.
+
+Each hosted packet has five events and zero drops, a valid matching live source/
+sender/window/generation event and active expected title or Notes request,
+with fixtureMode=keyboard-host. Each same-PID keyboard fixture corroborates
+actual host creation: workspace appeared firstResponder=true, empty scopes/
+hosts and installationCount0. With no registered scopes, the existing window/
+controller guard omits editing notifications. Missing End in those packets is
+not evidence of continuing native text editing. Bare packets have six events/
+zero drops and complete passing native UI journeys. This establishes whole-
+component sufficiency for the focused-keyboard phenotype in this fixture;
+it does not identify one override, initial claim, AnyView, router or private
+mechanism as cause. No actual commands or registrations are needed for this
+reduced phenotype, while production command compatibility remains untested.
+
+Product direct keyboard focus remains red on both families. Phone stress
+completes ten cycles then fails the eleventh field (160.770s); iPad fails its
+first field (43.984s). Those field failures remain separate from focused-keyboard
+results and are not labelled with historical touch retarget evidence. Smoke
+passes all four phone methods; iPad navigation passes88.070s while the durable
+row method fails app termination350.832s. Both workflows/all16 jobs are terminal,
+source/merge tree and canonical Xcode27A266a/SDK24A430/runtime24A434/arm64 match,
+all terminals are final-captured/killed, and no retry/full was dispatched.
+
+### Default-behavior controller decomposition, diagnostic only
+
+The next finite control retains bare, custom-host and product references, and
+adds a default-behavior host. It preserves the UIViewControllerRepresentable
+construction contract: UIHostingController<AnyView> starts with EmptyView,
+then receives the same AnyView(content plus router environment) assignment in
+make and every update. A storage-only subclass keeps the same controller-owned
+let router=TaskKeyboardRouter() lifetime/initialization, with ZERO lifecycle,
+responder eligibility, action availability or presses overrides. It inherits
+platform behavior; it is not literally an un-subclassed platform controller.
+The coordinator-router proposal was withdrawn to avoid changing ownership too.
+
+This changes the custom behavior group, including viewDidAppear's initial
+claim AND its existing diagnostic, together. Do not replay that diagnostic or
+claim on the default arm to equalize it. Existing TaskKeyboardHost/controller
+and TaskMenuActivation code stays byte-identical. No safe-area, navigation,
+storage, scopes, commands, manual responder call, focus observer, root-update
+freeze, delay or global hook is added. The complete minimal fixture subtree
+is byte-identical; the six existing test method bodies remain unchanged.
+A new validated immutable mode and one bounded existing-sink factory receipt
+identify the actual default controller/router construction without querying
+responder state or adding an observer. Existing request receipts identify mode.
+
+Two independent fresh default-host title/Notes cases reuse the exact native
+journey: actual keyboard-present precondition, one center opener with20s
+admission, original five-second absence/elapsed BEFORE option, actual native
+New-project/Release/Done, retained draft and returned typing. Eight methods per
+family must actually execute on one canonical changed head. Temporary full
+inventory is82/73, partitions41+41/33+40, still four workers. No full is run
+while known failures remain; retire all six minimal cases/fixture/receipts
+before eventual clean product acceptance.
+
+Bare/default pass with custom-host keyboard red selects the custom override/
+lifecycle-diagnostic group as the measured difference, not one removed line
+or permission to delete production responder support. Bare pass with both
+host types keyboard red means custom overrides are not necessary; the retained
+nested hosting/root/router-environment group remains sufficient. Mixed fields/
+families, changed reference outcomes, missing mode/source/input/export coverage
+or later option/ACK failures must retain their exact classification. No automatic
+retry or stacked follow-up. A default-arm pass cannot establish real command
+compatibility or twenty-cycle reliability. Any eventual production repair must
+preserve actual keyboard-command ownership/availability in workspace/editor/
+presentation scopes, plain versus Command input, title/Notes dismissal/return,
+Project/Priority selected/reselect, repeated actions, popover/morph and all
+remaining regressions, then pass observer-free exact-head smoke/full on both
+families. C and these controls remain diagnostic only.
+Standards and Spec source reviews report zero findings. The generic arm64 test
+build, strict App/Share/Widget/Shortcuts artifact verifier and all24 routing
+checks pass, without booting a local simulator. These are build/source results;
+no canonical default-behavior outcome or production acceptance is established.

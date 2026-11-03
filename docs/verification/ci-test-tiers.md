@@ -9,12 +9,12 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 80 methods | 71 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 82 methods | 73 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 11 methods | 9 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
-| Menu | 6 methods | 6 methods | Explicit dispatch |
+| Menu | 8 methods | 8 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -42,8 +42,8 @@ same keyboard prerequisite and native action, retains the draft text, and return
 to title/note editing. An independent title/Notes focus regression reaches the same native opener and
 keyboard-before-option assertion immediately on a fresh fixture, then verifies
 actual field/Done behavior and returned text editing. It does not replace the
-repeated case. Menu coverage retains both product methods and adds four independent minimal-root
-focus controls: title and Notes in bare and TaskKeyboardHost modes, on each family without HID,
+repeated case. Menu coverage retains both product methods and adds six independent minimal-root
+focus controls: title and Notes in bare, TaskKeyboardHost and default-behavior host modes, on each family without HID,
 server, peer or installed-extension setup. Its diagnostic rollups have distinct
 names and cannot satisfy the required smoke/full checks. The minimal controls
 are temporary diagnostic reproduction coverage: their DEBUG owned-fixture root
@@ -53,11 +53,16 @@ five-second keyboard-before-option assertion. The paired hosted arm adds only
 the existing unmodified TaskKeyboardHost around the same minimal root, without
 extra safe-area policy, navigation, scopes or commands. It tests that whole
 component, including its existing lifecycle, responder policy and diagnostics.
-A green hosted arm cannot exonerate host-with-real-scopes integration. A matching failure does not prove
+A green hosted arm cannot exonerate host-with-real-scopes integration. The
+default-behavior arm retains the same EmptyView/AnyView root assignments and
+controller-owned router/environment but has zero lifecycle/responder/action/
+press overrides. It tests the custom override/diagnostic group against inherited
+platform behavior, not one specific responder operation. Existing host and
+adapter reference code remains unchanged. A matching failure does not prove
 an Apple-only bug; a difference implicates the omitted composition as a group.
-They add four methods per family to full inventory while present; no full is
+They add six methods per family to full inventory while present; no full is
 dispatched while known failures remain. Remove the diagnostic fixture and its
-four selections after this finite comparison, before clean acceptance.
+six selections after this finite comparison, before clean acceptance.
 
 ## Build once, execute selected coverage
 
@@ -80,8 +85,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 41 methods | 39 methods |
-| iPad | 33 methods | 38 methods |
+| iPhone | 41 methods | 41 methods |
+| iPad | 33 methods | 40 methods |
 
 The partition union is exactly the previous full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

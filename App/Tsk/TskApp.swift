@@ -22,6 +22,8 @@ struct TskApp: App {
             if let mode = NativeMenuFocusControlGate.mode(ProcessInfo.processInfo.environment) {
                 if mode == .hosted {
                     TaskKeyboardHost { NativeMenuFocusControlView() }
+                } else if mode == .defaultBehavior {
+                    NativeMenuDefaultKeyboardHost { NativeMenuFocusControlView() }
                 } else {
                     NativeMenuFocusControlView()
                 }

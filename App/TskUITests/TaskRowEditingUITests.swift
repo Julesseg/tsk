@@ -402,18 +402,34 @@ import XCTest
         try verifyMinimalProjectMenuFromFocusedText("row-note-input", hosted: true)
     }
 
+    func testDefaultHostedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("task-description", mode: .defaultBehavior)
+    }
+
+    func testDefaultHostedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("row-note-input", mode: .defaultBehavior)
+    }
+
+    private enum MinimalMenuHostMode: String {
+        case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host"
+    }
+
     private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, hosted: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
+        try verifyMinimalProjectMenuFromFocusedText(identifier, mode: hosted ? .hosted : .bare, file: file, line: line)
+    }
+
+    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, mode: MinimalMenuHostMode, file: StaticString = #filePath, line: UInt = #line) throws {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", file: file, line: line)
         let app = taskTestApplication(), token = UUID().uuidString
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_CONTROL"] = token
-        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] = hosted ? "keyboard-host" : "bare"
+        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] = mode.rawValue
         app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = token
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
-        let mode = XCTAttachment(string: "mode=\(hosted ? "keyboard-host" : "bare") input=\(identifier) replica=\(token) session=\(app.launchEnvironment["TSK_UI_TEST_SESSION"] ?? "unavailable")")
-        mode.name = "Minimal menu fixture launch mode"; mode.lifetime = .keepAlways; add(mode)
+        let modeEvidence = XCTAttachment(string: "mode=\(mode.rawValue) input=\(identifier) replica=\(token) session=\(app.launchEnvironment["TSK_UI_TEST_SESSION"] ?? "unavailable")")
+        modeEvidence.name = "Minimal menu fixture launch mode"; modeEvidence.lifetime = .keepAlways; add(modeEvidence)
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["native-menu-focus-control"].firstMatch.waitForExistence(timeout: 5), file: file, line: line)
         let input = app.textFields[identifier]
