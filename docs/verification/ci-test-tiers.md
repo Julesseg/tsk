@@ -79,6 +79,19 @@ reliability or a specific-ancestor diagnosis. The one extra method per family
 accounts for temporary full78/69; remove the fixture, method and Action dispatch/
 rollup surface before clean acceptance. No full is dispatched while known red.
 
+The current finite Action observation records actual TaskListView scrollTo
+requests under an owned DEBUG gate without changing scrolling. Scalar request
+receipts are appended after synchronous return; that does not report motion or
+completion. Entry counters, installation and500ms main checkpoints with utility
+export provide coverage, with checkpoints outside the256-event cap. Negative
+interpretation requires matching identity, zero loss and a MAIN checkpoint after
+the failed verdict, plus positive request coverage where available. Missing tail,
+request witness, expiry or only green results are weak/inconclusive. No input,
+assertion wait or deadline is added; no scroll is induced to obtain a witness.
+Retire this observer with the completed temporary Action infrastructure before
+clean acceptance. Upcoming/system scrolling and other layout paths are outside
+this control's scope.
+
 ## Build once, execute selected coverage
 
 One Mac producer builds the simulator bridge, controller tests and signed arm64

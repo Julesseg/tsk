@@ -368,6 +368,7 @@ import XCTest
         let token = UUID().uuidString
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NATIVE_MENU_ACTION_CONTROL"] = token
+        app.launchEnvironment["TSK_TEST_LIST_SCROLL_TRACE"] = token
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         let session = try XCTUnwrap(app.launchEnvironment["TSK_UI_TEST_SESSION"])
         XCTContext.runActivity(named: "Owned production-pill action fixture replica=\(token) session=\(session)") { _ in app.launch() }
@@ -731,6 +732,7 @@ import XCTest
         if isolated {
             XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
             app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+            app.launchEnvironment["TSK_TEST_LIST_SCROLL_TRACE"] = app.launchEnvironment["TSK_TEST_REPLICA_NAME"]
         }
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"

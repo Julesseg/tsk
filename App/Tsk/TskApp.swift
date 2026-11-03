@@ -12,6 +12,7 @@ struct TskApp: App {
            let session = environment["TSK_UI_TEST_SESSION"], UUID(uuidString: session) != nil {
             UIView.setAnimationsEnabled(false)
         }
+        TaskListScrollDiagnostics.install(environment)
         #endif
         TskShortcuts.updateAppShortcutParameters()
     }

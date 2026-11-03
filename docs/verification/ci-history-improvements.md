@@ -1879,3 +1879,82 @@ The original two product method bodies match recorded byte hashes. Routing25,
 execution-plan11 and gate15 regressions pass; the generic arm64 build and strict
 App/Share/Widget/Shortcuts artifact admission pass. No local simulator was booted.
 These are source/build/harness checks, not a native-action comparison outcome.
+
+
+### Real-component result and List scroll-request observation
+
+At a92729a, action41595637886 finished red and smoke41595623695 green, exactly
+two workflows/all16 jobs terminal, attempt1. All3Action methods actually ran on
+each family with no skips. Strong owned launch metadata and fixture root markers
+were admitted; exact source/tree/canonical toolchain/runtime match. Both managed
+terminals were captured/killed; no retry/full ran. The real-component fixture
+passed all20 cycles/focus20/Notes/actual returned typing on phone242.398s and
+pad282.955s. Phone product stress passed High/reselect but its FIRST field was
+absent42.743s; direct Title/Notes passed66.138s. Pad product stress passed the full
+journey339.328s and direct focus79.310s. Thus only the phone episode supplies an
+omitted-COMPOSITE composition contrast; pad all-green is inconclusive for the
+remaining loss. Neither result identifies an ancestor or proves reliability.
+All6 smoke methods passed. Current action has no HID; phone9phase evidence remains
+bounded to8e230eb and pad9phase coverage is still missing.
+
+The phone failure video shows the native Project menu remaining rendered while
+the requested field is absent late in its wait; this does not identify current
+route internals or establish the old alpha/retarget signature. Passing screen
+recordings were not retained; explicit Priority captures and functional results
+remain. Morph/design acceptance is not inferred from source or finite green.
+
+Both committee members select ONE new actual app-mutation observation: requests
+from TaskListView's two selection scrollTo sites and its revealEditor scrollTo.
+Deferred row-ID/isAnimating/viewportInset tasks can request animated List motion;
+these calls were absent from the passing fixture and have not been measured.
+Source presence is not causal evidence. Outside recognition remains possible,
+but repeating its old inconclusive breadcrumbs or deleting the sole physical
+outside-save path is unjustified. No add-back ladder, command/rebuild suppression
+or new production behavior is selected.
+
+The DEBUG simulator observer requires isolated/sessionUUID/traceUUID==replica.
+Foundation-only startup records installation/version/callsite coverage. Entry
+counters run before the original reveal guard; all six task keys/yields, clipping/
+cancellation checks, targets, anchors, animation and one original invocation
+remain. Request metadata captures existing scalar model/viewport/inset values
+before the call and appends after synchronous return, never claiming motion or
+animation completion. Selection paths add no geometry query. No UIKit reference,
+hook, AX/responder query, focus write, body polling or app state reaction is added.
+
+A256-event value buffer has no evictions and flags drops; registration is bounded
+to8store IDs. A500ms main-queue checkpoint copies only diagnostics/counters,
+including sequence, entries, requests, pending ordinal and last row/store context.
+Checkpoints stay OUTSIDE the event cap, so heartbeat cadence cannot evict startup
+or real calls. JSON/file export is serialized on a utility queue with export
+ordinal/failure counters. The exporter stops after660s and flags expiry. No
+assertion wait, input, teardown grace or deadline changes force an export.
+
+A negative requires matching process/session/row, installed and entry coverage,
+zero drops/export failures, and a copied MAIN checkpoint AFTER the failed5s
+verdict, not merely a recent file write. Actual early request execution, if
+naturally present, supplies the positive witness; entry alone is not a request.
+No request witness, missing late fence, expiry, green-only or other incomplete
+coverage weakens the result to inconclusive; no induced scroll or unchanged
+repeat repairs coverage. A valid no-new-request episode demotes contemporaneous
+requests from THESE TaskListView sites, not Upcoming/system scrolling,
+TaskRowFocusOffset, other layout or prior animation completion. Overlap only
+establishes timing; only a measured stale/redundant/invalid reveal decision can
+support a later coordination repair. Similar requests in passes/failures do not
+select a repair. Instrumentation may perturb scheduling; green is not a fix.
+
+The same3/3Action methods, fixture/layout/input/assertions and same smoke run once
+on a changed observer-only head. Only owned app launch opt-in is added. No HID
+or general execution-pipeline change; Menu5/6/full78/69/four workers remain.
+Retire this observer, fixture/test and temporary Action surface before clean
+smoke/full/design acceptance. Native action loss and missing pad command coverage
+remain independent blockers.
+
+Source reviews report zero actionable Standards/Spec findings. A final scalar
+refinement retains the first main checkpoint's uptime/wall pair outside the ring
+and includes row/editor values in last-entry metadata; these are sampled context,
+not continuous owner-state observation. The final generic arm64 build and strict
+App/Share/Widget/Shortcuts admission pass. Both product input/assertion bodies
+and the fixture/host/adapter/CI/HID plumbing are unchanged; only owned diagnostic
+launch flags are added. No local simulator booted. Runtime probe installation,
+actual-call coverage and late-fence admission remain unverified until canonical
+artifacts are inspected. No host test is presented as native delivery evidence.

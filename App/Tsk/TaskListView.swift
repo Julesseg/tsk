@@ -27,10 +27,20 @@ struct TaskListView: View {
                         .listRowBackground(Color.clear)
                     }.accessibilityIdentifier("task-list")
                         .refreshable { await store.reload(); await calendar.refresh() }
-                        .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
-                        .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .onChange(of: selection?.wrappedValue) { _, id in
+                            if let id {
+                                #if DEBUG && targetEnvironment(simulator)
+                                let receipt = TaskListScrollDiagnostics.prepare("selection.today", target: id, anchor: "unspecified", store: store, animation: "no-explicit-animation")
+                                #endif
+                                proxy.scrollTo(id)
+                                #if DEBUG && targetEnvironment(simulator)
+                                TaskListScrollDiagnostics.returned(receipt)
+                                #endif
+                            }
+                        }
+                        .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "today.row-id") }
+                        .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "today.animating") }
+                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "today.viewport-inset") }
                 }
             } else if let error = store.error, store.visibleTasks.isEmpty {
                 ContentUnavailableView {
@@ -51,10 +61,20 @@ struct TaskListView: View {
                     }
                     .accessibilityIdentifier("task-list")
                     .refreshable { await store.reload() }
-                    .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
-                    .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                    .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                    .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    .onChange(of: selection?.wrappedValue) { _, id in
+                        if let id {
+                            #if DEBUG && targetEnvironment(simulator)
+                            let receipt = TaskListScrollDiagnostics.prepare("selection.plain", target: id, anchor: "unspecified", store: store, animation: "no-explicit-animation")
+                            #endif
+                            proxy.scrollTo(id)
+                            #if DEBUG && targetEnvironment(simulator)
+                            TaskListScrollDiagnostics.returned(receipt)
+                            #endif
+                        }
+                    }
+                    .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "plain.row-id") }
+                    .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "plain.animating") }
+                    .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset, trigger: "plain.viewport-inset") }
                 }
             }
         }
@@ -86,10 +106,19 @@ struct TaskListView: View {
         return editing.visibilityBounds.minY < viewport.minY - 1 || editing.visibilityBounds.maxY > viewport.maxY - keyboardInset + 1
     }
 
-    private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat) {
+    private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat, trigger: String) {
+        #if DEBUG && targetEnvironment(simulator)
+        TaskListScrollDiagnostics.entered(trigger, store: store)
+        #endif
         guard !Task.isCancelled, editorIsClipped(in: viewport, keyboardInset: keyboardInset), let editing = store.rowEditing else { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
+            #if DEBUG && targetEnvironment(simulator)
+            let receipt = TaskListScrollDiagnostics.prepare("reveal." + trigger, target: editing.draft.original.id, anchor: "top", store: store, editing: editing, viewport: viewport, keyboardInset: keyboardInset, animation: reduceMotion ? "disabled" : "smooth(0.32)")
+            #endif
             proxy.scrollTo(editing.draft.original.id, anchor: .top)
+            #if DEBUG && targetEnvironment(simulator)
+            TaskListScrollDiagnostics.returned(receipt)
+            #endif
         }
     }
 
