@@ -30,8 +30,7 @@ import XCTest
             XCTAssertTrue(row.label.contains(title))
             XCTAssertTrue(row.label.contains("Release"))
             XCTAssertTrue(row.label.contains("Deadline Today"))
-            XCTAssertTrue(row.label.contains("Scheduled"))
-            XCTAssertTrue(row.label.contains(Date(timeIntervalSince1970: 1792231200).formatted(date: .omitted, time: .shortened)))
+            XCTAssertTrue(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
             XCTAssertFalse(app.buttons["notification-attention"].exists)
             for hidden in ["Active", "Waiting", "Blocked by", "Generated occurrence"] {
@@ -108,8 +107,7 @@ import XCTest
         XCTAssertTrue(circle.isHittable)
         let label = planned.firstMatch.label
         XCTAssertTrue(label.contains("Deadline Tomorrow"))
-        XCTAssertTrue(label.contains("Scheduled"))
-        XCTAssertTrue(label.contains(Date(timeIntervalSince1970: 1792231200).formatted(date: .omitted, time: .shortened)))
+        XCTAssertTrue(label.contains("Scheduled Tomorrow"))
         XCTAssertTrue(label.contains("Release"))
         for hidden in ["Active", "Waiting", "Blocked by", "First prerequisite"] {
             XCTAssertFalse(label.contains(hidden))

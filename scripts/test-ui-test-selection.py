@@ -55,7 +55,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 32)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (42, 33)), ('iPad', (34, 32))):
+        for family, counts in (('iPhone', (39, 33)), ('iPad', (34, 32))):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -82,10 +82,12 @@ class SelectionTests(unittest.TestCase):
                 self.assertTrue(any("/" + suite + "/" in case for case in full))
 
     def test_full_keeps_the_existing_device_coverage(self):
-        self.assertEqual(selection.selection("full", "iPhone"), [])
+        self.assertEqual(selection.selection("full", "iPhone"), ["-skip-testing:TskUITests/iPadWorkspaceUITests"])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(phone), 75)
+        self.assertEqual(phone, {case for case in selection.test_methods() if "/iPadWorkspaceUITests/" not in case})
+        self.assertEqual(len(phone), 72)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
+        self.assertEqual(sum("/iPadWorkspaceUITests/" in case for case in pad), 3)
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
         self.assertEqual(len(pad), 66)

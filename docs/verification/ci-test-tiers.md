@@ -9,7 +9,7 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 75 methods | 66 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 72 methods | 66 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 12 methods | 10 methods | Explicit dispatch |
 | Text | 4 methods | 4 methods | Explicit dispatch |
@@ -74,8 +74,11 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Permanent full coverage is 75/66 across the same four workers:
-iPhone 42+33 and iPad 34+32. The completed isolated real-component fixture and
+in existing methods. Permanent full coverage is 72/66 across the same four workers:
+iPhone 39+33 and iPad 34+32. The three iPad-only workspace methods remain selected
+on iPad and are excluded from iPhone rather than being counted as skipped phone
+coverage. The cross-family workspace/editor HID case remains selected on both.
+The completed isolated real-component fixture and
 Action dispatch/rollup surface are removed; the production stress, independent
 focus and retention regressions remain. Menu 6/7 includes the actual HID ownership
 requirements on both families. The complete-status publication correction skips
@@ -106,7 +109,7 @@ includes ordinary task, built-in filter, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 42 methods | 33 methods |
+| iPhone | 39 methods | 33 methods |
 | iPad | 34 methods | 32 methods |
 
 The partition union is exactly the full selection, with no duplicates.

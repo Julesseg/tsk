@@ -120,9 +120,11 @@ def selection(suite, family, partition="all"):
     else:
         tests = PAD_SMOKE if family == "iPad" else PHONE_SMOKE
     filters = ["-only-testing:TskUITests/" + test for test in tests]
+    if suite == "full" and family == "iPhone":
+        filters.append("-skip-testing:TskUITests/iPadWorkspaceUITests")
     available = test_methods()
     for item in filters:
-        selector = item.removeprefix("-only-testing:")
+        selector = item.removeprefix("-only-testing:").removeprefix("-skip-testing:")
         if not any(matches(test, selector) for test in available):
             raise ValueError("Unknown UI test selector: " + selector)
     if partition == "all":
