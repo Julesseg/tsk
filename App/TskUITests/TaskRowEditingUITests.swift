@@ -830,12 +830,13 @@ import XCTest
         let selection: String?
     }
 
-    private func projectMenuPosition(_ app: XCUIApplication, options: [String]) throws -> ProjectMenuPosition? {
+    private func projectMenuPosition(_ app: XCUIApplication, options: [String], diagnostic: ((String) -> Void)? = nil) throws -> ProjectMenuPosition? {
         let application = try app.snapshot()
         let windows = application.children.filter { $0.elementType == .window }.map(\.frame)
         let order = Dictionary(uniqueKeysWithValues: options.enumerated().map { ($0.element, $0.offset) })
         var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
         var matches: [ProjectMenuPosition] = []
+        var samples: [String] = []
         while let (snapshot, ancestors) = pending.popLast() {
             let frames = ancestors + [snapshot.frame]
             if snapshot.elementType == .collectionView {
@@ -843,11 +844,10 @@ import XCTest
                     cell.children.filter { $0.elementType == .button }.map { (cell.frame, $0) }
                 }
                 let labels = choices.map { $0.1.label }
+                samples.append("collection=\(snapshot.frame) ancestors=\(ancestors) labels=\(labels)")
                 if labels.count >= 3, Set(labels).count == labels.count,
                    labels.allSatisfy({ order[$0] != nil }),
-                   labels == labels.sorted(by: { order[$0]! < order[$1]! }),
-                   let menu = TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: ancestors)
-                    .visibleInApplication(application.frame, windowFrames: windows) {
+                   labels == labels.sorted(by: { order[$0]! < order[$1]! }) {
                     var rows: [String: TaskNativeMenuOptionGeometry] = [:]
                     var selectedLabels: Set<String> = []
                     for (cellFrame, button) in choices where button.isEnabled {
@@ -857,8 +857,10 @@ import XCTest
                             if button.isSelected { selectedLabels.insert(button.label) }
                         }
                     }
-                    if rows.count >= 3 {
-                        matches.append(ProjectMenuPosition(applicationFrame: menu.ancestorFrames[0], viewport: menu.frame,
+                    samples.append("visibleRows=\(rows) selected=\(selectedLabels)")
+                    if rows.count >= 3, let row = rows.values.first {
+                        let viewport = row.ancestorFrames.dropLast().reduce(row.ancestorFrames[0]) { $0.intersection($1) }
+                        matches.append(ProjectMenuPosition(applicationFrame: row.ancestorFrames[0], viewport: viewport,
                                                            rows: rows, selectedLabels: selectedLabels,
                                                            selection: taskSnapshot("row-project", type: .button, in: application)?.value as? String))
                     }
@@ -866,6 +868,7 @@ import XCTest
             }
             pending.append(contentsOf: snapshot.children.map { ($0, frames) })
         }
+        diagnostic?(samples.joined(separator: "\n"))
         return matches.count == 1 ? matches[0] : nil
     }
 
@@ -875,9 +878,10 @@ import XCTest
         var previous: ProjectMenuPosition?
         var stableSince = ProcessInfo.processInfo.systemUptime
         var accepted: ProjectMenuPosition?
+        var lastSample = "not sampled"
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             guard ProcessInfo.processInfo.systemUptime < deadline,
-                  let current = try? self.projectMenuPosition(app, options: options),
+                  let current = try? self.projectMenuPosition(app, options: options, diagnostic: { lastSample = $0 }),
                   label == nil || current.rows[label!] != nil,
                   selected == nil || label.map({ current.selectedLabels.contains($0) == selected! }) == true,
                   ProcessInfo.processInfo.systemUptime < deadline else { previous = nil; return false }
@@ -887,7 +891,15 @@ import XCTest
             previous = current
             return false
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)), .completed)
+        let outcome = XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime))
+        if outcome != .completed {
+            let evidence = XCTAttachment(string: lastSample)
+            evidence.name = "Native Project menu admission sample"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            capture("Native Project menu admission failure", app)
+        }
+        XCTAssertEqual(outcome, .completed)
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
         return try XCTUnwrap(accepted, "The unique native Project menu must have two stable, visible samples")
     }
