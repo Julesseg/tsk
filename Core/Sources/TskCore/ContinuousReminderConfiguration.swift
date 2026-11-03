@@ -15,7 +15,7 @@ public protocol ContinuousReminderConfigurationStore: Sendable {
     func save(_ configuration: ContinuousReminderConfiguration) async throws
 }
 
-public struct ContinuousReminderStatus: Sendable {
+public struct ContinuousReminderStatus: Equatable, Sendable {
     public let configuration: ContinuousReminderConfiguration?
     public let active: Bool
     public let configuredOnAnotherDevice: Bool

@@ -99,7 +99,12 @@ This interval tests the newly reported retention contract, not a timeout change
 in existing methods. New real-product coverage makes permanent full78/69 plus
 the one temporary isolated fixture case =79/70 across the same four workers.
 Menu5/6/HID remains unchanged. One Action4/4 batch plus smoke is diagnostic only;
-no status/polling/gesture/menu implementation change is included. A green10s
+the complete-status publication candidate skips only unchanged successful status
+assignments. Complete equality includes optional configuration, device and ordered
+mappings plus active/ownership/paused flags. Every1s poll, manager read, error path
+and fixture bookkeeping remain. No menu/gesture/cache/identity change is included.
+The corrected local retention/selection/reselection case passed; that local beta
+build is separate from canonical and physical verification. A green10s
 sample is bounded nonreproduction, not reliability or a cause finding. Native
 admission/launch/settling gaps remain incomplete, and later option failure is
 separate from retention. Remove the isolated fixture/Action dispatch surface

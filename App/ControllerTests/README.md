@@ -33,3 +33,13 @@ command helper through a relative symlink. It checks fixed phase order, complete
 nonce-bound acknowledgements, expiry/abort rejection, explicit driver ownership
 and atomic runner-file boundaries. The UIKit adapter, host relay integration and
 actual native key delivery require separate compilation and canonical UI checks.
+
+The reminder-status target compiles the actual app controller through a relative
+symlink. It uses an in-memory TaskManager configuration/admission and stand-ins
+for its owning TaskStore and background scheduler; tests call only load, without
+scanning reminders, requesting EventKit access or scheduling background work.
+It verifies every manager read still occurs, first status publication, suppression
+of identical complete values, genuine configuration/device/mapping/paused changes
+and error reporting without replacing status. This tests the production guard
+rather than relying on compiler-specific Observation setter optimizations. Core
+tests separately retain actual enable/disable/import and paused-admission behavior.

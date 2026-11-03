@@ -33,7 +33,10 @@ final class ContinuousReminderController {
     deinit { execution?.cancel(); debounce?.cancel() }
 
     func load() async {
-        do { status = try await store.manager.continuousReminderStatus() }
+        do {
+            let nextStatus = try await store.manager.continuousReminderStatus()
+            if status != nextStatus { status = nextStatus }
+        }
         catch { self.error = error.localizedDescription }
         recordFixtureState()
     }

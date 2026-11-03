@@ -2076,3 +2076,108 @@ strict App/Share/Widget/Shortcuts artifact admission pass; routing25, execution1
 CI routing12 and shard-gate15 host checks pass. These checks establish build and
 harness admission only, not a retained-open native outcome. No local simulator
 was booted. Canonical runtime results remain pending.
+
+
+### Retention reachability result and bounded status publication candidate
+
+At2239bf9, action41618543697 failed and smoke41618522430 passed. These were all
+exact-head workflows, with16terminal jobs/attempt1. Tree
+d9eebf4302b71b62d986226894a39d7a8f7dfc8a matches smoke merge22e9140's tree and
+parent. Xcode27A266a/SDK24A430/runtime24A434/arm64 match both families. All4Action
+methods per family ran with no skips; both isolated20/focus/Notes and direct
+Title/Notes cases passed. Phone stress completed1cycle then its second field was
+absent59.253s. Pad completed6cycles; cycle7 field/value/Done dismissal succeeded
+but the elapsed dismissal check was0.302282s late163.256s, not a missing action.
+Both retention cases failed INITIAL menu admission (phone40.602s/pad52.425s),
+before any drag or untouched interval. These supply no retained-open verdict.
+All4phone smoke methods and both pad smoke methods passed. Both managed
+terminals were captured/killed; no retry/full was dispatched.
+
+Following the user's request for a faster local loop, the single retention
+method ran locally from existing products. The original test reproduced the
+initial-admission gap in78.199s (206.619s including fresh simulator setup/cleanup).
+The recording visibly contains the long native menu. A reviewed test-local
+correction drops the unnecessary requirement that the ENTIRE long collection
+fit inside its ancestors; each option still requires complete finite containment
+by its cell, collection, ancestors and owned app/window. The drag viewport is
+the intersection of those shared containers, excluding only the individual cell.
+Failure diagnostics reuse the same snapshot, without added UI queries. Global
+helpers/input/deadlines remain unchanged. This correction is frozen separately
+at1a38861, UI-test file SHA256
+ed0362659e8b17f2c5c716467e0ea64796f97ee3245d4a85f8885b95c29d309e.
+
+The corrected local baseline admitted the menu, issued12native50ms-press drags,
+then failed to reach the distant project114.883s. Video shows the initial
+No project/Release/001–010 neighborhood and transient001 highlighting; it does
+not show a later neighborhood followed by reset. Drag endpointsx185,y588→276
+lie in the observed native viewporty172–692. The10s interval and selection were
+unreached. This is a functional no-progress baseline, not a witnessed reset or
+publisher-cause proof. Both local runs used SDK27.1beta products/runtime27.0,
+not canonical CI products; no existing simulator was booted. Owned simulators
+were shut down/deleted and Simulator quit after each finite run.
+
+The user then identified Today on a PHYSICAL iPhone15Pro and clarified that the
+interruption may occur too quickly to see movement. Physical OS is unprovided.
+Both advisors therefore reranked: requiring settled scroll before any treatment
+would exclude that reported phenotype. ONE bounded complete-status publication
+candidate is justified by that report and the independently observed redundant
+notification, with cause provisional. Outside-recognizer replacement/manual
+input prerequisites/menu rewrite/options caching/identity resets remain parked.
+
+Product change is ONLY synthesized complete ContinuousReminderStatus equality
+plus conditional assignment after the SAME successful manager read. Equality
+includes complete optional configuration (enabled/designated device/ordered
+byte-exact mappings), active/configuredOnAnotherDevice/paused. Every1s poll,
+awaited read, error path, scan/enable/disable and unconditional recordFixtureState
+remain. No early return or polling suppression. The frozen corrected local test,
+fixture, runtime,12drags/target,10s exposure, fresh native selection/reselection,
+20s admission and5s outcomes remain identical for the comparison.
+
+A first host proof relied on modern Observation automatic equality suppression;
+Standards review caught its incompatibility with pinned LinuxSwift6.0.3 before
+publishing. That test is removed. Core retains portable equality assertions on
+real repeated manager reads/enable/paused transitions. The macOS controller proof
+uses the established relative-symlink pattern to compile the EXACT app load()
+method with in-memory configuration/admission and ownership/scheduler stand-ins.
+It invokes no scan, permission request or background scheduler. The ORIGINAL
+controller/type fails its identical-read notification expectation; the candidate
+passes first publication, repeated read-count preservation, complete config/
+device/mapping/paused changes and read-error retention. No copied guard or
+permanent UI observer supplies the fix. Core183tests, controller3tests, generic
+arm64 build and strict App/Share/Widget/Shortcuts admission pass; Standards/Spec
+reviews report0remaining findings.
+
+One local candidate menu run was selected against the frozen functional red.
+Complete scroll/retention/selection success supports bounded improvement only.
+Admitted no-progress/reset/selection recurrence rejects this as the claimed
+symptom repair; bootstrap/admission gaps are inconclusive. No retry-to-green or
+input/deadline fallback. Canonical both-family menu/20cycle/focus/native appearance,
+real HID and reminder status integration, plus all independent blockers and clean
+exact-head smoke/full/design acceptance, remain required. No new CI dispatch or
+production acceptance is inferred from host tests.
+
+
+The first candidate native run reached Sample030 after TWO drags, corroborated
+by video progressing through later project neighborhoods. It then stopped before
+exposure because the aggregate app snapshot omitted the underlying Project pill
+value. This was missing query coverage, not a witnessed changed draft. The exact
+Release assertions moved to the established identifier-scoped control value query
+BEFORE exposure and AFTER its fresh endpoint. No read was added inside10seconds;
+selected/reselected membership and tap geometry still share fresh bounded native
+admission. This separate reviewed test correction is frozen atf58ee79, test-file
+SHA2560227b117c3fe2e603fc175eb18db8bab751a8884f87c0463731fb638ec4ffc77.
+
+With the product candidate unchanged, that changed-test local continuation PASSED
+92.252s: native scrolling reached the distant neighborhood, consecutive anchors
+Sample031/032 stayed in place during10.134061seconds without input/AX reads,
+Release remained selected, and native selection/reselection/value/dismissal passed
+under the original admission/ACKs. The retained before/after screenshot payloads
+are identical. This is bounded local functional improvement versus the corrected
+baseline's twelve no-progress drags, not exclusive root-cause or physical proof.
+Owned simulator cleanup completed. Same local SDK27.1beta/runtime27.0/All/iPhone18
+ProMax differs from the user's physical Today/iPhone15Pro context. Both-family
+canonical repeated-option/focus/HID and all other acceptance remain outstanding.
+No additional publisher, gesture, cache, identity or input change was added to
+obtain this continuation; the prior missing-value assertion was corrected without
+skipping or weakening it. One changed-head canonical batch is next; no full or
+unchanged retry is authorized by a local pass.
