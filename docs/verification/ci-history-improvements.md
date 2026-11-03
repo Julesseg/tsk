@@ -1603,3 +1603,94 @@ Standards and Spec source reviews report zero findings. The generic arm64 test
 build, strict App/Share/Widget/Shortcuts artifact verifier and all24 routing
 checks pass, without booting a local simulator. These are build/source results;
 no canonical default-behavior outcome or production acceptance is established.
+
+
+### Default behavior passes; custom lifecycle group remains the discriminator
+
+At33f6c04f4adc884f9d97907ab20521789b14b6ed all eight methods were attempted
+on both families. Bare and default-behavior title/Notes pass complete native
+keyboard-before-option, field/Done and returned-editable-draft journeys. Default
+phone Notes/title take86.256s/31.794s, iPad135.026s/53.609s; overall case time
+includes startup/preparation/teardown and is not a speedup claim. No original
+sixty-second app-animation warning was observed in retained logs. Custom-host
+Notes/title still fail keyboard absence before option (phone26.097s/32.725s,
+iPad37.133s/33.637s).
+
+All four default packets have seven events/zero drops, actual storage-only
+controller/router factory identities, valid active-focus source delivery and
+later action requests. Bare packets have six events/zero drops; custom packets
+have five events/zero drops with valid delivery/request and actual empty-host
+appearance corroboration. This identifies the removed custom override/lifecycle-
+diagnostic group as the measured difference. It does not identify the initial
+claim, eligibility, diagnostic side effects or another override as cause, nor
+validate production command compatibility. Nested hosting/root assignment and
+preserved router/environment alone are insufficient in these controls.
+
+Product direct focus remains keyboard-red on both families. Phone stress
+completes eight cycles then fails field9 (143.080s). iPad stress cannot launch
+an app process (177.137s); that method was attempted but has no native stress
+input coverage. Direct product focus still provides the covered red reference.
+Smoke passes all four phone methods; iPad first New-project field is absent
+(59.953s), while navigation passes94.067s. Exactly two workflows/all16 jobs are
+terminal with matching head/merge tree and canonical Xcode27A266a/SDK24A430/
+runtime24A434/arm64. Both managed terminals were final-captured/killed. No retry
+or full ran. Launch, field and focus failures retain separate classifications.
+
+### First eligible lifecycle request only, diagnostic ablation
+
+The next single ablation keeps the SAME TaskKeyboardController class, hosting
+factory/root assignments, router lifetime, canBecomeFirstResponder eligibility,
+canPerformAction/presses overrides and original workspace diagnostic. A fully
+validated DEBUG simulator-owned minimal mode is frozen once per controller
+lifetime. Only its FIRST eligible app-owned becomeFirstResponder request in
+viewDidAppear is omitted. Ineligible appearances do not consume it; every later
+eligible appearance issues the original request. This tests that initial request,
+not an ongoing no-claim policy. The every-callsite suppression proposal was
+withdrawn during convergence. No resign operation, alternate responder, delayed
+focus or command/rebuild suppression is added. Ordinary product and existing
+reference modes retain their original request behavior.
+
+Every observed custom-fixture viewDidAppear reuses the original guard's one
+computed result and emits bounded decision metadata with controller/router
+identity, frozen mode and appearance/eligible-request ordinals. The receipt says
+issued/omitted/guard-rejected, not that a request necessarily became focus.
+No extra responder scan/query is added. The existing diagnostic still executes
+in its original position after the request decision, including its existing
+capture/availability queries and synchronous evidence write. Naturally changed
+query values and downstream effects are not separated from the omitted request.
+The new decision receipt uses the existing bounded asynchronous sink.
+
+Require positive first-eligible omission coverage before native text focus,
+one controller lifetime, matching active source request and native keyboard
+precondition. Any eligible re-claim before/during the keyboard verdict contaminates
+initial-omission attribution; stop that episode inconclusive rather than broadening
+the omission. A later claim strictly after the completed verdict leaves that
+earlier substep interpretable, while field/Done/returned editing may be affected
+separately. Export ending at the opener cannot establish absence of later claims:
+zero drops or one deduplicated workspace record is not complete late coverage.
+Successful later action receipts can provide coverage after the keyboard verdict;
+an uncovered negative tail remains inconclusive. No continuous FocusStore claim.
+
+Retain all eight prior method bodies and fixture view subtree unchanged, adding
+two fresh independent first-claim-omitted title/Notes cases with the same native
+input,20s admission, original five-second keyboard absence/elapsed BEFORE option,
+field/Done and editable-draft journey. Ten methods per family must be audited
+on one changed head. Temporary full inventory is84/75, partitions41+43/33+42,
+still four workers. No full or unchanged repeat while known red.
+
+Passing omitted-call cases with admitted, uncontaminated operation coverage and
+live bare/default-green/custom-red controls supports a contribution of the first
+app request in this fixture/configuration. It does not establish private keyboard
+retention mechanics, prevent other routes to first responder, or license deleting
+production command ownership. Same covered red with adequate uncontaminated
+coverage rejects initial-request necessity for that episode; missing tail,
+changed references, mixed cases/families or later-stage reds retain exact limits.
+No automatic eligibility/diagnostic fallback or stacked probe. Retire all fixture
+gates, eight minimal cases and temporary receipts before eventual clean smoke/
+full/design acceptance. Actual real-scope keyboard/HID command ownership,
+availability, plain typing, selected/reselect, twenty-cycle/focus20/morph and
+remaining regressions remain mandatory for any eventual production repair.
+Standards and Spec source reviews report zero findings. Generic arm64 test
+build, strict App/Share/Widget/Shortcuts artifact admission and all24 routing
+checks pass without a local simulator boot. These are build/source results,
+not a runtime omission outcome, command-compatibility result or acceptance.

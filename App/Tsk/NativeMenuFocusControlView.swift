@@ -3,7 +3,10 @@ import SwiftUI
 import TskCore
 
 enum NativeMenuFocusControlGate {
-    enum Mode: String { case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host" }
+    enum Mode: String {
+        case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host"
+        case firstClaimOmitted = "first-claim-omitted-keyboard-host"
+    }
 
     static func mode(_ environment: [String: String]) -> Mode? {
         guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",

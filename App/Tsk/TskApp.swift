@@ -20,7 +20,7 @@ struct TskApp: App {
         WindowGroup {
             #if DEBUG && targetEnvironment(simulator)
             if let mode = NativeMenuFocusControlGate.mode(ProcessInfo.processInfo.environment) {
-                if mode == .hosted {
+                if mode == .hosted || mode == .firstClaimOmitted {
                     TaskKeyboardHost { NativeMenuFocusControlView() }
                 } else if mode == .defaultBehavior {
                     NativeMenuDefaultKeyboardHost { NativeMenuFocusControlView() }

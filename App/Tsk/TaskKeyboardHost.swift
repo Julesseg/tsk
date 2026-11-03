@@ -255,11 +255,39 @@ struct TaskKeyboardHost<Content: View>: UIViewControllerRepresentable {
 
 final class TaskKeyboardController: UIHostingController<AnyView> {
     let router = TaskKeyboardRouter()
+    #if DEBUG && targetEnvironment(simulator)
+    private let menuFocusFixtureMode = NativeMenuFocusControlGate.mode(ProcessInfo.processInfo.environment)
+    private var fixtureAppearanceOrdinal = 0
+    private var fixtureEligibleRequestOrdinal = 0
+    #endif
     override var canBecomeFirstResponder: Bool { true }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if presentedViewController == nil, !(view.window?.tskFirstResponder is any UITextInput) { becomeFirstResponder() }
+        let eligibleForClaim = presentedViewController == nil && !(view.window?.tskFirstResponder is any UITextInput)
+        #if DEBUG && targetEnvironment(simulator)
+        let observesClaim = menuFocusFixtureMode == .hosted || menuFocusFixtureMode == .firstClaimOmitted
+        if observesClaim {
+            fixtureAppearanceOrdinal += 1
+            if eligibleForClaim { fixtureEligibleRequestOrdinal += 1 }
+        }
+        let omitClaim = eligibleForClaim && menuFocusFixtureMode == .firstClaimOmitted && fixtureEligibleRequestOrdinal == 1
+        #else
+        let omitClaim = false
+        #endif
+        if eligibleForClaim && !omitClaim { becomeFirstResponder() }
+        #if DEBUG && targetEnvironment(simulator)
+        if observesClaim, let menuFocusFixtureMode {
+            TaskMenuFocusDiagnostics.record("fixture.host.appearance", details: [
+                "fixtureMode": menuFocusFixtureMode.rawValue,
+                "controllerClass": NSStringFromClass(type(of: self)),
+                "controller": String(describing: ObjectIdentifier(self)), "router": String(describing: ObjectIdentifier(router)),
+                "appearanceOrdinal": String(fixtureAppearanceOrdinal), "eligibleRequestOrdinal": String(fixtureEligibleRequestOrdinal),
+                "eligible": String(eligibleForClaim),
+                "requestDisposition": eligibleForClaim ? (omitClaim ? "omitted" : "issued") : "guard-rejected"
+            ])
+        }
+        #endif
         router.diagnostic("workspace appeared firstResponder=\(isFirstResponder)")
     }
 

@@ -410,8 +410,17 @@ import XCTest
         try verifyMinimalProjectMenuFromFocusedText("row-note-input", mode: .defaultBehavior)
     }
 
+    func testFirstClaimOmittedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("task-description", mode: .firstClaimOmitted)
+    }
+
+    func testFirstClaimOmittedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("row-note-input", mode: .firstClaimOmitted)
+    }
+
     private enum MinimalMenuHostMode: String {
         case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host"
+        case firstClaimOmitted = "first-claim-omitted-keyboard-host"
     }
 
     private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, hosted: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {

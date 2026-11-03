@@ -40,7 +40,7 @@ class SelectionTests(unittest.TestCase):
                     methods = [selection.selected_methods(group) for group in groups]
                     self.assertEqual(methods[0] | methods[1], original)
                     self.assertFalse(methods[0] & methods[1])
-                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 18)
+                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 20)
                     self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
                     self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
                     self.assertFalse(owner.selected_cases(groups[1]))
@@ -52,10 +52,10 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 40)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 42)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (41, 41)), ('iPad', (33, 40))):
+        for family, counts in (('iPhone', (41, 43)), ('iPad', (33, 42))):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -84,11 +84,11 @@ class SelectionTests(unittest.TestCase):
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(phone), 82)
+        self.assertEqual(len(phone), 84)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 73)
+        self.assertEqual(len(pad), 75)
         for methods in (phone, pad):
             self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", methods)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
@@ -183,6 +183,8 @@ class SelectionTests(unittest.TestCase):
             "TskUITests/TaskRowEditingUITests/testHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
             "TskUITests/TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesTitleKeyboard",
             "TskUITests/TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
+            "TskUITests/TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesTitleKeyboard",
+            "TskUITests/TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesNoteKeyboard",
         }
         for family in ("iPhone", "iPad"):
             filters = selection.selection("menu", family)

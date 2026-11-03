@@ -61,6 +61,8 @@ MENU = (
     "TaskRowEditingUITests/testHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
     "TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesTitleKeyboard",
     "TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
+    "TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesTitleKeyboard",
+    "TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesNoteKeyboard",
 )
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
