@@ -1443,3 +1443,80 @@ Both Standards and Spec reviews report zero findings. The final arm64 generic
 test build and strict App/Share/Widget/Shortcuts artifact admission pass. These
 are source/build/routing checks only; no canonical minimal-root outcome is yet
 established and no local simulator was booted.
+
+
+### Bare minimal focus passes on both families; product remains red
+
+Atcc1617f05283168aaf780b8b7db6aedbc5608433, all four menu methods actually
+executed on each canonical family. Bare Notes/title passed on phone58.689s/
+36.454s and iPad48.597s/33.256s, including keyboard absence before option,
+real New-project/Release/Done, retained draft and returned actual typing.
+Each independent minimal packet has six events, zero drops, one matching
+source/window/generation delivery, an active appropriate focus value in the
+request and a later option-action request. Same-turn readback remains advisory.
+The passing native keyboard assertion is the functional outcome.
+
+Product direct title still fails its original five-second keyboard prerequisite
+before any option on phone37.400s and iPad64.966s, with valid active-title
+source/request evidence. Product Notes/return typing are not reached. Phone
+stress fails its first field acknowledgement (59.381s). iPad completes twelve
+cycles, then the thirteenth field/Release value is acknowledged after its
+five-second appearance deadline by26.467s (298.947s total). That is a timing/
+AX-read-budget failure, not missing action. Current traces have no global touch
+observer and cannot label these failures with historical retarget signatures.
+
+This satisfies the product-red/minimal-green branch on both families and
+implicates omitted integration as a group. It does not identify one ancestor,
+validate C, prove an Apple-only bug or compare intermittent option reliability
+from one minimal selection against twenty stress selections. Source/runtime/
+tree identities match. The iPad menu summary exporter timed out at20s; the
+canonical runtime summary was recovered from its retained xcresult locally,
+without a test retry. Keep that export limitation distinct from UI failures.
+
+Smoke41573227989 passes all four phone methods; iPad navigation passes while
+the durable row method fails app termination (396.560s). Exactly two head
+workflows/all16 jobs are terminal and audited, with canonical Xcode27A266a/
+SDK24A430/runtime24A434 and matching head/synthetic-merge tree. All watcher/
+verifier terminals were final-captured and killed. No retry or full ran.
+
+### Paired keyboard-host add-back, diagnostic only
+
+The next single component add-back compares the same bare minimal root with
+TaskKeyboardHost containing that exact root. This adds the existing controller
+hosting/environment/lifecycle component as one group. Host source and adapter
+remain unchanged. Do not add product ignoresSafeArea policy, NavigationStack,
+List, storage, command scopes, dummy commands or a focus observer. The added
+component naturally executes its existing conditional becomeFirstResponder
+lifecycle and legacy fixture diagnostics; it adds no new/manual responder call,
+but it must not be described as having no responder operations at runtime.
+
+The owned simulator/session/matching-UUID gate now validates an immutable mode:
+bare or keyboard-host. Unsupported modes do not silently select bare. Test
+launch attachments and the existing request receipt identify mode; retained
+hosted keyboard/appearance fixtures corroborate actual host construction and
+empty command context, without a new observer. The fixture body, focus owner/
+binding arrangement, menu/Picker/style/presentation and helper journey are
+identical between arms.
+
+Retain the two bare and two product methods byte-identical and selected, adding
+two fresh independent hosted title/Notes methods. Six actual methods per family
+must be audited on one changed head; no ordering or continuation assumption.
+Temporary full inventory is80/71, partitions41+39/33+38, same four workers.
+All native focus, one center opener,20s admission, original five-second keyboard
+absence/elapsed BEFORE option, real field/Done and returned draft typing remain.
+
+Bare passes plus hosted matching focus red with valid delivery selects the
+whole host component as sufficient in this reduced setup/family, not commands,
+AnyView, first-responder policy or one line as cause. Bare and hosted both pass
+with product red shows host alone is not sufficient under an empty router;
+it does not exonerate host-with-real-scopes/navigation/List integration. A bare
+control failure, missing source/launch/admission coverage, family disagreement
+or no product reference red prevents a clean contrast; report actual outcomes
+without an automatic repeat or add-back chain. Later option failure remains
+separate from successful keyboard dismissal. C and all fixtures remain
+rejected for production acceptance. Retire the temporary fixture, four minimal
+cases and all receipts before eventual clean exact-head smoke/full acceptance.
+Standards and Spec reviews report zero findings for the paired add-back delta.
+The generic arm64 test build, strict App/Share/Widget/Shortcuts artifact admission
+and all24 routing checks pass. No local simulator was booted. This is build/
+source evidence only; the paired canonical runtime comparison remains pending.

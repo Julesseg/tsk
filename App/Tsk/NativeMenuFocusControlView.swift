@@ -3,12 +3,15 @@ import SwiftUI
 import TskCore
 
 enum NativeMenuFocusControlGate {
-    static func enabled(_ environment: [String: String]) -> Bool {
+    enum Mode: String { case bare, hosted = "keyboard-host" }
+
+    static func mode(_ environment: [String: String]) -> Mode? {
         guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
               environment["TSK_UI_TEST_SESSION"].flatMap(UUID.init(uuidString:)) != nil,
               let token = environment["TSK_TEST_NATIVE_MENU_FOCUS_CONTROL"].flatMap(UUID.init(uuidString:)),
-              let replica = environment["TSK_TEST_REPLICA_NAME"].flatMap(UUID.init(uuidString:)) else { return false }
-        return token == replica
+              let replica = environment["TSK_TEST_REPLICA_NAME"].flatMap(UUID.init(uuidString:)),
+              token == replica else { return nil }
+        return Mode(rawValue: environment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] ?? "bare")
     }
 }
 
@@ -64,6 +67,7 @@ private struct NativeMenuFocusControlContent: View {
                 focusedNote = nil
                 TaskMenuFocusDiagnostics.record("focus.request", details: [
                     "fixture": "minimal", "parameter": "project", "titleBefore": String(beforeTitle), "noteBefore": beforeNote,
+                    "fixtureMode": NativeMenuFocusControlGate.mode(ProcessInfo.processInfo.environment)?.rawValue ?? "unavailable",
                     "titleRequested": "false", "noteRequested": "nil", "titleReadback": String(titleFocused),
                     "noteReadback": focusedNote?.rawValue ?? "nil", "readbackAdvisory": "true"
                 ])

@@ -19,8 +19,12 @@ struct TskApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG && targetEnvironment(simulator)
-            if NativeMenuFocusControlGate.enabled(ProcessInfo.processInfo.environment) {
-                NativeMenuFocusControlView()
+            if let mode = NativeMenuFocusControlGate.mode(ProcessInfo.processInfo.environment) {
+                if mode == .hosted {
+                    TaskKeyboardHost { NativeMenuFocusControlView() }
+                } else {
+                    NativeMenuFocusControlView()
+                }
             } else if NativeKeyboardControlGate.enabled(ProcessInfo.processInfo.environment) {
                 NativeKeyboardControlView()
             } else {

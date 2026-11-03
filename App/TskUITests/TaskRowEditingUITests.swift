@@ -394,15 +394,26 @@ import XCTest
         try verifyMinimalProjectMenuFromFocusedText("row-note-input")
     }
 
-    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, file: StaticString = #filePath, line: UInt = #line) throws {
+    func testHostedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("task-description", hosted: true)
+    }
+
+    func testHostedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("row-note-input", hosted: true)
+    }
+
+    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, hosted: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", file: file, line: line)
         let app = taskTestApplication(), token = UUID().uuidString
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
         app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_CONTROL"] = token
+        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] = hosted ? "keyboard-host" : "bare"
         app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = token
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
+        let mode = XCTAttachment(string: "mode=\(hosted ? "keyboard-host" : "bare") input=\(identifier) replica=\(token) session=\(app.launchEnvironment["TSK_UI_TEST_SESSION"] ?? "unavailable")")
+        mode.name = "Minimal menu fixture launch mode"; mode.lifetime = .keepAlways; add(mode)
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["native-menu-focus-control"].firstMatch.waitForExistence(timeout: 5), file: file, line: line)
         let input = app.textFields[identifier]
