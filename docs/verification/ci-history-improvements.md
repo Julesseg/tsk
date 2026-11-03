@@ -1087,3 +1087,10 @@ exists. The repeated focused-opener keyboard failure is now the next distinct
 repair target, with all assertions retained and intermittent action loss still
 unresolved. No alpha/command/rebuild suppression or broad ancestor removal is
 supported by this control.
+
+The temporary sendEvent/weak-origin recorder, App-delegate installer, parameter
+and expansion hooks, actual-registration/request instrumentation and test opt-in
+are now removed as well. Retain the twenty real native cycles, original focus
+prerequisite and selection/geometry/deadline assertions. Existing keyboard
+verification receipts and functional registration deduplication remain. The next
+focus repair will execute without these temporary runtime interceptions.

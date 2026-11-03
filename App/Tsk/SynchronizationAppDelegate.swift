@@ -10,9 +10,6 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserN
     static var refreshIdentifier: String { (Bundle.main.bundleIdentifier ?? "com.julesseguin.tsk") + ".refresh" }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        #if DEBUG && targetEnvironment(simulator)
-        TaskNativeTouchDiagnostics.installIfRequested(application: application)
-        #endif
         UNUserNotificationCenter.current().delegate = self
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshIdentifier, using: .main) { task in
             Task { @MainActor in
