@@ -2317,9 +2317,9 @@ not terminate the previous app; its input coverage is missing.
 iPad passed annotation and the native baseline, then completed six compatibility
 phases. The row-disappearance assertion passed this time. Its sixteen contiguous
 trace events show operation return, all original pauses, shouldRemove=true,
-covering/collapsing and defer-cleared feedback in3.23seconds, with zero drops or
+covering/collapsing and defer-cleared feedback in 3.23 seconds, with zero drops or
 export failures. Phone also progressed through all sixteen stages. This did not
-reproduce704's completion failure and cannot select a production repair.
+reproduce 704's completion failure and cannot select a production repair.
 
 The later iPad completedView RPC exceeded the original five-second transport
 limit; no timely ACK was produced, and the test aborted at its twelve-second
@@ -2331,5 +2331,43 @@ managed terminals captured/killed. No retry/full was dispatched.
 
 The entire temporary completion recorder, observer callback plumbing and launch
 flag are removed. TaskCompletionFeedback, TaskStore and the compatibility method
-are byte-identical to7043372 again. The prior completion episode remains
+are byte-identical to 7043372 again. The prior completion episode remains
 unresolved; the observer is not retained as a fix.
+
+
+### Public-result query group ownership
+
+The next correction is confined to result-collection lifecycle ownership.
+Host.start already creates a new session for the query, but its inner finally
+and owner fallback previously selected parent-only cleanup. A controlled old-
+source Python 3.12 query timeout left a pipe-holding descendant alive after its
+leader had exited. The query remained a timeout; this does not explain the
+original query latency.
+
+Both query cleanup paths now use owned-group cleanup. A confirmed PID/reaped/
+groupGone receipt is reused without signalling the retired group twice. If the
+first cleanup was interrupted, its detailed history is archived before fallback.
+Archive failure never skips teardown and remains a failure afterward; history
+and errors are published even when teardown fails.
+
+Actual local tree tests also exposed a transient EPERM from signal-zero existence
+checks during retirement. Only that check may remain UNKNOWN and continue polling
+within the original absolute ten/five-second group-verification bounds; ESRCH
+alone confirms absence. Every error remains in the receipt. Actual TERM/KILL or
+other errors still fail immediately, and persistent UNKNOWN fails closed. No
+query/HID deadline, input, phase binding or native assertion is changed. The
+60-second structured public-result query remains mandatory; timeout, malformed
+JSON and missing/native failed outcomes still reject acceptance.
+
+All 37 owner tests pass on Python 3.12 and 3.14, including real timeout/cancellation/
+exited-leader pipe holders, successful structured results, unrelated-process
+survival, idempotence, interrupted-history fallback, archive/teardown failure and
+transient/persistent permission verification. The independent cleanup tests pass.
+The clean app build and target admission are checked locally; native acceptance
+still requires actual Menu 6/7 outcomes and all nine iPad command phases.
+
+The next smoke and Menu runs use the same frozen source. Menu starts only after
+auto smoke succeeds, reducing overlap without changing coverage, worker
+definitions, input or budgets. This scheduling distinction is not a claimed cure
+for HID latency. Regression 6/7 then full 78/69 remain gated on verified results;
+no unchanged-head retry or full is dispatched while coverage remains red/missing.
