@@ -1235,3 +1235,43 @@ No retry or full was dispatched. Retire/revert this failed app variant before
 selecting another state-handoff treatment; retain both native regressions and
 their unchanged assertions/deadlines. The native event seam can inform later
 diagnosis, but the functional target does not stay merely because it attached.
+
+Smoke41561707023 subsequently passed all four phone and both iPad methods.
+Exactly two head workflows and every job are now terminal and audited, with
+no full or retry. The verifier was captured and killed after final completion.
+This green smoke does not cover or override the rejected direct focus result.
+
+### SwiftUI-owned focus action candidate
+
+The next single candidate restores the pre-B content-to-pill unfocus closure
+API. TaskRowEditorContent.body forms the same false/nil focus assignment; the
+pill stores that callback and the native adapter only forwards a generic action.
+The adapter has no FocusState.Binding properties or TskCore/focus-field knowledge.
+Its proven public event, bounded weak source attachment, exact-target lifecycle,
+sender/window validation and synchronous invocation remain unchanged. Project
+still omits the extra tap gesture; Priority and openPicker use the original
+unfocus closure. Native layout/style/menu/presentation and both UI methods and
+all deadlines remain unchanged. No owner onChange or additional hook is added.
+
+This changes the focus action's formation/capture boundary, rather than another
+event or responder mechanism. The original representable binding plumbing was
+new; restoring the existing SwiftUI action contract is a falsifiable repair
+hypothesis. Apple documents FocusState.Binding as writable, so do not claim
+that bindings generally cannot cross UIKit or that a snapshot readback proved
+a lost write. The failed variant has already been reverted.
+
+Small request receipts now originate inside the actual SwiftUI closure, label
+false/nil as requested values, and mark same-turn readback advisory. Native
+delivery receipts still identify the source. A valid focused event and closure
+request must lead to actual keyboard absence within the original five seconds
+before option input, followed by native field/Done, Notes and returned typing.
+A covered repeat keyboard failure rejects this closure candidate; do not stack
+a delayed-focus patch, wrapper rename or fallback afterward. Missing launch/
+attachment/event/export coverage remains unverified. A later option failure
+keeps readiness blocked while any earlier focus substep is reported accurately.
+Keep one changed-head canonical execution on both families, then remove all
+temporary receipts before eventual clean exact-head smoke/full acceptance.
+
+Generic arm64 build and both source-review axes pass; strict artifact admission
+is checked before publication. No local simulator was booted. The production
+focus effect and existing native option loss remain runtime-unverified.
