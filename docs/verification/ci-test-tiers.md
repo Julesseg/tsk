@@ -9,13 +9,13 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 78 methods | 69 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 79 methods | 70 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 12 methods | 10 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
 | Menu | 5 methods | 6 methods | Explicit dispatch |
-| Action | 3 methods | 3 methods | Temporary diagnostic dispatch |
+| Action | 4 methods | 4 methods | Temporary diagnostic dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -76,21 +76,34 @@ native-action comparison. This does not shrink the permanent Menu5/6/HID
 manifest or satisfy its command compatibility requirements. Action diagnostic
 rollups cannot satisfy required smoke/full checks. One fixture pass is not
 reliability or a specific-ancestor diagnosis. The one extra method per family
-accounts for temporary full78/69; remove the fixture, method and Action dispatch/
+accounts for temporary full79/70; remove the fixture, method and Action dispatch/
 rollup surface before clean acceptance. No full is dispatched while known red.
 
-The current finite Action observation records actual TaskListView scrollTo
-requests under an owned DEBUG gate without changing scrolling. Scalar request
-receipts are appended after synchronous return; that does not report motion or
-completion. Entry counters, installation and500ms main checkpoints with utility
-export provide coverage, with checkpoints outside the256-event cap. Negative
-interpretation requires matching identity, zero loss and a MAIN checkpoint after
-the failed verdict, plus positive request coverage where available. Missing tail,
-request witness, expiry or only green results are weak/inconclusive. No input,
-assertion wait or deadline is added; no scroll is induced to obtain a witness.
-Retire this observer with the completed temporary Action infrastructure before
-clean acceptance. Upcoming/system scrolling and other layout paths are outside
-this control's scope.
+The completed List scroll-request observer is removed. Its zero requests lacked
+an actual-call positive witness; that weak/inconclusive negative selects no
+scrolling repair. Historical packet/fence limits are recorded in the audit.
+
+Action now adds one independent real-product retained-open Project-menu case.
+It seeds80actual project values through the existing persistent fixture, opens
+once, drags only within the freshly admitted native collection, and establishes
+a distant fully visible settled neighborhood. Two matching fresh samples over at
+least300ms distinguish settling from later movement. Ten seconds follow with no
+input or accessibility reads while normal product polling stays active. A fresh
+endpoint must retain two consecutive interior anchor rows and their viewport
+within2points, plus the draft selection. Edge-clipped/virtualized rows are not
+compared as an exact visible set. Missing anchors require fresh neighborhood/video
+corroboration to classify a reset; an AX-only gap remains incomplete. Selection/reselection then uses newly admitted geometry and the
+original20s admission/5s acknowledgement bars; a reopened menu may legitimately
+need native scrolling again. A reset stops the case without replaying input.
+This interval tests the newly reported retention contract, not a timeout change
+in existing methods. New real-product coverage makes permanent full78/69 plus
+the one temporary isolated fixture case =79/70 across the same four workers.
+Menu5/6/HID remains unchanged. One Action4/4 batch plus smoke is diagnostic only;
+no status/polling/gesture/menu implementation change is included. A green10s
+sample is bounded nonreproduction, not reliability or a cause finding. Native
+admission/launch/settling gaps remain incomplete, and later option failure is
+separate from retention. Remove the isolated fixture/Action dispatch surface
+before clean smoke/full/design acceptance; keep the product retention regression.
 
 ## Build once, execute selected coverage
 
@@ -113,8 +126,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 42 methods | 36 methods |
-| iPad | 34 methods | 35 methods |
+| iPhone | 42 methods | 37 methods |
+| iPad | 34 methods | 36 methods |
 
 The partition union is exactly the full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

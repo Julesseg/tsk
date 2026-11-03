@@ -1958,3 +1958,121 @@ and the fixture/host/adapter/CI/HID plumbing are unchanged; only owned diagnosti
 launch flags are added. No local simulator booted. Runtime probe installation,
 actual-call coverage and late-fence admission remain unverified until canonical
 artifacts are inspected. No host test is presented as native delivery evidence.
+
+
+### List scroll-request result and observer retirement
+
+At243c18a, action41606542073 and smoke41606528437 both finished red; these were
+all exact-head workflows, with16 terminal jobs and attempt1. Source tree
+b277da3a18de4ccf9527341fd04a26ad3a6565ea matches the smoke merge tree.
+Both families used Xcode27A266a/SDK24A430/runtime24A434. All3Action methods per
+family actually executed, with no skips. Both managed watchers were captured
+and killed. No retry or full was dispatched.
+
+The real-component fixture passed High/reselect/all20/focus20/Notes/returned
+editing on phone347.915s and pad351.483s. Product stress completed4 cycles on
+phone before the fifth field was absent106.983s, and6 on pad before the seventh
+field was absent144.658s. Phone direct cleared the title keyboard before its
+later field-appearance failure36.808s; Notes was not reached. Pad direct passed
+Title/Notes and subsequent native selection/Done/draft/returned typing101.073s.
+These are current field outcomes, not evidence of historical alpha/retarget.
+The finite omitted-COMPOSITE comparison reproduced on both families without
+identifying an individual omitted responsibility or establishing reliability.
+
+All six recorder packets have requestCount0, zero drops/export failures and
+matching export/checkpoint ordinals. Product entry counts are phone12/14 and
+pad11/19; fixture entries0 are expected. Product records contain installation
+and list registration only. There is NO actual scroll-call positive witness.
+Entry coverage cannot replace that witness, so the negative remains weak/
+inconclusive under the prespecified bar. Stress checkpoints are after formal
+failure by0.122s/1.954s; the phone-direct checkpoint covers the ACK/query endpoint
+but precedes the formal assertion by0.201s. Do not relax that stricter late-fence
+bar, induce a scroll, repeat the control, or select a scroll treatment.
+
+Smoke actually attempted all4phone and2pad methods. Phone3 passed; the durable
+row test failed while terminating appPID16012, separate from menu attribution.
+Both pad methods passed. No new HID coverage ran on this diagnostic head; phone
+nine-phase evidence remains bounded to8e230eb, and the missing pad phases remain
+required. Startup-only TaskStore exports cannot exclude later episode mutation.
+
+The completed observer is retired: restore the original TaskListView calls,
+guards/task signatures, remove its Foundation startup installer, two diagnostic
+launch flags, and its recorder/exporter. This cleanup changes no scrolling
+policy and is not a fix. The temporary real-component root/test/Action surface
+still must be removed before clean acceptance. No further behavior correction
+is selected from these receipts; known action loss still blocks full/acceptance.
+
+
+### User-reported retained-open Project-menu regression
+
+The user reports that the expanded task's Project dropdown scrolls back to its
+original position every few seconds while still open. Scope was explicitly
+corrected from workspace chooser to the expanded pill. This is the same product
+surface as the missing native action, but a shared cause is not established.
+Both committee members converge on a new regression before another repair.
+The outside-recognition replacement, menu rewrite and status correction are
+parked; no such production change is included in this head.
+
+A concrete source cadence is ContinuousReminderController.observeStatus: every
+second it reads and assigns non-Equatable ContinuousReminderStatus; ContentView's
+ordinary task-list safe-area inset reads that status even for an inactive banner.
+All status fields can support equality. A local Observation host exercise shows
+same-field non-Equatable status assignment notifies while equal String-array
+assignment does not. This is compiler/source evidence, not canonical native menu
+invalidation or a cause. The500ms task-change stream yields only changed full
+versions, not an unconditional reload; fixed-date CI also lacks timed filter
+reevaluation. Do not generalize one publisher finding to all polling.
+
+ONE new independent product test seeds80actual deterministic projects through
+the existing persistent fixture. The original three Action methods remain
+byte-identical to the pre-observer versions. Native collection ownership uses
+known ordered option labels and actual cell/button geometry, allowing virtualized
+subsets without weakening existing exact-options helpers. Fresh contained/enabled
+geometry drives real50ms-press drags; observed row order reverses direction after
+an overshoot. A distant project must start outside the initial visible region,
+then become fully visible in a different settled neighborhood. Two fresh matching
+snapshots over at least300ms establish settling, within the existing20s bar.
+
+Ten seconds then pass with no input or accessibility reads. Normal production
+polling remains untouched; the interval is the new retention behavior, not a
+relaxation of any existing ACK. Fresh endpoint geometry must preserve two consecutive interior anchors and
+their viewport within2points, with unchanged draft project. Anchors are at least
+8points from vertical edges and absent initially; boundary virtualization cannot
+create a false exact-visible-set reset. A missing AX anchor is incomplete unless
+fresh neighborhood/video corroborates movement.
+Geometry evidence and before/after captures are retained; normal failure video is
+available, while passing automatic recordings may be discarded by XCTest. A reset
+fails without scrolling back or replaying a selection. Subsequent selection and
+reselection each admit fresh geometry/selected state within20s and require actual
+value/native dismissal within5s. Reopening may use fresh native drags rather than
+assuming platform restoration of scroll position. No cached baseline frame drives
+a later tap, and no separate unbounded AX query intervenes after tap admission.
+
+A reset during no input establishes retained-open failure only, not recreation,
+private mechanism or common cause with action loss. Stable retention followed by
+a failed selection remains a separate phase. A green finite interval is bounded
+nonreproduction; launch, menu ownership, scrolling/settling or export gaps remain
+incomplete. Do not repeat until a preferred split or ship a replacement from a
+single negative. The reserved semantic-status publication correction requires
+complete equality and genuine status/configuration transition verification if
+later selected; no polling suppression or frozen menu options is proposed.
+
+Temporary Action4/4 adds this case to the three current references with no HID
+setup; Menu5/6/HID remains unchanged. Full79/70 uses the same four partitions
+42+37/34+36, including the one temporary isolated fixture; permanent product
+coverage becomes78/69. One changed-head Action batch plus auto smoke follows
+source review/build; no unchanged retry/full while red. The completed List
+observer is removed symmetrically. Retire the isolated root/test/Action surface
+before clean acceptance and retain the real-product retention regression.
+
+
+Source review corrected three harness traps before dispatch: reopening is allowed
+to start at a different native viewport; selection state is read in the same
+bounded snapshot as tap geometry; and native reveal reverses after overshooting.
+The Spec review also replaced exact fully-visible key-set comparison with two
+interior consecutive anchors, avoiding edge-clipping/virtualization false resets.
+Existing expected input and deadlines are unchanged. Generic arm64 build and
+strict App/Share/Widget/Shortcuts artifact admission pass; routing25, execution11,
+CI routing12 and shard-gate15 host checks pass. These checks establish build and
+harness admission only, not a retained-open native outcome. No local simulator
+was booted. Canonical runtime results remain pending.

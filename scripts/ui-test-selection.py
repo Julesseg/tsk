@@ -64,6 +64,7 @@ ACTION = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
     "TaskRowEditingUITests/testIsolatedNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
+    "TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
 )
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
