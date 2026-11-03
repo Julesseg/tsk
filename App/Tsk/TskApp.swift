@@ -19,7 +19,9 @@ struct TskApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG && targetEnvironment(simulator)
-            if NativeKeyboardControlGate.enabled(ProcessInfo.processInfo.environment) {
+            if NativeMenuFocusControlGate.enabled(ProcessInfo.processInfo.environment) {
+                NativeMenuFocusControlView()
+            } else if NativeKeyboardControlGate.enabled(ProcessInfo.processInfo.environment) {
                 NativeKeyboardControlView()
             } else {
                 TaskKeyboardHost { TaskStorageRootView() }.ignoresSafeArea()

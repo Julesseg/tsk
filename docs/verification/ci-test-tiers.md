@@ -9,12 +9,12 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 76 methods | 67 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 78 methods | 69 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 11 methods | 9 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
-| Menu | 2 methods | 2 methods | Explicit dispatch |
+| Menu | 4 methods | 4 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -42,9 +42,18 @@ same keyboard prerequisite and native action, retains the draft text, and return
 to title/note editing. An independent title/Notes focus regression reaches the same native opener and
 keyboard-before-option assertion immediately on a fresh fixture, then verifies
 actual field/Done behavior and returned text editing. It does not replace the
-repeated case. Menu coverage selects both methods on each family without HID,
+repeated case. Menu coverage retains both product methods and adds two independent minimal-root
+focus controls, one for title and one for Notes, on each family without HID,
 server, peer or installed-extension setup. Its diagnostic rollups have distinct
-names and cannot satisfy the required smoke/full checks.
+names and cannot satisfy the required smoke/full checks. The minimal controls
+are temporary diagnostic reproduction coverage: their DEBUG owned-fixture root
+bypasses the product storage/row/List/command-host composition as one composite
+factor. They retain the same native menu adapter, style, popover/morph and
+five-second keyboard-before-option assertion. A matching failure does not prove
+an Apple-only bug; a difference implicates the omitted composition as a group.
+They add two methods per family to full inventory while present; no full is
+dispatched while known failures remain. Remove the diagnostic fixture and its
+two selections after this finite comparison, before clean acceptance.
 
 ## Build once, execute selected coverage
 
@@ -67,8 +76,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 41 methods | 35 methods |
-| iPad | 33 methods | 34 methods |
+| iPhone | 41 methods | 37 methods |
+| iPad | 33 methods | 36 methods |
 
 The partition union is exactly the previous full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

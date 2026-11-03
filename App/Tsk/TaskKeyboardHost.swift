@@ -188,7 +188,7 @@ final class TaskKeyboardRouter {
             editingChanges[identity, default: 0] += 1
         } else { editingChanges[identity] = 0 }
         editingDiagnosticCount += 1
-        diagnostic("editing notification=\(notification.name.rawValue) view=\(String(describing: type(of: view))) identity=\(ObjectIdentifier(view)) window=\(ObjectIdentifier(window)) count=\(editingDiagnosticCount)/32 firstResponder=\(view.isFirstResponder)", force: true)
+        diagnostic("editing notification=\(notification.name.rawValue) view=\(String(describing: type(of: view))) firstResponder=\(view.isFirstResponder)", force: true)
     }
 
     private func diagnosticReturnCommands(_ responder: UIResponder) -> [[String: Any]] {

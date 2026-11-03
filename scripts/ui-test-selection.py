@@ -55,6 +55,8 @@ TEXT = (
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
+    "TaskRowEditingUITests/testMinimalNativeProjectMenuDismissesTitleKeyboard",
+    "TaskRowEditingUITests/testMinimalNativeProjectMenuDismissesNoteKeyboard",
 )
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",

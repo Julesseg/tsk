@@ -386,6 +386,56 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
+    func testMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("task-description")
+    }
+
+    func testMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
+        try verifyMinimalProjectMenuFromFocusedText("row-note-input")
+    }
+
+    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", file: file, line: line)
+        let app = taskTestApplication(), token = UUID().uuidString
+        app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
+        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_CONTROL"] = token
+        app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = token
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["native-menu-focus-control"].firstMatch.waitForExistence(timeout: 5), file: file, line: line)
+        let input = app.textFields[identifier]
+        focusTaskText(input, app: app, file: file, line: line)
+        input.typeText(" draft retained")
+        let draft = try XCTUnwrap(input.value as? String, file: file, line: line)
+        XCTAssertEqual(draft.components(separatedBy: " draft retained").count, 2, file: file, line: line)
+        let openerDeadline = ProcessInfo.processInfo.systemUptime + 20
+        tapTaskControlAtCenter(app.buttons["row-project"], app: app, deadline: openerDeadline, requiresVisibleKeyboard: true, file: file, line: line)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app, file: file, line: line)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(field.value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline, file: file, line: line)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline, file: file, line: line)
+        XCTAssertEqual(input.value as? String, draft, file: file, line: line)
+        focusTaskText(input, app: app, file: file, line: line)
+        input.typeText(" editable again")
+        let returned = try XCTUnwrap(input.value as? String, file: file, line: line)
+        XCTAssertEqual(returned.components(separatedBy: " editable again").count, 2, file: file, line: line)
+        XCTAssertEqual(returned.replacingOccurrences(of: " editable again", with: ""), draft, file: file, line: line)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app, requiresVisibleKeyboard: true, file: file, line: line)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+    }
+
     private func verifyProjectMenuFromFocusedText(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         openTaskRowParameter("project", app: app)
         let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5

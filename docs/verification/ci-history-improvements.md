@@ -1343,3 +1343,103 @@ any local simulator. These are build checks, not runtime owner-state evidence.
 Both Standards and Spec source reviews report zero findings for the owner
 observation delta. They explicitly preserve the coalescing, lifetime and graph
 perturbation limits; no production repair claim is supported by this change.
+
+
+### Actual owner clears and native editing ends; keyboard remains rendered
+
+At22d127706eb5f09621d34b3a6e3a236277d2b567, both menu methods executed on
+both families. Phone stress completed nine cycles, then the tenth field was
+absent (204.904s); iPad failed the first field (63.132s). Direct title cases
+failed the original keyboard-absence prerequisite before any option input
+(phone34.166s, iPad38.517s). Notes/returned editing remain unexecuted.
+
+The direct owner control has positive coverage on both families. Phone
+PID13071/session164071BA has a real title false-to-true at uptime870.931,
+valid source delivery/request at874.508, and same-owner true-to-false at874.884.
+iPad PID4134/session0BBC2189 has false-to-true at401.317, delivery/request
+at406.572, and same-owner true-to-false at407.064. Both packets contain21
+records/zero drops; row/editing/proxy identity matches across each episode.
+Initial equal values and earlier navigation-owner replacements are not resets.
+No subsequent true transition is observed, but each export ends soon after
+false: this does not establish five seconds of continuous owner-false state.
+
+The same original native VerticalTextView/window emits Begin then End on each
+family, at notification counts1/32 and2/32, with firstResponder=false at End.
+A subsequent existing responder sample captures TaskKeyboardController. This
+is positive evidence that the title's native editing ended; it does not make
+that command host the cause or prove absence of every later native focus event.
+The legacy fixture's window guards and event-driven export still limit silence.
+Phone direct video at28s visibly shows both the native Project menu and keyboard
+keys near the failing deadline, so this is not merely an AX-only inference.
+The hierarchy names UIKeyboardLayoutStar Preview, but that private name does
+not establish a snapshot mechanism or justify a private API intervention.
+
+This selects the model/native presentation integration boundary for further
+investigation and demotes the claim that the focus request never reached its
+owner. It does not rehabilitate C, prove a root cause, or justify a delayed
+write, responder workaround, keyboard command/rebuild suppression or empty
+onChange fix. The owner observation can itself affect graph participation.
+Retire its onChange/lifetime/notification-string additions after this one run.
+
+Smoke41570381907 passed all four phone methods. iPad failed its first native
+New-project field at line191 (63.432s), then its separate navigation method
+failed app termination (169.458s); retain that termination classification.
+Menu41570391642 and smoke are the only two exact-head workflows, all16 jobs
+are terminal, no retry/full ran. Both producer/consumer trees match4f698b0;
+smoke's synthetic merge contains the head and the same tree. Canonical
+Xcode27A266a/SDK24A430/runtime24A434 and arm64 match both families. All managed
+terminals were final-captured and killed. Full acceptance remains blocked.
+
+
+### Finite minimal native-menu focus reproduction
+
+No production correction is supported yet. The next diagnostic changes one
+explicitly composite host factor: a DEBUG simulator-owned gate at WindowGroup
+selects a minimal SwiftUI root instead of task storage, row/List ancestors and
+the keyboard command host together. The gate requires isolated-simulator1,
+a valid test session and matching fixture/replica UUIDs. Normal product
+composition remains C, rejected and held only for this diagnostic comparison;
+its completed owner onChange/lifetime/log-string probe has been removed.
+
+The minimal root preserves vertical SwiftUI title/Notes fields with Boolean
+title and optional UTF8String Notes focus, separate owner/binding layers, and
+the same TaskMenuActivation implementation. A SwiftUI content closure requests
+false/nil synchronously on the same public source event. Project uses the
+shared label and26/44 style, native Picker with UTF8String tags and exact
+No project/Release/New project ordering, matched source/zoom, and a real
+340-point anchored popover with Release input/Done. Local fixture state avoids
+storage/row/List/command hosts. The omitted composition and layout differences
+are a group, not a claim of one precise ancestor ablation. No new observer,
+global hook, timing change, responder operation or fallback is added.
+
+Two independent fresh-fixture methods exercise title and Notes separately,
+with actual focus/keyboard presence and retained draft, one native source-center
+opener with fresh bounded admission, the original five-second absence/elapsed
+assertion BEFORE option input, then exact native New-project/Release/Done and
+returned typing. A title failure does not prevent the independent Notes case.
+Both original product methods remain byte-identical and selected. Menu now has
+four methods per family; temporary full inventory is78/69, partitions41+37/
+33+36 with the same four workers. No original method is removed, and no full
+is dispatched while known failures remain. The two diagnostic methods and
+fixture must be retired after this finite comparison before clean acceptance.
+
+Use the existing tiny source attachment/delivery/request receipts, actual
+outcome and video/hierarchy. The fixture has no TaskKeyboardHost observer;
+matching native End receipts there are neither required nor fabricated.
+Product red plus a valid matching minimal red means omitted product composition
+is not necessary for this phenotype; the adapter remains present, so this is
+not proof of an Apple-only defect. Product red plus both minimal cases green
+implicates the omitted composition as a group, not keyboard commands or one
+ancestor. All-green, invalid focus/attachment/emission, launch failures or
+unexecuted stages are inconclusive for this partition. An option failure after
+successful keyboard absence stays a separate action outcome, not common cause
+proof. Minimal-green never validates C in the product.
+
+One changed-head comparison on both canonical families only; no unchanged
+repeat/full. Remove remaining temporary diagnostics before eventual clean
+exact-head smoke/full/design acceptance. The generic arm64 build and24 routing
+checks pass without a local simulator boot; runtime reproduction is pending.
+Both Standards and Spec reviews report zero findings. The final arm64 generic
+test build and strict App/Share/Widget/Shortcuts artifact admission pass. These
+are source/build/routing checks only; no canonical minimal-root outcome is yet
+established and no local simulator was booted.
