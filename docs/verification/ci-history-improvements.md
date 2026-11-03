@@ -2302,3 +2302,34 @@ shouldRemove=false alone cannot explain indefinite feedback because defer still
 clears it. Retire all instrumentation after this one comparison. The independent
 post-test query and Upcoming input issues are not patched on this head. Full78/69
 and all real HID/clean-head requirements remain; no full while red.
+
+
+### Completion observation: finite inconclusive result and retirement
+
+At `cd4de24756f128eb6dc11909871134cd545fa5f8`,
+[Menu 41645748426](https://github.com/Julesseg/tsk/actions/runs/41645748426)
+was red and [smoke 41645729705](https://github.com/Julesseg/tsk/actions/runs/41645729705)
+passed all six actual methods. Phone attempted all six Menu methods: annotation,
+all nine product HID phases and all three menu regressions passed. The standalone
+native baseline failed before its input fixture launched because XCTest could
+not terminate the previous app; its input coverage is missing.
+
+iPad passed annotation and the native baseline, then completed six compatibility
+phases. The row-disappearance assertion passed this time. Its sixteen contiguous
+trace events show operation return, all original pauses, shouldRemove=true,
+covering/collapsing and defer-cleared feedback in3.23seconds, with zero drops or
+export failures. Phone also progressed through all sixteen stages. This did not
+reproduce704's completion failure and cannot select a production repair.
+
+The later iPad completedView RPC exceeded the original five-second transport
+limit; no timely ACK was produced, and the test aborted at its twelve-second
+limit. UP-only recovery is advisory, not native-key-state proof. Later methods
+were unexecuted and the partial xcresult lacked Info.plist. The trace's final
+main checkpoint preceded that later assertion, so it cannot support a negative
+tail claim. Both head workflows/jobs were audited to terminal state and both
+managed terminals captured/killed. No retry/full was dispatched.
+
+The entire temporary completion recorder, observer callback plumbing and launch
+flag are removed. TaskCompletionFeedback, TaskStore and the compatibility method
+are byte-identical to7043372 again. The prior completion episode remains
+unresolved; the observer is not retained as a fix.

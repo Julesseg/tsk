@@ -214,15 +214,8 @@ final class TaskStore {
     func completeFromList(id: UUID, animated: Bool = true) async -> TaskRecord? {
         guard !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
         let context = completionContext
-        let observe: ((String, [String: String]) -> Void)?
-        #if DEBUG && targetEnvironment(simulator)
-        observe = TaskCompletionDiagnostics.begin(store: self, task: task, context: context, animated: animated)
-        #else
-        observe = nil
-        #endif
         return await completionFeedback.complete(task: task, visibleTasks: visibleTasks, context: context, animated: animated,
             shouldRemove: { self.completionContext == context && !self.tasks.contains { $0.id == id } },
-            observe: observe,
             operation: { await self.complete(id: id) })
     }
 
