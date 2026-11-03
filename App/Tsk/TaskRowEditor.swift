@@ -113,8 +113,10 @@ private struct TaskRowEditorContent: View {
                         ForEach(TaskRowParameter.allCases) { parameter in
                             TaskRowParameterPill(editing: editing, parameter: parameter,
                                                  projects: store.availableProjects,
-                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate,
-                                                 titleFocused: $titleFocused, focusedNote: $focusedNote)
+                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
+                                titleFocused = false
+                                focusedNote = nil
+                            }
                         }
                         Button { open(.dependency) } label: {
                             HStack(spacing: 5) {
@@ -164,8 +166,7 @@ private struct TaskRowParameterPill: View {
     let projects: [String]
     let tags: [String]
     let now: Date
-    @FocusState.Binding var titleFocused: Bool
-    @FocusState.Binding var focusedNote: UTF8String?
+    let unfocus: () -> Void
     @Namespace private var presentationNamespace
 
     var body: some View {
@@ -196,17 +197,9 @@ private struct TaskRowParameterPill: View {
                         }
                     }
                 } label: {
-                    if parameter == .project {
-                        label.background {
-                            TaskMenuFocusDismissal(titleFocused: $titleFocused, focusedNote: $focusedNote)
-                                .allowsHitTesting(false)
-                                .accessibilityHidden(true)
-                        }
-                    } else {
-                        label
-                    }
+                    label
                 }
-                .modifier(TaskRowMenuUnfocusGesture(parameter: parameter, unfocus: unfocus))
+                .simultaneousGesture(TapGesture().onEnded { unfocus() })
             } else {
                 Button(action: openPicker) { label }
             }
@@ -236,21 +229,6 @@ private struct TaskRowParameterPill: View {
     private func openPicker() {
         unfocus()
         editing.parameter = parameter
-    }
-
-    private func unfocus() {
-        titleFocused = false
-        focusedNote = nil
-    }
-}
-
-private struct TaskRowMenuUnfocusGesture: ViewModifier {
-    let parameter: TaskRowParameter
-    let unfocus: () -> Void
-
-    func body(content: Content) -> some View {
-        if parameter == .project { content }
-        else { content.simultaneousGesture(TapGesture().onEnded { unfocus() }) }
     }
 }
 

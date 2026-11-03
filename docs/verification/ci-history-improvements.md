@@ -1203,3 +1203,35 @@ Standards review caught an assertion that could accept duplicate returned text
 input; it now requires exactly one inserted marker and exact prior text after
 removing it, without assuming caret position. Spec review is clear. These are
 build/source/selection results, not runtime focus evidence.
+
+### Direct focused opener rejects the synchronous binding handoff
+
+At `0613f58a21cb41d8d12e964af5d614df3844a782`, both menu identifiers
+actually executed on both families. iPad stress failed its first New-project
+field acknowledgement after57.928s; phone stress completed one cycle before
+the second field failure after76.619s. The independent case reached actual
+title focus and keyboard presence immediately, then failed its original
+five-second keyboard-absence assertion before any option input on both families
+(iPad33.713s; phone47.445s). Notes and returned editing were not reached.
+
+iPad direct PID15633/session04B47D52 exported seven records with zero drops.
+One valid native event was delivered on the attached source/window/generation;
+titleBefore=true and the immediate titleAfter readback remainedtrue. Actual
+keyboard presence persisted through the deadline. This rejects this synchronous
+representable-owned FocusState handoff. Immediate Binding readback can be a
+snapshot and does not alone prove that the setter was ignored, nor identify
+where a focus request was lost or reset. Native event emission is established;
+keyboard dismissal is not. No press/tap/responder fallback follows.
+
+Phone direct PID15577/session1E210B82 exported only five attachment records,
+without fresh opener events. Its keyboard failure is real, but event absence
+is not meaningful without that late coverage. The separate phone stress
+PID13075 emitted two valid unfocused callbacks. Do not conflate the two sessions
+or infer native option routing from older global traces.
+
+Producer source/tree and canonical Xcode27A266a/SDK24A430/runtime24A434 match
+both families. Smoke is still being audited by its separate managed verifier.
+No retry or full was dispatched. Retire/revert this failed app variant before
+selecting another state-handoff treatment; retain both native regressions and
+their unchanged assertions/deadlines. The native event seam can inform later
+diagnosis, but the functional target does not stay merely because it attached.
