@@ -350,8 +350,9 @@ async def container_for(udid, request, receipt, deadline):
     if budget <= 0:
         raise ValueError('Runner discovery cannot consume the five-second dispatch reservation')
     command = ['xcrun', 'simctl', 'get_app_container', udid, RUNNER, 'data']
-    process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    entry = dict(command=command, pid=process.pid, deadlineMonotonic=deadline, startedMonotonic=time.monotonic())
+    process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)
+    process_group = process.pid
+    entry = dict(command=command, pid=process.pid, processGroupID=process_group, deadlineMonotonic=deadline, startedMonotonic=time.monotonic())
     receipt.setdefault('containerLookups', []).append(entry)
     try:
         budget = deadline - time.monotonic() - 5
@@ -371,11 +372,10 @@ async def container_for(udid, request, receipt, deadline):
         entry['failure'] = type(error).__name__
         raise
     finally:
-        if process.returncode is None:
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
+        try:
+            os.killpg(process_group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         await asyncio.wait_for(process.wait(), timeout=5)
         entry.update(status=process.returncode, reaped=True, finishedMonotonic=time.monotonic())
 

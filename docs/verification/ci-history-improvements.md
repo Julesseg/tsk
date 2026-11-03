@@ -2212,3 +2212,42 @@ same four workers (42+36/34+35). Clean-head Menu/HID plus smoke, then the separa
 Regression 6/7 selection, must be audited before full coverage. The iPad nine-phase
 command gap, broader regression outcomes and physical Today/iPhone 15 Pro context
 are not supplied by the completed Action run.
+
+
+### Clean-head HID admission: owned discovery process groups
+
+At `46ac511af1920b010ff496904f4b591df9bd1821`,
+[Menu 41634351307](https://github.com/Julesseg/tsk/actions/runs/41634351307)
+failed before delivering any test HID command on either family. Each worker
+started only the annotation method; the remaining five phone/six iPad methods
+were unexecuted. Both receipts show a timed-out `get_app_container` preparation,
+no completed lookup-reap receipt, zero exchanges, and cancellation of owned tests
+after discovery cleanup remained unconfirmed. Phone's partial xcresult could not
+be summarized; iPad reported “Testing was canceled.” This is transport/setup
+coverage failure, not a demonstrated product command or menu regression.
+
+[Smoke 41634260698](https://github.com/Julesseg/tsk/actions/runs/41634260698)
+passed all four phone/two iPad methods. Menu products came from the cleanup SHA;
+smoke products came from its PR merge `15e5c950d69adc07f14ed7ebf82de0ba98061aea`.
+Both have tree `2c61e136b0ccfcd0eae72ac6b76c1731fa04e9cc` and canonical Xcode
+27A266a/SDK 24A430/runtime 24A434. All sixteen jobs reached terminal states; both
+managed terminals were captured and killed. No retry or full was dispatched.
+
+A local actual-process reproduction on Python 3.12 matches the missing-reap
+signature: the direct child is killed while a descendant retains its output
+pipes, and the original bounded wait does not finish. Python 3.14 did not exhibit
+that wait failure, but killing only the leader still leaves descendant ownership
+unresolved. This does not explain why the original simctl preparation hung.
+
+The correction starts only each discovery subprocess in a new session and
+retains its spawned PID as the owned group ID. Cleanup signals that group even
+when the direct child has already exited, then awaits the original five-second
+child completion before recording it as reaped. Only an already-absent group is
+ignored; other errors remain failures. The 30-second preparation, original
+12-second request, complete five-second dispatch reservation, native protocol and
+all product behavior are unchanged. Actual-process regressions cover live and
+already-exited parents with pipe-holding descendants, cancellation, success and
+an unrelated surviving process on Python 3.12 and 3.14. Descendant termination and
+pipe completion are checked separately from direct-child reaping. The corrected
+Menu 6/7 and smoke run must still recover all native method/phase/UI outcomes;
+process cleanup success cannot establish command acceptance.

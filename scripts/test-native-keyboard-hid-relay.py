@@ -761,6 +761,95 @@ class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(receipt['containerLookups'][0]['failure'], 'ValueError')
 
 
+class DiscoveryProcessGroupTests(unittest.IsolatedAsyncioTestCase):
+    async def exercise_tree(self, mode):
+        import os
+        import signal
+        import subprocess
+
+        create = asyncio.create_subprocess_exec
+        processes = []
+        observed = []
+        ready = asyncio.Event()
+        with tempfile.TemporaryDirectory() as directory:
+            pidfile = pathlib.Path(directory) / 'descendant'
+            descendant = "import os,pathlib,sys,time;pathlib.Path(sys.argv[1]).write_text(str(os.getpid()));time.sleep(60)"
+            code = (
+                "import subprocess,sys,time;"
+                "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],"
+                + ("stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL" if mode == 'success' else "")
+                + ");"
+                + ("print('/tmp/owned-runner',flush=True)" if mode in ('timeout-exited', 'success') else "time.sleep(60)")
+            )
+            sentinel = await create(sys.executable, '-c', 'import time;time.sleep(60)', start_new_session=True)
+            async def start(*args, **kwargs):
+                observed.append(dict(kwargs))
+                kwargs.setdefault('start_new_session', True)
+                process = await create(sys.executable, '-c', code, descendant, str(pidfile), **kwargs)
+                processes.append(process)
+                async def wait_ready():
+                    while not pidfile.exists() or mode in ('timeout-exited', 'success') and process.returncode is None:
+                        await asyncio.sleep(0.01)
+                await asyncio.wait_for(wait_ready(), 5)
+                ready.set()
+                return process
+            receipt = {}
+            try:
+                with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+                    clock.monotonic.return_value = 100.0
+                    task = asyncio.create_task(relay.container_for('owned-udid', request(), receipt, deadline=112 if mode in ('cancel', 'success') else 105.15))
+                    if mode == 'cancel':
+                        await asyncio.wait_for(ready.wait(), 5)
+                        task.cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await asyncio.wait_for(task, 6)
+                    elif mode == 'success':
+                        self.assertEqual(await asyncio.wait_for(task, 6), pathlib.Path('/tmp/owned-runner'))
+                    else:
+                        with self.assertRaises(TimeoutError):
+                            await asyncio.wait_for(task, 6)
+                entry = receipt['containerLookups'][0]
+                self.assertTrue(entry.get('reaped'), receipt)
+                self.assertIsNotNone(processes[0].returncode)
+                self.assertEqual(entry['processGroupID'], processes[0].pid)
+                await asyncio.wait_for(processes[0].communicate(), 1)
+                descendant_pid = int(pidfile.read_text())
+                async def terminated():
+                    while True:
+                        result = await asyncio.to_thread(subprocess.run, ['ps', '-o', 'stat=', '-p', str(descendant_pid)], capture_output=True, text=True)
+                        if result.returncode == 1 or result.returncode == 0 and result.stdout.strip().startswith('Z'):
+                            return
+                        if result.returncode:
+                            raise AssertionError(result.stderr)
+                        await asyncio.sleep(0.01)
+                await asyncio.wait_for(terminated(), 2)
+                self.assertTrue(observed[0].get('start_new_session'))
+                self.assertIsNone(sentinel.returncode)
+                os.kill(sentinel.pid, 0)
+                if mode != 'success':
+                    self.assertEqual(entry['failure'], 'CancelledError' if mode == 'cancel' else 'TimeoutError')
+                    self.assertNotIn('path', entry)
+            finally:
+                for process in processes + [sentinel]:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    await asyncio.wait_for(process.communicate(), 5)
+
+    async def test_timeout_cleans_live_parent_and_pipe_holding_descendant(self):
+        await self.exercise_tree('timeout-live')
+
+    async def test_timeout_cleans_pipe_holder_after_parent_already_exited(self):
+        await self.exercise_tree('timeout-exited')
+
+    async def test_cancellation_cleans_owned_tree_and_remains_cancellation(self):
+        await self.exercise_tree('cancel')
+
+    async def test_success_cleans_remaining_owned_descendant_and_preserves_unrelated_process(self):
+        await self.exercise_tree('success')
+
+
 class RunnerContainerTests(unittest.IsolatedAsyncioTestCase):
     def write_request(self, root, value):
         location = root / 'Documents/TSKHID' / value['owner'] / value['attempt']
