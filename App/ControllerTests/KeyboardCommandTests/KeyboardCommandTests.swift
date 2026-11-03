@@ -49,7 +49,8 @@ extension KeyboardCommandTests {
     func testOnlyFixedCaseSequencesAreAcceptedAndAbortPreventsFurtherRequests() throws {
         let cases: [(TaskKeyboardSession.Case, [String])] = [
             (.annotations, ["secondNoteCommandN", "secondNoteSave", "editSelectAll", "editedNoteSave"]),
-            (.workspace, ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView"])
+            (.workspace, ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView"]),
+            (.workspaceCompatibility, ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView", "captureAfterReturn", "saveAfterReturn"])
         ]
         for (name, phases) in cases {
             let session = try session(name)

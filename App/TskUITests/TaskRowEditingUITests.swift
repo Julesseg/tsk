@@ -303,7 +303,7 @@ import XCTest
     }
 
     func testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
-        let app = try launch(menuFocusTrace: true)
+        let app = try launch(isolated: true)
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         selectHighPriorityAndVerifyReselection(app)
@@ -359,7 +359,7 @@ import XCTest
     }
 
     func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
-        let app = try launch(menuFocusTrace: true)
+        let app = try launch(isolated: true)
         let title = expandTask(app)
         let originalTitle = try XCTUnwrap(title.value as? String)
         focusTaskText(title, app: app)
@@ -384,92 +384,6 @@ import XCTest
         XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Focused note survives menu")
         tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-    }
-
-    func testMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("task-description")
-    }
-
-    func testMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("row-note-input")
-    }
-
-    func testHostedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("task-description", hosted: true)
-    }
-
-    func testHostedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("row-note-input", hosted: true)
-    }
-
-    func testDefaultHostedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("task-description", mode: .defaultBehavior)
-    }
-
-    func testDefaultHostedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("row-note-input", mode: .defaultBehavior)
-    }
-
-    func testFirstClaimOmittedMinimalNativeProjectMenuDismissesTitleKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("task-description", mode: .firstClaimOmitted)
-    }
-
-    func testFirstClaimOmittedMinimalNativeProjectMenuDismissesNoteKeyboard() throws {
-        try verifyMinimalProjectMenuFromFocusedText("row-note-input", mode: .firstClaimOmitted)
-    }
-
-    private enum MinimalMenuHostMode: String {
-        case bare, hosted = "keyboard-host", defaultBehavior = "default-keyboard-host"
-        case firstClaimOmitted = "first-claim-omitted-keyboard-host"
-    }
-
-    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, hosted: Bool = false, file: StaticString = #filePath, line: UInt = #line) throws {
-        try verifyMinimalProjectMenuFromFocusedText(identifier, mode: hosted ? .hosted : .bare, file: file, line: line)
-    }
-
-    private func verifyMinimalProjectMenuFromFocusedText(_ identifier: String, mode: MinimalMenuHostMode, file: StaticString = #filePath, line: UInt = #line) throws {
-        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1", file: file, line: line)
-        let app = taskTestApplication(), token = UUID().uuidString
-        app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
-        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
-        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_CONTROL"] = token
-        app.launchEnvironment["TSK_TEST_NATIVE_MENU_FOCUS_MODE"] = mode.rawValue
-        app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = token
-        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
-        let modeEvidence = XCTAttachment(string: "mode=\(mode.rawValue) input=\(identifier) replica=\(token) session=\(app.launchEnvironment["TSK_UI_TEST_SESSION"] ?? "unavailable")")
-        modeEvidence.name = "Minimal menu fixture launch mode"; modeEvidence.lifetime = .keepAlways; add(modeEvidence)
-        app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["native-menu-focus-control"].firstMatch.waitForExistence(timeout: 5), file: file, line: line)
-        let input = app.textFields[identifier]
-        focusTaskText(input, app: app, file: file, line: line)
-        input.typeText(" draft retained")
-        let draft = try XCTUnwrap(input.value as? String, file: file, line: line)
-        XCTAssertEqual(draft.components(separatedBy: " draft retained").count, 2, file: file, line: line)
-        let openerDeadline = ProcessInfo.processInfo.systemUptime + 20
-        tapTaskControlAtCenter(app.buttons["row-project"], app: app, deadline: openerDeadline, requiresVisibleKeyboard: true, file: file, line: line)
-        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
-        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app, file: file, line: line)
-        let field = app.textFields["row-project-input"]
-        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(field.waitForExistence(timeout: 5), file: file, line: line)
-        XCTAssertEqual(field.value as? String, "Release", file: file, line: line)
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline, file: file, line: line)
-        app.buttons["close-row-parameter"].tap()
-        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5), file: file, line: line)
-        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release", file: file, line: line)
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline, file: file, line: line)
-        XCTAssertEqual(input.value as? String, draft, file: file, line: line)
-        focusTaskText(input, app: app, file: file, line: line)
-        input.typeText(" editable again")
-        let returned = try XCTUnwrap(input.value as? String, file: file, line: line)
-        XCTAssertEqual(returned.components(separatedBy: " editable again").count, 2, file: file, line: line)
-        XCTAssertEqual(returned.replacingOccurrences(of: " editable again", with: ""), draft, file: file, line: line)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app, requiresVisibleKeyboard: true, file: file, line: line)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
     }
 
     private func verifyProjectMenuFromFocusedText(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
@@ -731,15 +645,14 @@ import XCTest
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false, menuFocusTrace: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false, isolated: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        if menuFocusTrace {
+        if isolated {
             XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
             app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
-            app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = app.launchEnvironment["TSK_TEST_REPLICA_NAME"]
         }
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"

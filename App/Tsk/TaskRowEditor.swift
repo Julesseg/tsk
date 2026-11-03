@@ -114,19 +114,8 @@ private struct TaskRowEditorContent: View {
                             TaskRowParameterPill(editing: editing, parameter: parameter,
                                                  projects: store.availableProjects,
                                                  tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
-                                #if DEBUG && targetEnvironment(simulator)
-                                let beforeTitle = titleFocused
-                                let beforeNote = focusedNote?.rawValue ?? "nil"
-                                #endif
                                 titleFocused = false
                                 focusedNote = nil
-                                #if DEBUG && targetEnvironment(simulator)
-                                TaskMenuFocusDiagnostics.record("focus.request", details: [
-                                    "parameter": parameter.rawValue, "titleBefore": String(beforeTitle), "noteBefore": beforeNote,
-                                    "titleRequested": "false", "noteRequested": "nil", "titleReadback": String(titleFocused),
-                                    "noteReadback": focusedNote?.rawValue ?? "nil", "readbackAdvisory": "true"
-                                ])
-                                #endif
                             }
                         }
                         Button { open(.dependency) } label: {

@@ -50,6 +50,15 @@ def boundary(case, outcome='started.'):
 
 
 class MarkerTests(unittest.TestCase):
+    def test_each_case_bounds_sequences_to_its_registered_phase_count(self):
+        for case, phases in relay.CHORDS.items():
+            phase = next(reversed(phases))
+            value = request(case, phase, len(phases) - 1)
+            self.assertEqual(relay.parse_marker(marker(value), TOKEN), value)
+            for sequence in [-1, len(phases), True]:
+                with self.subTest(case=case, sequence=sequence), self.assertRaises(ValueError):
+                    relay.parse_marker(marker(dict(value, sequence=sequence)), TOKEN)
+
     def test_accepts_nonce_bound_native_focus_and_baseline(self):
         value = request()
         self.assertEqual(relay.parse_marker(marker(value), TOKEN), value)
@@ -136,6 +145,19 @@ class ArmedLogTests(unittest.TestCase):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_compatibility_requires_all_nine_owned_acknowledged_phases_in_order(self):
+        protocol = relay.Protocol(TOKEN)
+        protocol.line(boundary(relay.COMPATIBILITY))
+        attempt = str(uuid.uuid4())
+        for sequence, phase in enumerate(relay.CHORDS[relay.COMPATIBILITY]):
+            value = dict(request(relay.COMPATIBILITY, phase, sequence), attempt=attempt)
+            self.assertEqual(protocol.line(marker(value).rstrip(b'\n')), value)
+            with self.assertRaises(ValueError):
+                protocol.line(boundary(relay.COMPATIBILITY, 'passed (1.0 seconds).'))
+            protocol.acknowledged(value)
+        protocol.line(boundary(relay.COMPATIBILITY, 'passed (1.0 seconds).'))
+        protocol.finish()
+
     def test_recorded_non_keyboard_timeout_restart_preserves_failure_and_remaining_cases(self):
         protocol = relay.Protocol(TOKEN)
         interrupted = 'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences'
@@ -944,6 +966,11 @@ class FileAndMappingTests(unittest.TestCase):
             relay.CASE: {'commandReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
             relay.ANNOTATIONS: {'secondNoteCommandN': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'secondNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'editSelectAll': ((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')), 'editedNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
             relay.WORKSPACE: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
+        expected[relay.COMPATIBILITY] = {
+            **expected[relay.WORKSPACE],
+            'captureAfterReturn': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),
+            'saveAfterReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),
+        }
         self.assertEqual(relay.CHORDS,expected)
         self.assertEqual(relay.releases(expected[relay.WORKSPACE]['complete']),((40,'UP'),(225,'UP'),(227,'UP')))
 

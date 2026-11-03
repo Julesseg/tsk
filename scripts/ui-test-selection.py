@@ -15,7 +15,7 @@ PAD_SMOKE = (
     "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
 )
 PAD_FULL = (
-    "WorkspaceSettingsUITests",
+    "WorkspaceSettingsUITests", "TaskKeyboardCompatibilityUITests",
     "ShareCaptureUITests", "SynchronizationUITests", "iPadWorkspaceUITests",
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
     "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
@@ -31,6 +31,7 @@ DIAGNOSTIC = (
     "SpotlightUITests", "WidgetUITests",
 )
 KEYBOARD = (
+    "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
     "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
     "WorkspaceSettingsUITests/testPlacementAndEverySettingsDestination",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
@@ -55,14 +56,9 @@ TEXT = (
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
-    "TaskRowEditingUITests/testMinimalNativeProjectMenuDismissesTitleKeyboard",
-    "TaskRowEditingUITests/testMinimalNativeProjectMenuDismissesNoteKeyboard",
-    "TaskRowEditingUITests/testHostedMinimalNativeProjectMenuDismissesTitleKeyboard",
-    "TaskRowEditingUITests/testHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
-    "TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesTitleKeyboard",
-    "TaskRowEditingUITests/testDefaultHostedMinimalNativeProjectMenuDismissesNoteKeyboard",
-    "TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesTitleKeyboard",
-    "TaskRowEditingUITests/testFirstClaimOmittedMinimalNativeProjectMenuDismissesNoteKeyboard",
+    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
+    "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
 )
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
@@ -109,7 +105,7 @@ def selected_methods(filters):
 
 def selection(suite, family, partition="all"):
     if suite == "menu":
-        tests = MENU
+        tests = MENU + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
     elif suite == "regression":
         tests = REGRESSION + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
     elif suite == "text":

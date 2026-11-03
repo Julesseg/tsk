@@ -1694,3 +1694,62 @@ Standards and Spec source reviews report zero findings. Generic arm64 test
 build, strict App/Share/Widget/Shortcuts artifact admission and all24 routing
 checks pass without a local simulator boot. These are build/source results,
 not a runtime omission outcome, command-compatibility result or acceptance.
+
+
+### First-claim outcome and inherited-eligibility product candidate
+
+At be2cc91, menu41582457487 and smoke41582447508 finished red with all10
+selected menu methods attempted on both families. Bare/default title and Notes
+passed; normal custom and first-claim-omitted cases failed the original
+keyboard-before-option check. Each omitted-call packet proves eligible ordinal1
+was omitted before actual focus and contains valid source/request coverage,
+with6events/zero drops. Those packets end at the request, before the verdict.
+They do not fence the late interval against a subsequent eligible claim, so the
+initial-request causal comparison is INCONCLUSIVE; functional failure does not
+establish that the initial request was unnecessary. Phone product direct failed
+its keyboard-present precondition, while pad direct reached the covered
+keyboard-absence failure. Stress completed3phone/1pad cycles before later field
+absence; these are separate from focus and launch outcomes. Smoke finished
+phone2pass/2fail and pad2pass; no unchanged retry or full ran.
+
+The next bounded PRODUCT candidate restores inherited UIHostingController
+responder eligibility by deleting only TaskKeyboardController's unconditional
+canBecomeFirstResponder=true override. The original guarded viewDidAppear
+request and legacy diagnostic ordering remain, as do router/command lifetime,
+registration/rebuild, scoped actions, presses forwarding, root updates and the
+native menu activation/SwiftUI-owned focus closure. The basis is the repeated
+matched default/custom behavior-group contrast, not the unadmitted first-claim
+negative. No inherited getter value, private keyboard mechanism or root cause
+is asserted. The completed temporary root/modes/eight minimal methods and all
+PR77 focus receipts are retired as diagnostic cleanup, separately from that
+one functional policy change. Existing keyboard/HID harness diagnostics remain.
+
+Command compatibility is a co-equal rejection gate. The focused menu manifest
+retains both original product journeys, adds the existing standalone native
+transport baseline and actual annotation modal/editor command case on both
+families, plus a new cross-family real workspace/editor HID method. The iPad
+broader workspace method is also retained on iPad without changing its skip
+guard. The new method uses nine fixed owned phases, actual native input and UI
+results, plain typing, selected-row edit/save/complete/view, Settings return,
+recapture/save and persistence. No fallback app action qualifies. Existing nonce,
+PID, expiry, phase order, byte and UP-cleanup checks remain; sequence bounds are
+per registered case, preserving the old limits while admitting nine new phases.
+
+Menu selection is5phone/6pad, keyboard12/10, permanent full77/68 across the same
+four workers (42+35/34+34). No full is authorized while known red. Covered focus
+or actual command regression rejects the candidate and restores the override;
+launch/transport/unreached coverage remains unverified, not causal evidence.
+Native option loss remains a separate blocker even if focus and HID pass. No
+responder fallback, delay, command suppression or unrelated Share/reorder fix
+is stacked. Clean exact-head smoke/full both families and design acceptance
+remain required after supported repairs; no empty-fixture pass certifies these.
+
+Source validation for this candidate: Standards0hard breaches/one deliberately
+retained nonblocking adapter-metadata cleanup item, Spec0remaining findings and
+design0blockers. Review caught and corrected a new-test readiness race: the
+row-save acknowledgement now also requires the real row overlay to be enabled,
+which fences editing lifetime beyond collapsed-field AX absence, within the
+same10s budget. Selection24, execution-plan10, relay49, owner29, boundary3,
+Swift command6 and registration5 checks pass. The final generic arm64 build
+and strict App/Share/Widget/Shortcuts artifact check pass; no local simulator
+was booted. Canonical product focus/command results are still pending.
