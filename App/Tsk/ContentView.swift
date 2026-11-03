@@ -47,9 +47,6 @@ struct ContentView: View {
     @State private var projectPath = NavigationPath()
 
     init(store: TaskStore) {
-        #if DEBUG && targetEnvironment(simulator)
-        TaskNativeTouchDiagnostics.register(store: store)
-        #endif
         _store = State(initialValue: store)
         _spotlight = State(initialValue: SpotlightController(store: store))
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
@@ -63,10 +60,6 @@ struct ContentView: View {
         GlassEffectContainer(spacing: 8) {
             calendarWorkspace
                 .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
-                    #if DEBUG && targetEnvironment(simulator)
-                    let request = TaskNativeTouchDiagnostics.outsideTap(tap.location, editing: store.rowEditing)
-                    defer { TaskNativeTouchDiagnostics.outsideFinished(request) }
-                    #endif
                     guard let editing = store.rowEditing, editing.isExpanded,
                           !editing.bounds.contains(tap.location) else { return }
                     closeRow()
@@ -82,16 +75,8 @@ struct ContentView: View {
 
     private func closeRow(after: (() -> Void)? = nil) {
         guard let editing = store.rowEditing else { return }
-        #if DEBUG && targetEnvironment(simulator)
-        let request = TaskNativeTouchDiagnostics.closeRequested(editing)
-        #else
-        let request: Int? = nil
-        #endif
         Task {
-            #if DEBUG && targetEnvironment(simulator)
-            TaskNativeTouchDiagnostics.closeTaskStarted(request, editing: editing)
-            #endif
-            if await editing.saveAndCollapse(in: store, reduceMotion: reduceMotion, diagnosticRequest: request) { after?() }
+            if await editing.saveAndCollapse(in: store, reduceMotion: reduceMotion) { after?() }
         }
     }
 

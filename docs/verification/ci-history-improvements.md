@@ -1047,3 +1047,43 @@ an off-main Objective-C actor-thunk forwarding hazard and bounded the Mach-O
 load-command parser. Both source-review axes are clear. This is build/source
 evidence only; canonical execution must establish interception coverage and
 measure any new timing disturbance before interpreting the trace.
+
+### Alpha attribution inconclusive; focus prerequisite remains red
+
+At `04ce1540e906c96d63d88c7714687ae8aea0f713`, focused41545609830
+completed nineteen real New-project/Release/Done cycles on each family after
+High selection/reselection. Both then failed the original focused-cycle20
+keyboard-nonexistence prerequisite at line316, before option20. Phone elapsed
+326.584s; iPad454.834s. There is no twentieth-option result and no reproduced
+native option drop in this control. Nineteen successes do not establish repair
+of the earlier intermittent action loss.
+
+Phone PID6100/session529DDAE1 exported310 records and38 active-owner parameter
+writes. iPad PID12925/session2D09A0E5 exported313 records and38 writes. Both
+installed setter-v1, report zero record/origin/mutation drops and no evictions,
+and contain nineteen pre-ended Project samples at collection model alpha1.
+However neither contains any intercepted alpha mutation or symbol stack, even
+a successful fade control. Installation therefore does not establish setter
+coverage. Exports stop at phone title-began and iPad title-ended, before opener20;
+zero evictions does not make those late exports complete. Do not infer missing
+HID delivery, no close/save activity at opener20, or a negative alpha-writer
+result. The probe did not select a production repair. Remove its setter hook,
+image/stack machinery and close/save breadcrumbs; do not repeat it unchanged.
+
+Smoke41545598882 passed all four phone methods. Its iPad durable method failed
+High selected-state acknowledgement at line521 after132.023s, before Project
+coverage. The independent adaptive method failed its original Project-field
+keyboard requirement at line81 after44.616s. Its frame shows the field caret
+and Hide-keyboard control but no software keyboard; native didBeginEditing is
+recorded. This is separate from a native option drop and does not establish
+why the keyboard was absent. Neither smoke method opts into the native trace.
+
+Every job in exactly two terminal head workflows is audited. Producer/consumer
+identities match tree`8fb69733b6c63377f8b801dbdb3407e575a145e3`,
+Xcode27.0/27A266a, SDK24A430 and arm64 runtime24A434; smoke merge source
+`fb52b349d5fa8c80d0c4550cb5ed1fe6a722315a` has the same tree. Both managed
+terminals were captured and killed. No test retry, regression or full dispatch
+exists. The repeated focused-opener keyboard failure is now the next distinct
+repair target, with all assertions retained and intermittent action loss still
+unresolved. No alpha/command/rebuild suppression or broad ancestor removal is
+supported by this control.
