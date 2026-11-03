@@ -358,6 +358,52 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
+    func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
+        let app = try launch(menuFocusTrace: true)
+        let title = expandTask(app)
+        let originalTitle = try XCTUnwrap(title.value as? String)
+        focusTaskText(title, app: app)
+        verifyProjectMenuFromFocusedText(app)
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: "task-row-supporting-scroll", app: app))
+        focusTaskText(note, app: app)
+        note.typeText("Focused note survives menu")
+        verifyProjectMenuFromFocusedText(app)
+        XCTAssertEqual(note.value as? String, "Focused note survives menu")
+        focusTaskText(title, app: app)
+        title.typeText(" title retained")
+        let editedTitle = try XCTUnwrap(title.value as? String)
+        XCTAssertEqual(editedTitle.components(separatedBy: " title retained").count, 2)
+        XCTAssertEqual(editedTitle.replacingOccurrences(of: " title retained", with: ""), originalTitle)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        focusTaskText(note, app: app)
+        note.typeText(" and editable")
+        let editedNote = try XCTUnwrap(note.value as? String)
+        XCTAssertEqual(editedNote.components(separatedBy: " and editable").count, 2)
+        XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Focused note survives menu")
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
+    private func verifyProjectMenuFromFocusedText(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        openTaskRowParameter("project", app: app)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app, file: file, line: line)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(field.value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline, file: file, line: line)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline, file: file, line: line)
+    }
+
     func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
         let app = try launch(organized: true)
         let title = expandTask(app)

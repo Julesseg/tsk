@@ -9,12 +9,12 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 75 methods | 66 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 76 methods | 67 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 11 methods | 9 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
-| Menu | 1 method | 1 method | Explicit dispatch |
+| Menu | 2 methods | 2 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -39,8 +39,11 @@ The final cycle opens the menu from a focused title and requires native keyboard
 dismissal, covering the native menu activation focus handoff.
 After the twenty cycles, it also opens Project from a focused note, checks the
 same keyboard prerequisite and native action, retains the draft text, and returns
-to title/note editing. Menu coverage selects this regression alone on both
-families, without HID, server, peer or installed-extension setup. Its diagnostic rollups have distinct
+to title/note editing. An independent title/Notes focus regression reaches the same native opener and
+keyboard-before-option assertion immediately on a fresh fixture, then verifies
+actual field/Done behavior and returned text editing. It does not replace the
+repeated case. Menu coverage selects both methods on each family without HID,
+server, peer or installed-extension setup. Its diagnostic rollups have distinct
 names and cannot satisfy the required smoke/full checks.
 
 ## Build once, execute selected coverage
@@ -64,8 +67,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 41 methods | 34 methods |
-| iPad | 33 methods | 33 methods |
+| iPhone | 41 methods | 35 methods |
+| iPad | 33 methods | 34 methods |
 
 The partition union is exactly the previous full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

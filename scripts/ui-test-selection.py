@@ -52,7 +52,10 @@ TEXT = (
     "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
     "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
 )
-MENU = ("TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",)
+MENU = (
+    "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
+    "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
+)
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",

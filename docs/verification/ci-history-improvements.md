@@ -1144,3 +1144,62 @@ invalid callback associations are recorded before being rejected. The two
 review axes found no other actionable defect. This remains source/build
 evidence, with attachment, actual emission, keyboard effect, notes and native
 selection/timing/appearance awaiting canonical execution.
+
+### Activation attachment works; direct focused coverage was not reached
+
+At `2337aba18e819b8b59f20d4b69de2e0b07c9657c`, focused41552148053
+failed on phone after84.975s: High/reselection passed, two complete Project
+cycles passed, then cycle3 failed its field appearance assertion at line322.
+PID11321/sessionC4CA8B7C exported eleven focus receipts with zero drops. After
+an initial sizing instance detached, the live anchor attached to the enclosing
+SwiftUI.HostingUIButton. Three corresponding Project openings each emitted
+one valid event on the same source/coordinator/generation/window, with title
+false and note nil before/after. This verifies unfocused source attachment and
+emission, not dismissal of active text focus. There is no current global touch
+or alpha trace to identify the third lost option as the historical retarget.
+
+The iPad worker timed out launching the app via Xcode after200.468s, with no
+focus receipts or native journey. That provides no attachment/emission/focus
+verdict. Smoke41552134153 passed all four phone methods; iPad durable failed
+the High-row existence assertion after reopening at line547. Final hierarchy
+retains Priority=Not set and no menu, with zero Project coverage. Its separate
+adaptive journey passed. Missing High on reopen is distinct from the earlier
+selected-state assertion failure; it must not be reported as a Project result.
+
+Both head workflows and every job are terminal and audited. Exact tree is
+`0e1837437983bb7087124ae8a15b3e591afb1806`, canonical Xcode27A266a,
+SDK24A430/runtime24A434; smoke merge source`c1dd724a75c2d7066bb5afe29bb99de922c0425c`
+has the same tree. Both managed terminals are captured/killed. No retry/full
+was dispatched. The focused workers also spent time queued with runner_id0
+after their producer completed; unassigned waiting is not UI execution.
+
+Keep the activation-based focus candidate strictly unverified. The existing
+intermittent action failure blocked its focused trigger; it does not by itself
+establish that the focus bridge caused that older defect. The next changed
+variable is test reachability: add one independent title/Notes focus regression
+with a fresh fixture and immediate native title focus, followed by the original
+Project opener, five-second keyboard absence before option, real New-project/
+Release/Done checks, Notes focus/draft retention and actual returned text entry.
+No High warm-up or repeated opens precede the first focused trigger in this new
+case. The original High/reselect, twenty cycles/focus20 and appended Notes method
+remain byte-identical and selected. Production bridge behavior/receipts stay
+unchanged; this is new direct bug coverage, not an unchanged stress-test retry.
+
+Menu now selects two independent methods per family; full discovers the added
+case too, yielding76/67 methods and partitions41+35/33+34. No original selection
+is removed, no native fixture ownership changes, and worker count stays four.
+Assert both identifiers actually execute rather than assuming continuation after
+an unrelated method failure. A focused callback/keyboard success can support
+that focus substep even if a later option action fails; unreached Notes remain
+unverified. Absent/stale/invalid delivery or keyboard persistence on a covered
+focused opener rejects the mechanism. Launch/precondition/export failures remain
+missing coverage. No fallback, new hook, app patch, budget change or full dispatch
+is combined with this test addition. Native option loss still blocks acceptance.
+
+The generic arm64 test build and strict artifact verifier pass on Xcode27.1
+beta, with no local simulator boot. All24 selection checks pass, including
+unchanged full-union/fixture ownership and the two exact menu identifiers.
+Standards review caught an assertion that could accept duplicate returned text
+input; it now requires exactly one inserted marker and exact prior text after
+removing it, without assuming caret position. Spec review is clear. These are
+build/source/selection results, not runtime focus evidence.
