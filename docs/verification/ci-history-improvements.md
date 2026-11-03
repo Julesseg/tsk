@@ -2181,3 +2181,34 @@ No additional publisher, gesture, cache, identity or input change was added to
 obtain this continuation; the prior missing-value assertion was corrected without
 skipping or weakening it. One changed-head canonical batch is next; no full or
 unchanged retry is authorized by a local pass.
+
+
+### Complete-status publication: canonical result and diagnostic retirement
+
+At `440b1a275dc7f6fa3eb99f02e23b802bb70beb12`,
+[Action 41629098914](https://github.com/Julesseg/tsk/actions/runs/41629098914)
+actually ran all four methods on both families, with no skips or failures.
+The original product High/reselect + 20-cycle/focus20/Notes case, independent
+Title/Notes case, isolated real-component comparison and retained-open long-menu
+case all passed. Phone retention kept anchors 026/027 for 10.07088 seconds; iPad
+kept 028/029 for 10.04059 seconds, followed by actual selection/reselection.
+Matching before/after screenshot payloads corroborate endpoints, not uninterrupted
+view identity or exclusive publication causality.
+
+[Smoke 41629079528](https://github.com/Julesseg/tsk/actions/runs/41629079528)
+passed all four phone and two iPad methods. All sixteen jobs were successful on
+attempt one. Action products came from the head SHA; smoke products came from
+PR merge `be696b97270f5b66c13d63ede985d48d780e0ffb`, whose parents include the head.
+Both have tree `e9f9a250d844e3776d08e905d536134c84f342ef`, canonical Xcode
+27A266a, SDK 24A430, runtime 24A434 and arm64. Worker admission verifies signed
+products and execution identity. Both managed terminals were captured and killed;
+no retry or full coverage was dispatched.
+
+The completed isolated control root/gate, its independent test and temporary
+Action selection/dispatch/rollup surface are now removed. The three permanent
+product methods are unchanged, and retained-open coverage joins Menu 6/7 alongside
+actual native keyboard ownership requirements. Full remains 78/69 across the
+same four workers (42+36/34+35). Clean-head Menu/HID plus smoke, then the separate
+Regression 6/7 selection, must be audited before full coverage. The iPad nine-phase
+command gap, broader regression outcomes and physical Today/iPhone 15 Pro context
+are not supplied by the completed Action run.

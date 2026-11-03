@@ -9,13 +9,12 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 79 methods | 70 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 78 methods | 69 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 12 methods | 10 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
-| Menu | 5 methods | 6 methods | Explicit dispatch |
-| Action | 4 methods | 4 methods | Temporary diagnostic dispatch |
+| Menu | 6 methods | 7 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -58,57 +57,29 @@ Diagnostic menu rollups remain distinct from required smoke/full checks. The
 completed minimal-root/host/first-claim controls and temporary receipt sink have
 been removed; their historical outcomes are recorded separately.
 
-Action coverage is a temporary, independent native-action comparison. It selects
-the unchanged product stress and direct-title/Notes methods plus one new owned
-fixture stress method on each family. The fixture reuses the actual production
-Project/Priority pill and picker, one stable draft, native focus handoff,
-scroll/glass source slice and current TaskKeyboardHost. It omits workspace,
-storage, List, navigation, dimming/outside-close and real command scopes together
-as a composite factor. It retains High selected/reselect, twenty actual field/
-Done cycles, focus20, Notes and returned typing, with the same native input and
-budgets. Fixture locale and animation policy match the product references.
-Owned session/replica admission and a unique root marker establish the intended
-root. No new app event/alpha/focus observer is installed.
-
-Action workers use the same canonical products and disposable simulator harness
-but require no HID, server or peer, preventing an HID abort from erasing the
-native-action comparison. This does not shrink the permanent Menu5/6/HID
-manifest or satisfy its command compatibility requirements. Action diagnostic
-rollups cannot satisfy required smoke/full checks. One fixture pass is not
-reliability or a specific-ancestor diagnosis. The one extra method per family
-accounts for temporary full79/70; remove the fixture, method and Action dispatch/
-rollup surface before clean acceptance. No full is dispatched while known red.
-
-The completed List scroll-request observer is removed. Its zero requests lacked
-an actual-call positive witness; that weak/inconclusive negative selects no
-scrolling repair. Historical packet/fence limits are recorded in the audit.
-
-Action now adds one independent real-product retained-open Project-menu case.
-It seeds80actual project values through the existing persistent fixture, opens
+Menu coverage also retains an independent real-product retained-open Project-menu case.
+It seeds 80 actual project values through the existing persistent fixture, opens
 once, drags only within the freshly admitted native collection, and establishes
 a distant fully visible settled neighborhood. Two matching fresh samples over at
-least300ms distinguish settling from later movement. Ten seconds follow with no
+least 300 ms distinguish settling from later movement. Ten seconds follow with no
 input or accessibility reads while normal product polling stays active. A fresh
 endpoint must retain two consecutive interior anchor rows and their viewport
-within2points, plus the draft selection. Edge-clipped/virtualized rows are not
+within 2 points, plus the draft selection. Edge-clipped/virtualized rows are not
 compared as an exact visible set. Missing anchors require fresh neighborhood/video
 corroboration to classify a reset; an AX-only gap remains incomplete. Selection/reselection then uses newly admitted geometry and the
-original20s admission/5s acknowledgement bars; a reopened menu may legitimately
+original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. New real-product coverage makes permanent full78/69 plus
-the one temporary isolated fixture case =79/70 across the same four workers.
-Menu5/6/HID remains unchanged. One Action4/4 batch plus smoke is diagnostic only;
-the complete-status publication candidate skips only unchanged successful status
-assignments. Complete equality includes optional configuration, device and ordered
-mappings plus active/ownership/paused flags. Every1s poll, manager read, error path
-and fixture bookkeeping remain. No menu/gesture/cache/identity change is included.
-The corrected local retention/selection/reselection case passed; that local beta
-build is separate from canonical and physical verification. A green10s
-sample is bounded nonreproduction, not reliability or a cause finding. Native
-admission/launch/settling gaps remain incomplete, and later option failure is
-separate from retention. Remove the isolated fixture/Action dispatch surface
-before clean smoke/full/design acceptance; keep the product retention regression.
+in existing methods. Permanent full coverage is 78/69 across the same four workers:
+iPhone 42+36 and iPad 34+35. The completed isolated real-component fixture and
+Action dispatch/rollup surface are removed; the production stress, independent
+focus and retention regressions remain. Menu 6/7 includes the actual HID ownership
+requirements on both families. The complete-status publication correction skips
+only unchanged successful status assignments; every poll, manager read, error
+path and fixture bookkeeping remains. Both canonical action comparisons and smoke
+passed at 440b1a2, including 20 cycles, Title/Notes and retained-open selection on
+both families. That focused result does not replace clean-head HID, broader
+regressions, full coverage or physical-device verification.
 
 ## Build once, execute selected coverage
 
@@ -131,8 +102,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 42 methods | 37 methods |
-| iPad | 34 methods | 36 methods |
+| iPhone | 42 methods | 36 methods |
+| iPad | 34 methods | 35 methods |
 
 The partition union is exactly the full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

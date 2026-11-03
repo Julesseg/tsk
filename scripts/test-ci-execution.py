@@ -48,16 +48,6 @@ class ExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Branch moved'):
             plan.validate_source('frozen', 'different')
 
-    def test_action_comparison_keeps_two_canonical_workers_without_hid_fixtures(self):
-        action = plan.plan('action')
-        self.assertEqual(action['families'], ['iPhone', 'iPad'])
-        self.assertEqual(action['partitions'], ['all'])
-        self.assertEqual(len(action['matrix']['include']), 2)
-        for worker in action['matrix']['include']:
-            self.assertFalse(worker['native_keyboard'])
-            self.assertFalse(worker['server'])
-            self.assertFalse(worker['peer'])
-
     def test_products_reject_source_toolchain_and_runtime_mismatches(self):
         identity = dict(source='sha', tree='tree', sdk='27.0', runtimes=['27.0-build'])
         products.verify_identity(identity, dict(identity))
