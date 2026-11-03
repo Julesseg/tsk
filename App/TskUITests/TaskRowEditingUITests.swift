@@ -348,7 +348,7 @@ import XCTest
         }, "Two consecutive scrolled projects must settle away from the viewport edges and initial neighborhood")
         let selectionTarget = anchors[0]
         XCTAssertLessThan(before.rows[anchors[0]]!.frame.midY, before.rows[anchors[1]]!.frame.midY)
-        XCTAssertEqual(before.selection, "Release")
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
         capture("Project menu settled after native scrolling", app)
         let started = ProcessInfo.processInfo.systemUptime
         XCTContext.runActivity(named: "Project menu untouched retention interval: 10 seconds") { _ in
@@ -377,7 +377,7 @@ import XCTest
         XCTAssertEqual(endpoint.viewport.size.height, before.viewport.size.height, accuracy: 2)
         XCTAssertEqual(endpoint.viewport.minX, before.viewport.minX, accuracy: 2)
         XCTAssertEqual(endpoint.viewport.size.width, before.viewport.size.width, accuracy: 2)
-        XCTAssertEqual(endpoint.selection, "Release")
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
         for cycle in 1...2 {
             if cycle == 2 {
                 openTaskRowParameter("project", app: app)
@@ -827,7 +827,6 @@ import XCTest
         let viewport: CGRect
         let rows: [String: TaskNativeMenuOptionGeometry]
         let selectedLabels: Set<String>
-        let selection: String?
     }
 
     private func projectMenuPosition(_ app: XCUIApplication, options: [String], diagnostic: ((String) -> Void)? = nil) throws -> ProjectMenuPosition? {
@@ -861,8 +860,7 @@ import XCTest
                     if rows.count >= 3, let row = rows.values.first {
                         let viewport = row.ancestorFrames.dropLast().reduce(row.ancestorFrames[0]) { $0.intersection($1) }
                         matches.append(ProjectMenuPosition(applicationFrame: row.ancestorFrames[0], viewport: viewport,
-                                                           rows: rows, selectedLabels: selectedLabels,
-                                                           selection: taskSnapshot("row-project", type: .button, in: application)?.value as? String))
+                                                           rows: rows, selectedLabels: selectedLabels))
                     }
                 }
             }
