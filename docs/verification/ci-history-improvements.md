@@ -1275,3 +1275,71 @@ temporary receipts before eventual clean exact-head smoke/full acceptance.
 Generic arm64 build and both source-review axes pass; strict artifact admission
 is checked before publication. No local simulator was booted. The production
 focus effect and existing native option loss remain runtime-unverified.
+
+
+### SwiftUI-owned action also fails; observe the actual focus owners once
+
+At65a57dffd5cf0bcab575fc66d75cd3653c64a0f1, focused41564899779
+actually executed both methods on both families. Phone stress failed its first
+New-project field acknowledgement after72.056s. iPad completed eight cycles,
+then the ninth field acknowledgement failed after195.429s. Both independent
+direct cases reached title focus and keyboard presence, delivered the correct
+native source event and invoked the SwiftUI-owned request, but failed keyboard
+absence within the original five seconds BEFORE option input (phone37.132s,
+iPad45.608s). Notes and returned editing were not reached.
+
+Direct phone PID9561/sessionF4984635 and iPad PID51824/sessionD8D27ECC each
+exported seven records with zero drops. Delivery6 has the correct live source,
+window and generation; request7 asks false/nil with titleBefore=true. Immediate
+readback remains advisory. The actual keyboard deadline rejects C on both
+families. Restoring closure formation did not repair this contract; do not
+retain C as an acceptance candidate or claim that a setter was ignored.
+
+Smoke41564890924 passed all four phone and two iPad methods. Exactly two
+head workflows and all producer/consumer jobs are terminal and audited against
+the intended source/tree and canonical Xcode27A266a/SDK24A430/runtime24A434.
+Both managed terminals were captured and killed. No retry or full ran. Smoke
+does not cover or override the focused failures.
+
+The next head holds failed C ONLY for one diagnostic observation of the same
+known-red boundary. Passive onChange(initial:true) and appear/disappear receipts
+are added at the actual TaskListRow title FocusState owner and TaskRowEditor
+Notes FocusState owner. The existing rowGeometry reference supplies a labelled
+application-owner proxy, not a FocusStore identity. Notes has a DEBUG State UUID
+used only as a lifetime correlation token, never mutated or applied as an id.
+Requests gain row/editing identity. Existing keyboard editing-notification text
+gains native view/window identities and countN/32; its original window guards,
+cap, forced query and synchronous legacy sink remain unchanged. Only the new
+owner receipts use the existing bounded asynchronous focus sink.
+
+Require a real observed title false-to-true transition after native Begin as
+the positive control, matching row/owner/editing/session/PID and opener event,
+zero drops and usable late export. Initial equal observations are not resets;
+lifecycle reads are advisory. Never combine replaced owner tokens into one
+reset. The notification cap and window guards limit meaningful missing End
+claims, especially after repeated stress fields; the fresh direct-case PID is
+the cleanest correlation. A last file/event timestamp alone does not establish
+continuous coverage through five seconds. Notes remains untested if title fails.
+
+Same-owner observed false then true selects restoration/reacquisition for
+investigation, not its cause. Observed false while the keyboard remains selects
+model/native association investigation, conditional on whether another native
+input acquired focus. With positive owner-focus coverage but no later false,
+say only that no persistent owner change was observed; coalescing prevents a
+claim that the request was ignored or never accepted. Replacement, cap/drop/
+export gaps or only green outcomes are inconclusive. Reading focus in onChange
+can alter SwiftUI dependency participation, so a green diagnostic cannot
+rehabilitate C or become an empty-observer production fix.
+
+No focus setter, reaction, delay, input, target or global hook is added. Both
+test bodies, selections and native five-second keyboard-before-option bar stay
+unchanged. One changed-head observation per family only; no equivalent retry or
+full on known red. Retire these owner diagnostics after the experiment, select
+any production treatment from actual discriminating evidence, and remove all
+temporary receipts before clean exact-head smoke/full/design acceptance.
+
+The generic arm64 test build and strict artifact verifier pass without booting
+any local simulator. These are build checks, not runtime owner-state evidence.
+Both Standards and Spec source reviews report zero findings for the owner
+observation delta. They explicitly preserve the coalescing, lifetime and graph
+perturbation limits; no production repair claim is supported by this change.

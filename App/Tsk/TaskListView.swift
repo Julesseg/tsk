@@ -241,6 +241,13 @@ struct TaskListRow: View {
             }
         }
         .onChange(of: editing?.isSaving) { _, saving in if saving == true { titleFocused = false } }
+        #if DEBUG && targetEnvironment(simulator)
+        .onChange(of: titleFocused, initial: true) { previous, current in
+            recordTitleFocusOwner("change", previous: previous, current: current)
+        }
+        .onAppear { recordTitleFocusOwner("appear", current: titleFocused) }
+        .onDisappear { recordTitleFocusOwner("disappear", current: titleFocused) }
+        #endif
         .background(alignment: .top) {
             if editing != nil {
                 RoundedRectangle(cornerRadius: 18).fill(.background)
@@ -299,6 +306,19 @@ struct TaskListRow: View {
     private func expand() {
         store.expandRow(task, rowID: identity)
     }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func recordTitleFocusOwner(_ stage: String, previous: Bool? = nil, current: Bool) {
+        TaskMenuFocusDiagnostics.record("owner.title." + stage, details: [
+            "rowID": identity, "taskID": task.id.uuidString,
+            "ownerToken": String(describing: ObjectIdentifier(rowGeometry)), "ownerTokenKind": "rowGeometry-proxy",
+            "editingOwner": editing.map { String(describing: ObjectIdentifier($0)) } ?? "nil",
+            "previous": previous.map(String.init) ?? "unavailable", "current": String(current),
+            "valueSource": stage == "change" ? "SwiftUI.onChange" : "lifecycle-advisory",
+            "initialOrEqual": String(previous == current), "expanded": String(expanded)
+        ])
+    }
+    #endif
 
 }
 

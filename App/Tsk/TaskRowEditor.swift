@@ -12,6 +12,9 @@ struct TaskRowEditor: View {
     @State private var measuredActionsHeight: CGFloat = 44
     @State private var linkedTask: TaskRecord?
     @FocusState private var focusedNote: UTF8String?
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var focusOwnerToken = UUID()
+    #endif
     @Environment(\.taskRowActions) private var rowActions
 
     var body: some View {
@@ -55,6 +58,13 @@ struct TaskRowEditor: View {
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-row-editor")
+        #if DEBUG && targetEnvironment(simulator)
+        .onChange(of: focusedNote, initial: true) { previous, current in
+            recordNoteFocusOwner("change", previous: previous?.rawValue ?? "nil", current: current?.rawValue ?? "nil")
+        }
+        .onAppear { recordNoteFocusOwner("appear", current: focusedNote?.rawValue ?? "nil") }
+        .onDisappear { recordNoteFocusOwner("disappear", current: focusedNote?.rawValue ?? "nil") }
+        #endif
         .sheet(item: $editing.supportingPanel, onDismiss: {
             store.error = nil
             if let target = linkedTask { linkedTask = nil; rowActions.reveal(target) }
@@ -76,6 +86,18 @@ struct TaskRowEditor: View {
             await editing.setExpanded(true, reduceMotion: reduceMotion)
         }
     }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func recordNoteFocusOwner(_ stage: String, previous: String = "unavailable", current: String) {
+        TaskMenuFocusDiagnostics.record("owner.note." + stage, details: [
+            "rowID": editing.rowID, "editingOwner": String(describing: ObjectIdentifier(editing)),
+            "ownerToken": focusOwnerToken.uuidString, "ownerTokenKind": "view-state-lifetime",
+            "previous": previous, "current": current,
+            "valueSource": stage == "change" ? "SwiftUI.onChange" : "lifecycle-advisory",
+            "initialOrEqual": String(previous == current)
+        ])
+    }
+    #endif
 }
 
 private struct TaskRowEditorContent: View {
@@ -123,6 +145,7 @@ private struct TaskRowEditorContent: View {
                                 #if DEBUG && targetEnvironment(simulator)
                                 TaskMenuFocusDiagnostics.record("focus.request", details: [
                                     "parameter": parameter.rawValue, "titleBefore": String(beforeTitle), "noteBefore": beforeNote,
+                                    "rowID": editing.rowID, "editingOwner": String(describing: ObjectIdentifier(editing)),
                                     "titleRequested": "false", "noteRequested": "nil", "titleReadback": String(titleFocused),
                                     "noteReadback": focusedNote?.rawValue ?? "nil", "readbackAdvisory": "true"
                                 ])
