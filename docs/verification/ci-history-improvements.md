@@ -1094,3 +1094,53 @@ are now removed as well. Retain the twenty real native cycles, original focus
 prerequisite and selection/geometry/deadline assertions. Existing keyboard
 verification receipts and functional registration deduplication remain. The next
 focus repair will execute without these temporary runtime interceptions.
+
+### Project menu activation clears text focus
+
+The next single repair candidate replaces only Project's extra simultaneous
+tap gesture with the public UIControl menuActionTriggered event. Apple defines
+that event before menu presentation. A passive UIViewRepresentable in the
+existing label background searches only its own bounded ancestor chain for
+the nearest public UIControl, attaches its own target once, and keeps the
+control/anchor weak. Update the current focus closure, remove only that exact
+target on association changes/dismantle, and allow one weak deferred attachment
+attempt per window lifecycle. No global/sibling/private-class search, geometry
+cache, hit testing, gesture, event synthesis or responder call is added.
+
+The event callback validates sender, live window and label ancestry, then clears
+the same titleFocused/focusedNote bindings synchronously. Attachment/update and
+teardown never clear focus. Priority retains its original gesture; native
+Menu/Picker/options, styling44/26, popover/zoom/glass and scrolling remain.
+The alternative ButtonStyle press-state trigger was rejected for this candidate
+because a cancelled pill press or scroll start could clear focus before committed
+menu activation. The documented semantic event fits the opener contract, but
+this SwiftUI control's actual attachment and event emission are unverified.
+
+Only small opt-in Debug/simulator attachment, delivery and before/after-focus
+receipts remain, capped at256 with explicit drops. Serialization/atomic export
+run asynchronously; failures report once and do not retry unchanged data. No
+global touch/alpha/registration interception remains. Remove these temporary
+receipts after candidate validation, before clean acceptance.
+
+Keep the original High/reselection and twenty native Project cycles, including
+focused-title cycle20 and its five-second keyboard prerequisite before option20.
+Append a note-focused opener, the same real New-project/Release/Done checks,
+draft-note retention and return to title/note editing. Do not replace existing
+assertions or extend input/admission/acknowledgement budgets. Require one valid
+activation delivery on the attached source and actual keyboard disappearance.
+Missing/stale/duplicate delivery, absent source attachment, keyboard persistence
+or new native interaction/geometry/timing regression rejects this mechanism;
+there is no fallback. A historical option-drop recurrence still blocks readiness
+and must be classified separately, without claiming that this focus candidate
+caused it. A passing candidate does not identify the original intermittent
+loss's cause or establish final smoke/full acceptance.
+
+Primary API boundary: [menuActionTriggered](https://developer.apple.com/documentation/uikit/uicontrol/event/menuactiontriggered).
+
+Generic arm64 build-for-testing and strict artifact admission pass on
+Xcode27.1 beta with no local simulator boot. Source review found and corrected
+missing Coordinator actor isolation and silent diagnostic export errors;
+invalid callback associations are recorded before being rejected. The two
+review axes found no other actionable defect. This remains source/build
+evidence, with attachment, actual emission, keyboard effect, notes and native
+selection/timing/appearance awaiting canonical execution.

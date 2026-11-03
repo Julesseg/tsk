@@ -36,9 +36,11 @@ process after the original High selection/reselection sequence. Each cycle
 requires the actual field to appear and disappear within the original five-second
 acknowledgements, without changing the selected project or replaying a touch.
 The final cycle opens the menu from a focused title and requires native keyboard
-dismissal, covering the focus gesture that remains enabled while text is active.
-Menu coverage selects this regression alone on both families, without HID,
-server, peer or installed-extension setup. Its diagnostic rollups have distinct
+dismissal, covering the native menu activation focus handoff.
+After the twenty cycles, it also opens Project from a focused note, checks the
+same keyboard prerequisite and native action, retains the draft text, and returns
+to title/note editing. Menu coverage selects this regression alone on both
+families, without HID, server, peer or installed-extension setup. Its diagnostic rollups have distinct
 names and cannot satisfy the required smoke/full checks.
 
 ## Build once, execute selected coverage

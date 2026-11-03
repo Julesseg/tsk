@@ -303,7 +303,7 @@ import XCTest
     }
 
     func testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
-        let app = try launch()
+        let app = try launch(menuFocusTrace: true)
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         selectHighPriorityAndVerifyReselection(app)
@@ -329,6 +329,33 @@ import XCTest
                 XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
             }
         }
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: "task-row-supporting-scroll", app: app))
+        focusTaskText(note, app: app)
+        note.typeText("Draft note survives menu")
+        openTaskRowParameter("project", app: app)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+        XCTAssertEqual(note.value as? String, "Draft note survives menu")
+        focusTaskText(title, app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        focusTaskText(note, app: app)
+        XCTAssertEqual(note.value as? String, "Draft note survives menu")
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
     func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
@@ -572,11 +599,16 @@ import XCTest
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false) throws -> XCUIApplication {
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false, menuFocusTrace: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        if menuFocusTrace {
+            XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
+            app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+            app.launchEnvironment["TSK_TEST_MENU_FOCUS_TRACE"] = app.launchEnvironment["TSK_TEST_REPLICA_NAME"]
+        }
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
         var records: [[String: Any]] = [
