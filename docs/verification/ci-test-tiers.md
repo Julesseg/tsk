@@ -9,12 +9,13 @@ using the dispatch helper.
 | Coverage | iPhone | iPad | Trigger |
 | --- | --- | --- | --- |
 | Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 77 methods | 68 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 78 methods | 69 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | — | `diagnostic_only=true` |
 | Keyboard | 12 methods | 10 methods | Explicit dispatch |
 | Text | 5 methods | 5 methods | Explicit dispatch |
 | Regression | 6 methods | 7 methods | Explicit dispatch |
 | Menu | 5 methods | 6 methods | Explicit dispatch |
+| Action | 3 methods | 3 methods | Temporary diagnostic dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
@@ -57,6 +58,27 @@ Diagnostic menu rollups remain distinct from required smoke/full checks. The
 completed minimal-root/host/first-claim controls and temporary receipt sink have
 been removed; their historical outcomes are recorded separately.
 
+Action coverage is a temporary, independent native-action comparison. It selects
+the unchanged product stress and direct-title/Notes methods plus one new owned
+fixture stress method on each family. The fixture reuses the actual production
+Project/Priority pill and picker, one stable draft, native focus handoff,
+scroll/glass source slice and current TaskKeyboardHost. It omits workspace,
+storage, List, navigation, dimming/outside-close and real command scopes together
+as a composite factor. It retains High selected/reselect, twenty actual field/
+Done cycles, focus20, Notes and returned typing, with the same native input and
+budgets. Fixture locale and animation policy match the product references.
+Owned session/replica admission and a unique root marker establish the intended
+root. No new app event/alpha/focus observer is installed.
+
+Action workers use the same canonical products and disposable simulator harness
+but require no HID, server or peer, preventing an HID abort from erasing the
+native-action comparison. This does not shrink the permanent Menu5/6/HID
+manifest or satisfy its command compatibility requirements. Action diagnostic
+rollups cannot satisfy required smoke/full checks. One fixture pass is not
+reliability or a specific-ancestor diagnosis. The one extra method per family
+accounts for temporary full78/69; remove the fixture, method and Action dispatch/
+rollup surface before clean acceptance. No full is dispatched while known red.
+
 ## Build once, execute selected coverage
 
 One Mac producer builds the simulator bridge, controller tests and signed arm64
@@ -78,8 +100,8 @@ includes ordinary task, filter, attribute, recurrence and automation journeys:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 42 methods | 35 methods |
-| iPad | 34 methods | 34 methods |
+| iPhone | 42 methods | 36 methods |
+| iPad | 34 methods | 35 methods |
 
 The partition union is exactly the full selection, with no duplicates.
 All native HID cases, installed system integrations and server/peer consumers

@@ -358,6 +358,84 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
+    func testIsolatedNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
+        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
+        let app = taskTestApplication()
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
+        app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
+        app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
+        app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
+        let token = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
+        app.launchEnvironment["TSK_TEST_NATIVE_MENU_ACTION_CONTROL"] = token
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        let session = try XCTUnwrap(app.launchEnvironment["TSK_UI_TEST_SESSION"])
+        XCTContext.runActivity(named: "Owned production-pill action fixture replica=\(token) session=\(session)") { _ in app.launch() }
+        XCTAssertTrue(app.staticTexts["native-menu-action-control-marker"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.otherElements["native-menu-action-control"].exists)
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let originalTitle = try XCTUnwrap(title.value as? String)
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        selectHighPriorityAndVerifyReselection(app)
+        for cycle in 1...20 {
+            XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
+                if cycle == 20 { focusTaskText(title, app: app) }
+                openTaskRowParameter("project", app: app)
+                if cycle == 20 {
+                    let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+                    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                    XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+                }
+                tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+                let field = app.textFields["row-project-input"]
+                let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                XCTAssertEqual(field.value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+                app.buttons["close-row-parameter"].tap()
+                let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+                XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+            }
+        }
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
+        focusTaskText(note, app: app)
+        note.typeText("Draft note survives menu")
+        openTaskRowParameter("project", app: app)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+        XCTAssertEqual(note.value as? String, "Draft note survives menu")
+        focusTaskText(title, app: app)
+        title.typeText(" title retained")
+        let editedTitle = try XCTUnwrap(title.value as? String)
+        XCTAssertEqual(editedTitle.components(separatedBy: " title retained").count, 2)
+        XCTAssertEqual(editedTitle.replacingOccurrences(of: " title retained", with: ""), originalTitle)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        focusTaskText(note, app: app)
+        note.typeText(" and editable")
+        let editedNote = try XCTUnwrap(note.value as? String)
+        XCTAssertEqual(editedNote.components(separatedBy: " and editable").count, 2)
+        XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Draft note survives menu")
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
     func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
         let app = try launch(isolated: true)
         let title = expandTask(app)

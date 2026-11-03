@@ -29,7 +29,7 @@ def validate_source(expected, actual):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('suite', choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression', 'menu'])
+    parser.add_argument('suite', choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression', 'menu', 'action'])
     args = parser.parse_args()
     validate_source(os.environ.get('EXPECTED_SOURCE_SHA'), os.environ.get('GITHUB_SHA'))
     result = plan(args.suite)

@@ -60,6 +60,11 @@ MENU = (
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
     "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
 )
+ACTION = (
+    "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
+    "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
+    "TaskRowEditingUITests/testIsolatedNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
+)
 REGRESSION = (
     "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
@@ -104,7 +109,9 @@ def selected_methods(filters):
 
 
 def selection(suite, family, partition="all"):
-    if suite == "menu":
+    if suite == "action":
+        tests = ACTION
+    elif suite == "menu":
         tests = MENU + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
     elif suite == "regression":
         tests = REGRESSION + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
@@ -171,7 +178,7 @@ def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu", "action"))
     select.add_argument("family", choices=("iPhone", "iPad"))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")

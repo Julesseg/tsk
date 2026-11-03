@@ -1807,3 +1807,75 @@ video samples show the anchored Release popover on both families and the
 expanded Notes control after dismissal; these finite visual samples do not
 certify morph/design acceptance or intermittent reliability. No local simulator
 was booted. Counts/coverage and product code are unchanged on this harness head.
+
+
+### Corrected coverage result and real-component action comparison
+
+At8e230eb, menu41590694846 and smoke41590683565 finished red, exactly two
+workflows/all16jobs terminal, attempt1. Exact source/tree and canonical
+Xcode27A266a/SDK24A430/runtime24A434 match; managed terminals were captured/killed.
+All5phone menu methods ran. Direct Title+Notes focus/native keyboard-before-option,
+New-project/Release/Done, draft retention and returned typing passed79.257s.
+The cross-family product workspace/editor case passed all9owned HID phases and
+durable business outcomes95.127s, including Settings return and recapture/save.
+Annotation commands passed153.819s and native baseline17.357s. These14owned
+exchanges have matching identities, acknowledgements and key releases; native
+baseline alone is transport evidence. Phone smoke passed all4methods. This is
+bounded operational support for inherited eligibility on phone, not acceptance.
+
+Phone stress still passed High/reselect and2complete cycles before field3 was
+absent73.909s. No focus20 result or current retarget attribution. On pad, only3of6
+selected methods were attempted: annotations/native baseline passed181.585/
+23.514s and compatibility completed7owned phases through completion/Done and
+Settings return. CaptureAfterReturn hit a5sHID RPC TimeoutError without ACK;
+the original12s runner bar failed and the relay stopped the worker before both
+product menu methods and broader workspace coverage. Its partial xcresult lacks
+Info.plist. UP-only recovery completed but native key state remains unverified;
+process-group cleanup also reported an ownership error. Pad Notes/full9phase
+coverage is missing, not an observed eligibility regression. Pad smoke row failed
+finite/visible/stable completion-circle geometry admission313.047s; navigation
+passed102.619s. No retry or full ran.
+
+Both committee members converged on ONE new native-ACTION reproduction. Earlier
+minimal focus cases made one selection and used a simplified popover; they did
+not test repeated use of the real pill/state/picker cluster. A temporary owned
+DEBUG simulator root now reuses the actual private TaskRowParameterPill and
+TaskRowParameterPicker unchanged, with one ordinary TaskRowEditing Release draft,
+real Project/Priority, vertical Title/Notes focus forms, supporting/horizontal
+scroll/glass slice, current TaskKeyboardHost and the same safe-area policy.
+The omitted workspace/storage/List/navigation/outside/dimming/real-scope group
+is explicitly COMPOSITE. No dummy commands, source-body refactor, identity reset,
+new responder policy, geometry cache or app observer is added.
+
+The new independent method retains High/reselect,20 actual New-project/Release/
+Done cycles, title focus at20 with the original5s keyboard assertion BEFORE
+option, Notes and actual returned typing. Input center50ms/admission20s and
+field/value/dismissal5s bars stay unchanged. Both product reference method bodies
+remain byte-identical. Launch admission requires isolated simulator, UUIDsession
+and fixturetoken==replica; the root marker and test-owned replica/session activity
+prove the selected mode. Source review caught and corrected generic-helper
+animation disabling and locale differences; launch policy now matches product.
+
+A temporary Action3/3 selection runs the two unchanged product references and
+one fixture method independently from the unchanged Menu5/6/HID invocation.
+The same canonical producer/owned worker harness is reused without HID/server/
+peer setup; no run-ui-tests, relay or general phase-pipeline changes. Distinct
+Action rollups cannot stand in for required acceptance. Temporary full78/69
+(42+36/34+35) retains four workers. One action batch plus auto smoke is bounded;
+no unchanged retry/full or automatic add-back chain.
+
+Matching admitted field failures in product and fixture show the full omitted
+composition is unnecessary for that asserted phenotype, not Apple-only proof or
+historical route identity. A full fixture20/focus/Notes pass with product red
+implicates sensitivity to the omitted group, not a particular ancestor or broad
+reliability. Both green, High/focus/geometry/launch/export failures or incomplete
+coverage remain inconclusive for this partition. Classify field absent, present
+but elapsed red, focus and transport separately. Current phone focus/commands
+remain bounded to their tested head; this action comparison cannot fill missing
+padHID phases. Remove fixture/test/dispatch plumbing before clean acceptance.
+
+Final source validation reports zero remaining Standards/Spec/design findings.
+The original two product method bodies match recorded byte hashes. Routing25,
+execution-plan11 and gate15 regressions pass; the generic arm64 build and strict
+App/Share/Widget/Shortcuts artifact admission pass. No local simulator was booted.
+These are source/build/harness checks, not a native-action comparison outcome.

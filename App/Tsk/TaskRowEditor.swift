@@ -371,3 +371,90 @@ struct TaskRowParameterButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
     }
 }
+
+#if DEBUG && targetEnvironment(simulator)
+enum NativeMenuActionControlGate {
+    static func enabled(_ environment: [String: String]) -> Bool {
+        guard environment["TSK_UI_ISOLATED_SIMULATOR"] == "1",
+              environment["TSK_UI_TEST_SESSION"].flatMap(UUID.init(uuidString:)) != nil,
+              let token = environment["TSK_TEST_NATIVE_MENU_ACTION_CONTROL"].flatMap(UUID.init(uuidString:)),
+              let replica = environment["TSK_TEST_REPLICA_NAME"].flatMap(UUID.init(uuidString:)) else { return false }
+        return token == replica
+    }
+}
+
+struct NativeMenuActionControlView: View {
+    @State private var editing: TaskRowEditing
+    @FocusState private var titleFocused: Bool
+
+    init() {
+        let task = TaskRecord(id: UUID(uuidString: "A0000000-0000-0000-0000-000000000001")!,
+                              attributes: ["description": "Prepare the release with the product team", "project": "Release", "status": "pending", "scheduled": "1792231200", "due": "1792238400", "opaque": "retain"])
+        let editing = TaskRowEditing(task: task, rowID: "task-" + task.id.uuidString, context: .init(), tasks: [task], now: Date(timeIntervalSince1970: 1792144800))
+        editing.isExpanded = true
+        editing.revealProgress = 1
+        _editing = State(initialValue: editing)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Native menu action control")
+                .font(.headline)
+                .padding(.top, 64)
+                .accessibilityIdentifier("native-menu-action-control-marker")
+            TextField("What needs to be done?", text: $editing.draft.taskDraft.description, axis: .vertical)
+                .font(.subheadline)
+                .textFieldStyle(.plain)
+                .lineLimit(1...5)
+                .focused($titleFocused)
+                .accessibilityIdentifier("task-description")
+            NativeMenuActionControlEditor(editing: editing, titleFocused: $titleFocused)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("native-menu-action-control")
+    }
+}
+
+private struct NativeMenuActionControlEditor: View {
+    @Bindable var editing: TaskRowEditing
+    @FocusState.Binding var titleFocused: Bool
+    @FocusState private var focusedNote: UTF8String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Notes", text: $editing.draft.noteInput, axis: .vertical)
+                    .focused($focusedNote, equals: UTF8String("new"))
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .lineLimit(1...5)
+                    .accessibilityLabel("Notes")
+                    .accessibilityIdentifier("row-note-input")
+                ScrollView(.horizontal) {
+                    GlassEffectContainer(spacing: 6) {
+                        HStack(spacing: 6) {
+                            ForEach([TaskRowParameter.project, .priority]) { parameter in
+                                TaskRowParameterPill(editing: editing, parameter: parameter, projects: ["Release"], tags: [], now: editing.referenceDate) {
+                                    titleFocused = false
+                                    focusedNote = nil
+                                }
+                            }
+                        }.padding(.horizontal, 4)
+                    }
+                }
+                .scrollIndicators(.hidden)
+                .clipped()
+                .accessibilityIdentifier("row-date-parameters")
+                Button("Hide keyboard") { titleFocused = false; focusedNote = nil }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("dismiss-row-keyboard")
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .accessibilityIdentifier("task-row-supporting-scroll")
+    }
+}
+#endif

@@ -21,6 +21,8 @@ struct TskApp: App {
             #if DEBUG && targetEnvironment(simulator)
             if NativeKeyboardControlGate.enabled(ProcessInfo.processInfo.environment) {
                 NativeKeyboardControlView()
+            } else if NativeMenuActionControlGate.enabled(ProcessInfo.processInfo.environment) {
+                TaskKeyboardHost { NativeMenuActionControlView() }.ignoresSafeArea()
             } else {
                 TaskKeyboardHost { TaskStorageRootView() }.ignoresSafeArea()
             }
