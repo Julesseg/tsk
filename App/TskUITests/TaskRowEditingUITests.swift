@@ -20,7 +20,8 @@ import XCTest
         let annotation = app.descendants(matching: .any)["row-note-annotation_1792144800"].firstMatch
         XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
         XCTAssertEqual(annotation.value as? String, "Review the accessibility findings\nKeep the release checklist nearby")
-        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["custom-field-note"].firstMatch, in: editor, app: app))
+        XCTAssertFalse(app.buttons["advanced-attributes"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["custom-field-note"].firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Identity"].exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         capture("Supporting information is available inside the expanded row", app)
@@ -37,24 +38,12 @@ import XCTest
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
         XCTAssertEqual(note.value as? String, "New supporting note")
-        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
-        app.buttons["advanced-attributes"].tap()
-        setDateSwitch("uda-enabled-score", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
-        let score = app.descendants(matching: .any)["uda-value-score"].firstMatch
-        XCTAssertTrue(revealTaskElement(score, in: "advanced-attributes-form", app: app))
-        replaceTaskText(score, with: "invalid", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-attributes-keyboard"], app: app)
-        app.buttons["save-advanced-attributes"].tap()
-        XCTAssertTrue(app.staticTexts["advanced-attributes-error"].waitForExistence(timeout: 10))
-        capture("Typed custom field validation keeps the nested editor open", app)
-        app.buttons["Cancel"].tap()
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
         app.buttons["collapse-task-row"].tap()
         XCTAssertTrue(taskRow(named: "Unsaved supporting draft", app: app).waitForExistence(timeout: 10))
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
         app.launch()
         selectAllTasks(app)
         app.buttons["task-" + taskID].tap()
@@ -74,7 +63,8 @@ import XCTest
         let app = try launch(largeText: true, supporting: true)
         _ = expandTask(app)
         let editor = app.scrollViews["task-row-supporting-scroll"]
-        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
+        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["row-note-input"].firstMatch, in: editor, app: app))
+        XCTAssertFalse(app.buttons["advanced-attributes"].exists)
         capture("Populated supporting information at accessibility XXXL", app)
         XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
         app.buttons["collapse-task-row"].tap()
@@ -855,7 +845,6 @@ import XCTest
         }
         if supporting {
             app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
-            app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
             attributes += [
                 ["key": "annotation_1792144800", "value": "Review the accessibility findings\nKeep the release checklist nearby"],

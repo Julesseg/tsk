@@ -13,8 +13,6 @@ struct TaskSettingsView: View {
                         .accessibilityIdentifier("custom-views")
                     Button("Recurring templates", systemImage: "repeat") { choose(.recurring) }
                         .accessibilityIdentifier("recurring-templates")
-                    Button("Attribute definitions", systemImage: "slider.horizontal.3") { choose(.attributeDefinitions) }
-                        .accessibilityIdentifier("attribute-definitions")
                 }
                 Section("Integrations") {
                     NavigationLink {

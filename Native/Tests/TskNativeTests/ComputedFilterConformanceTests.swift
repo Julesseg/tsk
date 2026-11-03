@@ -12,9 +12,6 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let manager = TaskChampionSession.makeManager(directory: fixture.directory, now: { Date(timeIntervalSince1970: Double(epoch)) }, calendar: calendar)
-    for (name, type) in [("score", TaskAttributeType.numeric), ("effort", .duration), ("review", .date), ("note", .string), ("reference", .uuid)] {
-        _ = try await manager.saveAttributeDefinition(name: name, type: type)
-    }
     let replica = TaskChampionReplica(directory: fixture.directory)
     let prerequisite = UUID()
     let rows: [TaskAttributes] = [
@@ -88,9 +85,6 @@ func typedExpressionOperationsAgreeWithPinnedConversionAndDOMRules() async throw
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let manager = TaskChampionSession.makeManager(directory: fixture.directory, calendar: calendar)
-    for (name, type) in [("score", TaskAttributeType.numeric), ("effort", .duration), ("review", .date), ("note", .string)] {
-        _ = try await manager.saveAttributeDefinition(name: name, type: type)
-    }
     let replica = TaskChampionReplica(directory: fixture.directory)
     for (index, value) in ["2", "0", "-2", "0.1"].enumerated() {
         _ = try await replica.create(id: UUID(), attributes: ["description": "Operators \(index)", "status": "pending", "entry": "1792144800", "score": value, "effort": "PT1H", "review": "1792144800", "note": "abc", "annotation_1792144800": "note", "tag_home": ""])

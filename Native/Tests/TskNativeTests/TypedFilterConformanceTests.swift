@@ -9,7 +9,6 @@ func typedNumericFiltersAgreeWithPinnedTaskwarriorAndReopenedSavedViews() async 
     let fixture = try TypedFilterFixture()
     defer { fixture.remove() }
     let manager = TaskChampionSession.makeManager(directory: fixture.directory)
-    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
     let replica = TaskChampionReplica(directory: fixture.directory)
     for value in [nil, "", "-2", "0", "0.1", "2", "10", "100", "10000000"] as [String?] {
         var attributes: TaskAttributes = ["description": "Score \(value ?? "missing")", "status": "pending", "entry": "1792144800", "foreign": "keep"]
@@ -18,14 +17,17 @@ func typedNumericFiltersAgreeWithPinnedTaskwarriorAndReopenedSavedViews() async 
     }
     let expressions = ["score:0", "score.is:10000000", "score:'1'", "score:'0'", "score.is:0", "score.isnt:0", "score.not:0", "score.below:0", "score.above:0", "score.by:0", "score.none:", "score.any:", "score.below:", "score.above:", "score.by:", "score.is:0.1", "score.is:'0.1'", "score.above:0.1", "score.below:2", "score.by:2", "score.is:1e2", "score.is:+2", "score.has:'^0'", "score.has:1e", "score.has:'1e'", "score.hasnt:'^0'", "score.left:1", "score.right:0"]
     for expression in expressions { try await fixture.compare(expression, manager: manager) }
-    let saved = try await manager.saveView(name: "Typed scores", expression: "score.above:2")
-    let reopened = TaskChampionSession.makeManager(directory: fixture.directory)
-    #expect(try await reopened.savedViews() == [saved])
-    #expect(try await reopened.tasks(filter: saved.expression).count == 3)
+
 }
 
 @MainActor
 final class TypedFilterFixture {
+    static var schema: TaskFilterSchema {
+        let builtins = ["description", "project", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "template", "priority", "entry", "modified", "start", "end", "due", "scheduled", "wait", "until", "last", "recur", "id", "urgency"]
+            .compactMap { name in TaskFilterSchema.standard.type(for: name).map { (name, $0) } }
+        return TaskFilterSchema(attributes: builtins + [("score", .numeric), ("effort", .duration), ("review", .date), ("note", .string), ("reference", .uuid), ("rating", .string), ("spelling", .string), ("custom", .string)], orderedValues: [("priority", ["H", "M", "L", ""]), ("rating", ["low", "mid", "high"]), ("spelling", ["é", "e\u{301}"])])
+    }
+
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let config: URL
     let binary: String
@@ -45,7 +47,7 @@ final class TypedFilterFixture {
     func compare(_ expression: String, manager: TaskManager) async throws -> FilterConformanceSelection {
         let data = try task([expression, "_uuids"])
         let expected = Set(String(decoding: data, as: UTF8.self).split(whereSeparator: \.isWhitespace).map(String.init))
-        let actual = Set(try await manager.tasks(filter: expression).map { $0.id.uuidString.lowercased() })
+        let actual = Set(try await manager.tasks(filter: expression, schema: Self.schema).map { $0.id.uuidString.lowercased() })
         #expect(actual == expected, "\(expression)")
         return FilterConformanceSelection(expression: expression, selected: expected.sorted(), actual: actual.sorted())
     }
@@ -81,7 +83,6 @@ func typedDurationFiltersMatchPinnedMissingZeroNegativeAndModifierBehavior() asy
     let fixture = try TypedFilterFixture()
     defer { fixture.remove() }
     let manager = TaskChampionSession.makeManager(directory: fixture.directory)
-    _ = try await manager.saveAttributeDefinition(name: "effort", type: .duration)
     let replica = TaskChampionReplica(directory: fixture.directory)
     for value in [nil, "", "-PT1H", "PT0S", "PT30M", "PT1H", "PT2H", "P1D"] as [String?] {
         var attributes: TaskAttributes = ["description": "Effort \(value ?? "missing")", "status": "pending", "entry": "1792144800"]
@@ -99,11 +100,6 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let manager = TaskChampionSession.makeManager(directory: fixture.directory, calendar: calendar)
-    for (name, type) in [("note", TaskAttributeType.string), ("reference", .uuid), ("review", .date)] {
-        _ = try await manager.saveAttributeDefinition(name: name, type: type)
-    }
-    _ = try await manager.saveAttributeDefinition(name: "rating", type: .string, values: ["low", "mid", "high"])
-    _ = try await manager.saveAttributeDefinition(name: "spelling", type: .string, values: ["é", "e\u{301}"])
     let replica = TaskChampionReplica(directory: fixture.directory)
     let values: [[String?]] = [
         [nil, nil, nil, nil, nil, nil],
@@ -131,43 +127,8 @@ func typedStringUUIDDateAndPriorityQueriesMatchPinnedClientAndLocalOrdering() as
     for expression in expressions { try await fixture.compare(expression, manager: manager) }
     for expression in ["review.is:'1'", "review.below:'1'", "review.by:'1'", "review.is:20261016"] {
         _ = try fixture.task([expression, "_uuids"], expectedFailure: true)
-        await #expect(throws: TaskFilterError.self) { try await manager.validateFilter(expression) }
+        await #expect(throws: TaskFilterError.self) { try await manager.validateFilter(expression, schema: TypedFilterFixture.schema) }
     }
-}
-
-@Test func nativeTypedSavedMembershipChangesDurablyAndInvalidImportsRemainRecoverable() async throws {
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let manager = TaskChampionSession.makeManager(directory: directory, calendar: calendar)
-    for (name, type) in [("note", TaskAttributeType.string), ("score", .numeric), ("effort", .duration), ("review", .date), ("reference", .uuid)] {
-        _ = try await manager.saveAttributeDefinition(name: name, type: type)
-    }
-    let ordered = try await manager.saveAttributeDefinition(name: "rating", type: .string, values: ["high", "mid", "low", ""])
-    let task = try await manager.create(TaskDraft(description: "Typed native task", attributes: ["note": "Review it", "score": "2", "effort": "2h", "review": "2026-10-16T10:00:00Z", "reference": "abcdef12", "rating": "high", "unknown_é": "composed", "unknown_e\u{301}": "decomposed"]))
-    let view = try await manager.saveView(name: "Typed membership", expression: "score.above:1 and effort.by:PT2H and review:2026-10-16 and reference:abcdef12 and note:Review and rating.above:mid")
-    #expect(try await manager.tasks(filter: view.expression).map(\.id) == [task.id])
-    _ = try await manager.updateUserAttributes(id: task.id, changes: ["score": "1"])
-    let reopened = TaskChampionSession.makeManager(directory: directory, calendar: calendar)
-    #expect(try await reopened.savedViews() == [view])
-    #expect(try await reopened.attributeDefinitions().contains(ordered))
-    #expect(try await reopened.tasks(filter: view.expression).isEmpty)
-    _ = try await reopened.updateUserAttributes(id: task.id, changes: ["score": "3"])
-    #expect(try await manager.tasks(filter: view.expression).map(\.id) == [task.id])
-    let raw = TaskChampionReplica(directory: directory)
-    _ = try await raw.update(id: task.id, changes: ["score": "invalid imported value"])
-    await #expect(throws: TaskFilterError.invalidStoredValue(task.id, "score", .numeric)) { try await reopened.tasks(filter: view.expression) }
-    _ = try await reopened.update(id: task.id, changes: ["description": "Preserved while repairing"])
-    #expect(try await manager.task(id: task.id).attributes["score"] == "invalid imported value")
-    _ = try await reopened.updateUserAttributes(id: task.id, changes: ["score": "5"])
-    #expect(try await manager.tasks(filter: view.expression).map(\.id) == [task.id])
-    try await reopened.deleteAttributeDefinition(name: "score")
-    await #expect(throws: TaskFilterError.unknownAttribute("score")) { try await manager.tasks(filter: view.expression) }
-    let saved = try await manager.task(id: task.id)
-    #expect(saved.attributes["score"] == "5")
-    #expect(saved.attributes["unknown_é"] == "composed")
-    #expect(saved.attributes["unknown_e\u{301}"] == "decomposed")
 }
 
 struct FilterConformanceSelection: Codable {
@@ -182,7 +143,6 @@ func acceptedNumericExtremesRemainCompatibleAcrossModifiersDirectAndComputedView
     let fixture = try TypedFilterFixture()
     defer { fixture.remove() }
     let manager = TaskChampionSession.makeManager(directory: fixture.directory)
-    _ = try await manager.saveAttributeDefinition(name: "score", type: .numeric)
     for value in ["1e100", "-1e100", "1e-100", "16777217", "1.00000001"] {
         _ = try await manager.create(TaskDraft(description: "Numeric \(value)", attributes: ["score": value]))
     }

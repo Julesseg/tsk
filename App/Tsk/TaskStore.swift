@@ -12,7 +12,6 @@ final class TaskStore {
     var workspaceViews = WorkspaceViews(customIDs: [])
     var selectedWorkspaceView: WorkspaceView = .unfinished
     private(set) var workspaceViewsLoaded = false
-    var attributeDefinitions: [TaskAttributeDefinition] = []
     var customView: CustomViewSelection?
     var allTasks: [TaskRecord] = []
     var query: TaskQuery = .unfinished
@@ -119,7 +118,6 @@ final class TaskStore {
                         openView(current)
                     }
                 }
-                try await loadAttributeDefinitions()
                 await reload()
                 if let prior, prior.tasks != version.tasks, version.taskOrigin == .local { await manager.requestSynchronization(trigger: .backgroundOpportunity) }
                 prior = version
@@ -182,17 +180,6 @@ final class TaskStore {
 
     func removeDependency(id: UUID, reference: String) async -> TaskRecord? {
         await perform { try await $0.removeDependency(id: id, reference: reference) }
-    }
-
-    func loadAttributeDefinitions() async throws {
-        let definitions = try await manager.attributeDefinitions()
-        let changed = definitions != attributeDefinitions
-        attributeDefinitions = definitions
-        if changed, customView != nil { await reload() }
-    }
-
-    func updateUserAttributes(id: UUID, changes: TaskAttributePatch) async -> TaskRecord? {
-        await perform { try await $0.updateUserAttributes(id: id, changes: changes) }
     }
 
     func addAnnotation(id: UUID, text: String) async -> TaskRecord? {

@@ -7,7 +7,7 @@ struct ContentView: View {
     private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
 
     enum WorkspaceSetting {
-        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport, attributeDefinitions
+        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport
         #if DEBUG && targetEnvironment(simulator)
         case spotlightDiagnostics
         #endif
@@ -34,7 +34,6 @@ struct ContentView: View {
     @State private var isChoosingCustomView = false
     @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
-    @State private var isDefiningAttributes = false
     @State private var isImportingReminders = false
     @State private var isShowingSettings = false
     @State private var pendingWorkspaceSetting: WorkspaceSetting?
@@ -278,7 +277,6 @@ struct ContentView: View {
         .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
-        .sheet(isPresented: $isDefiningAttributes) { TaskAttributeDefinitionsView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "attribute-definitions"]) } }
     }
 
     private var editorSheets: some View {
@@ -451,7 +449,6 @@ struct ContentView: View {
             isConfiguringNotifications = true
         case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
         case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
-        case .attributeDefinitions: requestIntegrationPresentation("attribute-definitions", state: $isDefiningAttributes)
         #if DEBUG && targetEnvironment(simulator)
         case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
         #endif
@@ -484,7 +481,7 @@ struct ContentView: View {
 
     private var workspaceActions: TaskWorkspaceActions? {
         guard !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
-              !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isDefiningAttributes, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+              !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
         #endif

@@ -34,6 +34,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertFalse(app.buttons["spotlight-pending"].exists)
         tapTaskControl(settings, app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["attribute-definitions"].exists)
         capture("After settings")
         XCTAssertFalse(app.buttons["task-shortcuts"].exists)
         XCTAssertFalse(app.buttons["spotlight-settings"].exists)
@@ -43,7 +44,6 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let destinations = [
             ("custom-views", "Views"),
             ("recurring-templates", "Recurring templates"),
-            ("attribute-definitions", "Attribute definitions"),
             ("synchronization-settings", "Synchronization"),
             ("notification-settings", "Task notifications"),
             ("reminders-import", "Copy from Reminders"),

@@ -18,7 +18,7 @@ PAD_FULL = (
     "WorkspaceSettingsUITests", "TaskKeyboardCompatibilityUITests",
     "ShareCaptureUITests", "SynchronizationUITests", "iPadWorkspaceUITests",
     "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
-    "SeriesMetadataUITests", "SeriesTransitionUITests", "TaskAttributeUITests",
+    "SeriesMetadataUITests", "SeriesTransitionUITests",
     "TypedFilterUITests", "ReminderImportUITests", "ContinuousReminderImportUITests",
     "TaskRowEditingUITests", "TaskScheduledUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
     "WidgetUITests", "SpotlightUITests", "TaskNotificationUITests", "MissedNotificationUITests",
@@ -40,7 +40,7 @@ KEYBOARD = (
     "AutomaticSynchronizationUITests",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+    "TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
 )
 PHONE_KEYBOARD = (
     "TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday",
@@ -49,9 +49,8 @@ PHONE_KEYBOARD = (
 TEXT = (
     "ShareCaptureUITests",
     "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-    "TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
     "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
-    "TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+    "TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
 )
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
@@ -62,17 +61,16 @@ MENU = (
     "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
 )
 REGRESSION = (
-    "ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
-    "TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
-    'TaskActivityUITests', 'TaskAttributeUITests', 'TaskAutomationUITests',
+    'TaskActivityUITests', 'TaskAutomationUITests',
     'TaskRowEditingUITests', 'TaskScheduledUITests', 'TypedFilterUITests',
 }
 PHONE_TASK_PARTITION = {'TemporalFilterUITests', 'TskDependencyUITests', 'TskUITests', 'TskUpcomingUITests', 'TskWaitingUITests'}

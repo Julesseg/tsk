@@ -13,6 +13,7 @@ private struct ShareFixtureView: UIViewControllerRepresentable {
 
 private final class ShareFixtureController: UIViewController {
     private let shareButton = UIButton(type: .system)
+    private let result = UILabel()
     private var activityController: UIActivityViewController?
 
     override func viewDidLoad() {
@@ -31,7 +32,9 @@ private final class ShareFixtureController: UIViewController {
         shareButton.setTitle("Share text and link", for: .normal)
         shareButton.accessibilityIdentifier = "share-fixture-present"
         shareButton.addAction(UIAction { [weak self] _ in self?.presentShare() }, for: .touchUpInside)
-        let content = UIStackView(arrangedSubviews: [title, detail, shareButton])
+        result.text = "Ready"
+        result.accessibilityIdentifier = "share-fixture-result"
+        let content = UIStackView(arrangedSubviews: [title, detail, shareButton, result])
         content.axis = .vertical
         content.alignment = .center
         content.spacing = 24
@@ -49,9 +52,15 @@ private final class ShareFixtureController: UIViewController {
         let token = ProcessInfo.processInfo.environment["TSK_SHARE_FIXTURE_TOKEN"] ?? "isolated"
         let text = "Shared article \(token)\nFull shared text café e\u{301}"
         let url = URL(string: "https://example.com/tsk-share?fixture=\(token)#retained")!
-        let controller = UIActivityViewController(activityItems: [text, ShareFixtureURL(url: url)], applicationActivities: nil)
-        controller.completionWithItemsHandler = { @Sendable [weak self] _, _, _, _ in
-            Task { @MainActor [weak self] in self?.prepareActivityController() }
+        let mode = ProcessInfo.processInfo.environment["TSK_SHARE_FIXTURE_MODE"] ?? "both"
+        let items: [Any] = mode == "text" ? [text] : mode == "url" ? [ShareFixtureURL(url: url)] : [text, ShareFixtureURL(url: url)]
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        controller.completionWithItemsHandler = { @Sendable [weak self] _, completed, _, error in
+            let saved = completed && error == nil
+            Task { @MainActor [weak self] in
+                self?.result.text = saved ? "Saved" : "Not saved"
+                self?.prepareActivityController()
+            }
         }
         controller.popoverPresentationController?.sourceView = shareButton
         controller.popoverPresentationController?.sourceRect = shareButton.bounds
@@ -61,6 +70,7 @@ private final class ShareFixtureController: UIViewController {
     private func presentShare() {
         guard presentedViewController == nil, let controller = activityController else { return }
         activityController = nil
+        result.text = "Sharing"
         controller.popoverPresentationController?.sourceRect = shareButton.bounds
         present(controller, animated: true)
     }

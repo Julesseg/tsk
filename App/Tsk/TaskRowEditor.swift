@@ -65,8 +65,6 @@ struct TaskRowEditor: View {
                     linkedTask = target
                     editing.supportingPanel = nil
                 }
-            case .attributes:
-                TaskAdvancedAttributesEditor(store: store, task: editing.draft.original, onSave: editing.absorb)
             }
         }
         .task(id: measuredContentHeight > 0) {
@@ -141,7 +139,6 @@ private struct TaskRowEditorContent: View {
             .transition(.opacity)
             VStack(alignment: .leading, spacing: 12) {
                 TaskAvailabilityView(task: task, store: store)
-                TaskAdvancedAttributesSection(store: store, task: task, edit: { open(.attributes) })
                 TaskRecurrenceSection(task: task, store: store)
             }
             .padding(.vertical, 8)

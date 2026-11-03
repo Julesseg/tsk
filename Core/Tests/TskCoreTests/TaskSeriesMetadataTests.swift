@@ -46,18 +46,16 @@ import Testing
     #expect(try await manager.task(id: parent) == template)
 }
 
-@Test func seriesMetadataUsesLocalTypedValidationWithoutChangingAllowedValueOrder() async throws {
+@Test func seriesMetadataPreservesOpaqueFieldsAndRejectsEditingThem() async throws {
     let parent = UUID(), child = UUID()
-    let replica = OccurrenceReplica(records: [TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-", "description": "Series", "phase": "late"]), TaskRecord(id: child, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "0", "due": "200", "phase": "late"])])
-    let definitions = AttributeDefinitionTestStore()
-    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) }, attributeDefinitions: definitions)
-    _ = try await manager.saveAttributeDefinition(name: "phase", type: .string, values: ["late", "early", ""])
-    await #expect(throws: (any Error).self) { try await manager.previewSeriesMetadata(id: parent, changes: ["phase": "unknown"]) }
+    let replica = OccurrenceReplica(records: [TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "-", "description": "Series", "phase": "late"]), TaskRecord(id: child, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "0", "due": "200", "phase": "foreign"] )])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+    await #expect(throws: TaskSeriesMetadataError.self) { try await manager.previewSeriesMetadata(id: parent, changes: ["phase": "early"]) }
     #expect(await replica.batches == 0)
-    let preview = try await manager.previewSeriesMetadata(id: parent, changes: ["phase": "early"])
+    let preview = try await manager.previewSeriesMetadata(id: parent, changes: ["description": "Revised series"])
     _ = try await manager.applySeriesMetadata(preview)
-    #expect(try await manager.task(id: child).attributes["phase"] == "early")
-    #expect(try await manager.attributeDefinitions().first?.values == ["late", "early", ""])
+    #expect(try await manager.task(id: parent).attributes["phase"] == "late")
+    #expect(try await manager.task(id: child).attributes["phase"] == "foreign")
 }
 
 @Test func explicitSeriesFieldChangesStillReachAnOccurrenceWhenTemplateAlreadyMatches() async throws {

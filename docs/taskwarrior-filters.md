@@ -12,7 +12,7 @@ The reference client is Taskwarrior **3.5.0**, with `regex=1` and
 
 - String attributes, ordinary `+tag`/`-tag`, full UUIDs, and status predicates.
 - Date predicates with named dates, durations and offsets; computed availability,
-  dependency, date, presence, status, local-UDA and orphan virtual tags.
+  dependency, date, presence, status and orphan virtual tags.
 - Partial `attribute:value`, exact `.is`/`.equals`, `.isnt`, partial `.not`,
   `.none`, `.any`, and string `.before`/`.under`/`.below`,
   `.after`/`.over`/`.above`, `.by` comparisons.
@@ -30,32 +30,24 @@ as waiting. Text, project and tags remain case-sensitive. Tag keys and the
 Quote values containing spaces or expression punctuation, for example
 `description.has:'(Alpha|Beta)'`. A blank expression selects every task.
 The word `not` is searched text; unary negation uses `!(project:Work)`.
-Unknown attributes report the missing local schema instead of silently
-becoming text searches. Invalid modifiers, parentheses, quotes and regexes
+Unsupported attributes produce an explicit error instead of silently
+becoming text searches. Previously saved expressions are retained unchanged. Invalid modifiers, parentheses, quotes and regexes
 produce errors before querying or saving. A failed saved-view edit retains
 its previous definition and the editor draft.
 
-Typed local fields support string, numeric, date, duration and UUID predicates.
-Numbers compare the stored Float value promoted to Double, matching the pinned
-client rather than a rounded display. Durations compare fixed seconds; dates
-reuse the relative/local-calendar rules below; UUID values retain exact case
-and prefix spelling. Missing values retain Taskwarrior’s empty-string Variant
-semantics, which differ by type and operator: a missing numeric field is below
-zero, while a present numeric zero is not missing. Duration ordering against a
-zero operand intentionally differs from duration equality.
+The app uses the built-in Taskwarrior schema, including numeric ID/urgency,
+recurrence durations, dates and the default H/M/L/empty priority order. Numeric
+comparison keeps the pinned client's Float-to-Double behavior, and duration/date
+semantics remain distinct. Core conformance fixtures may provide an explicit
+schema to compare parsing against the reference client; the app does not store
+or manage local custom-attribute definitions.
 
-Local string definitions may declare allowed values, highest first, using one
-value per line in the native definition editor. An empty line explicitly places
-unset values in that order. Definitions and value identity preserve UTF-8
-bytes. The default priority order is H, M, L, empty. Filtering existing values
-outside a declared list follows the pinned client’s end-iterator ordering;
-changing a constrained value requires an allowed value or explicit removal.
-Changing a definition keeps task data intact and refreshes the current view.
-
-A referenced invalid stored typed value reports the task UUID, field and type.
-Unrelated fields remain readable/editable and the invalid raw string is retained
-until explicitly repaired or cleared. Removing a definition makes dependent
-filters report the missing schema without deleting its raw task attributes.
+Unknown task keys and byte-exact values remain preserved during ordinary edits,
+completion, synchronization and recurrence operations. They are not exposed in a
+custom-field editor. Retired definition files are inert, including malformed
+files, and are not deleted or used to validate new task operations. Saved
+expressions referring to unavailable fields report errors rather than broadening
+their results.
 
 Typed regex operands use the evaluated value’s representation (six significant
 digits for numeric values and ISO text for durations). Quote regex patterns

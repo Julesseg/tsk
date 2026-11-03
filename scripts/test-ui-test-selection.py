@@ -52,10 +52,10 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPad", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 35)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 32)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (42, 36)), ('iPad', (34, 35))):
+        for family, counts in (('iPhone', (42, 33)), ('iPad', (34, 32))):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -84,11 +84,11 @@ class SelectionTests(unittest.TestCase):
     def test_full_keeps_the_existing_device_coverage(self):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(phone), 78)
+        self.assertEqual(len(phone), 75)
         pad = selection.selected_methods(selection.selection("full", "iPad"))
         self.assertEqual(sum("/CalendarPresentationUITests/" in test for test in pad), 5)
         self.assertEqual(sum("/TaskPresentationUITests/" in test for test in pad), 4)
-        self.assertEqual(len(pad), 69)
+        self.assertEqual(len(pad), 66)
         for methods in (phone, pad):
             self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", methods)
         for suite, family in (("diagnostic", "iPhone"), ("full", "iPad"), ("smoke", "iPhone"), ("smoke", "iPad")):
@@ -100,10 +100,10 @@ class SelectionTests(unittest.TestCase):
             selected = selection.selected_methods(selection.selection("keyboard", family))
             self.assertEqual(len(selected), 12 if family == "iPhone" else 10)
             self.assertIn("TskUITests/CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable", selected)
-            self.assertIn("TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback", selected)
+            self.assertIn("TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor", selected)
             self.assertIn("TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer", selected)
             self.assertIn("TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations", selected)
-            self.assertIn("TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen", selected)
+            self.assertIn("TskUITests/TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion", selected)
             self.assertEqual("TskUITests/TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday" in selected, family == "iPhone")
             self.assertEqual("TskUITests/TskUITests/testOrganizationProjectViewsAndListActionsPersist" in selected, family == "iPhone")
 
@@ -120,11 +120,10 @@ class SelectionTests(unittest.TestCase):
             filters = selection.selection("text", family)
             selected = selection.selected_methods(filters)
             self.assertEqual(selected, {
-                "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+                "TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
                 "TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-                "TskUITests/TaskAttributeUITests/testAllFiveLocalDefinitionTypesPersistAfterNativeCreation",
                 "TskUITests/SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
-                "TskUITests/TypedFilterUITests/testTypedSavedViewMembershipAfterEditingAndPersistentReopen",
+                "TskUITests/TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
             })
             self.assertLess(selected, selection.selected_methods(selection.selection("full", family)))
             self.assertEqual(selection.phases(filters), ["share", "main"])
@@ -146,11 +145,10 @@ class SelectionTests(unittest.TestCase):
 
     def test_regression_selection_covers_failed_journeys_without_replacing_full(self):
         common = {
-            "TskUITests/ShareCaptureUITests/testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback",
+            "TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
             "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
             "TskUITests/TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
-            "TskUITests/TaskAttributeUITests/testLocalDefinitionsAllFiveTypedValuesValidationAndPersistentReopen",
             "TskUITests/WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
         }
         calendar = "TskUITests/iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen"

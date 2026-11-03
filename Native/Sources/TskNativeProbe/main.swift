@@ -34,7 +34,6 @@ struct MutationProbe {
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
                 let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
                 let view = try await manager.saveView(name: "Other process completed", expression: "status:completed")
-                _ = try await manager.saveAttributeDefinition(name: "processScore", type: .numeric)
                 try write(["saved": saved.id.uuidString, "view": view.id.uuidString], to: arguments[4])
             } catch { try? write(["error": error.localizedDescription], to: arguments[4]) }
             return
@@ -57,16 +56,6 @@ struct MutationProbe {
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
                 let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
                 try write(["saved": saved.id.uuidString], to: arguments[6])
-            } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
-            return
-        }
-        if arguments.count == 7, arguments[1] == "save-attribute" {
-            do {
-                let directory = URL(fileURLWithPath: arguments[2])
-                let store = AttributeBarrierStore(directory: directory, ready: URL(fileURLWithPath: arguments[4]), release: URL(fileURLWithPath: arguments[5]))
-                let manager = TaskManager(replica: TaskChampionReplica(directory: directory), attributeDefinitions: store)
-                let saved = try await manager.saveAttributeDefinition(name: arguments[3], type: .string)
-                try write(["saved": saved.name.rawValue], to: arguments[6])
             } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
             return
         }
@@ -193,31 +182,6 @@ private actor SavedViewBarrierStore: TaskViewDefinitionsStore {
     }
 
     func save(_ definitions: [SavedTaskView]) async throws { try await native.save(definitions) }
-}
-
-private actor AttributeBarrierStore: TaskAttributeDefinitionsStore {
-    let native: LocalTaskAttributeStore
-    let ready: URL
-    let release: URL
-
-    init(directory: URL, ready: URL, release: URL) {
-        native = LocalTaskAttributeStore(directory: directory)
-        self.ready = ready
-        self.release = release
-    }
-
-    func load() async throws -> [TaskAttributeDefinition] {
-        let definitions = try await native.load()
-        try Data().write(to: ready)
-        let deadline = Date().addingTimeInterval(10)
-        while !FileManager.default.fileExists(atPath: release.path) {
-            guard Date() < deadline else { throw TaskManagementError.storage("Attribute-definition probe timed out") }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return definitions
-    }
-
-    func save(_ definitions: [TaskAttributeDefinition]) async throws { try await native.save(definitions) }
 }
 
 private actor ProcessReminderSource: ReminderMoveSource {
