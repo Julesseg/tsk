@@ -49,9 +49,10 @@ import XCTest
         XCTAssertEqual(field.value as? String, "Keyboard ownership n")
         focusTaskText(field, app: app)
         field.typeText(" revised n")
-        let revised = try XCTUnwrap(field.value as? String)
-        XCTAssertEqual(revised.components(separatedBy: " revised n").count, 2)
-        XCTAssertEqual(revised.replacingOccurrences(of: " revised n", with: ""), "Keyboard ownership n")
+        let editedDraft = try XCTUnwrap(field.value as? String)
+        XCTAssertEqual(editedDraft.components(separatedBy: " revised n").count, 2)
+        XCTAssertEqual(editedDraft.replacingOccurrences(of: " revised n", with: ""), "Keyboard ownership n")
+        let revised = editedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         try command("saveEdit")
         let revisedRow = taskRow(named: revised, app: app)
         let editorClosed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in

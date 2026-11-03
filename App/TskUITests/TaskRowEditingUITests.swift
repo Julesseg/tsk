@@ -330,7 +330,7 @@ import XCTest
             }
         }
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
-        XCTAssertTrue(revealTaskElement(note, in: "task-row-supporting-scroll", app: app))
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Draft note survives menu")
         openTaskRowParameter("project", app: app)
@@ -365,7 +365,7 @@ import XCTest
         focusTaskText(title, app: app)
         verifyProjectMenuFromFocusedText(app)
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
-        XCTAssertTrue(revealTaskElement(note, in: "task-row-supporting-scroll", app: app))
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Focused note survives menu")
         verifyProjectMenuFromFocusedText(app)

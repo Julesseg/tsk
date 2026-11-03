@@ -1753,3 +1753,57 @@ same10s budget. Selection24, execution-plan10, relay49, owner29, boundary3,
 Swift command6 and registration5 checks pass. The final generic arm64 build
 and strict App/Share/Widget/Shortcuts artifact check pass; no local simulator
 was booted. Canonical product focus/command results are still pending.
+
+
+### Inherited-eligibility result and two harness corrections
+
+At de263af, menu41587495304 and smoke41587482718 finished red, exactly two
+workflows/all16 jobs terminal, attempt1. Source/tree and canonical
+Xcode27A266a/SDK24A430/runtime24A434 identities match, including the smoke
+synthetic merge parent/tree. Both managed terminals were final-captured/killed.
+All5phone/6pad menu methods actually executed with no skips. Annotation modal/
+editor commands and standalone native input passed both; the broader iPad
+workspace seven-phase journey passed. Owned HID records contain10phone and17pad
+unique acknowledged exchanges, matching session/PID/replica/nonce, deadlines and
+released Command keys; owned process groups were reaped. Transport alone is not
+app acceptance.
+
+Direct TITLE focus, actual native opener, keyboard absence within the original
+five seconds BEFORE option, native New-project/Release/Done and selected value
+passed both families. The next Notes reveal failed because its string-container
+overload queries collectionViews, while both saved hierarchies identify the
+existing task-row-supporting-scroll as ScrollView. Notes/returned typing remain
+unverified; this is a wrong-type harness query, not an observed focus failure.
+Both stress methods passed High/reselect and two full cycles, then the third
+field was absent (phone86.306s/pad71.413s method durations). No focus20 result,
+no current touch-route attribution, and no full acceptance follow.
+
+The cross-family command method passed its first five owned phases through
+actual row save, then failed the10s post-save query. Actual video shows a saved
+collapsed row titled revised nKeyboard ownership n. Raw typed input included a
+leading space; TaskManager.updateTask195 trims whitespace/newlines. The test
+queried the untrimmed draft value. Existing keyboard receipts show execute save
+and workspace scopes restored. This does not establish failed command delivery;
+complete/view/Settings-return/recapture-save phases remain unattempted. Phone
+smoke crashed while bootstrapping its runner, with zero product methods; pad
+smoke passed both (358.299s/92.046s). No unchanged retry or full ran.
+
+The next head changes ONLY these measured harness errors: retain raw exact-once
+native typing assertions and derive a separate trimmed saved-description
+expectation for every post-save/durable lookup; pass the actual ScrollView to
+the existing reveal overload at the two Notes callsites. No product behavior,
+caret/input, global reveal helper, assertions, deadline, manifest or scope changes.
+Inherited eligibility remains UNVERIFIED, not accepted or rejected from these
+queries. Both independent committee reviews and Standards/Spec reviews converge
+on this bounded coverage correction with zero blocking findings. One changed-head
+same5/6 native HID/product manifest plus smoke can reach the blocked behaviors;
+this is not an unchanged retry. Genuine covered focus/command failures still
+reject the candidate; native option loss still blocks readiness/full even if
+focus and command coverage improve. No fallback, extra observer or host change.
+
+The corrected harness builds for arm64 and passes strict App/Share/Widget/
+Shortcuts artifact admission. Standards and Spec report zero findings. Actual
+video samples show the anchored Release popover on both families and the
+expanded Notes control after dismissal; these finite visual samples do not
+certify morph/design acceptance or intermittent reliability. No local simulator
+was booted. Counts/coverage and product code are unchanged on this harness head.
