@@ -2251,3 +2251,54 @@ an unrelated surviving process on Python 3.12 and 3.14. Descendant termination a
 pipe completion are checked separately from direct-child reaping. The corrected
 Menu 6/7 and smoke run must still recover all native method/phase/UI outcomes;
 process cleanup success cannot establish command acceptance.
+
+
+### Discovery cleanup result and completion-feedback observation
+
+At `7043372556cabec9dc8ce3c4923abac138ada60d`,
+[Menu 41638270845](https://github.com/Julesseg/tsk/actions/runs/41638270845)
+actually attempted all six phone and seven iPad methods. Phone passed all six
+without skips, including the original 20-cycle/focus20/Notes, direct Title/Notes
+and retained-open menu cases. Its fourteen owned HID exchanges completed the
+annotation four phases, native baseline and all nine workspace/editor phases.
+The initial discovery timeout was followed by a confirmed reap and an existing
+fresh lookup that succeeded. However, the post-test public-result query timed
+out after its original 60 seconds, so the owner returned124 despite xcodebuild0
+and an independently readable passing xcresult. This remains an infrastructure
+failure, not a green workflow or failed native command.
+
+On iPad, all three product menu cases plus annotation/native baseline passed.
+Workspace/editor compatibility reached six owned phases through Cmd-Shift-Return,
+then failed its unchanged ten-second row-disappearance assertion. Same-PID raw
+receipts show selector entry and execute complete, followed by mutation/reload
+completion. Video and hierarchy show the original checked/struck disabled row
+still rendered while the detail pane shows Completed. Command delivery and the
+business mutation are supported; later three phases remain unexecuted. The
+broader workspace case reached capture/save and failed Upcoming admission: its
+logged tab hit point was{-1,-1}, with All still selected. This does not establish
+a scheduling-membership or later command defect.
+
+[Smoke 41638256044](https://github.com/Julesseg/tsk/actions/runs/41638256044)
+passed all six actual methods. All head workflows/jobs reached terminal states
+and both managed terminals were captured and killed. No retry/full was dispatched.
+
+One temporary owned completion-feedback observation now records actual operation
+return, phase writes, before/after each existing pause, the one existing
+shouldRemove evaluation, cancellation/error and defer removal. It captures
+latest/all/visible membership and captured/current context with store, feedback,
+task and row-editing identity. Only the compatibility fixture opts in through
+the DEBUG simulator/session/replica UUID gate. No native input, original pause,
+ten-second assertion, host policy or product menu method is changed.
+
+The ring holds256events without eviction, flags drops, limits8operations and
+expires180seconds after installation. Fresh500ms MAIN checkpoints remain outside
+the ring and copy scalar state; the serial utility queue alone encodes/writes.
+A negative requires a same-identity checkpoint actually after the formal failure,
+zero drops/export failures, contiguous sequence coverage, fresh matching export
+and an unexpired observer. A stale zero-failure packet is not proof a later write
+succeeded. Green or incomplete coverage is inconclusive. The fork is suspended
+operation/phase versus membership/snapshot versus model-to-render reconciliation;
+shouldRemove=false alone cannot explain indefinite feedback because defer still
+clears it. Retire all instrumentation after this one comparison. The independent
+post-test query and Upcoming input issues are not patched on this head. Full78/69
+and all real HID/clean-head requirements remain; no full while red.

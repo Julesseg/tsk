@@ -50,26 +50,54 @@ final class TaskCompletionFeedback {
     }
 
     func complete(task: TaskRecord, visibleTasks: [TaskRecord], context: Context, animated: Bool,
-                  shouldRemove: () -> Bool, operation: () async -> TaskRecord?) async -> TaskRecord? {
+                  shouldRemove: () -> Bool, observe: ((String, [String: String]) -> Void)? = nil,
+                  operation: () async -> TaskRecord?) async -> TaskRecord? {
         guard entries[task.id] == nil else { return nil }
         let index = visibleTasks.firstIndex { $0.id == task.id } ?? 0
         entries[task.id] = Entry(task: task, index: index, preceding: visibleTasks.prefix(index).map(\.id),
             following: visibleTasks.dropFirst(index + 1).map(\.id), context: context, phase: .saving)
-        defer { entries[task.id] = nil }
-        guard let saved = await operation() else { return nil }
+        observe?("saving", [:])
+        defer {
+            entries[task.id] = nil
+            observe?("defer.removed", [:])
+        }
+        guard let saved = await operation() else {
+            observe?("operation.failed", [:])
+            return nil
+        }
+        observe?("operation.returned", ["savedStatus": saved.status])
         entries[task.id]?.phase = .checked
+        observe?("checked", [:])
         do {
-            if animated { try await pause(.milliseconds(400)) }
+            if animated {
+                observe?("pause.400.before", [:])
+                try await pause(.milliseconds(400))
+                observe?("pause.400.after", [:])
+            }
+            observe?("pause.1000.before", [:])
             try await pause(.seconds(1))
-            if shouldRemove() {
+            observe?("pause.1000.after", [:])
+            let remove = shouldRemove()
+            observe?("shouldRemove", ["result": String(remove)])
+            if remove {
                 if animated {
                     entries[task.id]?.phase = .covering
+                    observe?("covering", [:])
+                    observe?("pause.420.before", [:])
                     try await pause(.milliseconds(420))
+                    observe?("pause.420.after", [:])
                 }
                 entries[task.id]?.phase = .collapsing
-                if animated { try await pause(.milliseconds(240)) }
+                observe?("collapsing", [:])
+                if animated {
+                    observe?("pause.240.before", [:])
+                    try await pause(.milliseconds(240))
+                    observe?("pause.240.after", [:])
+                }
             }
-        } catch {}
+        } catch {
+            observe?("pause.error", ["error": String(describing: error), "cancelled": String(Task.isCancelled)])
+        }
         return saved
     }
 }

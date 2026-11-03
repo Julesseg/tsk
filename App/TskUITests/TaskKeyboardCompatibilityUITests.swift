@@ -19,6 +19,7 @@ import XCTest
         }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_COMPLETION_FEEDBACK_TRACE"] = app.launchEnvironment["TSK_TEST_REPLICA_NAME"]
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         app.launch()
