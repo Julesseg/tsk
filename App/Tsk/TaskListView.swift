@@ -230,7 +230,7 @@ struct TaskListRow: View {
                         if store.isSelectingTasks { store.toggleSelection(task.id) }
                         else if task.canEdit { expand() } else { edit(task) }
                     } label: { Color.clear.contentShape(Rectangle()) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(TaskRowTapButtonStyle())
                         .disabled(phase != nil || editing != nil)
                         .accessibilityLabel { _ in
                             VStack {
@@ -325,6 +325,16 @@ struct TaskListRow: View {
 
 @MainActor private final class TaskRowGeometry {
     var bounds = CGRect.zero
+}
+
+private struct TaskRowTapButtonStyle: PrimitiveButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.onTapGesture {
+            if isEnabled { configuration.trigger() }
+        }
+    }
 }
 
 private struct TaskRowFocusOffset: ViewModifier {
