@@ -17,6 +17,13 @@ check one five-second budget, accepted geometry and at-most-once action selectio
 It imports standard CoreGraphics geometry without making UI or provider calls.
 These checks do not establish native input delivery or application response.
 
+The readiness target also compiles the exact outside-row gesture geometry through
+a relative symlink. Captured snapshot roles, frames and ancestry verify content
+chrome exclusion, bounded keyboard occlusion, foreign-surface rejection and safe
+point selection. Unknown roles remain nontraversable. The XCTest adapter retains
+fresh acquisition, its original deadline and one native coordinate tap; these
+host checks do not establish the actual gesture recipient or save outcome.
+
 A third dependency-free target compiles the actual keyboard registration decision
 through a relative symlink. It checks declaration changes, weak host ownership and
 unchanged-update suppression. UIKit installation and current-scope action dispatch

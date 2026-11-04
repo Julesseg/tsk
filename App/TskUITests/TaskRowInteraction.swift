@@ -138,18 +138,114 @@ extension XCTestCase {
 }
 
 extension XCTestCase {
-    @MainActor func closeTaskRow(_ app: XCUIApplication) {
-        let keyboard = app.keyboards.firstMatch
-        let bottom = keyboard.exists && keyboard.frame.height > 0 ? keyboard.frame.minY : app.frame.maxY
-        let viewport = CGRect(x: app.frame.minX, y: app.frame.minY, width: app.frame.width, height: max(0, bottom - app.frame.minY))
-        let targets = app.buttons.matching(identifier: "task-row-outside").allElementsBoundByIndex
-            .map { ($0, $0.frame.intersection(viewport)) }
-            .filter { !$0.1.isNull && !$0.1.isEmpty }
-        guard let target = targets.max(by: { $0.1.width * $0.1.height < $1.1.width * $1.1.height }) else {
-            XCTFail("No visible outside-tap region for the task row")
+    @MainActor func closeTaskRow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: TaskRowOutsideGeometry?
+        var latest: TaskRowOutsideGeometry?
+        var latestAnchor: XCUIElement?
+        var lastSample = "not sampled"
+        func require(_ condition: Bool, _ reason: String) throws {
+            guard ProcessInfo.processInfo.systemUptime < deadline else {
+                throw TaskRowOutsideGeometry.Failure(reason: "deadline expired")
+            }
+            guard condition else { throw TaskRowOutsideGeometry.Failure(reason: reason) }
+        }
+        func sample() -> Bool {
+            do {
+                try require(true, "deadline expired")
+                try require(app.state == .runningForeground, "application is not foreground")
+                let snapshot = try app.snapshot()
+                var nodes: [TaskRowOutsideGeometry.Node] = []
+                func collect(_ value: any XCUIElementSnapshot, ancestors: [Int], path: [Int]) throws {
+                    try require(nodes.count < 4096, "snapshot node cap")
+                    let kind: TaskRowOutsideGeometry.ElementType
+                    switch value.elementType {
+                    case .other: kind = .other
+                    case .window: kind = .window
+                    case .cell: kind = .cell
+                    case .collectionView: kind = .collectionView
+                    case .navigationBar: kind = .navigationBar
+                    case .tabBar: kind = .tabBar
+                    case .toolbar: kind = .toolbar
+                    case .keyboard: kind = .keyboard
+                    case .button: kind = .button
+                    case .switch: kind = .switch
+                    case .textField: kind = .textField
+                    case .textView: kind = .textView
+                    case .searchField: kind = .searchField
+                    case .link: kind = .link
+                    case .slider: kind = .slider
+                    case .stepper: kind = .stepper
+                    case .picker: kind = .picker
+                    case .pickerWheel: kind = .pickerWheel
+                    case .datePicker: kind = .datePicker
+                    case .segmentedControl: kind = .segmentedControl
+                    case .scrollBar: kind = .scrollBar
+                    case .sheet: kind = .sheet
+                    case .popover: kind = .popover
+                    case .alert: kind = .alert
+                    case .dialog: kind = .dialog
+                    case .menu: kind = .menu
+                    default: kind = .unclassified
+                    }
+                    let index = nodes.count
+                    nodes.append(.init(value: .init(elementType: kind, identifier: value.identifier,
+                                                    frame: value.frame, isEnabled: value.isEnabled),
+                                       ancestors: ancestors, path: path))
+                    for (childIndex, child) in value.children.enumerated() {
+                        try collect(child, ancestors: ancestors + [index], path: path + [childIndex])
+                    }
+                }
+                try collect(snapshot, ancestors: [], path: [])
+                let current = try TaskRowOutsideGeometry.admit(applicationFrame: snapshot.frame, nodes: nodes)
+                let lists = app.collectionViews.matching(identifier: current.listIdentifier)
+                    .containing(.any, identifier: "task-description").allElementsBoundByAccessibilityElement
+                try require(lists.count == 1, "physical task list is unavailable or ambiguous")
+                let anchor: XCUIElement
+                if current.reportedAppFrame.isEmpty {
+                    let windows = app.windows.containing(.any, identifier: "task-description").allElementsBoundByAccessibilityElement
+                    try require(windows.count == 1, "coordinate window is unavailable or ambiguous")
+                    anchor = windows[0]
+                } else {
+                    anchor = app
+                }
+                try require(true, "deadline expired")
+                latest = current
+                latestAnchor = anchor
+                let stable = previous == current
+                previous = current
+                lastSample = "\(current.diagnostic) stable=\(stable)"
+                return stable
+            } catch {
+                previous = nil
+                latest = nil
+                latestAnchor = nil
+                lastSample = String(describing: error)
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready && remaining > 0 {
+            let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [expectation], timeout: remaining) == .completed
+        }
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline, let geometry = latest, let anchor = latestAnchor else {
+            let detail = XCTAttachment(string: "Outside gesture admission: \(lastSample)\n" + app.debugDescription)
+            detail.name = "Outside gesture admission failure"; detail.lifetime = .keepAlways; add(detail)
+            let picture = XCTAttachment(screenshot: app.screenshot())
+            picture.name = "Outside gesture admission endpoint"; picture.lifetime = .keepAlways; add(picture)
+            XCTFail("No admitted physical outside-save point: \(lastSample)", file: file, line: line)
             return
         }
-        tapTaskControlAtCenter(target.0, app: app,
-                               requiresVisibleKeyboard: keyboard.exists && keyboard.frame.height > 0)
+        print("Outside gesture admitted: \(lastSample)")
+        let coordinate = anchor.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: geometry.target.midX - geometry.appFrame.minX,
+                                 dy: geometry.target.midY - geometry.appFrame.minY))
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            XCTFail("Outside-save admission expired before native input", file: file, line: line)
+            return
+        }
+        coordinate.tap()
     }
 }
