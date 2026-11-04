@@ -118,7 +118,7 @@ def fetch_pages(endpoint, remaining=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--family', choices=['iPhone', 'iPad'], required=True)
+    parser.add_argument('--family', choices=['iPhone'], required=True)
     parser.add_argument('--partitions', required=True)
     parser.add_argument('--run-id', type=int)
     parser.add_argument('--attempt', type=int, default=int(os.environ.get('GITHUB_RUN_ATTEMPT', '1')))

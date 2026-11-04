@@ -14,7 +14,7 @@ import time
 import uuid
 
 CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys'
-CASES = {CASE: ['commandReturn'], 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['secondNoteCommandN', 'secondNoteSave', 'editSelectAll', 'editedNoteSave'], 'iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen': ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'complete', 'completedView']}
+CASES = {CASE: ['commandReturn'], 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['secondNoteCommandN', 'secondNoteSave', 'editSelectAll', 'editedNoteSave']}
 CASES['TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'] = ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'complete', 'completedView', 'captureAfterReturn', 'saveAfterReturn']
 MARKER = b'TSK_KEYBOARD_COMMAND_REQUEST_V1 '
 
@@ -65,8 +65,6 @@ def passed_case(document, expected=None, relay=None):
         outcomes = cases.get(name, [])
         record = relay.get('cases', {}).get(name, {})
         if outcomes == ['Passed'] and record.get('completed') == CASES[name] and record.get('result') == 'passed':
-            continue
-        if name.startswith('iPadWorkspaceUITests/') and outcomes == ['Skipped'] and record.get('completed') == [] and record.get('result') == 'skipped':
             continue
         return False
     return True

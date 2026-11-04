@@ -1,6 +1,6 @@
 # tsk
 
-A native iOS and iPadOS Taskwarrior client backed by TaskChampion. Task data is
+A native iPhone Taskwarrior client backed by TaskChampion. Task data is
 stored locally in a shared App Group and synchronized through TaskChampion's
 encrypted protocol. `TskCore` owns task behavior; `TskNative` connects storage and
 system services; SwiftUI presents the app, Share extension and widgets.
@@ -12,7 +12,7 @@ import and task-date notifications. The designated desktop Taskwarrior client
 creates recurring occurrences after sync and a recurrence-enabled report.
 
 Portable Core tests, real native/Taskwarrior interoperability checks and signed
-generic builds cover the implementation. Canonical iPhone/iPad XCUITest is the
+generic builds cover the implementation. Canonical iPhone XCUITest is the
 runtime gate; current failures still require fixes and another run. Distribution
 requires App Group-capable profiles for the app and both extensions. Physical
 keyboard, personal-account, Focus and background behavior require separate
@@ -29,12 +29,14 @@ decisions in [docs/adr](docs/adr/), and source-based feasibility findings in
 The PRD is published as [spec #3](https://github.com/Julesseg/tsk/issues/3) in
 the issue tracker for implementation planning.
 
+Native iPad support is retired; the current platform scope is [iPhone only](docs/adr/0007-iphone-only.md).
+
 ## Development
 
 - Open `App/Tsk.xcodeproj` in Xcode and select the `Tsk` scheme.
 - Run Core tests: `cd Core && swift test`.
 - App display name: `tsk`; bundle identifier: `com.julesseguin.tsk`.
-- Targets iOS/iPadOS 26.0 and later, with Swift 6.
+- Targets iOS 26.0 and later, with Swift 6.
 
 ## Layout
 

@@ -1,39 +1,36 @@
 # CI test tiers
 
-PRs and pushes to `main` run all Core and persistent Native tests plus smoke
-coverage on both device families. `App · XCUITest (macOS)` and
-`App · XCUITest (iPad)` remain the required checks. Nightly runs use full
-coverage. The manual form defaults to smoke; choose coverage explicitly when
-using the dispatch helper.
+PRs and pushes to `main` run all Core and persistent Native tests plus iPhone
+smoke coverage. `App · XCUITest (macOS)` remains the required iPhone rollup;
+its legacy name refers to the Mac runner, not a macOS app. Native iPad support,
+its UI tests and CI jobs are retired under [ADR 0007](../adr/0007-iphone-only.md).
+Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 
-| Coverage | iPhone | iPad | Trigger |
-| --- | --- | --- | --- |
-| Smoke | 4 methods | 2 methods | PR, main push, explicit dispatch |
-| Full | 72 methods | 66 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 12 methods | — | `diagnostic_only=true` |
-| Keyboard | 12 methods | 10 methods | Explicit dispatch |
-| Text | 4 methods | 4 methods | Explicit dispatch |
-| Regression | 5 methods | 6 methods | Explicit dispatch |
-| Menu | 6 methods | 7 methods | Explicit dispatch |
+| Coverage | iPhone | Trigger |
+| --- | --- | --- |
+| Smoke | 4 methods | PR, main push, explicit dispatch |
+| Full | 72 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 12 methods | `diagnostic_only=true` |
+| Keyboard | 12 methods | Explicit dispatch |
+| Text | 4 methods | Explicit dispatch |
+| Regression | 5 methods | Explicit dispatch |
+| Menu | 6 methods | Explicit dispatch |
 
 Smoke covers capture, validation, cancellation, durable row editing/completion,
-view ordering/capacity and real-server sync on iPhone, plus adaptive navigation
-and row editing on iPad. Hardware keyboard, installed Share/widgets/Spotlight,
+view ordering/capacity and real-server sync on iPhone. Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
-full-suite assertions. Green smoke does not certify them. Full coverage on both
-families is required before accepting workflow changes, system integrations or
+full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.
 
 Custom-attribute editors/definitions and their dedicated cases are retired. The
 built-in arithmetic saved-view test remains in Keyboard/Text. Share coverage now
 checks automatic plain-description capture without an editor or extra fields.
 
-Regression coverage retains the installed Share, durable/organization row editing,
-and view-reorder journeys on both families, plus the
-iPad keyboard/calendar journey. It is a focused diagnostic loop for the observed
-failures, with original input, assertions and deadlines. It does not replace
-smoke or full acceptance. Only its iPad worker needs the native keyboard fixture;
-neither worker needs the synchronization server or peer.
+Regression coverage retains installed Share, durable/organization row editing,
+view reordering and the repeated native menu journey on iPhone. It is a focused
+diagnostic loop with the original input, assertions and deadlines; it does not
+replace smoke or full acceptance. It needs neither native keyboard transport
+nor a synchronization server or peer.
 
 The native menu regression opens and dismisses New project twenty times in one
 process after the original High selection/reselection sequence. Each cycle
@@ -47,14 +44,12 @@ to title/note editing. An independent title/Notes focus regression reaches the s
 keyboard-before-option assertion immediately on a fresh fixture, then verifies
 actual field/Done behavior and returned text editing. It does not replace the
 repeated case. Menu coverage retains both product methods and selects actual
-native HID compatibility on both families: the standalone native input baseline,
+native HID compatibility on iPhone: the standalone native input baseline,
 the annotation presentation/editor scope, and a cross-family workspace/row-editor
 journey. The latter starts without focused input, captures and saves with actual
 commands, checks plain typing and selected-row editing/completion/view commands,
 then verifies capture/save after returning from Settings and durable results.
-iPad also retains its broader injected workspace journey; its iPad-only class
-cannot supply phone coverage. Both menu workers therefore require the native
-keyboard fixture, but neither requires the synchronization server or peer.
+The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
 Transport ownership and complete case-specific phase acknowledgements must match
 the native UI outcomes; a fallback action or transport ACK alone is insufficient.
 Diagnostic menu rollups remain distinct from required smoke/full checks. The
@@ -74,19 +69,13 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Permanent full coverage is 72/66 across the same four workers:
-iPhone 39+33 and iPad 34+32. The three iPad-only workspace methods remain selected
-on iPad and are excluded from iPhone rather than being counted as skipped phone
-coverage. The cross-family workspace/editor HID case remains selected on both.
-The completed isolated real-component fixture and
-Action dispatch/rollup surface are removed; the production stress, independent
-focus and retention regressions remain. Menu 6/7 includes the actual HID ownership
-requirements on both families. The complete-status publication correction skips
-only unchanged successful status assignments; every poll, manager read, error
-path and fixture bookkeeping remains. Both canonical action comparisons and smoke
-passed at 440b1a2, including 20 cycles, Title/Notes and retained-open selection on
-both families. That focused result does not replace clean-head HID, broader
-regressions, full coverage or physical-device verification.
+in existing methods. Full coverage retains all 72 iPhone methods without skips,
+partitioned 39 workspace / 33 task-row methods. The retired iPad-only class and
+its seven-phase transport case are removed; the iPhone workspace/editor journey
+still requires all nine phases, alongside annotation and native-control coverage.
+Historical reports before ADR 0007 include retired iPad runs and do not establish
+current iPhone acceptance. Focused diagnostics do not replace clean-head full
+coverage or physical-device verification.
 
 ## Build once, execute selected coverage
 
@@ -103,27 +92,24 @@ before installing anything. The producer's immutable artifact ID selects the
 products, including on partial reruns. A worker cannot silently consume products
 from another source or toolchain.
 
-Smoke uses two Mac workers; full uses four. Full retains the `workspace` and
-`row-editing` partition IDs/artifact names for compatibility. `row-editing` now
-includes ordinary task, built-in filter, recurrence and automation journeys:
+Smoke uses one Mac execution worker; full uses two, after the shared producer.
+The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
 | iPhone | 39 methods | 33 methods |
-| iPad | 34 methods | 32 methods |
 
-The partition union is exactly the full selection, with no duplicates.
+The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers
-remain in workspace. Task workers require neither native HID nor a server.
-iPad smoke also uses neither. Share still executes before the rest of its worker.
-Portable selection and ownership regressions run once on Linux; controller
-regressions run once in the shared producer.
+remain in workspace. The task worker requires neither native HID nor a server.
+Share executes before the rest of its worker. Portable selection and ownership
+regressions run once on Linux; controller regressions run in the producer.
 
-The split uses historical successful method medians, approximately 66/65 minutes
-on iPhone and 72/68 on iPad before setup. These are balance estimates across
-source versions, not promised duration or passing evidence. Four workers are
-retained rather than assuming additional runner capacity. Measure new timings
-before changing parallelism or setting shorter full-suite budgets.
+Measure the complete iPhone-only workflow, including build, setup, queue and
+cleanup, before deciding whether full coverage belongs in PR checks. Removing
+iPad reduces runner work; it does not automatically halve elapsed time because
+the previous device workers ran in parallel. PR coverage remains smoke until a
+measured result supports changing that policy.
 
 Every execution worker owns one disposable simulator. Existing isolated
 ownership, cleanup traps and `always()` deletion remain. During Share and main
@@ -179,7 +165,7 @@ Use the helper after publishing a frozen branch:
 
 ```sh
 python3 scripts/dispatch-ui-tests.py --ref <branch> --suite full \
-  --reason 'Verify workflow changes on both device families'
+  --reason 'Measure complete iPhone coverage after retiring native iPad support'
 ```
 
 It reuses queued/running manual work only for matching source, branch and suite.
@@ -212,6 +198,6 @@ Inspect selections without booting a simulator:
 
 ```sh
 python3 scripts/plan-ui-tests.py full
-python3 scripts/ui-test-selection.py select full iPad --partition row-editing
+python3 scripts/ui-test-selection.py select full iPhone --partition row-editing
 python3 scripts/test-ui-test-selection.py
 ```

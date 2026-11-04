@@ -30,17 +30,19 @@ summary = load('summarize-ui-execution')
 
 
 class ExecutionTests(unittest.TestCase):
-    def test_plans_keep_four_full_workers_and_skip_unused_smoke_fixtures(self):
+    def test_plans_keep_two_iphone_full_workers_and_skip_unused_smoke_fixtures(self):
         full = plan.plan('full')
-        self.assertEqual(len(full['matrix']['include']), 4)
+        self.assertEqual(full['families'], ['iPhone'])
+        self.assertEqual(len(full['matrix']['include']), 2)
         for worker in full['matrix']['include']:
             self.assertEqual(worker['native_keyboard'], worker['partition'] == 'workspace')
             self.assertEqual(worker['server'], worker['partition'] == 'workspace')
             self.assertEqual(worker['peer'], worker['partition'] == 'workspace')
         smoke = plan.plan('smoke')
-        self.assertEqual(len(smoke['matrix']['include']), 2)
+        self.assertEqual(smoke['families'], ['iPhone'])
+        self.assertEqual(len(smoke['matrix']['include']), 1)
         self.assertFalse(any(worker['native_keyboard'] for worker in smoke['matrix']['include']))
-        self.assertEqual([worker['server'] for worker in smoke['matrix']['include']], [True, False])
+        self.assertEqual([worker['server'] for worker in smoke['matrix']['include']], [True])
         self.assertEqual(plan.plan('diagnostic')['families'], ['iPhone'])
         self.assertFalse(plan.plan('text')['server'])
         plan.validate_source('frozen', 'frozen')

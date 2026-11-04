@@ -10,19 +10,6 @@ PHONE_SMOKE = (
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
 )
-PAD_SMOKE = (
-    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-    "iPadWorkspaceUITests/testProjectTodayWaitingUpcomingAndPortraitKeepOneTask",
-)
-PAD_FULL = (
-    "WorkspaceSettingsUITests", "TaskKeyboardCompatibilityUITests",
-    "ShareCaptureUITests", "SynchronizationUITests", "iPadWorkspaceUITests",
-    "TaskAnnotationUITests", "TaskAutomationUITests", "RecurringTemplateUITests",
-    "SeriesMetadataUITests", "SeriesTransitionUITests",
-    "TypedFilterUITests", "ReminderImportUITests", "ContinuousReminderImportUITests",
-    "TaskRowEditingUITests", "TaskScheduledUITests", "TaskPresentationUITests", "TaskActivityUITests", "ReminderRecurrenceUITests", "CalendarTodayUITests", "CalendarPresentationUITests",
-    "WidgetUITests", "SpotlightUITests", "TaskNotificationUITests", "MissedNotificationUITests",
-)
 DIAGNOSTIC = (
     "ShareCaptureUITests", "CustomViewsUITests", "TaskAnnotationUITests", "MissedNotificationUITests",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
@@ -103,25 +90,23 @@ def selected_methods(filters):
 
 
 def selection(suite, family, partition="all"):
+    if family != "iPhone":
+        raise ValueError("Only iPhone UI coverage is supported")
     if suite == "menu":
-        tests = MENU + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
+        tests = MENU
     elif suite == "regression":
-        tests = REGRESSION + (("iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen",) if family == "iPad" else ())
+        tests = REGRESSION
     elif suite == "text":
         tests = TEXT
     elif suite == "keyboard":
-        tests = KEYBOARD + (PHONE_KEYBOARD if family == "iPhone" else ())
+        tests = KEYBOARD + PHONE_KEYBOARD
     elif suite == "diagnostic":
-        if family != "iPhone":
-            raise ValueError("Diagnostic coverage requires iPhone")
         tests = DIAGNOSTIC
     elif suite == "full":
-        tests = PAD_FULL if family == "iPad" else ()
+        tests = ()
     else:
-        tests = PAD_SMOKE if family == "iPad" else PHONE_SMOKE
+        tests = PHONE_SMOKE
     filters = ["-only-testing:TskUITests/" + test for test in tests]
-    if suite == "full" and family == "iPhone":
-        filters.append("-skip-testing:TskUITests/iPadWorkspaceUITests")
     available = test_methods()
     for item in filters:
         selector = item.removeprefix("-only-testing:").removeprefix("-skip-testing:")
@@ -131,7 +116,7 @@ def selection(suite, family, partition="all"):
         return filters
     selected = selected_methods(filters)
     rows = {test for test in selected if matches(test, "TskUITests/TaskRowEditingUITests")}
-    task_classes = TASK_PARTITION | (PHONE_TASK_PARTITION if family == 'iPhone' else {'WorkspaceSettingsUITests'})
+    task_classes = TASK_PARTITION | PHONE_TASK_PARTITION
     row_group = {test for test in selected if test.split('/')[1] in task_classes}
     if partition == "row-editing":
         chosen = row_group
@@ -173,7 +158,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
     select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu"))
-    select.add_argument("family", choices=("iPhone", "iPad"))
+    select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")
     phase.add_argument("filters", nargs=argparse.REMAINDER)

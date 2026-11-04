@@ -14,9 +14,7 @@ struct ContentView: View {
     }
 
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
@@ -42,7 +40,6 @@ struct ContentView: View {
     @State private var path: [UUID] = []
     @State private var linkedTaskIDs: Set<UUID> = []
     @State private var sidebarError: String?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var projectPath = NavigationPath()
 
     init(store: TaskStore) {
@@ -82,19 +79,10 @@ struct ContentView: View {
     private func showInformation(_ task: TaskRecord) {
         selectedTaskID = task.id
         if isProjectWorkspace { projectPath.append(task.id) }
-        else if presentation != .columns { path = [task.id] }
-    }
-
-    private var presentation: TaskWorkspacePresentation {
-        if sizeClass != .regular { return .compact }
-        return dynamicTypeSize.isAccessibilitySize ? .accessibilityColumns : .columns
+        else { path = [task.id] }
     }
 
     private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects && store.customView == nil }
-    private var isShowingLinkedColumn: Bool {
-        presentation == .columns && !isProjectWorkspace && selectedTask?.canEdit == true
-            && selectedTaskID.map(linkedTaskIDs.contains) == true
-    }
 
     private var tabSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
@@ -111,12 +99,6 @@ struct ContentView: View {
         projectPath = NavigationPath()
         selectedTaskID = nil
         path = []
-    }
-
-    private var taskNavigationPath: Binding<[UUID]> {
-        if presentation == .accessibilityColumns {
-            Binding(get: { selectedTaskID.map { [$0] } ?? [] }, set: { selectedTaskID = $0.last })
-        } else { $path }
     }
 
     private var workspaceTabSelection: Binding<WorkspaceTab> {
@@ -145,7 +127,6 @@ struct ContentView: View {
                         Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                             if view == store.selectedWorkspaceView {
                                 workspaceContent
-                                    .environment(\.horizontalSizeClass, sizeClass)
                             }
                         }
                         .accessibilityIdentifier("tab-" + view.id)
@@ -156,8 +137,6 @@ struct ContentView: View {
                     .accessibilityIdentifier("new-task")
                 }
                 .tabViewStyle(.tabBarOnly)
-                // Keep the native tab bar at the bottom on iPad while retaining regular content columns.
-                .environment(\.horizontalSizeClass, .compact)
             }
         }
     }
@@ -187,23 +166,12 @@ struct ContentView: View {
         .accessibilityIdentifier("new-task")
     }
 
-    @ViewBuilder private var tasksWorkspace: some View {
-        if presentation == .columns {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                taskList(selection: $selectedTaskID)
-                    .navigationSplitViewColumnWidth(min: 260, ideal: 360, max: 480)
-            } detail: {
-                selectedTaskDetail
-            }
-            .navigationSplitViewStyle(.balanced)
-            .accessibilityIdentifier("task-workspace")
-        } else {
-            NavigationStack(path: taskNavigationPath) {
-                taskList(selection: presentation == .accessibilityColumns ? $selectedTaskID : nil)
-                    .navigationDestination(for: UUID.self) { id in taskDestination(id) }
-            }
-            .accessibilityIdentifier("workspace-accessibility-navigation")
+    private var tasksWorkspace: some View {
+        NavigationStack(path: $path) {
+            taskList()
+                .navigationDestination(for: UUID.self) { id in taskDestination(id) }
         }
+        .accessibilityIdentifier("task-workspace")
     }
 
     private var projectsWorkspace: some View {
@@ -226,7 +194,7 @@ struct ContentView: View {
                 settingsToolbar
             }
             .navigationDestination(for: TaskProjectSelection.self) { project in
-                taskList(selection: nil, title: project.projectName ?? "No project")
+                taskList(title: project.projectName ?? "No project")
                     .onAppear { openProject(project) }
             }
             .navigationDestination(for: UUID.self) { id in
@@ -244,22 +212,10 @@ struct ContentView: View {
             .accessibilityIdentifier("project-" + title)
     }
 
-    private var selectedTaskDetail: some View {
-        Group {
-            if let task = selectedTask {
-                taskDestination(task.id).id(task.id)
-            } else {
-                ContentUnavailableView("Select a task", systemImage: "sidebar.right", description: Text("Choose a task to review its details, edit it, or mark it complete."))
-                    .accessibilityIdentifier("workspace-detail-empty")
-            }
-        }
-        .toolbar { settingsToolbar }
-    }
-
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
         if let task = store.allTasks.first(where: { $0.id == id }) {
             if linkedTaskIDs.contains(id), task.canEdit {
-                TaskLinkedTaskList(source: store, taskID: id, onBack: isShowingLinkedColumn ? { selectedTaskID = nil } : nil)
+                TaskLinkedTaskList(source: store, taskID: id)
             } else {
                 TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
             }
@@ -342,11 +298,7 @@ struct ContentView: View {
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
-        .onChange(of: path) { _, newPath in if presentation != .columns || isProjectWorkspace { selectedTaskID = newPath.last } }
-        .onChange(of: presentation) { previous, current in
-            if previous != .columns { selectedTaskID = path.last ?? selectedTaskID }
-            path = current != .columns ? selectedTaskID.map { [$0] } ?? [] : []
-        }
+        .onChange(of: path) { _, newPath in selectedTaskID = newPath.last }
     }
 
     private var applicationLifecycle: some View {
@@ -391,15 +343,13 @@ struct ContentView: View {
 
     private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
 
-    private func taskList(selection: Binding<UUID?>?, title: String? = nil) -> some View {
-        TaskListView(store: store, selection: selection, calendar: calendar, edit: { showInformation($0) })
-            .disabled(isShowingLinkedColumn)
-            .accessibilityHidden(isShowingLinkedColumn)
+    private func taskList(title: String? = nil) -> some View {
+        TaskListView(store: store, calendar: calendar, edit: { showInformation($0) })
             .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
-                if presentation != .columns || isProjectWorkspace { settingsToolbar }
+                settingsToolbar
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
@@ -492,7 +442,7 @@ struct ContentView: View {
             move: moveSelection,
             reveal: selectedTask.map { task in {
                 if isProjectWorkspace { projectPath.append(task.id) }
-                else if presentation != .columns { path = [task.id] }
+                else { path = [task.id] }
             } },
             openView: openView,
             refresh: { Task { await store.reload() } }
@@ -520,7 +470,7 @@ struct ContentView: View {
 
     private func moveSelection(_ movement: TaskSelectionMovement) {
         selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if presentation != .columns, !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
+        if !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {
@@ -533,10 +483,6 @@ private struct TaskListSelection: Equatable {
     let query: TaskQuery
     let project: TaskProjectSelection
     let customView: CustomViewSelection?
-}
-
-private enum TaskWorkspacePresentation: Equatable {
-    case columns, accessibilityColumns, compact
 }
 
 struct TaskRowDismissalOverlay: View {

@@ -1054,14 +1054,14 @@ class FileAndMappingTests(unittest.TestCase):
         expected={
             relay.CASE: {'commandReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
             relay.ANNOTATIONS: {'secondNoteCommandN': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'secondNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'editSelectAll': ((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')), 'editedNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
-            relay.WORKSPACE: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
+            relay.COMPATIBILITY: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
         expected[relay.COMPATIBILITY] = {
-            **expected[relay.WORKSPACE],
+            **expected[relay.COMPATIBILITY],
             'captureAfterReturn': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),
             'saveAfterReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),
         }
         self.assertEqual(relay.CHORDS,expected)
-        self.assertEqual(relay.releases(expected[relay.WORKSPACE]['complete']),((40,'UP'),(225,'UP'),(227,'UP')))
+        self.assertEqual(relay.releases(expected[relay.COMPATIBILITY]['complete']),((40,'UP'),(225,'UP'),(227,'UP')))
 
 
 if __name__=='__main__':unittest.main()

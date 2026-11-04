@@ -4,7 +4,7 @@ import XCTest
 @MainActor final class TaskKeyboardCompatibilityUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        XCUIDevice.shared.orientation = .portrait
     }
 
     override func tearDownWithError() throws {

@@ -4,7 +4,6 @@ import TskCore
 
 struct TaskListView: View {
     let store: TaskStore
-    let selection: Binding<UUID?>?
     let calendar: TodayCalendarController
     let edit: (TaskRecord) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -16,7 +15,7 @@ struct TaskListView: View {
         Group {
             if store.customView == nil && store.query == .today {
                 ScrollViewReader { proxy in
-                    List(selection: selection) {
+                    List {
                         TodayCalendarSection(calendar: calendar)
                         Section {
                             if let error = store.error, store.visibleTasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
@@ -27,7 +26,6 @@ struct TaskListView: View {
                         .listRowBackground(Color.clear)
                     }.accessibilityIdentifier("task-list")
                         .refreshable { await store.reload(); await calendar.refresh() }
-                        .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                         .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                         .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                         .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
@@ -41,17 +39,16 @@ struct TaskListView: View {
             } else if store.visibleTasks.isEmpty {
                 ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(store.customView != nil ? "Edit the filter or choose another view to find tasks." : "Capture a task to get started. Saved tasks stay on this device when you're offline."))
             } else if store.customView == nil && store.query == .upcoming {
-                UpcomingTaskList(store: store, selection: selection, edit: edit, viewport: CGRect(origin: geometry.frame(in: .global).origin, size: CGSize(width: geometry.size.width, height: geometry.size.height - keyboardInset)))
+                UpcomingTaskList(store: store, edit: edit, viewport: CGRect(origin: geometry.frame(in: .global).origin, size: CGSize(width: geometry.size.width, height: geometry.size.height - keyboardInset)))
             } else {
                 ScrollViewReader { proxy in
-                    List(selection: selection) {
+                    List {
                         ForEach(store.visibleTasks) { task in
                             TaskListRow(task: task, store: store, edit: edit)
                         }
                     }
                     .accessibilityIdentifier("task-list")
                     .refreshable { await store.reload() }
-                    .onChange(of: selection?.wrappedValue) { _, id in if let id { proxy.scrollTo(id) } }
                     .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }

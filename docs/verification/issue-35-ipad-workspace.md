@@ -1,5 +1,7 @@
 # Adaptive workspace and keyboard verification
 
+Native iPad requirements below are historical and superseded by [ADR 0007](../adr/0007-iphone-only.md).
+
 Wide windows use the native three-column `NavigationSplitView`: task views, projects, and saved filters in the sidebar; the existing task list in the content column; and the shared task detail in the detail column. Narrow windows use the native navigation stack and existing segmented/project controls. Native lists, forms, sidebar styles, materials, toolbars, Dynamic Type, and semantic labels retain system appearance, including Liquid Glass on supported systems.
 
 At accessibility Dynamic Type sizes, regular windows use a two-column sidebar and task navigation stack. Body-scaled sidebar width hints are bounded by the available window width so task content retains space. Selecting a task opens the same shared detail within the stack, and Back returns to the list. Ordinary text keeps the three-column workspace; narrow windows keep the compact controls. The selected UUID remains shared across these presentations, without capping text scaling.

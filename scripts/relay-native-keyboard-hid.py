@@ -18,7 +18,6 @@ PREFIX = b'TSK_KEYBOARD_COMMAND_REQUEST_V1 '
 ABORT = b'TSK_KEYBOARD_COMMAND_ABORT_V1 '
 CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys'
 ANNOTATIONS = 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations'
-WORKSPACE = 'iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen'
 COMPATIBILITY = 'TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'
 RUNNER = 'com.julesseguin.tsk.uitests.xctrunner'
 CONTAINER_PREPARATION_SECONDS = 30
@@ -34,7 +33,6 @@ def chord(key, shift=False):
 CHORDS = {
     CASE: {'commandReturn': CHORD},
     ANNOTATIONS: {'secondNoteCommandN': chord(17), 'secondNoteSave': CHORD, 'editSelectAll': chord(4), 'editedNoteSave': CHORD},
-    WORKSPACE: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33)},
     COMPATIBILITY: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33), 'captureAfterReturn': chord(17), 'saveAfterReturn': CHORD},
 }
 BOUNDARY = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \([\d.,]+ seconds\)\.)$")

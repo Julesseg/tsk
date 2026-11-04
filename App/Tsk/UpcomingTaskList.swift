@@ -3,14 +3,13 @@ import TskCore
 
 struct UpcomingTaskList: View {
     let store: TaskStore
-    var selection: Binding<UUID?>? = nil
     let edit: (TaskRecord) -> Void
     var viewport = CGRect.zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollViewReader { proxy in
-            List(selection: selection) {
+            List {
                 ForEach(store.upcomingDays) { group in
                     Section {
                         ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
@@ -37,9 +36,7 @@ struct UpcomingTaskList: View {
             .task(id: viewport.height) { await Task.yield(); revealEditor(using: proxy) }
             .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy) }
             .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy) }
-            .onChange(of: selection?.wrappedValue) { _, id in
-                if let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.task.id == id }) { proxy.scrollTo(entry.id) }
-            }
+
         }
     }
 

@@ -242,7 +242,7 @@ jobs:
     timeout-minutes: ${{ needs.changes.outputs.suite == 'full' && 165 || needs.changes.outputs.suite == 'smoke' && 60 || 90 }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.changes.outputs.matrix || '{"include":[{"family":"iPhone","partition":"all"},{"family":"iPad","partition":"all"}]}') }}
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix || '{"include":[{"family":"iPhone","partition":"all"}]}') }}
     steps:
       - name: Documentation-only change
         if: needs.changes.outputs.run_tests == 'false'
@@ -294,7 +294,7 @@ jobs:
         if: needs.changes.outputs.run_tests == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', matrix.family == 'iPhone' && 'ui-test-results' || 'ui-test-results-ipad', matrix.partition == 'row-editing' && '-row-editing' || '') }}
+          name: ${{ inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', 'ui-test-results', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
             App/TestResults.xcresult
             App/TestResults-sharing.xcresult
@@ -307,7 +307,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || matrix.family == 'iPhone' && 'App · XCUITest (macOS)' || 'App · XCUITest (iPad)' }}
+    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -316,7 +316,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: ${{ fromJSON(needs.changes.outputs.families || '["iPhone","iPad"]') }}
+        family: ${{ fromJSON(needs.changes.outputs.families || '["iPhone"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Require every selected UI shard

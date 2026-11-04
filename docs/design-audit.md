@@ -1,5 +1,7 @@
 # App design audit
 
+Native iPad requirements below are historical and superseded by [ADR 0007](adr/0007-iphone-only.md).
+
 Status: design interview complete. The user accepted the scope and interaction
 decisions on 2026-10-21. No application changes have been implemented by this
 audit; delivery steps and acceptance criteria below describe future work.

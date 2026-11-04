@@ -6,6 +6,8 @@ import subprocess
 
 
 def select_template(devices, family, sdk_version):
+    if family != "iPhone":
+        raise ValueError("Only iPhone simulators are supported")
     sdk_release = tuple(int(part) for part in sdk_version.split(".")[:2])
     available = []
     for runtime, entries in devices.items():
@@ -20,13 +22,13 @@ def select_template(devices, family, sdk_version):
                 available.append((version, runtime, device))
     if not available:
         raise ValueError(f"No available {family} simulator runtime matches iOS Simulator SDK {sdk_version}")
-    _, runtime, selected = max(available, key=lambda item: (item[0], "13-inch" in item[2]["name"] or "12.9-inch" in item[2]["name"], "Pro" in item[2]["name"], item[2]["name"]))
+    _, runtime, selected = max(available, key=lambda item: (item[0], "Pro" in item[2]["name"], item[2]["name"]))
     return runtime, selected
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--family", required=True, choices=["iPhone", "iPad"])
+    parser.add_argument("--family", required=True, choices=["iPhone"])
     arguments = parser.parse_args()
     sdk_version = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"], text=True).strip()
     devices = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "--json"], text=True))["devices"]

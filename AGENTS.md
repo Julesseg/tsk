@@ -1,9 +1,9 @@
 # tsk
 
-A native iOS/iPadOS Taskwarrior client. `Core/` owns task behavior; `Native/`
+A native iPhone Taskwarrior client. `Core/` owns task behavior; `Native/`
 connects TaskChampion and system services; `App/` contains thin SwiftUI app,
 Share and widget interfaces. Shared storage, encrypted sync and task workflows
-are implemented. Use canonical iPhone/iPad XCUITest for runtime verification;
+are implemented. Use canonical iPhone XCUITest for runtime verification;
 source, host tests and generic builds do not establish system delivery,
 physical input, account behavior or distribution provisioning.
 
@@ -60,7 +60,7 @@ CI verify it.
 
 #### CI is the canonical UI gate (background, not a decision to revisit)
 
-The iPhone `App · XCUITest (macOS)` and iPad checks run focused smoke coverage
+The iPhone `App · XCUITest (macOS)` check runs focused smoke coverage
 on PRs with non-documentation changes, alongside all Core and Native tests.
 Documentation-only PRs and pushes use lightweight checks without test builds.
 Full UI coverage runs nightly and through manual dispatch. Read

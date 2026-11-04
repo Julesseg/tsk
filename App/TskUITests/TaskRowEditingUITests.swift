@@ -5,7 +5,7 @@ import XCTest
     private let taskID = "A0000000-0000-0000-0000-000000000001"
     override func setUpWithError() throws {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        XCUIDevice.shared.orientation = .portrait
     }
     override func tearDownWithError() throws {
         XCUIApplication().terminate()

@@ -6,8 +6,6 @@ final class TypedFilterUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testComputedArithmeticViewErrorsEditsReopenAndCompletion() throws {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        if isPad { XCUIDevice.shared.orientation = .landscapeLeft }
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -52,7 +50,7 @@ final class TypedFilterUITests: XCTestCase {
         tapTaskControl(app.buttons["Low"], app: app)
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["save-task"].waitForNonExistence(timeout: 10))
-        if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         app.terminate()
         app.launch()
@@ -73,7 +71,7 @@ final class TypedFilterUITests: XCTestCase {
         app.buttons["complete-task"].tap()
         XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
-        if !isPad { app.navigationBars.buttons.element(boundBy: 0).tap() }
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 10))
         capture("Completion refreshes the same explicit pending arithmetic filter", app: app)
     }

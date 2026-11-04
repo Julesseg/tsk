@@ -462,15 +462,19 @@ extension XCTestCase {
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, bottomInset: bottomInset, requireFullVisibility: requireFullVisibility, file: file, line: line)
+    func revealTaskElement(_ element: XCUIElement, in containerID: String, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, prepareAfterFormAppears: (() -> Bool)? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        revealTaskElement(element, in: app.collectionViews[containerID].firstMatch, app: app, initialScrollUp: initialScrollUp, maximumSteps: maximumSteps, context: containerID, bottomInset: bottomInset, requireFullVisibility: requireFullVisibility, prepareAfterFormAppears: prepareAfterFormAppears, file: file, line: line)
     }
 
     @discardableResult
-    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+    func revealTaskElement(_ element: XCUIElement, in form: XCUIElement, app: XCUIApplication, initialScrollUp: Bool = true, maximumSteps: Int = 14, context: String = "native settings list", bottomInset: XCUIElement? = nil, requireFullVisibility: Bool = false, prepareAfterFormAppears: (() -> Bool)? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         guard form.waitForExistence(timeout: 5) else {
             recordTaskInteraction(app, detail: "Missing form \(context)")
             XCTFail("Missing task form: \(context)", file: file, line: line)
+            return false
+        }
+        if let prepareAfterFormAppears, !prepareAfterFormAppears() {
+            XCTFail("Native form preparation failed in \(context)", file: file, line: line)
             return false
         }
         var direction = TaskRevealScrollDirection(initialScrollUp: initialScrollUp)

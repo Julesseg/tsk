@@ -6,7 +6,7 @@ final class TaskActivityUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testOrdinaryTaskListStartDetailStopPersistentReopenAndCompletionClearActiveState() throws {
-        if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
+
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString

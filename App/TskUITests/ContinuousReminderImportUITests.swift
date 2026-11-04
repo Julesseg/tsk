@@ -93,7 +93,7 @@ final class ContinuousReminderImportUITests: XCTestCase {
 
     private func launchFixture(pause: Bool = false, changed: Bool = false) -> (XCUIApplication, String) {
         XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
-        if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
+
         let token = UUID().uuidString
         let app = taskTestApplication()
         app.resetAuthorizationStatus(for: .reminders)

@@ -49,12 +49,12 @@ class CanonicalResultTests(unittest.TestCase):
         self.assertFalse(owner.passed_case(case,{name},dict(cases={name:dict(completed=[],result='passed')})))
         self.assertFalse(owner.passed_case(case,{name,'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations'},receipt))
 
-    def test_original_phone_only_ipad_skip_is_allowed_without_hid_input(self):
-        name='iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen'
-        case=dict(nodeType='Test Case',nodeIdentifier=name+'()',result='Skipped')
-        receipt=dict(cases={name:dict(completed=[],result='skipped')})
-        self.assertTrue(owner.passed_case(case,{name},receipt))
-        self.assertFalse(owner.passed_case(dict(case,nodeIdentifier=owner.CASE+'()'),{owner.CASE},dict(cases={owner.CASE:dict(completed=[],result='skipped')})))
+    def test_selected_native_cases_cannot_skip_without_input(self):
+        for name in owner.CASES:
+            with self.subTest(case=name):
+                case = dict(nodeType='Test Case', nodeIdentifier=name+'()', result='Skipped')
+                receipt = dict(cases={name: dict(completed=[], result='skipped')})
+                self.assertFalse(owner.passed_case(case, {name}, receipt))
 
 
 class FakeProcess:

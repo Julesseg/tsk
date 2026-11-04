@@ -22,10 +22,14 @@ class SimulatorSelectionTests(unittest.TestCase):
             "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [device("iPhone 18 Pro Max"), device("iPad Pro 13-inch")],
             "com.apple.CoreSimulator.SimRuntime.iOS-27-1": [device("iPhone Duo"), device("iPad New")],
         }
-        for family in ["iPhone", "iPad"]:
+        for family in ["iPhone"]:
             runtime, selected = selection.select_template(devices, family, "27.0")
             self.assertEqual(runtime, "com.apple.CoreSimulator.SimRuntime.iOS-27-0")
             self.assertIn(selected, devices[runtime])
+
+    def test_unsupported_device_family_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Only iPhone"):
+            selection.select_template({}, "iPad", "27.0")
 
     def test_unavailable_and_other_platforms_do_not_supply_a_template(self):
         devices = {

@@ -2,13 +2,13 @@
 
 ## Problem Statement
 
-Taskwarrior users need a capable, modern iPhone and iPad app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
+Taskwarrior users need a capable, modern iPhone app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
 
 This PRD records the agreed product contract without recording personal infrastructure setup. Implementation and runtime verification are tracked separately; a requirement here does not establish that the behavior has been delivered or verified.
 
 ## Solution
 
-Build a first-class native iOS/iPadOS Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
+Build a first-class native iPhone Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
 
 The initial product includes Shortcuts/Siri, widgets, Spotlight, text/URL sharing, calendar events displayed only in Today, notifications derived from task dates, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
 
@@ -131,7 +131,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 ### Native experience and permissions
 
 92. As an iPhone user, I want to use a compact native capture-and-action workflow, so that daily task management fits the phone.
-93. As an iPad user, I want to use an adaptive layout with keyboard support at launch, so that the larger screen and keyboard improve task management.
+93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard support remains part of the iPhone workflow.
 94. As an iOS user, I want to use native navigation, typography, gestures, accessibility, appearance, and Liquid Glass, so that tsk behaves as a first-class iOS app.
 95. As a task owner, I want to scan compact lists and reveal additional detail when needed, so that the interface balances density with clarity.
 96. As an iOS user, I want to retain ordinary task management when Calendar, Reminders, or notification permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
@@ -198,7 +198,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Widgets support Today or a chosen view and task completion. Spotlight opens matching tasks.
 - Sharing text or a URL immediately saves a plain task with the complete shared content as its description, without an extension editor or extra fields. File attachment storage is not initial scope.
 - Calendar integration reads events for Today and creates no calendar events or time blocks. Permission denial or revocation leaves ordinary task management usable.
-- iPhone leads everyday capture and action. iPad gets adaptive layout and keyboard interaction at launch. Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
+- Support iPhone capture and action, including external keyboard interaction. Native iPad support is out of scope under [ADR 0007](adr/0007-iphone-only.md). Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
 
 ## Testing Decisions
 
@@ -216,7 +216,7 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Verify notification planning through Core, including the 09:00 default, custom/disabled replacement, unchanged task dates, distinct/combined events, final-state completion/deletion suppression, immediate newly missed events, repeat prevention, and pending cancellation/rescheduling. Test actual delivery and registration reconciliation on iOS; do not assume the deprecated notification API’s capacity is the current limit.
 - Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings, import results, and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
 - Exercise Shortcuts/App Intents, share extension, widgets, Spotlight, Calendar/Reminders access, and local notification delivery using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
-- Verify adaptive iPad behavior, physical keyboard interaction, system appearance, and accessibility. Simulator/CI success alone does not prove physical keyboard, background timing, or external-account behavior.
+- Verify iPhone navigation, physical keyboard interaction, system appearance, and accessibility. Simulator/CI success alone does not prove physical keyboard, background timing, or external-account behavior.
 - A documentation review or green scaffold CI does not fulfill these feature-level checks. Every delivered capability needs evidence at its stated seam, with unsupported cases and remaining verification limits reported explicitly.
 
 ## Out of Scope

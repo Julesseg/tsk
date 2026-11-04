@@ -11,7 +11,7 @@ spec.loader.exec_module(selection)
 
 
 def plan(suite):
-    families = ['iPhone'] if suite == 'diagnostic' else ['iPhone', 'iPad']
+    families = ['iPhone']
     partitions = ['workspace', 'row-editing'] if suite == 'full' else ['all']
     workers = []
     for family in families:

@@ -22,7 +22,7 @@ Today includes unfinished tasks scheduled for any time today, unfinished tasks s
 
 Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by their actual timestamps, and clearly distinguishes Scheduled from Deadline. A task with different Scheduled and Deadline dates may appear on both dates.
 
-Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in task fields. Local custom-attribute editors and definition management are out of scope. Report invalid or unsupported expressions clearly; Taskwarrior filter compatibility remains the requirement. Saved view definitions stay device-local; they do not synchronize between iPhone and iPad. Importing desktop reports, contexts, or `.taskrc` configuration is not planned.
+Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in task fields. Local custom-attribute editors and definition management are out of scope. Report invalid or unsupported expressions clearly; Taskwarrior filter compatibility remains the requirement. Saved view definitions stay device-local; they do not synchronize between devices. Importing desktop reports, contexts, or `.taskrc` configuration is not planned.
 
 ## Task editing
 
@@ -64,7 +64,7 @@ After synchronization, immediately fire newly discovered missed alerts for unfin
 
 ## Devices
 
-iPhone leads the everyday capture-and-action workflow. iPad receives an adaptive layout and keyboard support at launch. A dedicated Mac experience is a later decision.
+tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands remain supported on iPhone. Native iPad and Mac experiences are future product decisions.
 
 ## Visual direction
 

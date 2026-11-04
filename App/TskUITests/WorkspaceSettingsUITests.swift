@@ -5,10 +5,11 @@ import XCTest
 final class WorkspaceSettingsUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        XCUIDevice.shared.orientation = .portrait
     }
 
     override func tearDownWithError() throws {
+        XCUIApplication().terminate()
         XCUIDevice.shared.orientation = .portrait
         XCUIDevice.shared.appearance = .light
     }
@@ -286,7 +287,116 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.activityIndicators["workspace-sync-progress"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
         XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
-        openWorkspaceSetting("synchronization-settings", app: app, beforeSample: dismissPassword)
+        let settingsForm = app.collectionViews["workspace-settings-list"]
+        var initialSettingsDeadline: TimeInterval?
+        var passwordAttempted = false
+        var passwordFailure: String?
+        var passwordReceipt = "No exact password interruption handled during final Settings navigation"
+        addTeardownBlock {
+            let attachment = XCTAttachment(string: passwordReceipt)
+            attachment.name = "Final Settings password interruption"
+            attachment.lifetime = .keepAlways
+            self.add(attachment)
+        }
+        func rejectPassword(_ reason: String) -> Bool {
+            passwordFailure = reason
+            passwordReceipt += " rejected=\(reason) time=\(ProcessInfo.processInfo.systemUptime)"
+            return false
+        }
+        func dismissFinalPassword(_ dialog: XCUIElement, origin: String, deadline: TimeInterval) -> Bool {
+            guard passwordFailure == nil else { return false }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("deadline expired") }
+            guard dialog.exists else { return false }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("dialog query exceeded deadline") }
+            guard let snapshot = try? dialog.snapshot(),
+                  snapshot.elementType == .alert || snapshot.elementType == .sheet,
+                  snapshot.label == "Save Password?" else { return false }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("dialog snapshot exceeded deadline") }
+            guard !passwordAttempted else { return rejectPassword("A password prompt is present after the single permitted action") }
+            passwordReceipt = "origin=\(origin) role=\(snapshot.elementType.rawValue) title=\(snapshot.label) frame=\(snapshot.frame) observed=\(ProcessInfo.processInfo.systemUptime)"
+            let buttons = dialog.buttons.matching(NSPredicate(format: "label == %@", "Not Now"))
+            guard buttons.count == 1, ProcessInfo.processInfo.systemUptime < deadline else {
+                return rejectPassword("Not Now is not unique within the deadline")
+            }
+            let notNow = buttons.firstMatch
+            guard let button = try? notNow.snapshot(), button.elementType == .button,
+                  button.label == "Not Now", button.isEnabled,
+                  ProcessInfo.processInfo.systemUptime < deadline, notNow.isHittable,
+                  ProcessInfo.processInfo.systemUptime < deadline,
+                  let application = try? app.snapshot(), ProcessInfo.processInfo.systemUptime < deadline else {
+                return rejectPassword("Not Now is not ready within the deadline")
+            }
+            let frames = [snapshot.frame, button.frame, application.frame]
+            guard frames.allSatisfy({ !$0.isNull && !$0.isInfinite && $0.minX.isFinite && $0.minY.isFinite && $0.maxX.isFinite && $0.maxY.isFinite && $0.width > 0 && $0.height > 0 }),
+                  snapshot.frame.contains(button.frame) else { return rejectPassword("invalid password geometry") }
+            let sample = TaskControlReadinessSample(exists: true, enabled: button.isEnabled, hittable: true,
+                                                    elementFrame: button.frame, appFrame: application.frame,
+                                                    appWindowFrames: application.children.filter { $0.elementType == .window }.map { $0.frame })
+            guard sample.failureReason == nil, ProcessInfo.processInfo.systemUptime < deadline else {
+                return rejectPassword("password control is outside its admitted geometry or deadline")
+            }
+            passwordAttempted = true
+            passwordReceipt += " button=Not Now frame=\(button.frame) action=requested time=\(ProcessInfo.processInfo.systemUptime) deadline=\(deadline)"
+            print(passwordReceipt)
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("password action admission exceeded deadline") }
+            notNow.tap()
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("Not Now returned after deadline") }
+            let gone = dialog.waitForNonExistence(timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime))
+            guard gone, ProcessInfo.processInfo.systemUptime < deadline else {
+                return rejectPassword("matched password prompt did not disappear within the deadline")
+            }
+            passwordReceipt += " action=returned matchedPromptAbsent=true time=\(ProcessInfo.processInfo.systemUptime)"
+            print(passwordReceipt)
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("password completion receipt exceeded deadline") }
+            return true
+        }
+        func prepareFinalPassword(_ deadline: TimeInterval, origin: String) -> Bool {
+            guard passwordFailure == nil else { return false }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("password preparation has no remaining budget") }
+            for dialog in [app.alerts["Save Password?"], app.sheets["Save Password?"]] {
+                if dismissFinalPassword(dialog, origin: origin, deadline: deadline) { return true }
+                if passwordFailure != nil { return false }
+            }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return rejectPassword("password preparation exceeded its budget") }
+            return true
+        }
+        if !settingsForm.exists {
+            let settings = app.buttons["workspace-settings"]
+            XCTAssertTrue(settings.waitForExistence(timeout: 15))
+            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+            initialSettingsDeadline = deadline
+            do {
+                let monitor = addUIInterruptionMonitor(withDescription: "Optional password storage during final Settings opening") { dialog in
+                    dismissFinalPassword(dialog, origin: "interruption-monitor", deadline: deadline)
+                }
+                defer { removeUIInterruptionMonitor(monitor) }
+                tapTaskControl(settings, app: app, deadline: deadline, beforeSample: { deadline in
+                    if !prepareFinalPassword(deadline, origin: "target-app-pre-tap") {
+                        XCTFail(passwordFailure ?? "Final Settings password preparation failed")
+                    }
+                })
+            }
+            guard passwordFailure == nil, ProcessInfo.processInfo.systemUptime < deadline else {
+                XCTFail(passwordFailure ?? "Final Settings tap returned after its original admission deadline")
+                return
+            }
+        }
+        guard revealTaskElement(app.buttons["synchronization-settings"], in: "workspace-settings-list", app: app, prepareAfterFormAppears: {
+            guard let deadline = initialSettingsDeadline else {
+                return rejectPassword("Post-form preparation has no original Settings admission budget")
+            }
+            return prepareFinalPassword(deadline, origin: "target-app-post-form")
+        }) else { return }
+        let destinationDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        tapTaskControl(app.buttons["synchronization-settings"], app: app, deadline: destinationDeadline, beforeSample: { deadline in
+            if !prepareFinalPassword(deadline, origin: "target-app-destination") {
+                XCTFail(passwordFailure ?? "Synchronization destination password preparation failed")
+            }
+        })
+        guard passwordFailure == nil, ProcessInfo.processInfo.systemUptime < destinationDeadline else {
+            XCTFail(passwordFailure ?? "Synchronization destination returned after its original admission deadline")
+            return
+        }
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["sync-now"].isEnabled)
     }
