@@ -23,10 +23,11 @@ else
   cat <<'EOF'
 ENV=LOCAL MAC. Xcode is available, so UI tests can run locally when useful.
 `cd Core && swift test` remains the fast loop. PR CI runs UI smoke coverage;
-nightly/manual CI runs full UI coverage (docs/verification/ci-test-tiers.md). For
-UI tests, boot a simulator you own, then run:
-  cd App && xcodebuild test -project Tsk.xcodeproj -scheme Tsk \
-    -destination 'platform=iOS Simulator,id=<booted-udid>' CODE_SIGNING_ALLOWED=NO
-Shut down any simulator you booted when verification finishes.
+nightly/manual CI runs full UI coverage (docs/verification/ci-test-tiers.md).
+In T3 Code, use its device tools for interactive checks (docs/agents/t3-code.md).
+For automated UI tests, use scripts/run-ui-tests.sh with the target UDID and
+explicit derivedDataPath and resultBundlePath. Build the native simulator
+bridge first. Preserve already-booted simulators and shut down only devices
+this task booted when verification finishes.
 EOF
 fi

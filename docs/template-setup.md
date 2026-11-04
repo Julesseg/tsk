@@ -170,39 +170,23 @@ attached to the run as an artifact (7-day retention). A misformatted tag (not
 ## Enabling agent auto-dispatch (one-time)
 
 The auto-dispatch pipeline (`unblock-dispatch.yml` + `agent-implement.yml`)
-spawns a background [Paseo](https://paseo.sh) agent session per ready
-issue. Until you complete this setup, `unblock-dispatch.yml` runs on issue
-events but finds nothing to dispatch, and `agent-implement.yml` never runs —
-both stay green.
+starts a T3 Code thread in an isolated worktree for each ready issue. The Mac
+needs a registered `tsk` project, a running T3 server, authenticated GitHub
+and provider credentials, and a self-hosted GitHub Actions runner under the
+same user account.
 
-1. **Create the `ready-for-agent` label** and write blockers as `- #N` bullets
-   under a `## Blocked by` heading in issue bodies — that's what the dispatcher
-   scans for. An issue with no blockers qualifies too, and starts on the next
-   issue close or a manual run of `unblock-dispatch.yml`.
-2. **Install the `label-and-implement-with-pr` skill** under
-   `~/.agents/skills` on the runner, with the `implement`, `ui-report`, and
-   `babysit-pr` skills it uses. These are not shipped with this template.
-3. **Register a self-hosted macOS runner** (repo → Settings → Actions →
-   Runners) on a Mac with the Paseo daemon running, `gh` authenticated, and the
-   selected Paseo provider available.
-4. **Set three required repository Actions variables** (*Settings → Secrets and
-   variables → Actions → Variables* — a variable, not a secret):
+Set the required repository Actions variable `T3_PROJECT_DIR`. Optional
+`T3_BASE`, `T3_CLI` and `T3_BASE_DIR` select the base ref, CLI executable and
+T3 home. Save the project's provider/model, reasoning and permission settings
+in T3; the launcher inherits them without inventing unsupported CLI flags.
 
-   | Variable | Value |
-   | --- | --- |
-   | `PASEO_PROJECT_DIR` | Absolute path of this repo's clone on the runner Mac; agent sessions spawn git worktrees off it |
-   | `PASEO_PROVIDER` | Paseo provider for unattended sessions |
-   | `PASEO_MODEL` | Model exposed by that provider |
+Install the shared `label-and-implement-with-pr`, `implement`, `ui-report` and
+`babysit-pr` skills under `~/.agents/skills`. In T3, the project adapter in
+[`docs/agents/t3-code.md`](agents/t3-code.md) supplies delegation and PR watch
+mechanics. Existing Paseo schedules and heartbeats remain in Paseo.
 
-   The clone needs to be able to `git fetch origin` unattended as the runner's
-   user — the spawn step refreshes it so each session branches off the current
-   `origin/main` rather than the clone's own stale `main`.
-
-   `PASEO_THINKING`, `PASEO_MODE`, and `PASEO_BASE` are optional. No provider,
-   model, thinking, or permission-mode default is selected by the workflow.
-
-Full walkthrough, scope rules, the in-flight cap, and the optional variables:
-[`docs/agents/auto-dispatch.md`](agents/auto-dispatch.md).
+See [`docs/agents/auto-dispatch.md`](agents/auto-dispatch.md) for readiness
+rules, duplicate protection, configuration and verification.
 
 ## CI details
 
