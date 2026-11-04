@@ -24,6 +24,7 @@ on:
         type: boolean
 
 permissions:
+  contents: read
   issues: read
 
 jobs:
