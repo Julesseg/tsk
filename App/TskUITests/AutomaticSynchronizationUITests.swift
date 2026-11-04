@@ -160,12 +160,39 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
         XCTAssertTrue(app.buttons["dismiss-editor-keyboard"].waitForExistence(timeout: 5))
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app, beforeSample: dismissPasswordBeforeSample)
+        let hideDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        guard prepareKeyboardIntroduction(app, deadline: hideDeadline, beforeSample: { deadline in
+            let previouslyDismissed = dismissedPassword
+            dismissPasswordBeforeSample(deadline)
+            return !previouslyDismissed && dismissedPassword
+        }) else { return }
+        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["save-task"].isHittable)
         app.buttons["save-task"].tap()
-        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Durable work while automatic sync fails", app: app), timeout: 10))
+        let saveDeadline = ProcessInfo.processInfo.systemUptime + 10
+        XCTAssertTrue(waitForTaskSave(app, named: "Durable work while automatic sync fails",
+                                      timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime)))
+        guard ProcessInfo.processInfo.systemUptime < saveDeadline else {
+            XCTFail("Task save completion exceeded its original ten-second budget")
+            return
+        }
+        let passwordPreviouslyDismissed = dismissedPassword
+        dismissPasswordBeforeSample(saveDeadline)
+        if !passwordPreviouslyDismissed && dismissedPassword {
+            guard let passwordDialog = observedPasswordDialog?.element,
+                  ProcessInfo.processInfo.systemUptime < saveDeadline else {
+                XCTFail("The admitted post-save password prompt has no remaining completion budget")
+                return
+            }
+            XCTAssertTrue(passwordDialog.waitForNonExistence(timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime)))
+        }
+        guard ProcessInfo.processInfo.systemUptime < saveDeadline else {
+            XCTFail("Post-save preparation exceeded the original ten-second budget")
+            return
+        }
         XCTAssertTrue(taskRow(named: "Durable work while automatic sync fails", app: app).isHittable)
+        XCTAssertTrue(ProcessInfo.processInfo.systemUptime < saveDeadline, "Saved-row readiness must finish within the original ten-second budget")
         XCTAssertFalse(app.staticTexts["task-sync-error"].exists)
         XCTAssertFalse(app.buttons["retry-task-sync"].exists)
         capture("Saved locally despite automatic network failure", app)
@@ -184,6 +211,110 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         openWorkspaceSetting("synchronization-settings", app: app, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.staticTexts["sync-error"].waitForExistence(timeout: 20))
         capture("App opening retries without losing local work", app)
+    }
+
+    private func prepareKeyboardIntroduction(_ app: XCUIApplication, deadline: TimeInterval,
+                                             beforeSample: @escaping (TimeInterval) -> Bool) -> Bool {
+        struct Geometry: Equatable {
+            let windowPath: [Int]
+            let containerPath: [Int]
+            let window: CGRect
+            let container: CGRect
+            let button: CGRect
+            let application: CGRect
+        }
+        let explanation = "Speed up your typing by sliding your finger across the letters to compose a word."
+        var previous: Geometry?
+        var handled = false
+        var lastSample = "not sampled"
+        func positive(_ frame: CGRect) -> Bool {
+            !frame.isNull && [frame.minX, frame.minY, frame.maxX, frame.maxY, frame.width, frame.height].allSatisfy(\.isFinite)
+                && frame.width > 0 && frame.height > 0
+        }
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            if beforeSample(deadline) { previous = nil }
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            guard app.state == .runningForeground, ProcessInfo.processInfo.systemUptime < deadline else {
+                previous = nil; lastSample = "application is not foreground"; return false
+            }
+            do {
+                let snapshot = try app.snapshot()
+                var nodes: [(value: any XCUIElementSnapshot, ancestors: [Int], path: [Int])] = []
+                func collect(_ value: any XCUIElementSnapshot, ancestors: [Int], path: [Int]) throws {
+                    guard nodes.count < 4096, ProcessInfo.processInfo.systemUptime < deadline else {
+                        throw NSError(domain: "KeyboardIntroductionAdmission", code: 1)
+                    }
+                    let index = nodes.count
+                    nodes.append((value, ancestors, path))
+                    for (offset, child) in value.children.enumerated() {
+                        try collect(child, ancestors: ancestors + [index], path: path + [offset])
+                    }
+                }
+                try collect(snapshot, ancestors: [], path: [])
+                let explanations = nodes.indices.filter { nodes[$0].value.elementType == .staticText && nodes[$0].value.label == explanation }
+                let buttons = nodes.indices.filter { nodes[$0].value.elementType == .button && nodes[$0].value.label == "Continue" }
+                if explanations.isEmpty && buttons.isEmpty {
+                    lastSample = "exact explanation and Continue absent; handled=\(handled)"
+                    return ProcessInfo.processInfo.systemUptime < deadline
+                }
+                guard !handled, explanations.count == 1, buttons.count == 1 else {
+                    previous = nil; lastSample = "ambiguous or uncleared introduction"; return false
+                }
+                let text = nodes[explanations[0]], button = nodes[buttons[0]]
+                guard let window = button.ancestors.last(where: { nodes[$0].value.elementType == .window }),
+                      text.ancestors.last(where: { nodes[$0].value.elementType == .window }) == window,
+                      positive(nodes[window].value.frame),
+                      positive(text.value.frame), positive(button.value.frame), button.value.isEnabled,
+                      let container = button.ancestors.reversed().first(where: {
+                          text.ancestors.contains($0) && nodes[$0].value.elementType == .other
+                              && nodes[$0].ancestors.contains(window)
+                              && positive(nodes[$0].value.frame)
+                              && nodes[window].value.frame.contains(nodes[$0].value.frame)
+                              && !nodes[$0].value.frame.contains(nodes[window].value.frame)
+                              && nodes[$0].value.frame.contains(text.value.frame)
+                              && nodes[$0].value.frame.contains(button.value.frame)
+                      }), positive(snapshot.frame), snapshot.frame.contains(button.value.frame) else {
+                    previous = nil; lastSample = "introduction has no bounded shared owner"; return false
+                }
+                let current = Geometry(windowPath: nodes[window].path, containerPath: nodes[container].path,
+                                       window: nodes[window].value.frame, container: nodes[container].value.frame,
+                                       button: button.value.frame, application: snapshot.frame)
+                let controls = app.buttons.matching(NSPredicate(format: "label == %@", "Continue")).allElementsBoundByAccessibilityElement
+                guard controls.count == 1, controls[0].isEnabled, controls[0].isHittable else {
+                    previous = nil; lastSample = "matched Continue is not actionable"; return false
+                }
+                let stable = previous == current
+                previous = current
+                lastSample = "matched introduction button=\(current.button) stable=\(stable)"
+                guard stable, ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                let coordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: current.button.midX - current.application.minX,
+                                         dy: current.button.midY - current.application.minY))
+                print("Keyboard introduction admitted: \(lastSample)")
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                handled = true
+                previous = nil
+                coordinate.tap()
+                return false
+            } catch {
+                previous = nil
+                lastSample = "snapshot failed: \(error)"
+                return false
+            }
+        }
+        var ready = sample()
+        let remaining = deadline - ProcessInfo.processInfo.systemUptime
+        if !ready, remaining > 0 {
+            let expectation = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+            ready = XCTWaiter.wait(for: [expectation], timeout: remaining) == .completed
+        }
+        print("Keyboard introduction preparation: \(lastSample)")
+        guard ready, ProcessInfo.processInfo.systemUptime < deadline else {
+            XCTFail("Keyboard introduction preparation did not finish within Hide admission: \(lastSample)")
+            return false
+        }
+        return true
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

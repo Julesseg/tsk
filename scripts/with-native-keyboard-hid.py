@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import errno
 import importlib.util
 import json
 import math
@@ -13,7 +14,8 @@ import time
 import uuid
 
 CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys'
-CASES = {CASE: ['commandReturn'], 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['secondNoteCommandN', 'secondNoteSave', 'editSelectAll', 'editedNoteSave'], 'iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen': ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'complete', 'completedView']}
+CASES = {CASE: ['commandReturn'], 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['secondNoteCommandN', 'secondNoteSave', 'editSelectAll', 'editedNoteSave']}
+CASES['TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'] = ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'complete', 'completedView', 'captureAfterReturn', 'saveAfterReturn']
 MARKER = b'TSK_KEYBOARD_COMMAND_REQUEST_V1 '
 
 
@@ -63,8 +65,6 @@ def passed_case(document, expected=None, relay=None):
         outcomes = cases.get(name, [])
         record = relay.get('cases', {}).get(name, {})
         if outcomes == ['Passed'] and record.get('completed') == CASES[name] and record.get('result') == 'passed':
-            continue
-        if name.startswith('iPadWorkspaceUITests/') and outcomes == ['Skipped'] and record.get('completed') == [] and record.get('result') == 'skipped':
             continue
         return False
     return True
@@ -175,6 +175,7 @@ class Host:
             if type(pgid) is not int or pgid <= 1 or pgid == os.getpgrp():
                 raise RuntimeError('Refusing invalid or current process group: ' + str(pgid))
             detail = dict(pid=process.pid, pgid=pgid, phases=[])
+            existence_error = None
             path = self.evidence / ('process-cleanup-' + str(process.pid) + '.json')
 
             def record(phase, error=None):
@@ -188,6 +189,7 @@ class Host:
                     detail['receiptError'] = repr(error)
 
             def signal_group(number, phase):
+                nonlocal existence_error
                 record(phase)
                 try:
                     os.killpg(pgid, number)
@@ -196,15 +198,21 @@ class Host:
                     return False
                 except OSError as error:
                     record(phase, error)
+                    if number == 0 and error.errno == errno.EPERM:
+                        existence_error = error
+                        return None
                     raise RuntimeError('Owned process group cleanup failed phase=' + phase + ' pid=' + str(process.pid) + ' pgid=' + str(pgid) + ' errno=' + str(error.errno)) from error
 
             async def wait_for_group(seconds):
                 deadline = time.monotonic() + seconds
-                while signal_group(0, 'group-existence'):
-                    if time.monotonic() >= deadline:
+                while True:
+                    present = signal_group(0, 'group-existence')
+                    if present is False:
+                        return True
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
                         return False
-                    await asyncio.sleep(0.05)
-                return True
+                    await asyncio.sleep(min(0.05, remaining))
 
             group_gone = False
             try:
@@ -245,6 +253,8 @@ class Host:
             if detail.get('receiptError'):
                 raise RuntimeError('Owned process cleanup receipt could not be persisted: ' + detail['receiptError'])
             if not group_gone:
+                if existence_error is not None:
+                    raise RuntimeError('Owned process group cleanup remains unconfirmed phase=group-existence pid=' + str(process.pid) + ' pgid=' + str(pgid) + ' errno=' + str(existence_error.errno)) from existence_error
                 raise RuntimeError('Owned process group cleanup remains unconfirmed: ' + str(process.pid))
             return dict(pid=process.pid, status=process.returncode, reaped=True, hardKilled=hard_killed, groupGone=True)
         if process.returncode is None:
@@ -280,6 +290,10 @@ class Host:
         args = ['xcrun', 'xcresulttool', 'get', 'test-results', 'tests', '--path', bundle]
         process = await self.start(args, None, pipe=True)
         self.query_process = process
+        self.query_cleanup = None
+        self.query_cleanup_attempt = 0
+        self.query_cleanup_history = []
+        self.query_cleanup_history_errors = []
         query = dict(command=args, pid=process.pid, startedMonotonic=time.monotonic(), timeoutSeconds=60)
         try:
             raw, _ = await asyncio.wait_for(process.communicate(), timeout=60)
@@ -292,7 +306,36 @@ class Host:
         finally:
             query.update(status=process.returncode, finishedMonotonic=time.monotonic())
             (self.evidence / 'public-result-query.json').write_text(json.dumps(query, indent=2) + '\n')
-            await self.stop(process)
+            await self.cleanup_query()
+
+    async def cleanup_query(self):
+        process = self.query_process
+        cleanup = getattr(self, 'query_cleanup', None)
+        if cleanup is not None:
+            if cleanup.get('pid') != process.pid or not cleanup.get('reaped') or not cleanup.get('groupGone'):
+                raise RuntimeError('Public query cleanup receipt is not confirmed')
+            if getattr(self, 'query_cleanup_history_errors', []):
+                raise RuntimeError('Public query cleanup history could not be preserved')
+            return cleanup
+        attempt = getattr(self, 'query_cleanup_attempt', 0)
+        path = self.evidence / ('process-cleanup-' + str(process.pid) + '.json')
+        if attempt:
+            previous = self.evidence / ('public-query-cleanup-' + str(process.pid) + '-attempt-' + str(attempt) + '.json')
+            try:
+                path.rename(previous)
+                self.query_cleanup_history.append(previous.name)
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                self.query_cleanup_history_errors.append(dict(path=path.name, archive=previous.name, error=repr(error)))
+        self.query_cleanup_attempt = attempt + 1
+        cleanup = await self.stop(process, group=True)
+        if cleanup.get('pid') != process.pid or not cleanup.get('reaped') or not cleanup.get('groupGone'):
+            raise RuntimeError('Public query process group cleanup remains unconfirmed')
+        self.query_cleanup = cleanup
+        if getattr(self, 'query_cleanup_history_errors', []):
+            raise RuntimeError('Public query cleanup history could not be preserved')
+        return cleanup
 
 
 class Comparison:
@@ -379,10 +422,17 @@ class Comparison:
         for name, process in [('tests', tests), ('relay', relay), ('publicQuery', getattr(self.host, 'query_process', None))]:
             if process is not None:
                 try:
-                    self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')
+                    if name == 'publicQuery':
+                        self.receipt[name + 'Cleanup'] = await self.host.cleanup_query()
+                    else:
+                        self.receipt[name + 'Cleanup'] = await self.host.stop(process, group=name == 'tests')
                 except Exception as error:
                     self.receipt[name + 'CleanupError'] = repr(error)
                     status = status or 70
+                finally:
+                    if name == 'publicQuery':
+                        self.receipt['publicQueryCleanupHistory'] = getattr(self.host, 'query_cleanup_history', [])
+                        self.receipt['publicQueryCleanupHistoryErrors'] = getattr(self.host, 'query_cleanup_history_errors', [])
         final = read_receipt(relay_receipt)
         self.receipt['relayResult'] = final
         complete = final.get('state') == 'completed_native_assertions_required'

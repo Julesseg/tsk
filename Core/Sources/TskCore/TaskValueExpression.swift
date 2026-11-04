@@ -112,7 +112,7 @@ enum TaskExpressionValue: Sendable {
         case .integer(let value): return String(value)
         case .real(let value): return String(format: "%.6g", value)
         case .text(let value): return value
-        case .duration(let value): return TaskAttributeValues.durationString(value)
+        case .duration(let value): return TaskFilterValue.durationString(value)
         case .date(let value):
             let formatter = DateFormatter()
             formatter.calendar = context.calendar
@@ -166,8 +166,7 @@ enum TaskExpressionValue: Sendable {
         switch context.schema.type(for: name) ?? .string {
         case .string: return .text(raw)
         case .uuid:
-            do { _ = try TaskAttributeValues.normalized(raw, for: TaskAttributeDefinition(name: name, type: .uuid)) }
-            catch { throw TaskFilterError.invalidStoredValue(task.id, name, .uuid) }
+            guard raw.isEmpty || TaskFilterValue.uuidIsValid(raw) else { throw TaskFilterError.invalidStoredValue(task.id, name, .uuid) }
             return .text(raw)
         case .numeric:
             guard let number = FilterScalar.storedNumber(raw) else { throw TaskFilterError.invalidStoredValue(task.id, name, .numeric) }

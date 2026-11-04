@@ -37,9 +37,7 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
     #expect(String(decoding: version.1, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == "3.5.0")
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let definitions = LocalTaskAttributeStore(directory: directory)
-    let manager = TaskManager(replica: TaskChampionReplica(directory: directory), calendar: calendar, attributeDefinitions: definitions)
-    _ = try await manager.saveAttributeDefinition(name: "custom", label: "Custom", type: .string)
+    let manager = TaskManager(replica: TaskChampionReplica(directory: directory), calendar: calendar)
     let replica = TaskChampionReplica(directory: directory)
     let now = Date(timeIntervalSince1970: floor(Date().timeIntervalSince1970))
     let day = calendar.startOfDay(for: now)
@@ -107,7 +105,7 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
         #expect(result.0 == 0, "CLI rejected \(arguments)")
         let exported = try #require(JSONSerialization.jsonObject(with: result.1) as? [[String: Any]])
         let expected = Set(exported.compactMap { $0["uuid"] as? String })
-        let actual = Set(try await manager.tasks(filter: expression).map { $0.id.uuidString.lowercased() })
+        let actual = Set(try await manager.tasks(filter: expression, schema: TypedFilterFixture.schema).map { $0.id.uuidString.lowercased() })
         #expect(actual == expected, "\(expression)")
     }
     let saved = try await manager.addDependency(id: child.id, prerequisiteID: prerequisite.id)

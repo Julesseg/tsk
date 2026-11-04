@@ -45,7 +45,7 @@ import TskCore
     let id = UUID(uuidString: "abcdef12-1234-1234-1234-123456789012")!
     _ = try await replica.create(id: id, attributes: ["description": "Typed arithmetic", "status": "pending", "entry": "1792144800", "effort": "PT1H", "score": "-2", "note": "abc", "annotation_1792144800": "Note"])
     let manager = TaskManager(replica: replica)
-    let schema = TaskFilterSchema.standard.adding([TaskAttributeDefinition(name: "score", type: .numeric), TaskAttributeDefinition(name: "effort", type: .duration), TaskAttributeDefinition(name: "note", type: .string)])
+    let schema = TaskFilterSchema(attributes: [("status", .string), ("uuid", .string), ("score", .numeric), ("effort", .duration), ("note", .string)])
     for expression in ["effort * -0.5 > 1h", "effort / -0.5 > 1h", "score + effort > 1h", "score - effort == -3602", "true + score == -1", "true * score == -2", "annotations.1.entry.year == 2026", "annotations.1.description == 'Note'", "note - 'x' == \"abc-'x'\"", "abcdef12"] {
         #expect(try await manager.tasks(filter: expression, schema: schema).map(\.id) == [id], "\(expression)")
     }
@@ -58,7 +58,7 @@ import TskCore
     let id = UUID()
     _ = try await replica.create(id: id, attributes: ["description": "Imported invalid number", "status": "pending", "score": "invalid", "foreign": "keep"])
     let manager = TaskManager(replica: replica)
-    let schema = TaskFilterSchema.standard.adding([TaskAttributeDefinition(name: "score", type: .numeric)])
+    let schema = TaskFilterSchema(attributes: [("status", .string), ("uuid", .string), ("score", .numeric)])
     for expression in ["status:completed and score.above:0", "status:pending or score.above:0", "status:completed and score + 1 > 0"] {
         await #expect(throws: TaskFilterError.invalidStoredValue(id, "score", .numeric)) { try await manager.tasks(filter: expression, schema: schema) }
     }

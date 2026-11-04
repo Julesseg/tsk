@@ -18,7 +18,7 @@ PREFIX = b'TSK_KEYBOARD_COMMAND_REQUEST_V1 '
 ABORT = b'TSK_KEYBOARD_COMMAND_ABORT_V1 '
 CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys'
 ANNOTATIONS = 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations'
-WORKSPACE = 'iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen'
+COMPATIBILITY = 'TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'
 RUNNER = 'com.julesseguin.tsk.uitests.xctrunner'
 CONTAINER_PREPARATION_SECONDS = 30
 CHORD = ((227, 'DOWN'), (40, 'DOWN'), (40, 'UP'), (227, 'UP'))
@@ -33,7 +33,7 @@ def chord(key, shift=False):
 CHORDS = {
     CASE: {'commandReturn': CHORD},
     ANNOTATIONS: {'secondNoteCommandN': chord(17), 'secondNoteSave': CHORD, 'editSelectAll': chord(4), 'editedNoteSave': CHORD},
-    WORKSPACE: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33)},
+    COMPATIBILITY: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33), 'captureAfterReturn': chord(17), 'saveAfterReturn': CHORD},
 }
 BOUNDARY = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \([\d.,]+ seconds\)\.)$")
 TIMEOUT = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' exceeded execution time allowance of [\d.,]+ (?:seconds|minutes)\. .+$")
@@ -78,12 +78,14 @@ def validate_request(request, expected_token):
         raise ValueError('Unexpected protocol or runner')
     if type(request['runnerPID']) is not int or not 0 < request['runnerPID'] <= 2_147_483_647:
         raise ValueError('Invalid runner PID')
-    if type(request['sequence']) is not int or not 0 <= request['sequence'] < 7:
+    if type(request['sequence']) is not int or request['sequence'] < 0:
         raise ValueError('Invalid request sequence')
     if type(request['expiresAt']) not in (int, float) or not math.isfinite(request['expiresAt']):
         raise ValueError('Invalid request expiry')
     if request['caseName'] not in CHORDS or request['phase'] not in CHORDS[request['caseName']]:
         raise ValueError('Unexpected case or phase')
+    if request['sequence'] >= len(CHORDS[request['caseName']]):
+        raise ValueError('Invalid request sequence')
     if native:
         state = request['nativeState']
         values = {'firstResponder': True, 'textLength': 1, 'textIsPlainN': True, 'commandNCount': 1, 'commandReturnCount': 0}
@@ -346,8 +348,9 @@ async def container_for(udid, request, receipt, deadline):
     if budget <= 0:
         raise ValueError('Runner discovery cannot consume the five-second dispatch reservation')
     command = ['xcrun', 'simctl', 'get_app_container', udid, RUNNER, 'data']
-    process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-    entry = dict(command=command, pid=process.pid, deadlineMonotonic=deadline, startedMonotonic=time.monotonic())
+    process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True)
+    process_group = process.pid
+    entry = dict(command=command, pid=process.pid, processGroupID=process_group, deadlineMonotonic=deadline, startedMonotonic=time.monotonic())
     receipt.setdefault('containerLookups', []).append(entry)
     try:
         budget = deadline - time.monotonic() - 5
@@ -367,11 +370,10 @@ async def container_for(udid, request, receipt, deadline):
         entry['failure'] = type(error).__name__
         raise
     finally:
-        if process.returncode is None:
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
+        try:
+            os.killpg(process_group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         await asyncio.wait_for(process.wait(), timeout=5)
         entry.update(status=process.returncode, reaped=True, finishedMonotonic=time.monotonic())
 

@@ -1,4 +1,14 @@
-# Typed custom-field filtering (#18)
+# Built-in typed filtering and historical custom-schema evidence
+
+Local custom-field definitions and editors have been retired. The app now uses
+its built-in Taskwarrior schema and explicitly rejects unsupported saved-filter
+fields while retaining the original expression and task data. Core's explicit
+schema/conformance seam remains for reference-client comparisons. The existing
+builtin urgency/priority arithmetic UI journey remains selected; the removed
+custom-definition UI journey is not an acceptance requirement.
+
+The following describes historical evidence for the earlier, broader scope. It
+does not advertise the retired authoring/storage/UI feature.
 
 The existing public TaskManager raw-filter/saved-view seam resolves device-local
 attribute definitions and evaluates all five types. Numeric predicates use the

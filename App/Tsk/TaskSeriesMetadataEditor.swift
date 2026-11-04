@@ -48,9 +48,6 @@ struct TaskSeriesMetadataEditor: View {
                             .focused($textField, equals: UTF8String("new-note")).accessibilityIdentifier("series-new-annotation")
                         Text("Only edited annotations and the new note propagate. Other occurrence notes remain intact.").font(.footnote)
                     }
-                    ForEach(store.attributeDefinitions) { definition in
-                        attribute(definition)
-                    }
                 }
                 .disabled(preview != nil || store.isSaving || isPreviewing)
                 if let preview { previewSection(preview) }
@@ -79,30 +76,7 @@ struct TaskSeriesMetadataEditor: View {
             }
             .taskKeyboardCommands(editorActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
             .interactiveDismissDisabled(store.isSaving)
-            .task { do { try await store.loadAttributeDefinitions() } catch { self.error = error.localizedDescription } }
             .modifier(TaskWorkspacePanel(store: store))
-        }
-    }
-
-    @ViewBuilder private func attribute(_ definition: TaskAttributeDefinition) -> some View {
-        let name = definition.name.rawValue
-        Section(definition.label.isEmpty ? name : definition.label) {
-            Toggle("Set value", isOn: Binding(get: { draft.attributes[name] != nil }, set: { draft.attributes[name] = $0 ? initialValue(definition) : nil }))
-                .accessibilityIdentifier("series-uda-enabled-\(name)")
-            if let value = draft.attributes[name] {
-                if definition.type == .string, let values = definition.values {
-                    Picker("Value", selection: Binding(get: { UTF8String(value) }, set: { draft.attributes[name] = $0.rawValue })) {
-                        if !values.contains(where: { $0.matchesBytes(value) }) { Text("Unrecognized: \(value)").tag(UTF8String(value)) }
-                        ForEach(values.map { UTF8String($0) }) { value in Text(value.rawValue.isEmpty ? "Unset" : value.rawValue).tag(value) }
-                    }
-                    .accessibilityIdentifier("series-uda-value-\(name)")
-                } else {
-                    TextField(definition.type.example, text: Binding(get: { value }, set: { draft.attributes[name] = $0 }), axis: .vertical)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled().focused($textField, equals: definition.name)
-                        .accessibilityIdentifier("series-uda-value-\(name)")
-                }
-                Text(definition.type.rawValue).font(.caption).foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -134,22 +108,11 @@ struct TaskSeriesMetadataEditor: View {
         }
     }
 
-    private func initialValue(_ definition: TaskAttributeDefinition) -> String {
-        switch definition.type {
-        case .string: definition.values?.first ?? ""
-        case .numeric: "0"
-        case .duration: "PT0S"
-        case .date: String(Int(store.currentDate.timeIntervalSince1970))
-        case .uuid: ""
-        }
-    }
-
     private func summary(_ name: String, patch: TaskAttributePatch, original: TaskRecord) -> String {
         let value = patch[name] ?? nil
         if name.utf8.starts(with: "tag_".utf8) { return "\(value == nil ? "Remove" : "Add") tag “\(String(name.dropFirst(4)))”" }
         let label: String
         if name.utf8.starts(with: "annotation_".utf8) { label = "Annotation" }
-        else if let definition = store.attributeDefinitions.first(where: { $0.name == UTF8String(name) }) { label = definition.label.isEmpty ? name : definition.label }
         else { label = name.capitalized }
         return "\(label): \(original.attributes[name] ?? "Unset") → \(value ?? "Unset")"
     }

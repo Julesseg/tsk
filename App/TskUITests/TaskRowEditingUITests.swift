@@ -5,7 +5,7 @@ import XCTest
     private let taskID = "A0000000-0000-0000-0000-000000000001"
     override func setUpWithError() throws {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        XCUIDevice.shared.orientation = .portrait
     }
     override func tearDownWithError() throws {
         XCUIApplication().terminate()
@@ -20,7 +20,8 @@ import XCTest
         let annotation = app.descendants(matching: .any)["row-note-annotation_1792144800"].firstMatch
         XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
         XCTAssertEqual(annotation.value as? String, "Review the accessibility findings\nKeep the release checklist nearby")
-        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["custom-field-note"].firstMatch, in: editor, app: app))
+        XCTAssertFalse(app.buttons["advanced-attributes"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["custom-field-note"].firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Identity"].exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         capture("Supporting information is available inside the expanded row", app)
@@ -37,24 +38,12 @@ import XCTest
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
         XCTAssertEqual(note.value as? String, "New supporting note")
-        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
-        app.buttons["advanced-attributes"].tap()
-        setDateSwitch("uda-enabled-score", to: true, app: app, in: "advanced-attributes-form", keyboardDismissIdentifier: "dismiss-attributes-keyboard")
-        let score = app.descendants(matching: .any)["uda-value-score"].firstMatch
-        XCTAssertTrue(revealTaskElement(score, in: "advanced-attributes-form", app: app))
-        replaceTaskText(score, with: "invalid", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-attributes-keyboard"], app: app)
-        app.buttons["save-advanced-attributes"].tap()
-        XCTAssertTrue(app.staticTexts["advanced-attributes-error"].waitForExistence(timeout: 10))
-        capture("Typed custom field validation keeps the nested editor open", app)
-        app.buttons["Cancel"].tap()
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
         app.buttons["collapse-task-row"].tap()
         XCTAssertTrue(taskRow(named: "Unsaved supporting draft", app: app).waitForExistence(timeout: 10))
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE")
         app.launch()
         selectAllTasks(app)
         app.buttons["task-" + taskID].tap()
@@ -74,7 +63,8 @@ import XCTest
         let app = try launch(largeText: true, supporting: true)
         _ = expandTask(app)
         let editor = app.scrollViews["task-row-supporting-scroll"]
-        XCTAssertTrue(revealTaskElement(app.buttons["advanced-attributes"], in: editor, app: app))
+        XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["row-note-input"].firstMatch, in: editor, app: app))
+        XCTAssertFalse(app.buttons["advanced-attributes"].exists)
         capture("Populated supporting information at accessibility XXXL", app)
         XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
         app.buttons["collapse-task-row"].tap()
@@ -183,9 +173,7 @@ import XCTest
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "task-row-editor").count, 1)
         capture("Expanded without keyboard", app)
         XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
-        openTaskRowParameter("priority", app: app)
-        capture("Native priority menu", app)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
+        selectHighPriorityAndVerifyReselection(app)
         openTaskRowParameter("project", app: app)
         capture("Native project menu", app)
         tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
@@ -304,6 +292,207 @@ import XCTest
         capture("Upcoming membership applies after collapse", app)
     }
 
+    func testNativeProjectMenuRetainsScrolledPositionWhileOpen() throws {
+        let projects = (1...80).map { String(format: "Sample project %03d", $0) }
+        let options = ["No project", "Release"] + projects + ["New project…"]
+        let target = projects[29]
+        let app = try launch(isolated: true, projects: projects)
+        _ = expandTask(app)
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        openTaskRowParameter("project", app: app)
+        let initial = try settledProjectMenu(app, options: options)
+        XCTAssertNil(initial.rows[target], "The target must start outside the visible menu neighborhood")
+        func revealTarget(_ label: String, from start: ProjectMenuPosition) throws -> ProjectMenuPosition {
+            var position = start
+            for step in 1...12 {
+                if position.rows[label] != nil { return position }
+                let first = try XCTUnwrap(position.rows.keys.compactMap { options.firstIndex(of: $0) }.min())
+                let upward = first < options.firstIndex(of: label)!
+                XCTContext.runActivity(named: "Native Project menu drag \(step), upward=\(upward)") { _ in
+                    let viewport = position.viewport
+                    let origin = app.coordinate(withNormalizedOffset: .zero)
+                    origin.withOffset(CGVector(dx: viewport.midX - position.applicationFrame.minX,
+                                               dy: viewport.minY + viewport.height * (upward ? 0.8 : 0.2) - position.applicationFrame.minY))
+                        .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(
+                            dx: viewport.midX - position.applicationFrame.minX,
+                            dy: viewport.minY + viewport.height * (upward ? 0.2 : 0.8) - position.applicationFrame.minY)))
+                }
+                position = try settledProjectMenu(app, options: options)
+            }
+            _ = try XCTUnwrap(position.rows[label], "Native menu scrolling must reveal the distant project")
+            return position
+        }
+        let position = try revealTarget(target, from: initial)
+        XCTAssertGreaterThanOrEqual(position.rows.count, 3)
+        XCTAssertNotEqual(Set(initial.rows.keys), Set(position.rows.keys))
+        let before = position
+        let pairs = projects.indices.dropLast().map { [projects[$0], projects[$0 + 1]] }.filter { pair in
+            pair.allSatisfy { label in
+                before.rows[label].map { before.viewport.insetBy(dx: 0, dy: 8).contains($0.frame) } == true
+                    && initial.rows[label] == nil
+            }
+        }
+        let anchors = try XCTUnwrap(pairs.min { left, right in
+            abs(before.rows[left[0]]!.frame.midY - before.viewport.midY)
+                < abs(before.rows[right[0]]!.frame.midY - before.viewport.midY)
+        }, "Two consecutive scrolled projects must settle away from the viewport edges and initial neighborhood")
+        let selectionTarget = anchors[0]
+        XCTAssertLessThan(before.rows[anchors[0]]!.frame.midY, before.rows[anchors[1]]!.frame.midY)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        capture("Project menu settled after native scrolling", app)
+        let started = ProcessInfo.processInfo.systemUptime
+        XCTContext.runActivity(named: "Project menu untouched retention interval: 10 seconds") { _ in
+            let elapsed = XCTestExpectation(description: "No input or accessibility reads during retention")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { elapsed.fulfill() }
+            XCTAssertEqual(XCTWaiter.wait(for: [elapsed], timeout: 11), .completed)
+        }
+        let exposure = ProcessInfo.processInfo.systemUptime - started
+        let after = try projectMenuPosition(app, options: options)
+        let evidence = XCTAttachment(string: "exposureSeconds=\(exposure)\nanchors=\(anchors)\ninitial=\(initial)\nbefore=\(before)\nafter=\(String(describing: after))")
+        evidence.name = "Retained native Project menu geometry"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+        capture("Project menu after untouched retention", app)
+        let endpoint = try XCTUnwrap(after, "The same logical Project menu must remain open")
+        XCTAssertGreaterThanOrEqual(exposure, 10)
+        for label in anchors {
+            let geometry = try XCTUnwrap(before.rows[label])
+            let current = try XCTUnwrap(endpoint.rows[label], "Endpoint anchor unavailable: \(label); inspect fresh neighborhood/video to distinguish reset from AX coverage")
+            XCTAssertEqual(current.frame.minY, geometry.frame.minY, accuracy: 2, "Project moved without input: \(label)")
+            XCTAssertEqual(current.frame.minX, geometry.frame.minX, accuracy: 2)
+            XCTAssertEqual(current.frame.size.width, geometry.frame.size.width, accuracy: 2)
+            XCTAssertEqual(current.frame.size.height, geometry.frame.size.height, accuracy: 2)
+        }
+        XCTAssertEqual(endpoint.viewport.minY, before.viewport.minY, accuracy: 2)
+        XCTAssertEqual(endpoint.viewport.size.height, before.viewport.size.height, accuracy: 2)
+        XCTAssertEqual(endpoint.viewport.minX, before.viewport.minX, accuracy: 2)
+        XCTAssertEqual(endpoint.viewport.size.width, before.viewport.size.width, accuracy: 2)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        for cycle in 1...2 {
+            if cycle == 2 {
+                openTaskRowParameter("project", app: app)
+                _ = try revealTarget(selectionTarget, from: settledProjectMenu(app, options: options))
+            }
+            let admissionDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+            let current = try settledProjectMenu(app, options: options, requiring: selectionTarget,
+                                                 selected: cycle == 2 ? true : nil, deadline: admissionDeadline)
+            let geometry = try XCTUnwrap(current.rows[selectionTarget])
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, admissionDeadline)
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: geometry.frame.midX - current.applicationFrame.minX,
+                                     dy: geometry.frame.midY - current.applicationFrame.minY)).tap()
+            let deadline = ProcessInfo.processInfo.systemUptime + 5
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                app.buttons["row-project"].value as? String == selectionTarget
+                    && !app.buttons.matching(NSPredicate(format: "label == %@", selectionTarget)).firstMatch.exists
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)), .completed)
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+        }
+    }
+
+    func testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal() throws {
+        let app = try launch(isolated: true)
+        let title = expandTask(app)
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        selectHighPriorityAndVerifyReselection(app)
+        for cycle in 1...20 {
+            XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
+                if cycle == 20 { focusTaskText(title, app: app) }
+                openTaskRowParameter("project", app: app)
+                if cycle == 20 {
+                    let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+                    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+                    XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+                }
+                tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+                let field = app.textFields["row-project-input"]
+                let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForExistence(timeout: 5))
+                XCTAssertEqual(field.value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+                app.buttons["close-row-parameter"].tap()
+                let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+                XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+                XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+            }
+        }
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
+        focusTaskText(note, app: app)
+        note.typeText("Draft note survives menu")
+        openTaskRowParameter("project", app: app)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+        XCTAssertEqual(note.value as? String, "Draft note survives menu")
+        focusTaskText(title, app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        focusTaskText(note, app: app)
+        XCTAssertEqual(note.value as? String, "Draft note survives menu")
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
+    func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
+        let app = try launch(isolated: true)
+        let title = expandTask(app)
+        let originalTitle = try XCTUnwrap(title.value as? String)
+        focusTaskText(title, app: app)
+        verifyProjectMenuFromFocusedText(app)
+        let note = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
+        focusTaskText(note, app: app)
+        note.typeText("Focused note survives menu")
+        verifyProjectMenuFromFocusedText(app)
+        XCTAssertEqual(note.value as? String, "Focused note survives menu")
+        focusTaskText(title, app: app)
+        title.typeText(" title retained")
+        let editedTitle = try XCTUnwrap(title.value as? String)
+        XCTAssertEqual(editedTitle.components(separatedBy: " title retained").count, 2)
+        XCTAssertEqual(editedTitle.replacingOccurrences(of: " title retained", with: ""), originalTitle)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        focusTaskText(note, app: app)
+        note.typeText(" and editable")
+        let editedNote = try XCTUnwrap(note.value as? String)
+        XCTAssertEqual(editedNote.components(separatedBy: " and editable").count, 2)
+        XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Focused note survives menu")
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
+    private func verifyProjectMenuFromFocusedText(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        openTaskRowParameter("project", app: app)
+        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
+        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app, file: file, line: line)
+        let field = app.textFields["row-project-input"]
+        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(field.value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline, file: file, line: line)
+        app.buttons["close-row-parameter"].tap()
+        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5), file: file, line: line)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release", file: file, line: line)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline, file: file, line: line)
+    }
+
     func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
         let app = try launch(organized: true)
         let title = expandTask(app)
@@ -349,6 +538,13 @@ import XCTest
         capture("Tags persist after dismissal and relaunch", app)
         openTaskRowParameter("project", app: app)
         tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
+        openTaskRowParameter("project", app: app)
+        let noProject = app.buttons.matching(NSPredicate(format: "label == %@", "No project")).firstMatch
+        XCTAssertTrue(noProject.waitForExistence(timeout: 5))
+        XCTAssertTrue(noProject.isSelected)
+        tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
         openTaskRowParameter("priority", app: app)
         tapTaskPickerOption("None", options: ["None", "Low", "Medium", "High"], app: app)
         openTaskRowParameter("tags", app: app)
@@ -477,6 +673,18 @@ import XCTest
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
+    private func selectHighPriorityAndVerifyReselection(_ app: XCUIApplication) {
+        openTaskRowParameter("priority", app: app)
+        capture("Native priority menu", app)
+        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
+        openTaskRowParameter("priority", app: app)
+        let selectedHigh = app.buttons.matching(NSPredicate(format: "label == %@", "High")).firstMatch
+        XCTAssertTrue(selectedHigh.waitForExistence(timeout: 5))
+        XCTAssertTrue(selectedHigh.isSelected)
+        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+    }
+
     private func visibleCompletionCircleFrame(_ id: String, app: XCUIApplication) throws -> CGRect {
         let deadline = ProcessInfo.processInfo.systemUptime + 5
         var previous: CGRect?
@@ -526,17 +734,107 @@ import XCTest
         return title
     }
 
-    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false) throws -> XCUIApplication {
+    private struct ProjectMenuPosition: Equatable {
+        let applicationFrame: CGRect
+        let viewport: CGRect
+        let rows: [String: TaskNativeMenuOptionGeometry]
+        let selectedLabels: Set<String>
+    }
+
+    private func projectMenuPosition(_ app: XCUIApplication, options: [String], diagnostic: ((String) -> Void)? = nil) throws -> ProjectMenuPosition? {
+        let application = try app.snapshot()
+        let windows = application.children.filter { $0.elementType == .window }.map(\.frame)
+        let order = Dictionary(uniqueKeysWithValues: options.enumerated().map { ($0.element, $0.offset) })
+        var pending: [(any XCUIElementSnapshot, [CGRect])] = [(application, [])]
+        var matches: [ProjectMenuPosition] = []
+        var samples: [String] = []
+        while let (snapshot, ancestors) = pending.popLast() {
+            let frames = ancestors + [snapshot.frame]
+            if snapshot.elementType == .collectionView {
+                let choices = snapshot.children.filter { $0.elementType == .cell }.flatMap { cell in
+                    cell.children.filter { $0.elementType == .button }.map { (cell.frame, $0) }
+                }
+                let labels = choices.map { $0.1.label }
+                samples.append("collection=\(snapshot.frame) ancestors=\(ancestors) labels=\(labels)")
+                if labels.count >= 3, Set(labels).count == labels.count,
+                   labels.allSatisfy({ order[$0] != nil }),
+                   labels == labels.sorted(by: { order[$0]! < order[$1]! }) {
+                    var rows: [String: TaskNativeMenuOptionGeometry] = [:]
+                    var selectedLabels: Set<String> = []
+                    for (cellFrame, button) in choices where button.isEnabled {
+                        if let row = TaskNativeMenuOptionGeometry(frame: button.frame, ancestorFrames: frames + [cellFrame])
+                            .visibleInApplication(application.frame, windowFrames: windows) {
+                            rows[button.label] = row
+                            if button.isSelected { selectedLabels.insert(button.label) }
+                        }
+                    }
+                    samples.append("visibleRows=\(rows) selected=\(selectedLabels)")
+                    if rows.count >= 3, let row = rows.values.first {
+                        let viewport = row.ancestorFrames.dropLast().reduce(row.ancestorFrames[0]) { $0.intersection($1) }
+                        matches.append(ProjectMenuPosition(applicationFrame: row.ancestorFrames[0], viewport: viewport,
+                                                           rows: rows, selectedLabels: selectedLabels))
+                    }
+                }
+            }
+            pending.append(contentsOf: snapshot.children.map { ($0, frames) })
+        }
+        diagnostic?(samples.joined(separator: "\n"))
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    private func settledProjectMenu(_ app: XCUIApplication, options: [String], requiring label: String? = nil,
+                                    selected: Bool? = nil, deadline: TimeInterval? = nil) throws -> ProjectMenuPosition {
+        let deadline = deadline ?? ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+        var previous: ProjectMenuPosition?
+        var stableSince = ProcessInfo.processInfo.systemUptime
+        var accepted: ProjectMenuPosition?
+        var lastSample = "not sampled"
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  let current = try? self.projectMenuPosition(app, options: options, diagnostic: { lastSample = $0 }),
+                  label == nil || current.rows[label!] != nil,
+                  selected == nil || label.map({ current.selectedLabels.contains($0) == selected! }) == true,
+                  ProcessInfo.processInfo.systemUptime < deadline else { previous = nil; return false }
+            let now = ProcessInfo.processInfo.systemUptime
+            if previous == current, now - stableSince >= 0.3 { accepted = current; return true }
+            if previous != current { stableSince = now }
+            previous = current
+            return false
+        }, object: nil)
+        let outcome = XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime))
+        if outcome != .completed {
+            let evidence = XCTAttachment(string: lastSample)
+            evidence.name = "Native Project menu admission sample"
+            evidence.lifetime = .keepAlways
+            add(evidence)
+            capture("Native Project menu admission failure", app)
+        }
+        XCTAssertEqual(outcome, .completed)
+        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, deadline)
+        return try XCTUnwrap(accepted, "The unique native Project menu must have two stable, visible samples")
+    }
+
+    private func launch(largeText: Bool = false, crowded: Bool = false, longTitle: Bool = false, neighbors: Bool = false, organized: Bool = false, supporting: Bool = false, isolated: Bool = false, projects: [String] = []) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = nil
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        if isolated {
+            XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
+            app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        }
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
         var records: [[String: Any]] = [
             ["id": taskID, "attributes": ["description": "Prepare the release with the product team", "status": "pending", "project": "Release", "scheduled": "1792231200", "due": "1792238400", "opaque": "retain"].map { ["key": $0.key, "value": $0.value] }],
             ["id": "A0000000-0000-0000-0000-000000000002", "attributes": [["key": "description", "value": "Review accessibility findings"], ["key": "status", "value": "pending"]]]
         ]
+        for (index, project) in projects.enumerated() {
+            records.append(["id": String(format: "B0000000-0000-0000-0000-%012d", index), "attributes": [
+                ["key": "description", "value": "Stored project \(project)"],
+                ["key": "status", "value": "completed"], ["key": "project", "value": project]
+            ]])
+        }
         if organized {
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
             attributes += [["key": "priority", "value": "M"], ["key": "tag_review", "value": ""]]
@@ -547,7 +845,6 @@ import XCTest
         }
         if supporting {
             app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
-            app.launchEnvironment["TSK_TEST_ATTRIBUTE_DEFINITIONS_FIXTURE"] = "1"
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
             attributes += [
                 ["key": "annotation_1792144800", "value": "Review the accessibility findings\nKeep the release checklist nearby"],

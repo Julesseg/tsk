@@ -65,8 +65,6 @@ struct TaskRowEditor: View {
                     linkedTask = target
                     editing.supportingPanel = nil
                 }
-            case .attributes:
-                TaskAdvancedAttributesEditor(store: store, task: editing.draft.original, onSave: editing.absorb)
             }
         }
         .task(id: measuredContentHeight > 0) {
@@ -141,7 +139,6 @@ private struct TaskRowEditorContent: View {
             .transition(.opacity)
             VStack(alignment: .leading, spacing: 12) {
                 TaskAvailabilityView(task: task, store: store)
-                TaskAdvancedAttributesSection(store: store, task: task, edit: { open(.attributes) })
                 TaskRecurrenceSection(task: task, store: store)
             }
             .padding(.vertical, 8)
@@ -197,9 +194,17 @@ private struct TaskRowParameterPill: View {
                         }
                     }
                 } label: {
-                    label
+                    if parameter == .project {
+                        label.background {
+                            TaskMenuActivation(action: unfocus)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    } else {
+                        label
+                    }
                 }
-                .simultaneousGesture(TapGesture().onEnded { unfocus() })
+                .modifier(TaskRowMenuUnfocusGesture(parameter: parameter, unfocus: unfocus))
             } else {
                 Button(action: openPicker) { label }
             }
@@ -229,6 +234,16 @@ private struct TaskRowParameterPill: View {
     private func openPicker() {
         unfocus()
         editing.parameter = parameter
+    }
+}
+
+private struct TaskRowMenuUnfocusGesture: ViewModifier {
+    let parameter: TaskRowParameter
+    let unfocus: () -> Void
+
+    func body(content: Content) -> some View {
+        if parameter == .project { content }
+        else { content.simultaneousGesture(TapGesture().onEnded { unfocus() }) }
     }
 }
 
@@ -349,5 +364,7 @@ struct TaskRowParameterButtonStyle: ButtonStyle {
             .background(.background, in: Capsule())
             .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
             .opacity(configuration.isPressed ? 0.65 : 1)
+            .frame(minWidth: 44, minHeight: 44, alignment: .top)
+            .contentShape(Rectangle())
     }
 }

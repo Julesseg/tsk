@@ -8,29 +8,27 @@ struct TaskLinkedTaskList: View {
     }
 
     let taskID: UUID
-    let onBack: (() -> Void)?
     @State private var store: TaskStore
     @State private var calendar: TodayCalendarController
     @State private var destination: Destination?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(source: TaskStore, taskID: UUID, onBack: (() -> Void)? = nil) {
+    init(source: TaskStore, taskID: UUID) {
         self.taskID = taskID
-        self.onBack = onBack
         _store = State(initialValue: source.linkedTaskStore())
         _calendar = State(initialValue: TodayCalendarController(manager: source.manager))
     }
 
     var body: some View {
-        TaskListView(store: store, selection: nil, calendar: calendar, edit: { task in
+        TaskListView(store: store, calendar: calendar, edit: { task in
             finish { destination = Destination(task: task, isLink: false) }
         })
         .navigationTitle("Linked task")
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Back", systemImage: "chevron.backward") { finish { if let onBack { onBack() } else { dismiss() } } }
+                Button("Back", systemImage: "chevron.backward") { finish { dismiss() } }
                     .accessibilityIdentifier("back-from-linked-task")
             }
         }

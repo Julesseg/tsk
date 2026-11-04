@@ -6,12 +6,11 @@ import TskCore
 @MainActor @Observable
 final class TaskRowEditing {
     enum SupportingPanel: Identifiable {
-        case dependency, attributes
+        case dependency
 
         var id: String {
             switch self {
             case .dependency: "dependency"
-            case .attributes: "attributes"
             }
         }
     }

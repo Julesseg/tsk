@@ -12,9 +12,10 @@ import TskCore
             if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) { continue }
             if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                 items.append(try await load(provider, identifier: UTType.url.identifier, url: true))
+            } else {
+                let text = provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) ? UTType.plainText.identifier : UTType.text.identifier
+                if provider.hasItemConformingToTypeIdentifier(text) { items.append(try await load(provider, identifier: text, url: false)) }
             }
-            let text = provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) ? UTType.plainText.identifier : UTType.text.identifier
-            if provider.hasItemConformingToTypeIdentifier(text) { items.append(try await load(provider, identifier: text, url: false)) }
         }
         try Task.checkCancellation()
         return items

@@ -6,13 +6,11 @@ import TskNative
 import UniformTypeIdentifiers
 
 @available(macOS 11, iOS 14, *)
-@Test @MainActor func actualItemProvidersRetainTextAndURLAndSharedParticipantCaptureReopensInTheApp() async throws {
+@Test @MainActor func actualItemProvidersCreateOnePlainTaskThatReopensInTheApp() async throws {
     let body = "Shared café e\u{301}\nFull text remains available"
     let url = URL(string: "https://example.com/share?q=retained#source")!
     let providers = [NSItemProvider(item: body as NSString, typeIdentifier: UTType.plainText.identifier), NSItemProvider(item: url as NSURL, typeIdentifier: UTType.url.identifier)]
     let items = try await SharedTaskProviderLoader.load(providers)
-    let draft = try TaskManager.sharedDraft(from: items)
-    #expect(draft.content.matchesBytes(body + "\n\n" + url.absoluteString))
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let group = root.appendingPathComponent("shared"), legacy = root.appendingPathComponent("private")
@@ -20,30 +18,54 @@ import UniformTypeIdentifiers
     let directory = try TaskChampionSession.prepareShared(container: group, legacy: legacy)
     let participant = try TaskChampionSession.prepareShared(container: group, legacy: legacy, allowMigration: false)
     let manager = try await TaskChampionSession.open(directory: participant)
-    let task = try await manager.captureSharedTask(draft)
+    let task = try await manager.captureSharedTask(items)
     let app = try await TaskChampionSession.open(directory: directory)
     #expect(try await app.task(id: task.id) == task)
-    #expect(task.annotations.first?.text.matchesBytes(draft.content) == true)
+    #expect(task.description.matchesBytes(body + "\n\n" + url.absoluteString))
+    #expect(task.annotations.isEmpty && task.tags.isEmpty && task.attributes["project"] == nil)
+}
+
+@available(macOS 11, iOS 14, *)
+@Test @MainActor func aURLProviderWithATextRepresentationCreatesOnlyOneURLDescription() async throws {
+    let provider = NSItemProvider()
+    let url = "https://example.com/one-link"
+    for type in [UTType.url, UTType.plainText] {
+        provider.registerDataRepresentation(forTypeIdentifier: type.identifier, visibility: .all) { completion in
+            completion(Data(url.utf8), nil)
+            return nil
+        }
+    }
+    let items = try await SharedTaskProviderLoader.load([provider])
+    #expect(items.count == 1)
+    #expect(try TaskManager.sharedDescription(from: items) == url)
+}
+
+@available(macOS 11, iOS 14, *)
+@Test @MainActor func fileItemProvidersDoNotBecomeStoredAttachmentPathsOrTasks() async throws {
+    let provider = NSItemProvider(item: URL(fileURLWithPath: "/tmp/not-a-task-attachment.txt") as NSURL, typeIdentifier: UTType.fileURL.identifier)
+    let items = try await SharedTaskProviderLoader.load([provider])
+    #expect(throws: TaskSharingError.noSupportedContent) { try TaskManager.sharedDescription(from: items) }
 }
 #endif
 
-@Test func sharedCaptureStorageFailureNeverAcknowledgesATaskAndRetryKeepsItsContent() async throws {
+@Test func sharedCaptureStorageFailureNeverAcknowledgesATaskAndRetryKeepsTheDescription() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let manager = try await TaskChampionSession.open(directory: directory)
     let before = try await manager.create(TaskDraft(description: "Existing task", attributes: ["opaque": "retained"]))
-    let draft = try TaskManager.sharedDraft(from: [.text("Unsaved shared text"), .url(URL(string: "https://example.com/retry")!)])
+    let items: [SharedTaskItem] = [.text("Unsaved shared text"), .url(URL(string: "https://example.com/retry")!)]
     try shareSQL(directory, "CREATE TRIGGER fail_share BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'actual share save fixture failure'); END;")
-    await #expect(throws: (any Error).self) { try await manager.captureSharedTask(draft) }
+    await #expect(throws: (any Error).self) { try await manager.captureSharedTask(items) }
     #expect(try await manager.tasks() == [before])
     try shareSQL(directory, "DROP TRIGGER fail_share;")
-    let saved = try await manager.captureSharedTask(draft)
-    #expect(saved.annotations.first?.text == "Unsaved shared text\n\nhttps://example.com/retry")
+    let saved = try await manager.captureSharedTask(items)
+    #expect(saved.description == "Unsaved shared text\n\nhttps://example.com/retry")
+    #expect(saved.annotations.isEmpty)
     #expect(try await manager.task(id: before.id) == before)
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_SYNC_TEST_URL"] != nil && ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
-func sharedFactoryCaptureAutomaticallySyncsAndTaskwarriorReadsCompatibleTextLinkOrganizationAndDates() async throws {
+func sharedFactoryCaptureAutomaticallySyncsAndTaskwarriorReadsThePlainDescription() async throws {
     let env = ProcessInfo.processInfo.environment
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -53,13 +75,8 @@ func sharedFactoryCaptureAutomaticallySyncsAndTaskwarriorReadsCompatibleTextLink
     try await SyncConfigurationStore(directory: directory).save(configuration)
     let manager = try await TaskChampionSession.open(directory: directory)
     let states = await manager.synchronizationUpdates()
-    var draft = try TaskManager.sharedDraft(from: [.text("Shared body\nPreserve café e\u{301}"), .url(URL(string: "https://example.com/read?q=one#source")!)])
-    draft.task.description = "Shared capture interop"
-    draft.task.project = "Shared.Reading"
-    try draft.task.addTag("reference")
-    draft.task.plannedDate = Date(timeIntervalSince1970: 1792108800)
-    draft.task.deadline = Date(timeIntervalSince1970: 1792231200)
-    let saved = try await manager.captureSharedTask(draft)
+    let items: [SharedTaskItem] = [.text("Shared body\nPreserve café e\u{301}"), .url(URL(string: "https://example.com/read?q=one#source")!)]
+    let saved = try await manager.captureSharedTask(items)
     for await state in states {
         if case .synchronized = state { break }
         if case .failed(let message) = state { throw TaskManagementError.storage(String(describing: message)) }
@@ -83,13 +100,8 @@ func sharedFactoryCaptureAutomaticallySyncsAndTaskwarriorReadsCompatibleTextLink
     let rows = try #require(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
     let row = try #require(rows.first)
     #expect(row["uuid"] as? String == saved.id.uuidString.lowercased())
-    #expect(row["description"] as? String == "Shared capture interop")
-    #expect(row["project"] as? String == "Shared.Reading")
-    #expect(row["tags"] as? [String] == ["reference"])
-    #expect(row["scheduled"] as? String == "20261016T000000Z")
-    #expect(row["due"] as? String == "20261017T100000Z")
-    let notes = try #require(row["annotations"] as? [[String: String]])
-    #expect(notes.first?["description"]?.matchesBytes(draft.content) == true)
+    #expect((row["description"] as? String)?.matchesBytes(saved.description) == true)
+    for name in ["project", "priority", "scheduled", "due", "tags", "annotations"] { #expect(row[name] == nil) }
     if let path = env["TSK_SHARE_PROOF_PATH"] { try data.write(to: URL(fileURLWithPath: path)) }
 }
 
@@ -102,12 +114,3 @@ private func shareSQL(_ directory: URL, _ query: String) throws {
     let error = errors.fileHandleForReading.readDataToEndOfFile()
     guard process.terminationStatus == 0 else { throw TaskManagementError.storage(String(decoding: error, as: UTF8.self)) }
 }
-
-#if canImport(UniformTypeIdentifiers)
-@available(macOS 11, iOS 14, *)
-@Test @MainActor func fileItemProvidersDoNotBecomeStoredAttachmentPathsOrTasks() async throws {
-    let provider = NSItemProvider(item: URL(fileURLWithPath: "/tmp/not-a-task-attachment.txt") as NSURL, typeIdentifier: UTType.fileURL.identifier)
-    let items = try await SharedTaskProviderLoader.load([provider])
-    #expect(throws: TaskSharingError.noSupportedContent) { try TaskManager.sharedDraft(from: items) }
-}
-#endif

@@ -50,6 +50,15 @@ def boundary(case, outcome='started.'):
 
 
 class MarkerTests(unittest.TestCase):
+    def test_each_case_bounds_sequences_to_its_registered_phase_count(self):
+        for case, phases in relay.CHORDS.items():
+            phase = next(reversed(phases))
+            value = request(case, phase, len(phases) - 1)
+            self.assertEqual(relay.parse_marker(marker(value), TOKEN), value)
+            for sequence in [-1, len(phases), True]:
+                with self.subTest(case=case, sequence=sequence), self.assertRaises(ValueError):
+                    relay.parse_marker(marker(dict(value, sequence=sequence)), TOKEN)
+
     def test_accepts_nonce_bound_native_focus_and_baseline(self):
         value = request()
         self.assertEqual(relay.parse_marker(marker(value), TOKEN), value)
@@ -136,6 +145,19 @@ class ArmedLogTests(unittest.TestCase):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_compatibility_requires_all_nine_owned_acknowledged_phases_in_order(self):
+        protocol = relay.Protocol(TOKEN)
+        protocol.line(boundary(relay.COMPATIBILITY))
+        attempt = str(uuid.uuid4())
+        for sequence, phase in enumerate(relay.CHORDS[relay.COMPATIBILITY]):
+            value = dict(request(relay.COMPATIBILITY, phase, sequence), attempt=attempt)
+            self.assertEqual(protocol.line(marker(value).rstrip(b'\n')), value)
+            with self.assertRaises(ValueError):
+                protocol.line(boundary(relay.COMPATIBILITY, 'passed (1.0 seconds).'))
+            protocol.acknowledged(value)
+        protocol.line(boundary(relay.COMPATIBILITY, 'passed (1.0 seconds).'))
+        protocol.finish()
+
     def test_recorded_non_keyboard_timeout_restart_preserves_failure_and_remaining_cases(self):
         protocol = relay.Protocol(TOKEN)
         interrupted = 'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences'
@@ -739,6 +761,95 @@ class ContainerBudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(receipt['containerLookups'][0]['failure'], 'ValueError')
 
 
+class DiscoveryProcessGroupTests(unittest.IsolatedAsyncioTestCase):
+    async def exercise_tree(self, mode):
+        import os
+        import signal
+        import subprocess
+
+        create = asyncio.create_subprocess_exec
+        processes = []
+        observed = []
+        ready = asyncio.Event()
+        with tempfile.TemporaryDirectory() as directory:
+            pidfile = pathlib.Path(directory) / 'descendant'
+            descendant = "import os,pathlib,sys,time;pathlib.Path(sys.argv[1]).write_text(str(os.getpid()));time.sleep(60)"
+            code = (
+                "import subprocess,sys,time;"
+                "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]],"
+                + ("stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL" if mode == 'success' else "")
+                + ");"
+                + ("print('/tmp/owned-runner',flush=True)" if mode in ('timeout-exited', 'success') else "time.sleep(60)")
+            )
+            sentinel = await create(sys.executable, '-c', 'import time;time.sleep(60)', start_new_session=True)
+            async def start(*args, **kwargs):
+                observed.append(dict(kwargs))
+                kwargs.setdefault('start_new_session', True)
+                process = await create(sys.executable, '-c', code, descendant, str(pidfile), **kwargs)
+                processes.append(process)
+                async def wait_ready():
+                    while not pidfile.exists() or mode in ('timeout-exited', 'success') and process.returncode is None:
+                        await asyncio.sleep(0.01)
+                await asyncio.wait_for(wait_ready(), 5)
+                ready.set()
+                return process
+            receipt = {}
+            try:
+                with mock.patch.object(relay.asyncio, 'create_subprocess_exec', side_effect=start), mock.patch.object(relay, 'time') as clock:
+                    clock.monotonic.return_value = 100.0
+                    task = asyncio.create_task(relay.container_for('owned-udid', request(), receipt, deadline=112 if mode in ('cancel', 'success') else 105.15))
+                    if mode == 'cancel':
+                        await asyncio.wait_for(ready.wait(), 5)
+                        task.cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await asyncio.wait_for(task, 6)
+                    elif mode == 'success':
+                        self.assertEqual(await asyncio.wait_for(task, 6), pathlib.Path('/tmp/owned-runner'))
+                    else:
+                        with self.assertRaises(TimeoutError):
+                            await asyncio.wait_for(task, 6)
+                entry = receipt['containerLookups'][0]
+                self.assertTrue(entry.get('reaped'), receipt)
+                self.assertIsNotNone(processes[0].returncode)
+                self.assertEqual(entry['processGroupID'], processes[0].pid)
+                await asyncio.wait_for(processes[0].communicate(), 1)
+                descendant_pid = int(pidfile.read_text())
+                async def terminated():
+                    while True:
+                        result = await asyncio.to_thread(subprocess.run, ['ps', '-o', 'stat=', '-p', str(descendant_pid)], capture_output=True, text=True)
+                        if result.returncode == 1 or result.returncode == 0 and result.stdout.strip().startswith('Z'):
+                            return
+                        if result.returncode:
+                            raise AssertionError(result.stderr)
+                        await asyncio.sleep(0.01)
+                await asyncio.wait_for(terminated(), 2)
+                self.assertTrue(observed[0].get('start_new_session'))
+                self.assertIsNone(sentinel.returncode)
+                os.kill(sentinel.pid, 0)
+                if mode != 'success':
+                    self.assertEqual(entry['failure'], 'CancelledError' if mode == 'cancel' else 'TimeoutError')
+                    self.assertNotIn('path', entry)
+            finally:
+                for process in processes + [sentinel]:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    await asyncio.wait_for(process.communicate(), 5)
+
+    async def test_timeout_cleans_live_parent_and_pipe_holding_descendant(self):
+        await self.exercise_tree('timeout-live')
+
+    async def test_timeout_cleans_pipe_holder_after_parent_already_exited(self):
+        await self.exercise_tree('timeout-exited')
+
+    async def test_cancellation_cleans_owned_tree_and_remains_cancellation(self):
+        await self.exercise_tree('cancel')
+
+    async def test_success_cleans_remaining_owned_descendant_and_preserves_unrelated_process(self):
+        await self.exercise_tree('success')
+
+
 class RunnerContainerTests(unittest.IsolatedAsyncioTestCase):
     def write_request(self, root, value):
         location = root / 'Documents/TSKHID' / value['owner'] / value['attempt']
@@ -943,9 +1054,14 @@ class FileAndMappingTests(unittest.TestCase):
         expected={
             relay.CASE: {'commandReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
             relay.ANNOTATIONS: {'secondNoteCommandN': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'secondNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'editSelectAll': ((227,'DOWN'),(4,'DOWN'),(4,'UP'),(227,'UP')), 'editedNoteSave': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP'))},
-            relay.WORKSPACE: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
+            relay.COMPATIBILITY: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
+        expected[relay.COMPATIBILITY] = {
+            **expected[relay.COMPATIBILITY],
+            'captureAfterReturn': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),
+            'saveAfterReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),
+        }
         self.assertEqual(relay.CHORDS,expected)
-        self.assertEqual(relay.releases(expected[relay.WORKSPACE]['complete']),((40,'UP'),(225,'UP'),(227,'UP')))
+        self.assertEqual(relay.releases(expected[relay.COMPATIBILITY]['complete']),((40,'UP'),(225,'UP'),(227,'UP')))
 
 
 if __name__=='__main__':unittest.main()

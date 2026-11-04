@@ -88,7 +88,6 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 public actor TaskManager {
     let replica: any TaskReplica
     let viewDefinitions: (any TaskViewDefinitionsStore)?
-    let userAttributeDefinitions: (any TaskAttributeDefinitionsStore)?
     let reminderImportConfiguration: (any ContinuousReminderConfigurationStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
@@ -110,10 +109,9 @@ public actor TaskManager {
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, attributeDefinitions: (any TaskAttributeDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects(), notificationSynchronization: (any TaskSynchronizationReceiptStore)? = nil) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects(), notificationSynchronization: (any TaskSynchronizationReceiptStore)? = nil) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
-        self.userAttributeDefinitions = attributeDefinitions
         self.reminderImportConfiguration = reminderImportConfiguration
         self.reminderImportAdmission = reminderImportAdmission
         self.notificationSynchronization = notificationSynchronization
@@ -164,9 +162,6 @@ public actor TaskManager {
         }
         var attributes = try TaskOrganization.normalizedAttributes(draft.attributes)
         let timestamp = String(Int(now().timeIntervalSince1970))
-        let typed = try await normalizedUserAttributes(attributes.mapValues { Optional($0) })
-        attributes = [:]
-        for (name, value) in typed { if let value { attributes[name] = value } }
         attributes["description"] = description
         attributes["status"] = "pending"
         attributes["entry"] = timestamp
@@ -182,7 +177,7 @@ public actor TaskManager {
         return try await updateTask(id: id, changes: changes)
     }
 
-    func updateTask(id: UUID, changes: TaskAttributePatch, userAttributesOnly: Bool = false, annotationChanges: TaskAttributePatch = [:]) async throws -> TaskRecord {
+    func updateTask(id: UUID, changes: TaskAttributePatch, annotationChanges: TaskAttributePatch = [:]) async throws -> TaskRecord {
         let task = try await self.task(id: id)
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         let reserved = Set(["uuid", "id", "status", "entry", "modified", "start", "end", "recur", "rtype", "template", "last", "parent", "mask", "imask", "tags", "depends"])
@@ -190,7 +185,7 @@ public actor TaskManager {
             throw TaskManagementError.reservedAttribute(key)
         }
         guard !changes.isEmpty || !annotationChanges.isEmpty else { return task }
-        var patch = try await normalizedUserAttributes(changes, requireDefinitions: userAttributesOnly)
+        var patch = changes
         if changes.keys.contains("description") {
             let description = (changes["description"] ?? nil)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !description.isEmpty else { throw TaskManagementError.emptyDescription }

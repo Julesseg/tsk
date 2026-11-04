@@ -22,11 +22,11 @@ Today includes unfinished tasks scheduled for any time today, unfinished tasks s
 
 Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by their actual timestamps, and clearly distinguishes Scheduled from Deadline. A task with different Scheduled and Deadline dates may appear on both dates.
 
-Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults, with user-defined attribute types configurable locally in tsk. Report invalid or unsupported expressions clearly; Taskwarrior filter compatibility remains the requirement. Saved view definitions stay device-local; they do not synchronize between iPhone and iPad. Importing desktop reports, contexts, or `.taskrc` configuration is not planned.
+Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in task fields. Local custom-attribute editors and definition management are out of scope. Report invalid or unsupported expressions clearly; Taskwarrior filter compatibility remains the requirement. Saved view definitions stay device-local; they do not synchronize between devices. Importing desktop reports, contexts, or `.taskrc` configuration is not planned.
 
 ## Task editing
 
-Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, and dependencies, plus starting and stopping work. Include an advanced editor for user-defined attributes and preserve unfamiliar fields.
+Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, and dependencies, plus starting and stopping work. Preserve unfamiliar task fields without exposing a custom-attribute editor.
 
 ## Offline use and synchronization
 
@@ -54,7 +54,7 @@ Shortcuts and the URL scheme will expose Add Task, Modify Task, Delete Task, Fin
 
 Widgets show Today or a chosen task view and provide completion actions. Spotlight opens matching tasks in tsk.
 
-Sharing text or a URL into tsk opens an editable task draft before saving, preserving shared text and links with quick access to project, tags, and dates. File attachment storage is deferred initially.
+Sharing text or a URL into tsk immediately creates a plain task whose complete description is the shared content. There is no extension editor, annotation, project, tag, priority, or date selection. File attachment storage is deferred initially.
 
 Notifications are based on Scheduled or Deadline times. A separate opt-in reminder time per task is not the agreed behavior. Different Scheduled and Deadline times each produce a notification, distinguished as scheduled versus due; coincident times produce one combined notification. Completion or deletion cancels pending notifications once known locally.
 
@@ -64,7 +64,7 @@ After synchronization, immediately fire newly discovered missed alerts for unfin
 
 ## Devices
 
-iPhone leads the everyday capture-and-action workflow. iPad receives an adaptive layout and keyboard support at launch. A dedicated Mac experience is a later decision.
+tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands remain supported on iPhone. Native iPad and Mac experiences are future product decisions.
 
 ## Visual direction
 

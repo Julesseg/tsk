@@ -40,8 +40,7 @@ struct FilterTypedPredicate: Sendable {
                 guard let number = FilterScalar.storedNumber(stored) else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
                 actual = .number(number)
             case .uuid:
-                do { _ = try TaskAttributeValues.normalized(stored, for: TaskAttributeDefinition(name: name, type: .uuid)) }
-                catch { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
+                guard stored.isEmpty || TaskFilterValue.uuidIsValid(stored) else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
                 actual = .text(stored)
             case .duration:
                 guard stored.isEmpty || TaskwarriorDuration(stored, allowRawSeconds: false) != nil else { throw TaskFilterError.invalidStoredValue(task.id, name, type) }
@@ -83,7 +82,7 @@ enum FilterScalar: Sendable {
         switch self {
         case .text(let value): value
         case .number(let value): String(format: "%.6g", value)
-        case .duration(let value): TaskAttributeValues.durationString(value)
+        case .duration(let value): TaskFilterValue.durationString(value)
         }
     }
 

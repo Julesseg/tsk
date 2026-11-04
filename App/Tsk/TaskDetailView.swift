@@ -50,7 +50,6 @@ struct TaskDetailView: View {
             TaskDependenciesSection(store: store, task: task, onSave: { task = $0 }, select: { panel = .dependency })
             Section("Planning") { TaskPlanningSummary(task: task) }
             TaskAnnotationsSection(store: store, task: task, edit: { panel = .annotation($0) })
-            TaskAdvancedAttributesSection(store: store, task: task, edit: { panel = .attributes })
             if !task.canEdit, task.recurrenceInspection == nil {
                 Section { Text("These task attributes are preserved. Recurring tasks and unsupported states require their dedicated editor.").font(.footnote) }
             }
@@ -84,7 +83,6 @@ struct TaskDetailView: View {
             case .series: TaskSeriesMetadataEditor(store: store, template: task, onSave: { task = $0 })
             case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
             case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
-            case .attributes: TaskAdvancedAttributesEditor(store: store, task: task, onSave: { task = $0 })
             }
         }
         .onChange(of: isEditing) { _, editing in
@@ -102,7 +100,7 @@ struct TaskDetailView: View {
 }
 
 private enum TaskDetailPanel: Identifiable {
-    case dependency, annotation(TaskAnnotation?), attributes, series, transition
+    case dependency, annotation(TaskAnnotation?), series, transition
 
     var id: String {
         switch self {
@@ -110,7 +108,6 @@ private enum TaskDetailPanel: Identifiable {
         case .series: "series"
         case .dependency: "dependency"
         case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
-        case .attributes: "attributes"
         }
     }
 }

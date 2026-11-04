@@ -1,126 +1,203 @@
 # CI test tiers
 
-Pull requests and pushes to `main` with non-documentation changes run all Core
-and persistent Native tests, plus a small UI smoke selection on both device
-families. The existing `App · XCUITest (macOS)` and `App · XCUITest (iPad)`
-check names remain the branch-protection gates.
+PRs and pushes to `main` run all Core and persistent Native tests plus iPhone
+smoke coverage. `App · XCUITest (macOS)` remains the required iPhone rollup;
+its legacy name refers to the Mac runner, not a macOS app. Native iPad support,
+its UI tests and CI jobs are retired under [ADR 0007](../adr/0007-iphone-only.md).
+Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 
-| UI coverage | iPhone | iPad | Trigger |
-| --- | --- | --- | --- |
-| Smoke | 4 methods | 2 methods | PR, push, manual `ui_suite=smoke` |
-| Full | All 74 declared methods | 65-method selection | Nightly at 02:00 UTC, manual `ui_suite=full` |
-| Diagnostic | 12-method subset | — | Manual `diagnostic_only=true` |
-| Keyboard diagnostics | 11-method subset | 9-method subset | Manual `ui_suite=keyboard` |
-| Text diagnostics | 5-method subset | 5-method subset | Manual `ui_suite=text` |
+| Coverage | iPhone | Trigger |
+| --- | --- | --- |
+| Smoke | 4 methods | PR, main push, explicit dispatch |
+| Full | 72 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 12 methods | `diagnostic_only=true` |
+| Keyboard | 12 methods | Explicit dispatch |
+| Text | 4 methods | Explicit dispatch |
+| Regression | 5 methods | Explicit dispatch |
+| Menu | 6 methods | Explicit dispatch |
 
-The iPhone smoke journeys cover capture/validation/cancel/reopen; row title and
-attribute editing, picker dismissal, invalid-draft retention and durable
-completion; persisted view ordering and capacity; and real-server synchronization.
-The iPad journeys cover the same row round trip and adaptive landscape/portrait
-project/date views.
+Smoke covers capture, validation, cancellation, durable row editing/completion,
+view ordering/capacity and real-server sync on iPhone. Hardware keyboard, installed Share/widgets/Spotlight,
+permissions, notification delivery and other system integrations retain their
+full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
+behavior outside smoke. Moving frequency does not establish acceptance.
 
-Physical-keyboard journeys run in full/nightly and focused keyboard/text
-diagnostics. PR smoke does not certify physical-keyboard delivery. This keeps
-ordinary task editing independent of the native keyboard companion's startup.
-Full and diagnostic selections still require the owned transport whenever they
-include a hardware-keyboard case; a missing transport fails before XCTest can
-silently use the local fallback. Native request proofs, assertions and deadlines
-are unchanged. The workflow installs the companion only for those selections.
+Custom-attribute editors/definitions and their dedicated cases are retired. The
+built-in arithmetic saved-view test remains in Keyboard/Text. Share coverage now
+checks automatic plain-description capture without an editor or extra fields.
 
-Installed Share capture, widgets, all three Spotlight scenarios, Settings tours,
-appearance/accessibility permutations, annotations, recurrence, Reminders,
-Calendar, notifications, exhaustive typed attributes and filters, and additional
-persistence/error journeys run in full coverage. Moving a scenario to full
-coverage does not establish that it passed. System changes still require actual
-native full-suite results before acceptance. See [the consolidation audit](test-suite-consolidation.md)
-for the merged methods and measured baseline.
+Regression coverage retains installed Share, durable/organization row editing,
+view reordering and the repeated native menu journey on iPhone. It is a focused
+diagnostic loop with the original input, assertions and deadlines; it does not
+replace smoke or full acceptance. It needs neither native keyboard transport
+nor a synchronization server or peer.
 
-Smoke uses one worker per family. Full coverage uses disjoint workspace and
-row-editing workers: 64 + 10 methods on iPhone and 55 + 10 on iPad. Each method is
-selected once per family. Native HID cases remain in the workspace worker with
-their existing identity checks and deadlines. The row-only worker selects no
-native command cases and uses XCTest input. Focused diagnostic dispatches use
-one worker per selected family. Each worker builds once, owns one disposable
-simulator, and runs Share before the remaining cases when selected.
+The native menu regression opens and dismisses New project twenty times in one
+process after the original High selection/reselection sequence. Each cycle
+requires the actual field to appear and disappear within the original five-second
+acknowledgements, without changing the selected project or replaying a touch.
+The final cycle opens the menu from a focused title and requires native keyboard
+dismissal, covering the native menu activation focus handoff.
+After the twenty cycles, it also opens Project from a focused note, checks the
+same keyboard prerequisite and native action, retains the draft text, and returns
+to title/note editing. An independent title/Notes focus regression reaches the same native opener and
+keyboard-before-option assertion immediately on a fresh fixture, then verifies
+actual field/Done behavior and returned text editing. It does not replace the
+repeated case. Menu coverage retains both product methods and selects actual
+native HID compatibility on iPhone: the standalone native input baseline,
+the annotation presentation/editor scope, and a cross-family workspace/row-editor
+journey. The latter starts without focused input, captures and saves with actual
+commands, checks plain typing and selected-row editing/completion/view commands,
+then verifies capture/save after returning from Settings and durable results.
+The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
+Transport ownership and complete case-specific phase acknowledgements must match
+the native UI outcomes; a fallback action or transport ACK alone is insufficient.
+Diagnostic menu rollups remain distinct from required smoke/full checks. The
+completed minimal-root/host/first-claim controls and temporary receipt sink have
+been removed; their historical outcomes are recorded separately.
 
-The gates inspect jobs from the current run attempt and require every expected
-worker for their family to complete successfully. Missing, duplicate, skipped,
-cancelled, failed or pending workers fail the gate. Existing workspace artifact
-names remain; full row artifacts add `-row-editing`.
+Menu coverage also retains an independent real-product retained-open Project-menu case.
+It seeds 80 actual project values through the existing persistent fixture, opens
+once, drags only within the freshly admitted native collection, and establishes
+a distant fully visible settled neighborhood. Two matching fresh samples over at
+least 300 ms distinguish settling from later movement. Ten seconds follow with no
+input or accessibility reads while normal product polling stays active. A fresh
+endpoint must retain two consecutive interior anchor rows and their viewport
+within 2 points, plus the draft selection. Edge-clipped/virtualized rows are not
+compared as an exact visible set. Missing anchors require fresh neighborhood/video
+corroboration to classify a reset; an AX-only gap remains incomplete. Selection/reselection then uses newly admitted geometry and the
+original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
+need native scrolling again. A reset stops the case without replaying input.
+This interval tests the newly reported retention contract, not a timeout change
+in existing methods. Full coverage retains all 72 iPhone methods without skips,
+partitioned 39 workspace / 33 task-row methods. The retired iPad-only class and
+its seven-phase transport case are removed; the iPhone workspace/editor journey
+still requires all nine phases, alongside annotation and native-control coverage.
+Historical reports before ADR 0007 include retired iPad runs and do not establish
+current iPhone acceptance. Focused diagnostics do not replace clean-head full
+coverage or physical-device verification.
 
-Job-fetch requests retry transient HTTP 429/500/502/503/504 responses and request
-timeouts up to three times, with two- and four-second backoff. Each request has a
-45-second limit and restarts pagination for the same run attempt. Failed or
-malformed responses cannot pass the gate. Authorization failures and failed
-test results are not retried by the gate; this only retries GitHub API reads.
+## Build once, execute selected coverage
 
-Portable selection, routing, installer, relay, owner and cleanup regressions run
-once in the Linux routing job. Calendar controller regressions run once in the
-iPhone workspace/all Mac worker. Native runtime and input acceptance remain in
-the actual iPhone/iPad workers. An independent peer verifies the uploaded task
-whenever the real-server synchronization journey is selected.
+One Mac producer builds the simulator bridge, controller tests and signed arm64
+UI products. It validates intent metadata and App Group entitlements before any
+simulator is created. The selected coverage determines whether it also builds
+the real synchronization server and independent peer. Rust caches already exist;
+Core/Native Linux Swift builds have separate toolchain-specific caches.
 
-Documentation-only changes skip Core/Native builds and run the named UI workers
-on Linux without Xcode or simulators. Routing inspects the complete PR diff from
-its merge base, or the before/after range for a push. Its allowlist is root
-Markdown and license files, nested `README.md` files, and documentation/text/image/PDF
-files under `docs/`. Unknown paths, mixed changes, executable examples, empty
-diffs, missing commits and classification errors run normal tests. Renames
-inspect both paths. Nightly and manual dispatches always run tests. The Release
-workflow also excludes documentation-only changes.
+A compressed artifact preserves executable permissions and bundle symlinks.
+Workers verify its checksum, Git commit/tree, Xcode version, SDK version/build,
+architecture, installed matching runtime versions/builds, and app signature
+before installing anything. The producer's immutable artifact ID selects the
+products, including on partial reruns. A worker cannot silently consume products
+from another source or toolchain.
 
-UI test app launches disable OS activity logging. XCTest's injected accessibility
-diagnostics can otherwise produce extensive synchronous app output and block its
-main thread during queries. XCTest steps, screenshots, fixture JSON, native HID
-exchanges, relay ownership checks and system-service logs remain enabled. This
-launch setting applies only to test-created app instances.
+Smoke uses one Mac execution worker; full uses two, after the shared producer.
+The retained full partitions are:
 
-UI products build in a separate 20-minute step before simulator creation.
-Execution reuses those signed arm64 products with `--skip-build`. Xcode 27.0
-is explicit. The simulator selector matches the selected SDK's major/minor
-release, preserving the runtime repair on `main`; a newer installed runtime
-cannot silently change the lane. Its portable selection checks run in routing.
-Smoke keeps its 45-minute execution and 60-minute worker limits. Full keeps
-150/180-minute execution/worker limits; diagnostics keep 60/90. Every method
-keeps its 600-second XCTest limit. These are ceilings, not measured durations.
-The `always()` cleanup removes the owned simulator after failure or timeout.
+| Family | Workspace | Task/row editing |
+| --- | ---: | ---: |
+| iPhone | 39 methods | 33 methods |
 
-Full and diagnostic native keyboard admission retains UP-only initialization, a live owned relay
-and companion, fixed case/phase sequences, nonce/PID/device/socket checks,
-30-second initialization and 10-second arming limits. Requests retain their
-12-second deadline and five-second dispatch reservation. Container prefetch
-retains its 30-second cap, exact owner/attempt/nonce validation and child cleanup.
-There is no command replay or automatic test retry. Keyboard-dismissal controls
-still require visible keyboard geometry and two stable samples inside the
-20-second control deadline. Native menu selection checks the exact ordered menu
-and two stable, finite, ancestor-contained row snapshots, then performs one tap
-at that admitted position without resolving the disappearing menu button again.
+The partition union is exactly the full selection, with no duplicates or skips.
+All native HID cases, installed system integrations and server/peer consumers
+remain in workspace. The task worker requires neither native HID nor a server.
+Share executes before the rest of its worker. Portable selection and ownership
+regressions run once on Linux; controller regressions run in the producer.
 
-After an explicitly reported non-keyboard method timeout, the relay recognizes
-XCTest's restart boundary and permits the remaining methods to run. It retains
-the timed-out method in its receipt and rejects the run at completion. A missing
-timeout boundary, a mismatched method, a keyboard-case timeout, an outstanding
-HID exchange or a repeated timed-out method still fails closed. This preserves
-the original failure while allowing XCTest to finish its result bundle.
+Measure the complete iPhone-only workflow, including build, setup, queue and
+cleanup, before deciding whether full coverage belongs in PR checks. Removing
+iPad reduces runner work; it does not automatically halve elapsed time because
+the previous device workers ran in parallel. PR coverage remains smoke until a
+measured result supports changing that policy.
 
-Run full coverage on both families before accepting system integrations,
-workflow changes, or behavior outside smoke coverage:
+Every execution worker owns one disposable simulator. Existing isolated
+ownership, cleanup traps and `always()` deletion remain. During Share and main
+execution, an asynchronous monitor checks only the owned device. A positively
+observed `Shutdown` stops the owned process group and reports infrastructure
+exit 74. Missing/slow/invalid queries do not assert device loss. Monitor queries
+are bounded and killed/reaped without blocking native keyboard request delivery.
+Ordinary test assertions still allow independent methods to finish. The first
+failure is annotated immediately, rather than waiting for the suite's last case.
+
+## Results and gates
+
+Each worker uploads its original xcresult bundles and runtime/transport receipts,
+plus `.build/ui-execution.json` with source, attempt, device family, suite,
+completed method durations and failures. Job summaries show XCTest duration and
+slow methods. Family gate summaries separately show runner queue and occupied
+time; unassigned cancellations contribute zero occupied time.
+
+Gates read only the current run attempt. GitHub materializes retained successful
+jobs in later attempts; repeated timestamps do not represent new execution.
+Missing or nonterminal API results refresh with backoff under a 90-second
+monotonic deadline. Actual failed/cancelled/skipped workers and duplicate results
+fail immediately. Failure to converge remains red. A stale gate can be rerun
+alone; rerunning all UI workers to refresh API state is unnecessary.
+
+Build limit is 35 minutes, including a 20-minute UI build step. Smoke retains
+45-minute execution/60-minute worker limits; full retains 150-minute execution
+with a 165-minute worker limit after moving builds out; focused diagnostics have
+60/90-minute execution/worker limits. Each XCTest method retains its 600-second
+allowance. These are ceilings, not performance targets. A polling deadline does
+not interrupt a blocking XCTest accessibility call.
+
+Native HID initialization, fixed case/phase sequences, nonce/PID/device/socket
+checks, request deadlines, UP cleanup and public XCTest acceptance remain
+unchanged. Keyboard dismissal still requires visible geometry and two stable
+samples within 20 seconds. It prefers keyboard frames from the same app snapshot. If that hierarchy omits
+the keyboard, the original query against the same owning application supplies
+the geometry; absence still fails rather than inventing a keyboard frame. Native Select All still
+requires the real long-press menu, a unique visible enabled/hittable native menu
+item or button within five seconds, and actual clear/readback assertions. Each
+sample binds the unique native candidate from one scoped query; its observed
+geometry supplies the touch without re-querying the disappearing menu. Empty
+application frames require containment in an actual owned window.
+
+Transient GitHub jobs-API HTTP 429/500/502/503/504 responses and request timeouts
+retain upstream retries, up to three attempts. Requests and backoff consume the
+same 90-second run-ID convergence budget. Authorization errors, malformed responses
+and terminal test failures fail immediately; API retries never replay tests.
+
+## Dispatch and retries
+
+Use the helper after publishing a frozen branch:
 
 ```sh
-gh workflow run ci.yml --repo Julesseg/tsk --ref <branch> -f ui_suite=full
+python3 scripts/dispatch-ui-tests.py --ref <branch> --suite full \
+  --reason 'Measure complete iPhone coverage after retiring native iPad support'
 ```
 
-Manual dispatch defaults to full. Manual, scheduled and PR/push runs have
-separate concurrency groups; repeated dispatches on one branch replace each
-other. Verify the actual run head SHA. Keyboard/text diagnostics have separate
-names and concurrency groups and cannot satisfy canonical branch protection.
-Appearance captures require visual confirmation; source, builds and focused
-checks do not establish system delivery or signed-distribution acceptance.
+It reuses queued/running manual work only for matching source, branch and suite.
+To reuse completed successful evidence, supply `--identity <manifest.json>` with
+the expected exact source/toolchain/runtime identity from the
+`ui-execution-identity` artifact. Without it, success on a matching SHA alone is
+insufficient. Failed matching coverage requires diagnosis and a targeted job
+rerun; `--force` is reserved for an explicitly reasoned new experiment. Verify the
+resulting run SHA. A branch move during admission fails rather than dispatching
+an unintended source.
+
+PR/push, nightly, full/manual and focused diagnostics have separate concurrency
+groups. Repeated manual requests queue instead of cancelling in-flight evidence;
+the helper avoids sequential duplicates. Direct Actions-form requests and
+simultaneous clients still need inspection: concurrency is not a global cache
+or a guarantee against all duplicate dispatch races.
+
+Classify failures before retrying. Refresh a stale gate alone. Fix compilation,
+metadata, repeat assertions and changed-code defects. At most one targeted
+same-source retry for evidenced infrastructure failure; keep the first verdict
+and stop repeated retries if the cause persists. Focused results supplement full
+acceptance and cannot satisfy canonical branch protection by themselves.
+
+Documentation-only changes run routing and named UI workers on Linux without
+Xcode or simulators. Unknown/mixed/empty/invalid diffs run normal tests. Nightly
+and manual dispatch always request real coverage. The installable Release
+workflow is separately opt-in; see [release documentation](../../ci/README.md).
 
 Inspect selections without booting a simulator:
 
 ```sh
-python3 scripts/ui-test-selection.py select smoke iPhone
-python3 scripts/ui-test-selection.py select full iPad --partition workspace
+python3 scripts/plan-ui-tests.py full
+python3 scripts/ui-test-selection.py select full iPhone --partition row-editing
 python3 scripts/test-ui-test-selection.py
 ```

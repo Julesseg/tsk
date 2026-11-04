@@ -1,5 +1,7 @@
 # App design audit
 
+Native iPad requirements below are historical and superseded by [ADR 0007](adr/0007-iphone-only.md).
+
 Status: design interview complete. The user accepted the scope and interaction
 decisions on 2026-10-21. No application changes have been implemented by this
 audit; delivery steps and acceptance criteria below describe future work.
@@ -95,15 +97,14 @@ the layout. Reverse the transition when collapsing. See ADR-0004.
 
 Hide raw technical information entirely from the app rather than moving it to a
 disclosure: no UUID inspection or raw storage dictionary. Preserve underlying
-task data. Whether configured user-defined attributes count as technical
-information has been resolved: meaningful configured fields, such as Energy,
-remain editable using their labels. Raw storage inspection is removed.
+task data. Local custom-attribute editing and definition management have been removed at
+the user’s request. Raw storage inspection is also removed.
 
 Accepted layout: editable title first, then dedicated custom parameter
 components arranged horizontally. Each component displays a task parameter and
 opens its editing control when tapped: for example, a date picker or tags
 selector. Use these components for project, tags, priority and scheduling;
-annotations, dependencies and meaningful custom fields remain available below.
+annotations and dependencies remain available below.
 Start/Stop is secondary. Remove duplicated values and use one actionable error
 presentation. Completed tasks and recurring templates retain action restrictions.
 iPad and accessibility routes follow the in-list editing direction too.
@@ -141,9 +142,9 @@ views or open a sheet merely to capture.
 
 Lead with description, project and direct planned-day choices. Offer compact
 controls for tags, priority, deadline and waiting date, expanding their editors
-when used. Existing populated fields must be apparent when editing. Apply the
-same parameter components to Share while preserving shared text/URLs and
-review-before-save.
+when used. Existing populated fields must be apparent when editing. Share is deliberately
+simpler: it creates a plain task from the full shared text/URL and dismisses
+without an editor or additional fields.
 
 Accepted defaults: Today capture starts planned for Today; project capture
 inherits that project; other task views leave planned day unset. Defaults are

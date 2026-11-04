@@ -14,7 +14,7 @@ struct TaskKeyboardCommand {
 }
 
 @MainActor
-final class TaskKeyboardRouter {
+final class TaskKeyboardRouter: ObservableObject {
     private var order: [UUID] = []
     private var scopes: [UUID: [TaskKeyboardCommand]] = [:]
     private let id = UUID()
@@ -239,43 +239,16 @@ extension EnvironmentValues {
     }
 }
 
-struct TaskKeyboardHost<Content: View>: UIViewControllerRepresentable {
-    @ViewBuilder let content: () -> Content
+struct TaskKeyboardHost<Content: View>: View {
+    @StateObject private var router = TaskKeyboardRouter()
+    private let content: () -> Content
 
-    func makeUIViewController(context: Context) -> TaskKeyboardController {
-        let controller = TaskKeyboardController(rootView: AnyView(EmptyView()))
-        controller.rootView = AnyView(content().environment(\.taskKeyboardRouter, controller.router))
-        return controller
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
     }
 
-    func updateUIViewController(_ controller: TaskKeyboardController, context: Context) {
-        controller.rootView = AnyView(content().environment(\.taskKeyboardRouter, controller.router))
-    }
-}
-
-final class TaskKeyboardController: UIHostingController<AnyView> {
-    let router = TaskKeyboardRouter()
-    override var canBecomeFirstResponder: Bool { true }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        if presentedViewController == nil, !(view.window?.tskFirstResponder is any UITextInput) { becomeFirstResponder() }
-        router.diagnostic("workspace appeared firstResponder=\(isFirstResponder)")
-    }
-
-    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if action == #selector(UIViewController.tskPerformScopedTaskCommand(_:)) {
-            router.diagnostic("availability sender=\(sender.map { String(describing: type(of: $0)) } ?? "nil")")
-            return !router.commands.isEmpty
-        }
-        return super.canPerformAction(action, withSender: sender)
-    }
-
-    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        for press in presses where press.key?.modifierFlags.contains(.command) == true {
-            router.diagnostic("command press code=\(press.key?.keyCode.rawValue ?? 0)")
-        }
-        super.pressesBegan(presses, with: event)
+    var body: some View {
+        content().environment(\.taskKeyboardRouter, router)
     }
 }
 

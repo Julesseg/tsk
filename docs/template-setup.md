@@ -5,6 +5,11 @@ The app identity is already configured as `Tsk` / `com.julesseguin.tsk`.
 
 ## Enabling installable PR builds (one-time)
 
+Installables are opt-in. After configuration, request an open PR build with
+`gh workflow run release.yml -f pr_number=<number>`; ordinary PR pushes run CI
+without publishing an installable.
+
+
 The release pipeline builds a signed `.ipa` per PR and publishes it to
 `https://<owner>.github.io/<repo>/` (URL derived automatically — nothing to
 configure). It needs an Apple Developer **paid** membership, three matching
@@ -18,7 +23,7 @@ Share/Widget profiles fail validation rather than producing an installable build
 Everything happens at [developer.apple.com/account](https://developer.apple.com/account)
 under **Certificates, Identifiers & Profiles**.
 
-1. **Register your test devices** — *Devices → +*. You need each iPhone/iPad's
+1. **Register your test devices** — *Devices → +*. You need each iPhone's
    **UDID** (connect the device to a Mac: Finder → select the device → click
    the model/serial line until the UDID shows). Ad-hoc builds install **only**
    on devices baked into the profile.

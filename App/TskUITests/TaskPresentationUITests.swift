@@ -9,7 +9,7 @@ import XCTest
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        XCUIDevice.shared.orientation = UIDevice.current.userInterfaceIdiom == .pad ? .landscapeLeft : .portrait
+        XCUIDevice.shared.orientation = .portrait
     }
 
     override func tearDownWithError() throws {
@@ -30,7 +30,7 @@ import XCTest
             XCTAssertTrue(row.label.contains(title))
             XCTAssertTrue(row.label.contains("Release"))
             XCTAssertTrue(row.label.contains("Deadline Today"))
-            XCTAssertTrue(row.label.contains("Scheduled"))
+            XCTAssertTrue(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
             XCTAssertFalse(app.buttons["notification-attention"].exists)
             for hidden in ["Active", "Waiting", "Blocked by", "Generated occurrence"] {
@@ -107,7 +107,7 @@ import XCTest
         XCTAssertTrue(circle.isHittable)
         let label = planned.firstMatch.label
         XCTAssertTrue(label.contains("Deadline Tomorrow"))
-        XCTAssertTrue(label.contains("Scheduled"))
+        XCTAssertTrue(label.contains("Scheduled Tomorrow"))
         XCTAssertTrue(label.contains("Release"))
         for hidden in ["Active", "Waiting", "Blocked by", "First prerequisite"] {
             XCTAssertFalse(label.contains(hidden))

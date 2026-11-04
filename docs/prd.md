@@ -2,13 +2,13 @@
 
 ## Problem Statement
 
-Taskwarrior users need a capable, modern iPhone and iPad app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
+Taskwarrior users need a capable, modern iPhone app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
 
 This PRD records the agreed product contract without recording personal infrastructure setup. Implementation and runtime verification are tracked separately; a requirement here does not establish that the behavior has been delivered or verified.
 
 ## Solution
 
-Build a first-class native iOS/iPadOS Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
+Build a first-class native iPhone Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
 
 The initial product includes Shortcuts/Siri, widgets, Spotlight, text/URL sharing, calendar events displayed only in Today, notifications derived from task dates, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
 
@@ -30,8 +30,8 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 10. As a task owner, I want to manage dependencies between tasks, so that I can see what blocks work and what becomes available after completion.
 11. As a task owner, I want to start and stop work on a task, so that active work is represented consistently with Taskwarrior.
 12. As a task owner, I want to complete tasks from the task list, so that routine actions do not require opening every task.
-13. As a Taskwarrior user, I want to edit user-defined attributes through an advanced editor, so that my additional task fields remain usable on mobile.
-14. As a Taskwarrior user, I want to define user-defined attribute types locally in tsk, so that editing and filtering can interpret those values correctly.
+13. As a Taskwarrior user, I want unfamiliar task attributes preserved during ordinary edits without a custom-field editor.
+14. As a task owner, I want unsupported filter fields reported explicitly instead of silently changing saved-view membership.
 15. As a Taskwarrior user, I want to retain unfamiliar attributes when editing other fields, so that mobile edits do not discard information used by other clients.
 
 ### Task views and choosing work
@@ -89,9 +89,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 57. As an iOS user, I want to show a chosen task view in a widget, so that the widget can reflect the work I want to monitor.
 58. As an iOS user, I want to complete tasks from a widget, so that a small task action takes minimal interaction.
 59. As an iOS user, I want to open a matching task from Spotlight, so that system search leads directly to the relevant task.
-60. As an iOS user, I want to share text into an editable task draft, so that information from another app can become actionable work.
-61. As an iOS user, I want to share a URL into a task draft while retaining the link and shared text, so that the original content remains useful when I act on the task.
-62. As an iOS user, I want to set project, tags, and dates while reviewing a shared draft, so that the task is organized before saving.
+60. As an iOS user, I want shared text to become a plain task description without a review form.
+61. As an iOS user, I want sharing text or a URL to create a plain task automatically with the full content as its description.
+62. As an iOS user, I want sharing to return to the source app without an editor or additional task fields.
 
 ### Calendar and Reminders import
 
@@ -131,7 +131,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 ### Native experience and permissions
 
 92. As an iPhone user, I want to use a compact native capture-and-action workflow, so that daily task management fits the phone.
-93. As an iPad user, I want to use an adaptive layout with keyboard support at launch, so that the larger screen and keyboard improve task management.
+93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard support remains part of the iPhone workflow.
 94. As an iOS user, I want to use native navigation, typography, gestures, accessibility, appearance, and Liquid Glass, so that tsk behaves as a first-class iOS app.
 95. As a task owner, I want to scan compact lists and reveal additional detail when needed, so that the interface balances density with clarity.
 96. As an iOS user, I want to retain ordinary task management when Calendar, Reminders, or notification permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
@@ -145,7 +145,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Introduce one primary public task-management interface in Core through which callers and behavior tests create, edit, complete, query, plan, and synchronize tasks. Keep field validation, view membership, filter evaluation, recurrence bookkeeping, import orchestration, and notification planning behind that interface.
 - Reuse the existing Core and XCUITest testing seams. Where platform execution actually varies, supply concrete adapters for persistent TaskChampion data, synchronization, EventKit, notification registration, clock/time zone, and system entry points. Keep adapter details internal where possible; do not create a public interface for each individual field or UI action.
 - Keep platform-independent decisions testable without EventKit or UserNotifications. Actual OS reads, writes, permission requests, scheduling, and extension execution belong in platform adapters; their results flow back through the Core interface.
-- Preserve task identity and unfamiliar attributes. User-defined attribute definitions are configured locally. Do not round-trip tasks through a reduced schema that discards fields another client understands.
+- Preserve task identity and unfamiliar attributes. Local custom-attribute editing and definition management are not supported. Do not round-trip tasks through a reduced schema that discards fields another client understands.
 - Pin the supported Taskwarrior and TaskChampion versions before claiming compatibility. Select and verify the Swift integration route separately; this PRD does not assert that an existing bridge or Taskwarrior library has already been proven to work on iOS.
 
 ### Dates, task views, and filters
@@ -154,8 +154,8 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Today contains unfinished tasks scheduled for today or an earlier day, including times later today, and tasks due today or overdue. An unfinished scheduled task remains until completed or rescheduled. Matching waiting or blocked tasks remain visible with their reason. Calendar events appear in Today only.
 - Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by actual timestamps, and labels their roles. A task can appear on two dates when its Scheduled and Deadline dates differ.
 - Provide project views and actions directly from lists. Templates and ordinary occurrences remain distinct domain concepts.
-- Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults and local attribute definitions. Do not import desktop reports, contexts, or configuration.
-- TaskChampion’s storage interface is not a Taskwarrior filter evaluator. Implement or reuse compatible evaluation and verify its behavior against the pinned Taskwarrior version, including boolean expressions, modifiers, relative dates, virtual tags, dependencies, and typed custom fields. Explicit errors must not become an excuse to silently replace the requested language with a smaller tag/project filter builder.
+- Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in fields. Do not import desktop reports, contexts, or configuration.
+- TaskChampion’s storage interface is not a Taskwarrior filter evaluator. Implement or reuse compatible evaluation and verify its behavior against the pinned Taskwarrior version, including boolean expressions, modifiers, relative dates, virtual tags, dependencies, and built-in typed fields. Explicit errors must not become an excuse to silently replace the requested language with a smaller tag/project filter builder.
 - Saved custom views remain device-local. Notification preferences also remain device-specific.
 
 ### Persistence and synchronization
@@ -196,9 +196,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Reconcile registrations when task dates change. Register local notifications so existing schedules can fire while the app is closed. Remote completion cannot cancel a stale local alert until the relevant change reaches the device; do not imply automatic server-side cancellation.
 - Shortcuts and simple, unversioned URLs expose Add, Modify, Delete, Find, Complete, Open Task, and Open View with named inputs and shared behavior. Task-targeted actions use one entity or full UUID. Mutations execute immediately and acknowledge durable local storage; optional URL callbacks return structured results and never undo or retry a committed change on delivery failure. Existing saved shortcuts may break; Modify replaces standalone Reschedule. See [ADR 0005](adr/0005-structured-actions-for-urls-and-shortcuts.md) for the decision and implementation tickets.
 - Widgets support Today or a chosen view and task completion. Spotlight opens matching tasks.
-- Sharing text or a URL opens an editable draft retaining the shared content, with project, tags, and dates available before save. File attachment storage is not initial scope.
+- Sharing text or a URL immediately saves a plain task with the complete shared content as its description, without an extension editor or extra fields. File attachment storage is not initial scope.
 - Calendar integration reads events for Today and creates no calendar events or time blocks. Permission denial or revocation leaves ordinary task management usable.
-- iPhone leads everyday capture and action. iPad gets adaptive layout and keyboard interaction at launch. Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
+- Support iPhone capture and action, including external keyboard interaction. Native iPad support is out of scope under [ADR 0007](adr/0007-iphone-only.md). Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
 
 ## Testing Decisions
 
@@ -208,7 +208,7 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Core’s current Swift Testing greeting tests provide the fast, platform-independent testing lane, not task behavior prior art. Extend that lane with scenario-based tests through the proposed task-management interface. The current XCUITest launch/greeting smoke test establishes the UI lane; it is not evidence that any task feature exists.
 - Use deterministic time, time zones, and controlled adapter results for meaningful Core scenarios. Prefer a small number of whole workflows over separate seams for each field or view.
 - Verify create/edit/complete/query workflows survive reopening local storage, retain UUIDs and unknown fields, and keep local edits during sync failures. Exercise multiple clients against a real TaskChampion setup before claiming convergence; mocked sync success is insufficient.
-- Compare Taskwarrior filter results against the pinned Taskwarrior client using shared task fixtures. Cover expression operators, parentheses, attribute modifiers, relative dates, virtual tags, dependencies, typed user-defined fields, missing values, and explicit invalid/unsupported-expression errors.
+- Compare Taskwarrior filter results against the pinned Taskwarrior client using shared task fixtures. Cover expression operators, parentheses, attribute modifiers, relative dates, virtual tags, dependencies, built-in typed fields, missing values, and explicit invalid/unsupported-expression errors.
 - Exercise Scheduled time selection and preservation, including non-midnight and existing midnight values. Exercise Today and Upcoming at day/DST boundaries: overdue, earlier Scheduled dates, times later today, future Scheduled/Deadline timestamps, tasks present at both dates, completion, rescheduling, waiting/blocked inclusion, and Scheduled-versus-Deadline separation. Verify calendar events appear only in Today.
 - Round-trip recurring templates through a real external Taskwarrior generator. Verify creation, occurrence return sync, occurrence completion bookkeeping, single-occurrence edits, effective-date series edits, preserved completed history, masks/relationships, and continued generation without duplicated or missing instances. Include date boundaries, relative dates, month ends, leap days, and daylight saving in the supported contract.
 - Test one-time import leaves sources unchanged and continuous import deletes only after durable destination save. Inject destination-save failure, deletion failure, and interruption between stores; verify source preservation and honest duplicate limitations rather than an exactly-once assertion. Verify completed and unselected source items are excluded, lists map to projects, and no per-item provenance or bookkeeping is retained.
@@ -216,7 +216,7 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Verify notification planning through Core, including the 09:00 default, custom/disabled replacement, unchanged task dates, distinct/combined events, final-state completion/deletion suppression, immediate newly missed events, repeat prevention, and pending cancellation/rescheduling. Test actual delivery and registration reconciliation on iOS; do not assume the deprecated notification API’s capacity is the current limit.
 - Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings, import results, and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
 - Exercise Shortcuts/App Intents, share extension, widgets, Spotlight, Calendar/Reminders access, and local notification delivery using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
-- Verify adaptive iPad behavior, physical keyboard interaction, system appearance, and accessibility. Simulator/CI success alone does not prove physical keyboard, background timing, or external-account behavior.
+- Verify iPhone navigation, physical keyboard interaction, system appearance, and accessibility. Simulator/CI success alone does not prove physical keyboard, background timing, or external-account behavior.
 - A documentation review or green scaffold CI does not fulfill these feature-level checks. Every delivered capability needs evidence at its stated seam, with unsupported cases and remaining verification limits reported explicitly.
 
 ## Out of Scope

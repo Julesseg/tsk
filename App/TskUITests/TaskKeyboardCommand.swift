@@ -37,13 +37,13 @@ final class TaskKeyboardSession {
     enum Case: String {
         case native = "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys"
         case annotations = "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations"
-        case workspace = "iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen"
+        case workspaceCompatibility = "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus"
 
         var phases: [String] {
             switch self {
             case .native: ["commandReturn"]
             case .annotations: ["secondNoteCommandN", "secondNoteSave", "editSelectAll", "editedNoteSave"]
-            case .workspace: ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView"]
+            case .workspaceCompatibility: ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView", "captureAfterReturn", "saveAfterReturn"]
             }
         }
     }

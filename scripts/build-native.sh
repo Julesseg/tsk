@@ -8,6 +8,13 @@ if [[ "${1:-host}" == host ]]; then
     exit
 fi
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-26.0}"
+if [[ "${1:-}" == device ]]; then
+    rustup target add aarch64-apple-ios
+    cargo build --locked --release --manifest-path "$manifest" --target aarch64-apple-ios
+    mkdir -p "$repo_root/Native/Artifacts/iphoneos"
+    cp "$target_dir/aarch64-apple-ios/release/libtsk_taskchampion.a" "$repo_root/Native/Artifacts/iphoneos/"
+    exit
+fi
 if [[ "${1:-}" == simulator ]]; then
     rustup target add aarch64-apple-ios-sim
     cargo build --locked --release --manifest-path "$manifest" --target aarch64-apple-ios-sim
@@ -16,7 +23,7 @@ if [[ "${1:-}" == simulator ]]; then
     exit
 fi
 if [[ "${1:-}" != apple ]]; then
-    echo 'Usage: build-native.sh [host|apple|simulator]' >&2
+    echo 'Usage: build-native.sh [host|apple|simulator|device]' >&2
     exit 2
 fi
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios

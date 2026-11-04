@@ -49,12 +49,12 @@ class CanonicalResultTests(unittest.TestCase):
         self.assertFalse(owner.passed_case(case,{name},dict(cases={name:dict(completed=[],result='passed')})))
         self.assertFalse(owner.passed_case(case,{name,'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations'},receipt))
 
-    def test_original_phone_only_ipad_skip_is_allowed_without_hid_input(self):
-        name='iPadWorkspaceUITests/testInjectedKeyboardCaptureSelectionEditCompletionAndReopen'
-        case=dict(nodeType='Test Case',nodeIdentifier=name+'()',result='Skipped')
-        receipt=dict(cases={name:dict(completed=[],result='skipped')})
-        self.assertTrue(owner.passed_case(case,{name},receipt))
-        self.assertFalse(owner.passed_case(dict(case,nodeIdentifier=owner.CASE+'()'),{owner.CASE},dict(cases={owner.CASE:dict(completed=[],result='skipped')})))
+    def test_selected_native_cases_cannot_skip_without_input(self):
+        for name in owner.CASES:
+            with self.subTest(case=name):
+                case = dict(nodeType='Test Case', nodeIdentifier=name+'()', result='Skipped')
+                receipt = dict(cases={name: dict(completed=[], result='skipped')})
+                self.assertFalse(owner.passed_case(case, {name}, receipt))
 
 
 class FakeProcess:
@@ -63,6 +63,7 @@ class FakeProcess:
 
 
 class FakeHost:
+    cleanup_query = owner.Host.cleanup_query
     def __init__(self, evidence, *, fail=None, code=0, marked=True, complete=True, passed=True):
         self.evidence, self.fail, self.code = evidence, fail, code
         self.marked, self.complete, self.passed = marked, complete, passed
@@ -119,7 +120,7 @@ class FakeHost:
         if self.fail == 'group-cleanup' and process.kind == 'tests':
             raise RuntimeError('Owned process group cleanup remains unconfirmed')
         process.returncode = process.returncode or 0
-        return dict(pid=process.pid, status=process.returncode, reaped=True, hardKilled=process.kind == 'relay' and self.fail == 'hard-kill')
+        return dict(pid=process.pid, status=process.returncode, reaped=True, groupGone=group, hardKilled=process.kind == 'relay' and self.fail == 'hard-kill')
 
     async def recover(self, socket, request):
         self.events.append('UP-only')
@@ -370,6 +371,102 @@ class CleanupCancellationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn('upOnlyRecovery', receipt)
 
 
+class PublicQueryProcessTests(unittest.IsolatedAsyncioTestCase):
+    async def exercise(self, mode):
+        import os
+        import signal
+
+        original_wait = asyncio.wait_for
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            pidfile = root / 'descendant'
+            processes = []
+            ready = asyncio.Event()
+            output = json.dumps(dict(nodeType='Test Case', nodeIdentifier=owner.CASE + '()', result='Passed'))
+            child = "import pathlib,os,sys,time;pathlib.Path(sys.argv[1]).write_text(str(os.getpid()));time.sleep(60)"
+            code = """import signal,subprocess,sys,time
+child=subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]], **({'stdout':subprocess.DEVNULL,'stderr':subprocess.DEVNULL} if sys.argv[3]=='success' else {}))
+def interrupt(*args):
+    child.terminate()
+    child.wait()
+    sys.exit(0)
+signal.signal(signal.SIGINT,interrupt)
+if sys.argv[3] in ('success','leader-exited'):
+    print(sys.argv[4],flush=True)
+else:
+    time.sleep(60)
+"""
+            class QueryHost(owner.Host):
+                async def start(self, command, log, environment=None, pipe=False):
+                    process = await super().start([sys.executable, '-c', code, child, str(pidfile), mode, output], log, environment, pipe)
+                    processes.append(process)
+                    async def wait_ready():
+                        while not pidfile.exists() or mode in ('success', 'leader-exited') and process.returncode is None:
+                            await asyncio.sleep(0.01)
+                    await original_wait(wait_ready(), 5)
+                    ready.set()
+                    return process
+            host = QueryHost(path.parent, root, root)
+            sentinel = await asyncio.create_subprocess_exec(sys.executable, '-c', 'import time;time.sleep(60)', start_new_session=True)
+            observed = []
+            async def bounded(awaitable, timeout):
+                observed.append(timeout)
+                return await original_wait(awaitable, 0.1 if timeout == 60 else timeout)
+            try:
+                with mock.patch.object(owner.asyncio, 'wait_for', side_effect=bounded):
+                    task = asyncio.create_task(host.public_result(COMMAND))
+                    if mode == 'cancel':
+                        await original_wait(ready.wait(), 5)
+                        task.cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await task
+                    elif mode == 'success':
+                        self.assertEqual(await task, json.loads(output))
+                    else:
+                        with self.assertRaises(TimeoutError):
+                            await task
+                process = processes[0]
+                self.assertTrue(host.query_cleanup['groupGone'])
+                self.assertTrue(host.query_cleanup['reaped'])
+                await original_wait(process.communicate(), 1)
+                with self.assertRaises(ProcessLookupError):
+                    os.killpg(process.pid, 0)
+                self.assertIsNone(sentinel.returncode)
+                os.kill(sentinel.pid, 0)
+                detail = root / ('process-cleanup-' + str(process.pid) + '.json')
+                first = detail.read_bytes()
+                relay = root / 'relay.json'
+                relay.write_text(json.dumps(dict(state='completed_native_assertions_required', inFlight=None)))
+                comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', root, root, root / 'socket', COMMAND, host=host)
+                status = 130 if mode == 'cancel' else 0 if mode == 'success' else 124
+                with mock.patch.object(owner.os, 'killpg', wraps=os.killpg) as signals:
+                    self.assertEqual(await comparison._cleanup(None, None, None, root / 'log', relay, status), status)
+                    signals.assert_not_called()
+                self.assertEqual(detail.read_bytes(), first)
+                self.assertEqual(host.query_cleanup_attempt, 1)
+                self.assertEqual(json.loads((root / 'public-result-query.json').read_text())['timeoutSeconds'], 60)
+                self.assertIn(60, observed)
+            finally:
+                for process in processes + [sentinel]:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    await original_wait(process.communicate(), 5)
+
+    async def test_timeout_reaps_query_pipe_holders_and_stays_timeout(self):
+        await self.exercise('timeout')
+
+    async def test_exited_query_leader_does_not_hide_pipe_holder(self):
+        await self.exercise('leader-exited')
+
+    async def test_cancellation_reaps_query_group_and_stays_cancellation(self):
+        await self.exercise('cancel')
+
+    async def test_structured_success_reaps_group_and_outer_cleanup_is_idempotent(self):
+        await self.exercise('success')
+
+
 class PublicQueryCancellationTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancel_during_actual_query_finally_reaps_registered_query_and_all_components(self):
         with tempfile.TemporaryDirectory() as root:
@@ -390,6 +487,7 @@ class PublicQueryCancellationTests(unittest.IsolatedAsyncioTestCase):
                 async def stop(self,process,group=False):
                     if process.kind=='public-query' and self.first_cleanup:
                         self.first_cleanup=False
+                        (evidence / 'process-cleanup-456.json').write_text(json.dumps(dict(pid=456, phases=['first-cleanup-interrupted'])))
                         entered.set()
                         await asyncio.Event().wait()
                     return await super().stop(process,group)
@@ -399,8 +497,54 @@ class PublicQueryCancellationTests(unittest.IsolatedAsyncioTestCase):
             task=asyncio.create_task(comparison.run());await asyncio.wait_for(entered.wait(),1);task.cancel()
             self.assertEqual(await asyncio.wait_for(task,1),130)
             self.assertTrue(comparison.receipt['publicQueryCleanup']['reaped'])
+            self.assertTrue(comparison.receipt['publicQueryCleanup']['groupGone'])
+            self.assertEqual(host.query_cleanup_attempt, 2)
+            previous = evidence / 'public-query-cleanup-456-attempt-1.json'
+            self.assertEqual(json.loads(previous.read_text())['phases'], ['first-cleanup-interrupted'])
+            self.assertEqual(comparison.receipt['publicQueryCleanupHistory'], [previous.name])
             self.assertEqual(host.events[-2:],['stop:public-query','stop:companion'])
             self.assertEqual(json.loads((evidence/'public-result-query.json').read_text())['timeoutSeconds'],60)
+
+
+    async def assert_failed_query_cleanup(self, archive_fails):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            host = owner.Host(path.parent, root, root)
+            process = SimpleNamespace(pid=456, returncode=0)
+            host.query_process = process
+            host.query_cleanup = None
+            host.query_cleanup_attempt = 1
+            host.query_cleanup_history = []
+            host.query_cleanup_history_errors = []
+            (root / 'process-cleanup-456.json').write_text(json.dumps(dict(phases=['original-interrupted-history'])))
+            relay = root / 'relay.json'
+            relay.write_text(json.dumps(dict(state='completed_native_assertions_required', inFlight=None)))
+            comparison = owner.Comparison('343D52B5-399D-4E45-A357-BF8F8446452B', root, root, root / 'socket', COMMAND, host=host)
+            result = dict(pid=456, reaped=True, groupGone=True)
+            with mock.patch.object(host, 'stop', new_callable=mock.AsyncMock, return_value=result, side_effect=None if archive_fails else RuntimeError('group remains unconfirmed')) as stop:
+                if archive_fails:
+                    with mock.patch.object(pathlib.Path, 'rename', side_effect=PermissionError(13, 'archive unavailable')):
+                        self.assertEqual(await comparison._cleanup(None, None, None, root / 'log', relay, 0), 70)
+                else:
+                    self.assertEqual(await comparison._cleanup(None, None, None, root / 'log', relay, 0), 70)
+                stop.assert_awaited_once_with(process, group=True)
+                if archive_fails:
+                    self.assertTrue(host.query_cleanup['groupGone'])
+                    self.assertTrue(comparison.receipt['publicQueryCleanupHistoryErrors'])
+                    with self.assertRaisesRegex(RuntimeError, 'history'):
+                        await host.cleanup_query()
+                    self.assertEqual(stop.await_count, 1)
+                else:
+                    previous = root / 'public-query-cleanup-456-attempt-1.json'
+                    self.assertEqual(json.loads(previous.read_text())['phases'], ['original-interrupted-history'])
+                    self.assertEqual(comparison.receipt['publicQueryCleanupHistory'], [previous.name])
+                self.assertIn('publicQueryCleanupError', comparison.receipt)
+
+    async def test_archive_failure_cannot_skip_teardown_or_turn_into_success(self):
+        await self.assert_failed_query_cleanup(True)
+
+    async def test_failed_teardown_still_publishes_preserved_first_history(self):
+        await self.assert_failed_query_cleanup(False)
 
 
 class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
@@ -471,9 +615,13 @@ class OwnedGroupTests(unittest.IsolatedAsyncioTestCase):
 
 class CleanupPermissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_group_permission_failures_still_interrupt_and_reap_owned_parent(self):
-        for failure_signal in [owner.signal.SIGTERM, 0]:
+        for failure_signal in [owner.signal.SIGTERM, owner.signal.SIGKILL, 0]:
             with self.subTest(signal=failure_signal), tempfile.TemporaryDirectory() as root:
                 events = []
+                clock = 100.0
+                async def sleep(seconds):
+                    nonlocal clock
+                    clock += seconds
                 class Process:
                     pid = 24102
                     returncode = None
@@ -488,11 +636,56 @@ class CleanupPermissionTests(unittest.IsolatedAsyncioTestCase):
                     if number == failure_signal:
                         raise PermissionError(1, 'Operation not permitted')
                 host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
-                with mock.patch.object(owner.os, 'killpg', side_effect=killpg):
+                with mock.patch.object(owner.os, 'killpg', side_effect=killpg), mock.patch.object(owner.time, 'monotonic', side_effect=lambda: clock), mock.patch.object(owner.asyncio, 'sleep', side_effect=sleep):
                     with self.assertRaisesRegex(RuntimeError, 'phase=.*pid=24102.*errno=1'):
                         await host.stop(Process(), group=True)
                 self.assertEqual(events[0], ('parent', owner.signal.SIGINT))
                 self.assertIn(('reap', 24102), events)
+
+    async def test_unknown_existence_needs_later_absence_and_retains_error_receipt(self):
+        process = SimpleNamespace(pid=24103, returncode=0, wait=mock.AsyncMock(return_value=0))
+        probes = 0
+        def killpg(pgid, number):
+            nonlocal probes
+            self.assertEqual(pgid, process.pid)
+            if number == 0:
+                probes += 1
+                if probes == 1:
+                    raise PermissionError(1, 'Operation not permitted')
+                raise ProcessLookupError()
+            self.assertEqual(number, owner.signal.SIGTERM)
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            with mock.patch.object(owner.os, 'killpg', side_effect=killpg):
+                receipt = await host.stop(process, group=True)
+            self.assertTrue(receipt['groupGone'])
+            self.assertEqual(probes, 2)
+            history = json.loads((pathlib.Path(root) / 'process-cleanup-24103.json').read_text())
+            self.assertEqual([row['errno'] for row in history['phases'] if 'errno' in row], [1])
+
+    async def test_persistent_unknown_exhausts_original_bounds_without_claiming_absence(self):
+        process = SimpleNamespace(pid=24104, returncode=0, wait=mock.AsyncMock(return_value=0))
+        clock = 100.0
+        signals = []
+        async def sleep(seconds):
+            nonlocal clock
+            self.assertLessEqual(seconds, 0.05)
+            clock += seconds
+        def killpg(pgid, number):
+            self.assertEqual(pgid, process.pid)
+            if number == 0:
+                raise PermissionError(1, 'Operation not permitted')
+            signals.append(number)
+        with tempfile.TemporaryDirectory() as root:
+            host = owner.Host(path.parent, pathlib.Path(root), pathlib.Path(root))
+            with mock.patch.object(owner.os, 'killpg', side_effect=killpg), mock.patch.object(owner.time, 'monotonic', side_effect=lambda: clock), mock.patch.object(owner.asyncio, 'sleep', side_effect=sleep):
+                with self.assertRaisesRegex(RuntimeError, 'unconfirmed.*errno=1'):
+                    await host.stop(process, group=True)
+            self.assertAlmostEqual(clock, 115.0)
+            self.assertEqual(signals, [owner.signal.SIGTERM, owner.signal.SIGKILL])
+            history = json.loads((pathlib.Path(root) / 'process-cleanup-24104.json').read_text())
+            self.assertTrue(history['reaped'])
+            self.assertFalse(history['groupGone'])
 
 
     async def test_owned_parent_can_finalize_before_group_cleanup(self):

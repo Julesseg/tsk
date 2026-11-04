@@ -17,6 +17,13 @@ check one five-second budget, accepted geometry and at-most-once action selectio
 It imports standard CoreGraphics geometry without making UI or provider calls.
 These checks do not establish native input delivery or application response.
 
+The readiness target also compiles the exact outside-row gesture geometry through
+a relative symlink. Captured snapshot roles, frames and ancestry verify content
+chrome exclusion, bounded keyboard occlusion, foreign-surface rejection and safe
+point selection. Unknown roles remain nontraversable. The XCTest adapter retains
+fresh acquisition, its original deadline and one native coordinate tap; these
+host checks do not establish the actual gesture recipient or save outcome.
+
 A third dependency-free target compiles the actual keyboard registration decision
 through a relative symlink. It checks declaration changes, weak host ownership and
 unchanged-update suppression. UIKit installation and current-scope action dispatch
@@ -33,3 +40,13 @@ command helper through a relative symlink. It checks fixed phase order, complete
 nonce-bound acknowledgements, expiry/abort rejection, explicit driver ownership
 and atomic runner-file boundaries. The UIKit adapter, host relay integration and
 actual native key delivery require separate compilation and canonical UI checks.
+
+The reminder-status target compiles the actual app controller through a relative
+symlink. It uses an in-memory TaskManager configuration/admission and stand-ins
+for its owning TaskStore and background scheduler; tests call only load, without
+scanning reminders, requesting EventKit access or scheduling background work.
+It verifies every manager read still occurs, first status publication, suppression
+of identical complete values, genuine configuration/device/mapping/paused changes
+and error reporting without replacing status. This tests the production guard
+rather than relying on compiler-specific Observation setter optimizations. Core
+tests separately retain actual enable/disable/import and paused-admission behavior.

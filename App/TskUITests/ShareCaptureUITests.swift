@@ -6,80 +6,49 @@ import XCTest
 
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testInstalledExtensionFirstFailureCancelEditableSaveAndDurableAppReadback() throws {
-        let token = UUID().uuidString
-        let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
-        host.launchEnvironment["TSK_SHARE_FIXTURE_TOKEN"] = token
-        defer { host.terminate() }
+    func testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor() throws {
         let app = taskTestApplication()
         defer { app.terminate() }
-        host.launch()
-        openExtension(host)
-        XCTAssertTrue(host.staticTexts["share-save-error"].waitForExistence(timeout: 15))
-        XCTAssertTrue(host.staticTexts["share-save-error"].label.contains("Open tsk"))
-        XCTAssertFalse(host.buttons["save-shared-task"].isEnabled)
-        capture("Actual extension-first shared storage error preserves source draft", host)
-        host.buttons["cancel-shared-task"].tap()
         app.launch()
         selectAllTasks(app)
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        XCTAssertFalse(taskRow(named: "Shared article " + token, app: app).exists)
         app.terminate()
-        host.terminate()
-        host.launch()
-        openExtension(host)
-        let description = descriptionField(host)
-        replace(description, with: "Cancelled share " + token)
-        host.buttons["cancel-shared-task"].tap()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        XCTAssertFalse(taskRow(named: "Cancelled share " + token, app: app).exists)
-        app.terminate()
-        host.terminate()
-        host.launch()
-        openExtension(host)
-        replace(descriptionField(host), with: " ")
-        host.buttons["save-shared-task"].tap()
-        XCTAssertTrue(host.staticTexts["share-save-error"].waitForExistence(timeout: 10))
-        XCTAssertTrue(host.staticTexts["share-save-error"].label.contains("description"))
-        XCTAssertTrue(revealTaskElement(host.textViews["share-retained-content"], in: "share-task-form", app: host))
-        XCTAssertTrue((host.textViews["share-retained-content"].value as? String)?.contains("https://example.com/tsk-share?fixture=" + token) == true)
-        capture("Actual extension keeps full shared content after validation failure", host)
-        let title = "Saved share " + token
-        XCTAssertTrue(revealTaskElement(descriptionField(host), in: "share-task-form", app: host))
-        replace(descriptionField(host), with: title)
-        let project = host.textFields["task-project"]
-        XCTAssertTrue(revealTaskElement(project, in: "share-task-form", app: host, bottomInset: host.buttons["dismiss-share-keyboard"]))
-        project.tap(); project.typeText("Shared.Reading")
-        let tag = host.textFields["task-tag-input"]
-        XCTAssertTrue(revealTaskElement(tag, in: "share-task-form", app: host, bottomInset: host.buttons["dismiss-share-keyboard"]))
-        tag.tap(); tag.typeText("reference")
-        host.buttons["add-tag"].tap()
-        setDateSwitch("planned-day-enabled", to: true, app: host, in: "share-task-form", keyboardDismissIdentifier: "dismiss-share-keyboard")
-        XCTAssertTrue(revealTaskElement(host.buttons["plan-tomorrow"], in: "share-task-form", app: host))
-        host.buttons["plan-tomorrow"].tap()
-        setDateSwitch("deadline-enabled", to: true, app: host, in: "share-task-form", keyboardDismissIdentifier: "dismiss-share-keyboard")
-        capture("Native share extension reviews organization and independent planned/deadline dates", host)
-        host.buttons["save-shared-task"].tap()
-        let dismissed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: host.buttons["save-shared-task"])
-        let completion = XCTWaiter.wait(for: [dismissed], timeout: 15)
-        if completion != .completed { shareDiscoveryEvidence("Actual extension editor after Save did not dismiss", app: host) }
-        XCTAssertEqual(completion, .completed)
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 15))
-        capture("Extension-created task is visible in the main app after process reopen", app)
-        openTaskInformation(taskRow(named: title, app: app), app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["Project, Shared.Reading"], in: "task-detail-form", app: app))
-        XCTAssertTrue(app.staticTexts["Tags, reference"].exists)
-        let note = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Full shared text café e\u{301}")).firstMatch
-        XCTAssertTrue(revealTaskElement(note, in: "task-detail-form", app: app))
-        XCTAssertTrue(note.label.contains("https://example.com/tsk-share?fixture=" + token))
-        for identifier in ["task-planned-day", "task-deadline"] {
-            XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)[identifier].firstMatch, in: "task-detail-form", app: app))
+        let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
+        defer { host.terminate() }
+        for mode in ["text", "url", "both"] {
+            let token = UUID().uuidString
+            let text = "Shared article " + token + "\nFull shared text café e\u{301}"
+            let url = "https://example.com/tsk-share?fixture=" + token + "#retained"
+            let expected = mode == "text" ? text : mode == "url" ? url : text + "\n\n" + url
+            host.launchEnvironment["TSK_SHARE_FIXTURE_TOKEN"] = token
+            host.launchEnvironment["TSK_SHARE_FIXTURE_MODE"] = mode
+            host.launch()
+            openExtension(host)
+            let result = host.staticTexts["share-fixture-result"]
+            let completed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in result.exists && result.label == "Saved" && host.buttons["share-fixture-present"].isHittable }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 15), .completed)
+            XCTAssertFalse(host.buttons["save-shared-task"].exists)
+            XCTAssertFalse(host.descendants(matching: .any)["share-task-description"].firstMatch.exists)
+            capture("Share automatically saved plain \(mode) without an editor", host)
+            host.terminate()
+            app.launch()
+            selectAllTasks(app)
+            let row = taskRow(named: expected, app: app)
+            XCTAssertTrue(row.waitForExistence(timeout: 15))
+            let identity = row.identifier
+            openTaskInformation(row, app: app)
+            let description = app.staticTexts["task-detail-description"]
+            XCTAssertTrue(revealTaskElement(description, in: "task-detail-form", app: app))
+            XCTAssertEqual(description.label, expected)
+            XCTAssertFalse(app.buttons["advanced-attributes"].exists)
+            capture("Shared \(mode) is the complete plain task description", app)
+            app.terminate()
+            app.launch()
+            selectAllTasks(app)
+            XCTAssertTrue(taskRow(named: expected, app: app).waitForExistence(timeout: 15))
+            XCTAssertEqual(taskRow(named: expected, app: app).identifier, identity)
+            app.terminate()
         }
-        capture("Main app retains exact shared annotation, project, tag and separate saved dates", app)
     }
 
     private func openExtension(_ app: XCUIApplication) {
@@ -144,11 +113,6 @@ import XCTest
             }
             tapTaskControl(entry, app: app)
         }
-        guard app.buttons["cancel-shared-task"].waitForExistence(timeout: 15) else {
-            shareDiscoveryEvidence("Selected system activity did not expose the extension editor", app: app)
-            XCTFail("Installed tsk share extension editor did not open")
-            return
-        }
     }
 
     private func activityEntry(_ titles: [String], in sheet: XCUIElement) -> XCUIElement {
@@ -209,17 +173,10 @@ import XCTest
         #endif
     }
 
-    private func descriptionField(_ app: XCUIApplication) -> XCUIElement {
-        let field = app.textFields["share-task-description"]
-        return field.exists ? field : app.textViews["share-task-description"]
-    }
-    private func replace(_ field: XCUIElement, with value: String) {
-        let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
-        let tutorial = host.buttons["Continue"]
-        if tutorial.exists, host.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
-        replaceTaskText(field, with: value, app: host)
-    }
     private func capture(_ name: String, _ app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

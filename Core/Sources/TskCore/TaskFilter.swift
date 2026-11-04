@@ -12,7 +12,7 @@ public enum TaskFilterError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .evaluation(let message): "Filter evaluation: \(message)"
         case .syntax(let message, let offset): "Filter at byte \(offset + 1): \(message)"
-        case .unknownAttribute(let name): "Unknown filter attribute ‘\(name)’. Define its local schema before filtering it."
+        case .unknownAttribute(let name): "Unknown or unsupported filter attribute ‘\(name)’."
         case .unsupported(let message): "Unsupported filter: \(message)"
         case .invalidStoredValue(let id, let name, let type): "Task \(id.uuidString) has an invalid \(type.rawValue) value for ‘\(name)’. Edit or clear that field before filtering it."
         case .invalidRegex(let pattern, let message): "Invalid ECMAScript pattern ‘\(pattern)’: \(message)"
@@ -45,15 +45,6 @@ public struct TaskFilterSchema: Sendable {
     }
 
     public func type(for name: String) -> TaskFilterAttributeType? { attributes[UTF8String(name)] }
-
-    public func adding(_ definitions: [TaskAttributeDefinition]) -> TaskFilterSchema {
-        var result = self
-        for definition in definitions where !Self.standard.contains(definition.name.rawValue) {
-            result.attributes[definition.name] = definition.type
-            if let values = definition.values { result.valueOrders[definition.name] = values }
-        }
-        return result
-    }
 
     public static let standard = TaskFilterSchema(attributes:
         ["description", "project", "priority", "status", "uuid", "rtype", "depends", "tags", "mask", "imask", "parent", "template"].map { ($0, .string) }
@@ -150,7 +141,6 @@ extension TaskManager {
     }
 
     public func viewSnapshot(filter expression: String, schema: TaskFilterSchema = .standard) async throws -> TaskViewSnapshot {
-        let schema = try await effectiveFilterSchema(base: schema)
         let filter = try CompiledTaskFilter(expression, schema: schema)
         let records = try await tasks()
         var filterCalendar = Calendar(identifier: .gregorian)
@@ -162,6 +152,6 @@ extension TaskManager {
     }
 
     public func validateFilter(_ expression: String, schema: TaskFilterSchema = .standard) async throws {
-        _ = try CompiledTaskFilter(expression, schema: await effectiveFilterSchema(base: schema))
+        _ = try CompiledTaskFilter(expression, schema: schema)
     }
 }
