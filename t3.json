@@ -1,0 +1,26 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "defaultThreadEnvMode": "worktree",
+  "scripts": [
+    {
+      "name": "Core tests",
+      "command": "swift test --package-path Core",
+      "icon": "test"
+    },
+    {
+      "name": "Native tests",
+      "command": "scripts/build-native.sh host && TSK_TASKCHAMPION_LIBRARY=\"$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib\" swift test --package-path Native",
+      "icon": "test"
+    },
+    {
+      "name": "Simulator build",
+      "command": "scripts/build-native.sh simulator && xcodebuild build -project App/Tsk.xcodeproj -scheme Tsk -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/t3-simulator CODE_SIGNING_ALLOWED=NO",
+      "icon": "build"
+    },
+    {
+      "name": "Agent integration checks",
+      "command": "python3 scripts/test-agent-dispatch.py && python3 scripts/test-agent-hooks.py",
+      "icon": "test"
+    }
+  ]
+}
