@@ -7,6 +7,7 @@ import re
 PHONE_SMOKE = (
     "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+    "TaskBulkSelectionUITests",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
     "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
 )
@@ -57,7 +58,7 @@ REGRESSION = (
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
-    'TaskActivityUITests', 'TaskAutomationUITests',
+    'TaskActivityUITests', 'TaskAutomationUITests', 'TaskBulkSelectionUITests',
     'TaskRowEditingUITests', 'TaskScheduledUITests', 'TypedFilterUITests',
 }
 PHONE_TASK_PARTITION = {'TemporalFilterUITests', 'TskDependencyUITests', 'TskUITests', 'TskUpcomingUITests', 'TskWaitingUITests'}

@@ -182,21 +182,31 @@ Accepted action set: planned day, deadline, project, tags, priority and completi
 selected tasks. Descriptions, dependencies and recurring-series changes remain
 individual operations.
 
-Accepted selection gesture, inspired by the user's description of Sorted3:
+Accepted selection gesture:
 
-- Swipe a task right by about one quarter of the task-list column width to select
-  it and enter selection mode; on iPad use the column rather than device width.
-- Enter selection mode immediately on crossing the threshold, before finger-up.
-- Completion circles on every task become selection circles, filled for selected
-  tasks.
-- Continue the gesture vertically to select tasks it touches. This selects tasks
-  rather than repeatedly toggling them on re-entry.
+- Long press a task to enter selection mode before finger-up. Keep the same
+  finger down and move vertically to extend selection; no sideways initiation.
+- A normal tap still edits the task. Movement before the hold is recognized
+  remains ordinary scrolling or a swipe. The task-row long-press menu is removed;
+  activity, editing and completion remain available through their other controls.
+- The selected row background is the only visual selection indicator. Completion
+  circles stay visually unchanged by selection; checkmarks indicate completion.
+- The initial task chooses select or deselect mode and stays fixed during the
+  gesture. Re-entering another row changed by the gesture reverses it; dwelling
+  within a row does not toggle repeatedly. Crossing back into the preceding row
+  also reverses the turning-point row, so returning to the initial row undoes
+  the sweep. Distinct Upcoming appearances share task selection; reversing
+  between two appearances of the same task changes that task only once.
+- Provide light selection haptics when selection changes.
 - Disable list scrolling during the selection gesture.
 
-Accepted: selection mode persists after release and scrolling resumes, allowing
-selection through multiple gestures. Tapping a selection circle toggles that
-task. Done exits selection mode. Upcoming's repeated appearances share one
-selection and count as one task.
+Accepted: selection mode persists after release while at least one task is
+selected, and scrolling resumes, allowing selection through multiple gestures.
+Deselecting the last task exits selection mode and hides the bottom controls.
+A held gesture continues tracking until release, so reversing can select tasks
+again. Tapping a row or its leading circle toggles that task during selection.
+Done exits selection mode.
+Upcoming's repeated appearances share one selection and count as one task.
 
 Show a bottom action bar with selected count and access to Plan, Deadline,
 Project, Tags, Priority and Complete. Each action opens focused controls rather

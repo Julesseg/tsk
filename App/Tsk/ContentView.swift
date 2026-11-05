@@ -437,15 +437,16 @@ struct ContentView: View {
         #endif
         return TaskWorkspaceActions(
             capture: capture,
-            edit: selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
-            complete: selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
+            edit: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
+            complete: store.isSelectingTasks ? { Task { await store.completeSelection() } } : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
                 if isProjectWorkspace { projectPath.append(task.id) }
                 else { path = [task.id] }
             } },
             openView: openView,
-            refresh: { Task { await store.reload() } }
+            refresh: { Task { await store.reload() } },
+            select: selectedTask.flatMap { task in task.canComplete ? { store.toggleSelection(task.id) } : nil }
         )
     }
 

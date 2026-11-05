@@ -10,6 +10,7 @@ struct TaskWorkspaceActions {
     let reveal: (() -> Void)?
     let openView: (TaskQuery) -> Void
     let refresh: () -> Void
+    var select: (() -> Void)? = nil
 
     var keyboardCommands: [TaskKeyboardCommand] {
         var commands = [
@@ -22,6 +23,7 @@ struct TaskWorkspaceActions {
             TaskKeyboardCommand(id: "completed", input: "4", modifiers: .command, title: "Done", action: { openView(.completed) }),
             TaskKeyboardCommand(id: "refresh", input: "r", modifiers: .command, title: "Refresh Tasks", action: refresh)
         ]
+        if let select { commands.append(TaskKeyboardCommand(id: "select", input: "s", modifiers: [.command, .shift], title: "Select Task", action: select)) }
         if let edit { commands.append(TaskKeyboardCommand(id: "edit", input: "e", modifiers: .command, title: "Edit Task", action: edit)) }
         if let complete { commands.append(TaskKeyboardCommand(id: "complete", input: "\r", modifiers: [.command, .shift], title: "Complete Task", action: complete)) }
         if let reveal { commands.append(TaskKeyboardCommand(id: "reveal", input: "o", modifiers: .command, title: "Reveal Task Details", action: reveal)) }
