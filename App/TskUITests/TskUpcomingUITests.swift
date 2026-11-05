@@ -14,13 +14,17 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 5))
         capture("Upcoming empty", app: app)
         app.buttons["New task"].tap()
-        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
+        XCTAssertTrue(app.tabBars.buttons["Upcoming"].isSelected)
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
         description.typeText("One task two future dates")
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
+        XCTAssertTrue(app.staticTexts["capture-confirmation"].waitForExistence(timeout: 10))
+        selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "One task two future dates", app: app).waitForExistence(timeout: 10))
         app.terminate()
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
@@ -39,7 +43,7 @@ final class TskUpcomingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
         app.buttons["edit-task"].tap()
         tapButton("plan-tomorrow", app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(plannedRows(app).firstMatch.waitForExistence(timeout: 10))

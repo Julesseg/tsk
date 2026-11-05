@@ -75,13 +75,13 @@ final class TskDependencyUITests: XCTestCase {
     private func captureTask(_ description: String, planned: Bool, waiting: Bool, app: XCUIApplication) {
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
-        let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(description)
         if planned { setDateSwitch("planned-day-enabled", to: true, app: app) }
         if waiting { setDateSwitch("waiting-date-enabled", to: true, app: app) }
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(taskRow(named: description, app: app).waitForExistence(timeout: 10))
     }
 

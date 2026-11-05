@@ -159,17 +159,17 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
         description.typeText("Durable work while automatic sync fails")
         XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
-        XCTAssertTrue(app.buttons["dismiss-editor-keyboard"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons[taskEditorKeyboardDismissIdentifier(app)].waitForExistence(timeout: 5))
         let hideDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         guard prepareKeyboardIntroduction(app, deadline: hideDeadline, beforeSample: { deadline in
             let previouslyDismissed = dismissedPassword
             dismissPasswordBeforeSample(deadline)
             return !previouslyDismissed && dismissedPassword
         }) else { return }
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
+        tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["save-task"].isHittable)
-        app.buttons["save-task"].tap()
+        XCTAssertTrue(taskEditorSaveButton(app).isHittable)
+        taskEditorSaveButton(app).tap()
         let saveDeadline = ProcessInfo.processInfo.systemUptime + 10
         XCTAssertTrue(waitForTaskSave(app, named: "Durable work while automatic sync fails",
                                       timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime)))

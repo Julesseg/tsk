@@ -250,3 +250,39 @@ extension XCTestCase {
         coordinate.tap()
     }
 }
+
+@MainActor extension XCTestCase {
+    func taskEditorSaveButton(_ app: XCUIApplication) -> XCUIElement {
+        app.buttons[app.otherElements["task-row-editor"].exists || app.buttons["collapse-task-row"].exists ? "collapse-task-row" : "save-task"]
+    }
+
+    func taskEditorKeyboardDismissIdentifier(_ app: XCUIApplication) -> String {
+        app.buttons["collapse-task-row"].exists ? "dismiss-row-keyboard" : "dismiss-editor-keyboard"
+    }
+
+    func setCaptureProject(_ project: String, app: XCUIApplication) {
+        openTaskRowParameter("project", app: app)
+        tapTaskControl(app.buttons["row-new-project"], app: app)
+        let field = app.textFields["row-project-input"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(project)
+        tapTaskControl(app.buttons["close-row-parameter"], app: app)
+    }
+
+    func setCaptureDate(_ parameter: String, enabled: Bool, app: XCUIApplication) {
+        if app.buttons["dismiss-row-keyboard"].exists {
+            tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        }
+        openTaskRowParameter(parameter, app: app)
+        if enabled, parameter == "waiting-date" {
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: Double(app.launchEnvironment["TSK_TEST_NOW"] ?? "") ?? Date().timeIntervalSince1970))!
+            let label = tomorrow.formatted(.dateTime.weekday(.wide).month(.wide).day().locale(Locale(identifier: "en_US")))
+            let day = app.datePickers["waiting-date-picker"].buttons[label]
+            XCTAssertTrue(day.waitForExistence(timeout: 5))
+            day.tap()
+        }
+        let action = app.buttons[enabled ? "close-row-parameter" : "remove-" + parameter]
+        tapTaskControl(action, app: app)
+    }
+}

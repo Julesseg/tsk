@@ -10,6 +10,10 @@ struct UpcomingTaskList: View {
     var body: some View {
         ScrollViewReader { proxy in
             List {
+                if let task = store.captureTask {
+                    TaskListRow(task: task, store: store, edit: edit, rowIdentifier: store.rowEditing?.rowID)
+                        .id(task.id)
+                }
                 ForEach(store.upcomingDays) { group in
                     Section {
                         ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
@@ -46,8 +50,17 @@ struct UpcomingTaskList: View {
     }
 
     private func revealEditor(using proxy: ScrollViewProxy) {
-        guard !Task.isCancelled, editorIsClipped, let editing = store.rowEditing,
-              let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == editing.rowID }) else { return }
+        guard !Task.isCancelled, let editing = store.rowEditing else { return }
+        if editing.isCapture, editing.bounds == .zero {
+            proxy.scrollTo(editing.draft.original.id, anchor: .top)
+            return
+        }
+        guard editorIsClipped else { return }
+        if editing.isCapture {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(editing.draft.original.id, anchor: .top) }
+            return
+        }
+        guard let entry = store.upcomingDays.flatMap(\.entries).first(where: { $0.rowIdentifier == editing.rowID }) else { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) { proxy.scrollTo(entry.id, anchor: .top) }
     }
 

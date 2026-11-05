@@ -20,8 +20,9 @@ struct TaskListView: View {
                     List {
                         TodayCalendarSection(calendar: calendar)
                         Section {
-                            if let error = store.error, store.visibleTasks.isEmpty { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                            else if store.visibleTasks.isEmpty { Text("Nothing planned or due today").foregroundStyle(.secondary) }
+                            captureRow
+                            if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
+                            else if store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned or due today").foregroundStyle(.secondary) }
                             ForEach(store.visibleTasks) { task in TaskListRow(task: task, store: store, edit: edit) }
                         }
                         .listSectionSeparator(.hidden)
@@ -32,19 +33,20 @@ struct TaskListView: View {
                         .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                         .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                 }
-            } else if let error = store.error, store.visibleTasks.isEmpty {
+            } else if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil {
                 ContentUnavailableView {
                     Label("Tasks unavailable", systemImage: "exclamationmark.triangle")
                 } description: { Text(error) } actions: {
                     Button("Retry") { Task { await store.reload() } }
                 }
-            } else if store.visibleTasks.isEmpty {
+            } else if store.visibleTasks.isEmpty && store.captureTask == nil {
                 ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(store.customView != nil ? "Edit the filter or choose another view to find tasks." : "Capture a task to get started. Saved tasks stay on this device when you're offline."))
             } else if store.customView == nil && store.query == .upcoming {
                 UpcomingTaskList(store: store, edit: edit, viewport: CGRect(origin: geometry.frame(in: .global).origin, size: CGSize(width: geometry.size.width, height: geometry.size.height - keyboardInset)))
             } else {
                 ScrollViewReader { proxy in
                     List {
+                        captureRow
                         ForEach(store.visibleTasks) { task in
                             TaskListRow(task: task, store: store, edit: edit)
                         }
@@ -86,6 +88,13 @@ struct TaskListView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardFrame = .null }
     }
 
+    @ViewBuilder private var captureRow: some View {
+        if let task = store.captureTask {
+            TaskListRow(task: task, store: store, edit: edit, rowIdentifier: store.rowEditing?.rowID)
+                .id(task.id)
+        }
+    }
+
     private func keyboardOverlap(in bounds: CGRect) -> CGFloat {
         guard !keyboardFrame.isNull, keyboardFrame.intersects(bounds), keyboardFrame.maxY >= bounds.maxY else { return 0 }
         return max(0, bounds.maxY - keyboardFrame.minY)
@@ -97,7 +106,12 @@ struct TaskListView: View {
     }
 
     private func revealEditor(using proxy: ScrollViewProxy, viewport: CGRect, keyboardInset: CGFloat) {
-        guard !Task.isCancelled, editorIsClipped(in: viewport, keyboardInset: keyboardInset), let editing = store.rowEditing else { return }
+        guard !Task.isCancelled, let editing = store.rowEditing else { return }
+        if editing.isCapture, editing.bounds == .zero {
+            proxy.scrollTo(editing.draft.original.id, anchor: .top)
+            return
+        }
+        guard editorIsClipped(in: viewport, keyboardInset: keyboardInset) else { return }
         withAnimation(reduceMotion ? nil : .smooth(duration: 0.32)) {
             proxy.scrollTo(editing.draft.original.id, anchor: .top)
         }
@@ -184,6 +198,7 @@ struct TaskListRow: View {
                 .accessibilityLabel(store.isSelectingTasks ? "\(store.selectedTaskIDs.contains(task.id) ? "Deselect task" : "Select task"): \(task.description)" : "\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
                 .accessibilityValue(store.isSelectingTasks ? (store.selectedTaskIDs.contains(task.id) ? "Selected" : "Not selected") : checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
+                .accessibilityHidden(editing?.isCapture == true)
             }
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: hasMetadata ? 4 : 0) {
@@ -200,6 +215,7 @@ struct TaskListRow: View {
                     .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
                     .frame(minHeight: hasMetadata ? 0 : 44, alignment: .leading)
                     .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
+                    .accessibilityLabel("Task title")
                     .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
                     .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                     .accessibilityHidden(!expanded)
@@ -265,6 +281,15 @@ struct TaskListRow: View {
                     TaskKeyboardCommand(id: "collapse", input: "\u{1b}", modifiers: [], title: "Close Task Editor", action: rowActions.close)
                 ])
                 .allowsHitTesting(false)
+            }
+        }
+        .onChange(of: expanded) { _, expanded in
+            if expanded, editing?.isCapture == true { titleFocused = true }
+        }
+        .onAppear {
+            if let editing {
+                editing.viewport = viewport
+                editing.measure(rowGeometry.bounds)
             }
         }
         .onChange(of: editing?.isSaving) { _, saving in if saving == true { titleFocused = false } }

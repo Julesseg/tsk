@@ -3,7 +3,7 @@ import TskCore
 
 struct TaskEditorView: View {
     let store: TaskStore
-    let original: TaskRecord?
+    let original: TaskRecord
     let onSave: ((TaskRecord) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var draft: TaskDraft
@@ -13,12 +13,11 @@ struct TaskEditorView: View {
     @State private var tagError: String?
     @FocusState private var focusedField: TaskEditorField?
 
-    init(store: TaskStore, task: TaskRecord? = nil, onSave: ((TaskRecord) -> Void)? = nil) {
+    init(store: TaskStore, task: TaskRecord, onSave: ((TaskRecord) -> Void)? = nil) {
         self.store = store
         original = task
         self.onSave = onSave
-        var draft = TaskDraft(description: task?.description ?? "", attributes: task?.attributes ?? [:])
-        if task == nil, store.customView == nil, let project = store.projectSelection.projectName { draft.project = project }
+        let draft = TaskDraft(description: task.description, attributes: task.attributes)
         _draft = State(initialValue: draft)
     }
 
@@ -65,7 +64,7 @@ struct TaskEditorView: View {
                 }
             }
             .onChange(of: UTF8String(tagInput)) { _, _ in tagError = nil }
-            .navigationTitle(original == nil ? "New task" : original?.isOccurrence == true ? "Edit occurrence" : "Edit task")
+            .navigationTitle(original.isOccurrence == true ? "Edit occurrence" : "Edit task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -90,12 +89,10 @@ struct TaskEditorView: View {
         Task {
             if !tagInput.isEmpty, !addTag() { return }
             let didSave: Bool
-            if let original {
-                if let saved = await store.update(id: original.id, changes: changes) {
-                    onSave?(saved)
-                    didSave = true
-                } else { didSave = false }
-            } else { didSave = await store.save(draft) }
+            if let saved = await store.update(id: original.id, changes: changes) {
+                onSave?(saved)
+                didSave = true
+            } else { didSave = false }
             if didSave { dismiss() } else { error = store.error }
         }
     }
@@ -113,7 +110,6 @@ struct TaskEditorView: View {
     }
 
     private var changes: TaskAttributePatch {
-        guard let original else { return [:] }
         var edited = draft.attributes
         edited["description"] = draft.description
         return edited.changes(comparedTo: original.attributes)

@@ -140,12 +140,12 @@ import XCTest
         app.buttons["New task"].tap()
         let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10)); field.tap(); field.typeText(title)
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.collectionViews["task-editor-form"].exists, "Dismissing the keyboard must keep the editor open")
+        XCTAssertTrue(app.descendants(matching: .any)["task-row-editor"].firstMatch.exists, "Dismissing the keyboard must keep the editor open")
         XCTAssertEqual(field.value as? String, title)
-        XCTAssertTrue(app.buttons["save-task"].exists)
-        tapTaskControl(app.buttons["save-task"], app: app)
+        XCTAssertTrue(taskEditorSaveButton(app).exists)
+        tapTaskControl(taskEditorSaveButton(app), app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: title, app: app), timeout: 15))
     }
     private func permission(allow: Bool) {

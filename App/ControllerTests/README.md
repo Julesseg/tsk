@@ -50,3 +50,10 @@ of identical complete values, genuine configuration/device/mapping/paused change
 and error reporting without replacing status. This tests the production guard
 rather than relying on compiler-specific Observation setter optimizations. Core
 tests separately retain actual enable/disable/import and paused-admission behavior.
+
+The capture target compiles TaskStore, TaskRowEditing, TaskStoreViews and
+TaskCompletionFeedback through relative symlinks. An in-memory replica controls
+storage failures; only display-link animation and passive diagnostic sinks are
+stand-ins. It verifies blank dismissal, retained failed saves, exactly-once retry,
+repeated capture, invalid-editor protection and finishing edits before capture.
+Canonical iPhone tests establish layout, focus, keyboard and native input behavior.

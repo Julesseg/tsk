@@ -13,6 +13,25 @@ public struct TaskRowDraft: Equatable, Sendable {
         taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
     }
 
+    public init(capturing query: TaskQuery, project: TaskProjectSelection = .all, now: Date, calendar: Calendar = .autoupdatingCurrent) {
+        var draft = TaskDraft()
+        if query == .today { draft.schedule(on: now, calendar: calendar) }
+        if let project = project.projectName { draft.project = project }
+        original = TaskRecord(id: UUID(), attributes: ["description": "", "status": "pending"])
+        taskDraft = draft
+    }
+
+    public func creationDraft(at date: Date) throws -> TaskDraft {
+        var draft = self
+        try draft.addTagInput()
+        _ = try draft.changes()
+        if !noteInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let task = TaskRecord(id: original.id, attributes: draft.taskDraft.attributes)
+            draft.taskDraft.attributes[try task.nextAnnotationReference(at: date)] = noteInput
+        }
+        return draft.taskDraft
+    }
+
     public mutating func rebase(on task: TaskRecord) {
         guard task.id == original.id else { return }
         let title = taskDraft.description
