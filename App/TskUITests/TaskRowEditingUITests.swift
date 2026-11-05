@@ -399,44 +399,14 @@ import XCTest
         for cycle in 1...20 {
             XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
                 if cycle == 20 { focusTaskText(title, app: app) }
-                openTaskRowParameter("project", app: app)
-                if cycle == 20 {
-                    let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
-                    XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-                    XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
-                }
-                tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
-                let field = app.textFields["row-project-input"]
-                let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
-                XCTAssertTrue(field.waitForExistence(timeout: 5))
-                XCTAssertEqual(field.value as? String, "Release")
-                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
-                app.buttons["close-row-parameter"].tap()
-                let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
-                XCTAssertTrue(field.waitForNonExistence(timeout: 5))
-                XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
-                XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+                verifyProjectMenuPresentation(app, dismissingKeyboard: cycle == 20)
             }
         }
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
         XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Draft note survives menu")
-        openTaskRowParameter("project", app: app)
-        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline)
-        tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
-        let field = app.textFields["row-project-input"]
-        let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        XCTAssertEqual(field.value as? String, "Release")
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, appearanceDeadline)
-        app.buttons["close-row-parameter"].tap()
-        let dismissalDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline)
+        verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         XCTAssertEqual(note.value as? String, "Draft note survives menu")
         focusTaskText(title, app: app)
         tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
@@ -452,12 +422,12 @@ import XCTest
         let title = expandTask(app)
         let originalTitle = try XCTUnwrap(title.value as? String)
         focusTaskText(title, app: app)
-        verifyProjectMenuFromFocusedText(app)
+        verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
         XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Focused note survives menu")
-        verifyProjectMenuFromFocusedText(app)
+        verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         XCTAssertEqual(note.value as? String, "Focused note survives menu")
         focusTaskText(title, app: app)
         title.typeText(" title retained")
@@ -475,11 +445,13 @@ import XCTest
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
     }
 
-    private func verifyProjectMenuFromFocusedText(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    private func verifyProjectMenuPresentation(_ app: XCUIApplication, dismissingKeyboard: Bool, file: StaticString = #filePath, line: UInt = #line) {
         openTaskRowParameter("project", app: app)
-        let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
-        XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
+        if dismissingKeyboard {
+            let keyboardDeadline = ProcessInfo.processInfo.systemUptime + 5
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, keyboardDeadline, file: file, line: line)
+        }
         tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app, file: file, line: line)
         let field = app.textFields["row-project-input"]
         let appearanceDeadline = ProcessInfo.processInfo.systemUptime + 5

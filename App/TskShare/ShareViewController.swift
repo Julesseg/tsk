@@ -33,9 +33,15 @@ import TskNative
             let manager = try await TaskChampionSession.open(directory: TaskChampionSession.participantDirectory())
             let saved = try await manager.captureSharedTask(items)
             TaskParticipantDiagnostics.event("share.capture.durable-result", details: ["id": saved.id.uuidString])
+            #if DEBUG && targetEnvironment(simulator)
+            await TaskParticipantDiagnostics.flush()
+            #endif
             let request = diagnosticRequest
             context.completeRequest(returningItems: nil) { _ in TaskParticipantDiagnostics.endShareRequest(request) }
         } catch {
+            #if DEBUG && targetEnvironment(simulator)
+            await TaskParticipantDiagnostics.flush()
+            #endif
             TaskParticipantDiagnostics.endShareRequest(diagnosticRequest)
             context.cancelRequest(withError: error)
         }

@@ -8,6 +8,10 @@ while IFS= read -r selector; do
 done <<< "$selection"
 printf 'UI suite: %s (%s, %s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$UI_PARTITION" "$selection"
 export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
+export TEST_RUNNER_TSK_UI_DIAGNOSTICS=0
+case "$UI_SUITE" in
+    diagnostic|keyboard|text|regression|menu) export TEST_RUNNER_TSK_UI_DIAGNOSTICS=1 ;;
+esac
 export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
 export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
 export TSK_TASKCHAMPION_LIBRARY="$PWD/../.build/ui-tools/libtsk_taskchampion.dylib"

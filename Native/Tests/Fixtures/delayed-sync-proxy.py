@@ -1,6 +1,7 @@
 import http.server
 import json
 import pathlib
+import signal
 import sys
 import threading
 import time
@@ -10,6 +11,7 @@ import urllib.request
 backend, directory, method = sys.argv[1:]
 control = pathlib.Path(directory)
 mutex = threading.Lock()
+signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})
 
 def publish(name, value):
     temporary = control / (name + '.tmp')

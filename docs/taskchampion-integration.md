@@ -40,6 +40,27 @@ unknown fields, independent local clients, and genuine storage failure. With
 check exports a native capture and edits it while retaining opaque fields,
 annotations, tags, and identity.
 
+CI provisions that pinned client and the real sync server instead of leaving
+those tests disabled. `scripts/run-native-tests.py` runs the portable target on
+Linux and the separate `TskNativeAppleTests` target on the Mac producer. It
+discovers the selected target and gives each sync-gated method its own fixture;
+this prevents unrelated test replicas from sharing remote client state. The
+Apple target includes real-framework adapters and an owned Spotlight index, while
+the iPhone UI suite retains installed integration and system-delivery acceptance.
+
+For a local run after building the host bridge, native probe and server:
+
+```sh
+TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.dylib" \
+  python3 scripts/run-native-tests.py --target TskNativeTests \
+    --server /path/to/taskchampion-sync-server --taskwarrior /path/to/task \
+    --probe "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
+    --output .build/native-test-results
+```
+
+Use `--target TskNativeAppleTests` on a Mac for the Apple-framework target. The
+runner requires Taskwarrior 3.5.0; the existing server wrapper requires 0.7.1.
+
 Before building the Xcode app, run on a Mac with Xcode:
 
 ```sh

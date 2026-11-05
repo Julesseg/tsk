@@ -2,11 +2,14 @@ import ctypes
 import json
 import os
 import pathlib
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 import uuid
+
+signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})
 
 
 def connect(library):

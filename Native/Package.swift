@@ -10,6 +10,7 @@ let package = Package(
         .target(name: "CTaskChampion", linkerSettings: [.linkedLibrary("dl", .when(platforms: [.linux]))]),
         .target(name: "TskNative", dependencies: ["CTaskChampion", .product(name: "TskCore", package: "Core")]),
         .executableTarget(name: "TskNativeProbe", dependencies: ["TskNative"]),
-        .testTarget(name: "TskNativeTests", dependencies: ["TskNative"])
+        .testTarget(name: "TskNativeTests", dependencies: ["TskNative"]),
+        .testTarget(name: "TskNativeAppleTests", dependencies: ["TskNative"])
     ]
 )
