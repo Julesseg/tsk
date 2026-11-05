@@ -18,8 +18,18 @@
       "icon": "build"
     },
     {
+      "name": "Remote iOS doctor",
+      "command": "bash scripts/remote-ios.sh doctor",
+      "icon": "configure"
+    },
+    {
+      "name": "Remote simulator build",
+      "command": "bash scripts/remote-ios.sh build",
+      "icon": "build"
+    },
+    {
       "name": "Agent integration checks",
-      "command": "python3 scripts/test-agent-dispatch.py && python3 scripts/test-agent-hooks.py",
+      "command": "env -u ELECTRON_RUN_AS_NODE bash -c 'python3 scripts/test-agent-dispatch.py && python3 scripts/test-agent-hooks.py && python3 scripts/test-remote-ios.py'",
       "icon": "test"
     }
   ]

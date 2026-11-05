@@ -5,14 +5,18 @@ if [ "${AGENT_REMOTE:-false}" = "true" ]; then
   cat <<'EOF'
 ENV=REMOTE LINUX. No iOS simulator/runtime exists here, so the App/ Xcode
 target and the TskUITests XCUITest suite cannot run on this machine. Exercise
-the portable logic with `cd Core && swift test`, implement UI work normally,
-and let the `App · XCUITest (macOS)` CI job verify UI behavior.
+the portable logic with `cd Core && swift test` and implement UI work normally.
+With a configured SSH Mac, use `bash scripts/remote-ios.sh doctor` and
+the build/install/test workflow in docs/remote-ios.md. Otherwise use CI for
+Apple verification. `App · XCUITest (macOS)` remains the canonical UI gate.
 EOF
 elif [ "$(uname -s)" = "Linux" ]; then
   cat <<'EOF'
 ENV=LOCAL LINUX. No Xcode or iOS simulator exists here, so the App/ target and
 the TskUITests XCUITest suite cannot run on this machine. Implement UI work
-normally and let CI verify it.
+normally. With a configured SSH Mac, use `bash scripts/remote-ios.sh doctor`
+and the build/install/test workflow in docs/remote-ios.md. Otherwise use CI for
+Apple verification. `App · XCUITest (macOS)` remains the canonical UI gate.
 EOF
   if command -v swift >/dev/null 2>&1 || [ -x "$HOME/.local/share/swiftly/bin/swift" ]; then
     printf '%s\n' 'A Swift toolchain is available. Run the portable tests with `cd Core && swift test`.'

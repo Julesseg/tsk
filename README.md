@@ -35,6 +35,7 @@ Native iPad support is retired; the current platform scope is [iPhone only](docs
 
 - Open `App/Tsk.xcodeproj` in Xcode and select the `Tsk` scheme.
 - Run Core tests: `cd Core && swift test`.
+- From Linux, build and test on a Mac with the [remote iOS workflow](docs/remote-ios.md).
 - App display name: `tsk`; bundle identifier: `com.julesseguin.tsk`.
 - Targets iOS 26.0 and later, with Swift 6.
 

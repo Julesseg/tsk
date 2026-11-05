@@ -68,6 +68,7 @@ jobs:
           python3 scripts/test-ci-test-routing.py
           python3 scripts/test-agent-dispatch.py
           python3 scripts/test-agent-hooks.py
+          python3 scripts/test-remote-ios.py
           python3 scripts/test-create-ui-test-simulator.py
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-ui-shard-checks.py
