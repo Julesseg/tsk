@@ -95,6 +95,16 @@ without skips, rejects missing/ambiguous sync selectors,
 and preserves a failing batch while continuing independent cases. Diagnostic-only
 dispatches retain their focused UI path and do not run either Native target.
 
+The owned Python proxy and multiprocess fixture unblock inherited `SIGTERM`
+before publishing readiness or spawning helpers;
+Swift 6.0.3's Linux test runner can otherwise leave it blocked in children and
+hang synchronous cleanup after synchronization has finished. A focused regression
+requires the actual proxy to terminate after readiness. UTF-8 export assertions
+project raw JSON through Python into an array of fields before decoding in Swift,
+preserving both canonically equivalent key spellings that the Linux Foundation
+JSON-to-dictionary observation path collapses. The byte-exact field, tag and
+project assertions remain on actual Taskwarrior exports.
+
 The common UI launcher suppresses animations for functional checks. The row-editor
 launcher and explicit animated workspace cases restore them. Results from
 suppressed-animation journeys do not certify transition timing or performance.

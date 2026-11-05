@@ -44,7 +44,7 @@ func taskwarriorExportRetainsUnicodeFieldsTagsAndExactProjectsAfterNativeEdits()
     let other = try await manager.create(TaskDraft(description: "Other", attributes: ["project": decomposed]))
     let config = directory.appendingPathComponent("taskrc")
     try "data.location=\(directory.path)\nuda.\(composed).type=string\nuda.\(decomposed).type=string\nconfirmation=no\n".write(to: config, atomically: true, encoding: .utf8)
-    func export() throws -> [NSDictionary] {
+    func export() throws -> [TaskwarriorIdentityExport] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = ["rc:\(config.path)", "rc.recurrence=off", "export"]
@@ -55,21 +55,54 @@ func taskwarriorExportRetainsUnicodeFieldsTagsAndExactProjectsAfterNativeEdits()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
-        return try #require(JSONSerialization.jsonObject(with: data) as? [NSDictionary])
+        return try decodeTaskwarriorIdentityExport(data)
     }
     let firstExport = try export()
-    let before = try #require(firstExport.first { ($0["uuid"] as? String) == original.id.uuidString.lowercased() })
-    #expect(before[composed] as? String == "first")
-    #expect(before[decomposed] as? String == "second")
-    #expect(Set((before["tags"] as? [String] ?? []).map { UTF8String($0) }) == [UTF8String(composed), UTF8String(decomposed)])
+    let before = try #require(firstExport.first { $0["uuid"] == original.id.uuidString.lowercased() })
+    #expect(before[composed] == "first")
+    #expect(before[decomposed] == "second")
+    #expect(Set(before.tags.map { UTF8String($0) }) == [UTF8String(composed), UTF8String(decomposed)])
     _ = try await manager.update(id: original.id, changes: ["description": "Unrelated edit"])
     _ = try await manager.update(id: original.id, changes: ["tag_\(decomposed)": nil])
     let reopened = TaskManager(replica: TaskChampionReplica(directory: directory))
     #expect(try await reopened.tasks(project: .project(composed)).map(\.id) == [original.id])
     #expect(try await reopened.tasks(project: .project(decomposed)).map(\.id) == [other.id])
-    let after = try #require(export().first { ($0["uuid"] as? String) == original.id.uuidString.lowercased() })
-    #expect(after[composed] as? String == "first")
-    #expect(after[decomposed] as? String == "second")
-    #expect((after["project"] as? String)?.matchesBytes(composed) == true)
-    #expect((after["tags"] as? [String] ?? []).map { UTF8String($0) } == [UTF8String(composed)])
+    let after = try #require(export().first { $0["uuid"] == original.id.uuidString.lowercased() })
+    #expect(after[composed] == "first")
+    #expect(after[decomposed] == "second")
+    #expect(after["project"]?.matchesBytes(composed) == true)
+    #expect(after.tags.map { UTF8String($0) } == [UTF8String(composed)])
+}
+
+@Test func taskwarriorExportObserverPreservesCanonicallyEquivalentKeys() throws {
+    let data = Data(#"[{"café":"first","cafe\u0301":"second"}]"#.utf8)
+    let row = try #require(decodeTaskwarriorIdentityExport(data).first)
+    #expect(row["café"] == "first")
+    #expect(row["cafe\u{301}"] == "second")
+}
+
+private struct TaskwarriorIdentityExport: Decodable {
+    struct Field: Decodable { let key: String; let value: String }
+    let fields: [Field]
+    let tags: [String]
+    subscript(_ key: String) -> String? { fields.first { $0.key.matchesBytes(key) }?.value }
+}
+
+private func decodeTaskwarriorIdentityExport(_ data: Data) throws -> [TaskwarriorIdentityExport] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+    let fixture = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Fixtures/taskwarrior-utf8-export.py")
+    process.arguments = [fixture.path]
+    let input = Pipe(), output = Pipe(), errors = Pipe()
+    process.standardInput = input
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    try input.fileHandleForWriting.write(contentsOf: data)
+    try input.fileHandleForWriting.close()
+    let projection = output.fileHandleForReading.readDataToEndOfFile()
+    let diagnostics = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    try #require(process.terminationStatus == 0, Comment(rawValue: String(decoding: diagnostics, as: UTF8.self)))
+    return try JSONDecoder().decode([TaskwarriorIdentityExport].self, from: projection)
 }
