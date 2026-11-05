@@ -66,3 +66,27 @@ The local report is
 It explicitly lists missing matched baseline, populated Calendar/neighbors,
 accessibility-size, storage-error and clean animation captures. These gaps and
 actual hardware-keyboard transport remain pending full iPhone evidence.
+
+## PR smoke diagnosis
+
+At `d0c7710`, PR smoke passed three methods and failed repeated capture at
+`TskUITests.swift:27`. New task was enabled at `(357, 873, 62, 62)` but failed
+native hit admission for all 17 samples within the unchanged twenty-second
+budget. The captured hierarchy exposed an invisible `task-row-outside` Button
+at `(0, 320, 440, 636)`, spanning the tab bar beneath the editor. The rollup
+correctly failed because this shard failed; it had no separate gate error.
+
+The viewport correction limits the outside-region accessibility metadata to
+the task list's lower edge, matching the existing outside-save gesture guard.
+It preserves the visual dimming path, shared animation, native tab control,
+readiness policy, assertions and deadlines. The existing capture journey is the
+regression seam: it must actually admit and activate New task, retain one title,
+save, and reopen the durable task.
+
+A reused local simulator stopped earlier because its keyboard frame was outside
+the app window, so that run did not reproduce the CI symptom. A disposable phone
+was created for a matched control, but the Device tool could not discover/open
+it even after its prescribed inventory refresh and retry. Local device work
+stopped; the unused phone was deleted and the booted probe device shut down.
+Compilation/controller checks supplement the required new-head canonical CI;
+no local native hit-testing pass is claimed.

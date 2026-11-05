@@ -518,7 +518,9 @@ struct TaskRowDismissalOverlay: View {
         GeometryReader { geometry in
             if let editing, editing.isExpanded, editing.bounds != .zero {
                 let origin = geometry.frame(in: .global).origin
-                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: close)
+                let height = max(0, min(geometry.size.height, editing.viewport.maxY - origin.y))
+                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y),
+                                 size: CGSize(width: geometry.size.width, height: height), close: close)
                     .allowsHitTesting(false)
             }
         }
