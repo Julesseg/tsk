@@ -93,6 +93,10 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        #if DEBUG
+        trace("began", details: ["touches": "\(touches.count)", "activeTouch": "\(activeTouch != nil)", "rows": "\(rows.count)"])
+        recordedFirstMovement = false
+        #endif
         guard activeTouch == nil, touches.count == 1, let touch = touches.first, let store, !store.isSaving else { state = state == .possible ? .failed : .cancelled; finish(); return }
         generation += 1
         preparation?.cancel()
@@ -122,6 +126,9 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
     }
 
     @objc private func handlePress() {
+        #if DEBUG
+        if state != .changed { trace("state", details: ["state": "\(state.rawValue)", "activeTouch": "\(activeTouch != nil)", "selecting": "\(store?.isSelectingTasks == true)"]) }
+        #endif
         guard let touch = activeTouch else { return }
         let point = touch.location(in: nil)
         recordPosition(point)
@@ -209,6 +216,9 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
     }
 
     override func reset() {
+        #if DEBUG
+        trace("reset", details: ["state": "\(state.rawValue)", "touchPhase": "\(activeTouch?.phase.rawValue ?? -1)", "selected": "\(store?.selectedTaskIDs.count ?? -1)"])
+        #endif
         super.reset()
         release()
     }
@@ -264,6 +274,9 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
     }
 
     func finish() {
+        #if DEBUG
+        trace("finish", details: ["state": "\(state.rawValue)", "activeTouch": "\(activeTouch != nil)"])
+        #endif
         generation += 1
         collapsedLayout?.resume()
         collapsedLayout = nil
@@ -332,8 +345,50 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
             }
         }
         #endif
-        return isTaskListContent(touch.view)
+        let admitted = isTaskListContent(touch.view)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1" {
+            var path: [String] = []
+            var ancestor = touch.view
+            while let current = ancestor, path.count < 12 {
+                let enabled = (current as? UIControl).map { " enabled=\($0.isEnabled)" } ?? ""
+                path.append("\(type(of: current))\(enabled)")
+                ancestor = current.superview
+            }
+            let point = touch.location(in: nil)
+            trace("admission", details: ["admitted": "\(admitted)", "path": path.joined(separator: "/"), "point": "\(point)", "viewport": "\(viewport)", "row": rows.first(where: { $0.bounds.contains(point) })?.rowID ?? "none", "list": scope?.list.map { "\(ObjectIdentifier($0))" } ?? "none"])
+        }
+        #endif
+        return admitted
     }
+
+    #if DEBUG
+    private var recordedFirstMovement = false
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        if !recordedFirstMovement, state == .possible, let touch = touches.first {
+            recordedFirstMovement = true
+            let point = touch.location(in: nil)
+            trace("first-move", details: ["elapsed": "\(touch.timestamp - pressStartedAt)", "distance": "\(hypot(point.x - initial.x, point.y - initial.y))", "point": "\(point)"])
+        }
+        super.touchesMoved(touches, with: event)
+    }
+
+    private func trace(_ phase: String, details: [String: String]) {
+        guard ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1" else { return }
+        var captured = details
+        captured["captureUptime"] = "\(ProcessInfo.processInfo.systemUptime)"
+        captured["recognizer"] = "\(ObjectIdentifier(self))"
+        captured["scope"] = scope.map { "\(ObjectIdentifier($0))" } ?? "none"
+        captured["generation"] = "\(generation)"
+        let payload = captured
+        Self.traceQueue.async {
+            TaskParticipantDiagnostics.event("[DEBUG-pr75-selection]." + phase, details: payload)
+        }
+    }
+
+    private static let traceQueue = DispatchQueue(label: "tsk.selection-trace")
+    #endif
 
     private func isTaskListContent(_ view: UIView?) -> Bool {
         guard let list = scope?.list else { return false }

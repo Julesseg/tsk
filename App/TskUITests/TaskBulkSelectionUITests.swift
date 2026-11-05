@@ -53,7 +53,14 @@ import XCTest
         XCTAssertFalse(app.textFields["task-description"].exists, "A swipe without a hold must not select or open the editor")
         start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2)
         let count = app.staticTexts["task-selection-count"]
-        XCTAssertTrue(count.waitForExistence(timeout: 10))
+        let selectionAppeared = count.waitForExistence(timeout: 10)
+        if !selectionAppeared {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Missing held selection after short swipe"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(selectionAppeared)
         XCTAssertEqual(count.label, "3 selected")
         let data = try XCTUnwrap((count.value as? String)?.data(using: .utf8))
         let proof = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
