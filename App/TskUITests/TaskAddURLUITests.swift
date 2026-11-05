@@ -3,7 +3,7 @@ import XCTest
 @MainActor final class TaskAddURLUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testSystemAddURLRevealsExpandedContainingListAndPersistsAfterRelaunch() throws {
+    func testSystemAddURLAppearsInCurrentListWithoutOpeningAnEditorAndPersistsAfterRelaunch() throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
@@ -11,16 +11,21 @@ import XCTest
         defer { app.terminate() }
         let host = try send("tsk://add?description=URL%20train&project=Travel&tags=trip&priority=H&scheduled=2026-11-05T10%3A30%3A00%2B02%3A00&deadline=2026-11-06T08%3A00%3A00Z&waiting-until=2026-11-04T09%3A00%3A00Z")
         defer { host.terminate() }
+        let row = taskRow(named: "URL train", app: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
+        XCTAssertTrue(app.buttons["New task"].exists)
+        XCTAssertFalse(app.textFields["task-description"].exists)
+        XCTAssertFalse(app.buttons["task-url-back"].exists)
+        capture("URL-created task appears as a normal row in the current list", app)
+        row.tap()
         let description = app.textFields["task-description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 20))
+        XCTAssertTrue(description.waitForExistence(timeout: 10))
         XCTAssertEqual(description.value as? String, "URL train")
         XCTAssertTrue(app.buttons["row-scheduled"].exists)
         XCTAssertTrue(app.buttons["row-deadline"].exists)
         XCTAssertTrue(app.buttons["row-waiting-date"].exists)
-        capture("System URL reveals saved task expanded in its containing list", app)
-        app.buttons["task-url-back"].tap()
-        XCTAssertTrue(app.buttons["task-url-back"].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
+        capture("URL-created task uses the ordinary row editor when tapped", app)
         app.terminate()
         app.launch()
         selectAllTasks(app)
@@ -74,10 +79,9 @@ import XCTest
         replaceTaskText(title, with: "Saved before URL", app: app)
         let host = try send("tsk://add?description=After%20valid%20draft")
         defer { host.terminate() }
-        XCTAssertTrue(app.buttons["task-url-back"].waitForExistence(timeout: 15))
-        XCTAssertEqual(title.value as? String, "After valid draft")
-        app.buttons["task-url-back"].tap()
-        XCTAssertTrue(app.buttons["task-url-back"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "After valid draft", app: app).waitForExistence(timeout: 15))
+        XCTAssertFalse(title.exists)
+        XCTAssertFalse(app.buttons["task-url-back"].exists)
         XCTAssertTrue(taskRow(named: "Saved before URL", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Saved before URL", app: app).tap()
         XCTAssertTrue(title.waitForExistence(timeout: 10))
@@ -121,30 +125,15 @@ import XCTest
         captureDraft.typeText("Capture before URL")
         host.terminate()
         _ = try send("tsk://add?description=After%20capture")
-        XCTAssertTrue(app.buttons["task-url-back"].waitForExistence(timeout: 15))
-        XCTAssertEqual(app.textFields["task-description"].value as? String, "After capture")
-        app.buttons["task-url-back"].tap()
-        XCTAssertTrue(app.buttons["task-url-back"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "After capture", app: app).waitForExistence(timeout: 15))
+        XCTAssertFalse(captureDraft.exists)
+        XCTAssertFalse(app.buttons["task-url-back"].exists)
         XCTAssertTrue(taskRow(named: "Capture before URL", app: app).waitForExistence(timeout: 10))
-        host.terminate()
-        _ = try send("tsk://add?description=Keep%20this%20destination")
-        XCTAssertTrue(title.waitForExistence(timeout: 15))
-        replaceTaskText(title, with: "", app: app)
-        host.terminate()
-        _ = try send("tsk://add?description=Rejected%20destination%20navigation")
-        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
-        app.alerts.buttons["OK"].tap()
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertEqual(title.value as? String, "")
-        XCTAssertTrue(app.staticTexts["draft-error"].exists)
-        XCTAssertTrue(app.buttons["task-url-back"].exists)
-        capture("Invalid destination draft survives rejected URL navigation", app)
         app.terminate()
         app.launch()
         selectAllTasks(app)
         XCTAssertFalse(taskRow(named: "Rejected capture navigation", app: app).exists)
-        XCTAssertFalse(taskRow(named: "Rejected destination navigation", app: app).exists)
-        XCTAssertTrue(taskRow(named: "Keep this destination", app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(taskRow(named: "After capture", app: app).waitForExistence(timeout: 10))
     }
 
     func testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd() throws {

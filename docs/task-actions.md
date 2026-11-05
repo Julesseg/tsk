@@ -27,7 +27,7 @@ Routes are deliberately unversioned. Future additions must preserve these meanin
 
 Shortcuts returns a Task entity with Full UUID, Description, Project, Tags, Priority, Scheduled, Deadline, Waiting until, Status and Open Task URL. Entity resolution uses the durable UUID. The Open Task URL is `tsk://open-task?id=<full UUID>`; working-set numbers and partial UUIDs are rejected.
 
-Without callbacks, tsk reveals the task in a containing list and expands its row. Back returns to the prior workspace. Existing valid task edits are saved before leaving; validation or save failure keeps the draft and reports the error. A URL received while another unsupported editing panel is open reports an error rather than discarding that panel.
+Without callbacks, Add Task refreshes the current workspace. The saved task appears as an ordinary row wherever it matches the current view and filters; no destination page or editor is opened. Explicit Open Task links use the existing task-link navigation with a route back. Existing valid task edits are saved before executing the URL; validation or save failure keeps the draft and reports the error. A URL received while another unsupported editing panel is open reports an error rather than discarding that panel.
 
 ## Callbacks
 

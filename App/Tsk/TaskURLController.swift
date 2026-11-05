@@ -6,13 +6,7 @@ import UIKit
 
 @MainActor @Observable
 final class TaskURLController {
-    struct Destination: Identifiable {
-        let id = UUID()
-        let taskID: UUID
-        let store: TaskStore
-    }
-
-    var destination: Destination?
+    var taskToOpen: TaskRecord?
     var message: String?
     private var requests: [URL] = []
     private var isExecuting = false
@@ -34,9 +28,8 @@ final class TaskURLController {
             do {
                 callbacks = try TaskActionCallbacks(url: url)
                 let action = try TaskActionURL(url: url)
-                let active = destination?.store ?? store
-                guard await active.prepareForTaskActionNavigation() else {
-                    throw TaskActionError.navigationFailed(active.error ?? "Finish the current editing panel before opening a task URL.")
+                guard await store.prepareForTaskActionNavigation() else {
+                    throw TaskActionError.navigationFailed(store.error ?? "Finish the current editing panel before opening a task URL.")
                 }
                 let task: TaskRecord
                 switch action {
@@ -45,16 +38,13 @@ final class TaskURLController {
                     saved = task
                 case .openTask(let id): task = try await store.manager.task(id: id)
                 }
-                if let callback = try callbacks?.successURL(for: task) {
-                    await deliver(callback, saved: saved)
-                } else {
-                    let containing = TaskStore(manager: store.manager, directory: store.directory)
-                    containing.query = task.status == "completed" ? .completed : .all
-                    await containing.reload()
-                    if let error = containing.error { throw TaskManagementError.storage(error) }
-                    destination = Destination(taskID: task.id, store: containing)
-                }
+                let callback = try callbacks?.successURL(for: task)
                 await store.reload()
+                if let callback {
+                    await deliver(callback, saved: saved)
+                } else if case .openTask = action {
+                    taskToOpen = task
+                }
             } catch {
                 let code = TaskActionFailureCode(error: error, savedLocally: saved != nil).rawValue
                 message = (saved.map { "Task saved locally (\($0.id.uuidString)). " } ?? "") + error.localizedDescription
@@ -91,50 +81,6 @@ final class TaskURLController {
         else if let saved {
             message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone. Opening Add again creates another task."
         } else { message = "The callback could not be delivered. " + (message ?? "") }
-    }
-}
-
-struct TaskURLDestination: View {
-    let destination: TaskURLController.Destination
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var detailID: UUID?
-    private var store: TaskStore { destination.store }
-
-    var body: some View {
-        NavigationStack {
-            TaskListView(store: store, calendar: TodayCalendarController(manager: store.manager), edit: { detailID = $0.id })
-                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
-                    guard let editing = store.rowEditing, editing.isExpanded, !editing.bounds.contains(tap.location) else { return }
-                    closeRow()
-                }, including: store.rowEditing == nil ? .subviews : .all)
-                .navigationTitle("Saved tasks")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Back") {
-                            Task { if await store.prepareForTaskActionNavigation() { dismiss() } }
-                        }.accessibilityIdentifier("task-url-back")
-                    }
-                }
-                .navigationDestination(item: $detailID) { id in
-                    if let task = store.allTasks.first(where: { $0.id == id }) { TaskDetailView(store: store, task: task) }
-                }
-        }
-        .overlay { TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() }) }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in
-            closeRow { detailID = task.id }
-        }, reveal: { task in closeRow { detailID = task.id } }))
-        .task(id: destination.id) {
-            await store.reload()
-            if let task = store.tasks.first(where: { $0.id == destination.taskID }) { store.expandRow(task) }
-        }
-        .interactiveDismissDisabled(store.rowEditing != nil || !store.presentedTaskPanels.isEmpty)
-    }
-
-    private func closeRow(after: (() -> Void)? = nil) {
-        guard let row = store.rowEditing else { after?(); return }
-        Task { if await row.saveAndCollapse(in: store, reduceMotion: reduceMotion) { after?() } }
     }
 }
 

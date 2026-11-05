@@ -37,13 +37,7 @@ struct TaskStorageRootView: View {
         .onChange(of: store == nil) { _, missing in
             if !missing, let store { Task { await automation.executePending(in: store) } }
         }
-        .sheet(item: Binding(get: {
-            store?.presentedTaskPanels.isEmpty == true && spotlightRequest == nil ? automation.destination : nil
-        }, set: { automation.destination = $0 })) { destination in
-            TaskURLDestination(destination: destination)
-                .modifier(TaskActionMessage(controller: automation, isActive: destination.store.presentedTaskPanels.isEmpty))
-        }
-        .modifier(TaskActionMessage(controller: automation, isActive: automation.destination == nil && store?.presentedTaskPanels.isEmpty != false && spotlightRequest == nil))
+        .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && spotlightRequest == nil))
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
         }
