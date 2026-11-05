@@ -3,6 +3,29 @@ import Foundation
 public enum TaskParticipantDiagnostics {
     @TaskLocal public static var shareRequest: UUID?
 
+    public static var isEnabled: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        environmentToken != nil
+        #else
+        false
+        #endif
+    }
+
+    public static func writeKeyboardReceipt(_ data: Data, token: String) {
+        #if DEBUG && targetEnvironment(simulator)
+        guard environmentToken == token else { return }
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("keyboard-fixture-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
+        TaskDiagnosticFileWriter.shared.submit(data, to: file)
+        #endif
+    }
+
+    public static func flush() async {
+        #if DEBUG && targetEnvironment(simulator)
+        await TaskDiagnosticFileWriter.shared.flushPending()
+        #endif
+    }
+
     public static func begin(_ stage: String) -> UUID? {
         #if DEBUG && targetEnvironment(simulator)
         TaskParticipantDiagnosticRecorder.shared.begin(stage, token: environmentToken, request: shareRequest)
@@ -40,8 +63,7 @@ public enum TaskParticipantDiagnostics {
 
     #if DEBUG && targetEnvironment(simulator)
     private static var environmentToken: String? {
-        guard let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], !token.isEmpty else { return nil }
-        return token
+        TaskDiagnosticSettings.token(environment: ProcessInfo.processInfo.environment)
     }
     #endif
 
@@ -96,7 +118,7 @@ final class TaskParticipantDiagnosticRecorder: @unchecked Sendable {
         } catch { NSLog("tsk isolated Share diagnostic failed: %@", error.localizedDescription) }
     }
 
-    private struct Event: Codable {
+    private struct Event: Codable, Sendable {
         let stage: String
         let phase: String
         let id: UUID
@@ -143,12 +165,10 @@ final class TaskParticipantDiagnosticRecorder: @unchecked Sendable {
         else { active[id] = nil; activeTokens[id] = nil }
         events = Array(events.suffix(300))
         let name = token.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) || $0 == "-" ? String($0) : "_" }.joined()
-        do {
-            let data = try JSONEncoder().encode(["events": events, "active": active.values.sorted { $0.time < $1.time }])
-            let destination = sharedDirectory ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let file = destination.appendingPathComponent("participant-fixture-\(name)-\(ProcessInfo.processInfo.processIdentifier).json")
-            try data.write(to: file, options: .atomic)
-        } catch { NSLog("tsk isolated participant diagnostic failed: %@", error.localizedDescription) }
+        let snapshot = ["events": events, "active": active.values.sorted { $0.time < $1.time }]
+        let destination = sharedDirectory ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let file = destination.appendingPathComponent("participant-fixture-\(name)-\(ProcessInfo.processInfo.processIdentifier).json")
+        TaskDiagnosticFileWriter.shared.submit(snapshot, to: file)
     }
 }
 #endif

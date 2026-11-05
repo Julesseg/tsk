@@ -1,6 +1,6 @@
 # CI test tiers
 
-PRs and pushes to `main` run all Core and persistent Native tests plus iPhone
+PRs and pushes to `main` run all Core and Native test targets plus iPhone
 smoke coverage. `App · XCUITest (macOS)` remains the required iPhone rollup;
 its legacy name refers to the Mac runner, not a macOS app. Native iPad support,
 its UI tests and CI jobs are retired under [ADR 0007](../adr/0007-iphone-only.md).
@@ -78,6 +78,33 @@ current iPhone acceptance. Focused diagnostics do not replace clean-head full
 coverage or physical-device verification.
 
 ## Build once, execute selected coverage
+
+The Linux Native job runs `TskNativeTests` with a pinned Taskwarrior 3.5.0 client,
+the real synchronization server and the native probe. The Mac producer runs
+`TskNativeAppleTests`, including App Intents, EventKit, item providers,
+notification content and owned Spotlight indexing, using the same fixture
+versions. Apple tests have their own SwiftPM target so Linux compilation cannot
+silently stand in for their execution. Each discovered sync test runs with a
+fresh server/client/secret/database; other tests run together. The test runner
+records selections, logs and outcomes, requires an exact completed-method receipt
+without skips, rejects missing/ambiguous sync selectors,
+and preserves a failing batch while continuing independent cases. Diagnostic-only
+dispatches retain their focused UI path and do not run either Native target.
+
+The common UI launcher suppresses animations for functional checks. The row-editor
+launcher and explicit animated workspace cases restore them. Results from
+suppressed-animation journeys do not certify transition timing or performance.
+Direct intent fixtures call the actual `perform()` implementation; their app
+readback does not certify external Shortcuts/Siri discovery or invocation.
+
+Ordinary smoke/full runs leave expensive participant and keyboard traces off.
+Focused diagnostic, keyboard, text, regression and menu selections explicitly
+forward `TSK_UI_DIAGNOSTICS=1` to the app. An isolated replica alone does not
+enable them. Receipts coalesce by file on a utility queue, outside input dispatch;
+Share's explicit request-scoped fixture flushes before completing the extension.
+Diagnostic snapshots remain best-effort if a process is killed before the next
+flush. Transport acknowledgements and UI outcome assertions are independent of
+these optional traces.
 
 One Mac producer builds the simulator bridge, controller tests and signed arm64
 UI products. It validates intent metadata and App Group entitlements before any

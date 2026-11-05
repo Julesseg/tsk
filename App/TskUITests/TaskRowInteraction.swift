@@ -15,6 +15,7 @@ extension XCTestCase {
         app.launchEnvironment["OS_ACTIVITY_MODE"] = "disable"
         app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "1"
         app.launchEnvironment["TSK_UI_TEST_SESSION"] = UUID().uuidString
+        app.launchEnvironment["TSK_UI_DIAGNOSTICS"] = ProcessInfo.processInfo.environment["TSK_UI_DIAGNOSTICS"] == "1" ? "1" : "0"
         return app
     }
 

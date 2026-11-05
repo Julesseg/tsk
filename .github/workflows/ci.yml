@@ -72,6 +72,7 @@ jobs:
           python3 scripts/test-ui-test-selection.py
           python3 scripts/test-ui-shard-checks.py
           python3 scripts/test-ci-execution.py
+          python3 scripts/test-native-test-selection.py
           python3 scripts/test-native-keyboard-hid-installer.py
           python3 scripts/test-native-keyboard-hid-relay.py
           python3 scripts/test-native-keyboard-hid-owner.py
@@ -105,17 +106,37 @@ jobs:
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned Rust toolchain
         run: |
           apt-get update
-          apt-get install -y curl gcc g++ sqlite3
+          apt-get install -y curl gcc g++ sqlite3 cmake uuid-dev git
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+        with:
+          repository: GothenburgBitFactory/taskwarrior
+          ref: 3419d5ba1e6a780fbbb0a8d68d8fd31e675c1bf8
+          submodules: recursive
+          path: .build/taskwarrior
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GothenburgBitFactory/taskchampion-sync-server
+          ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
+          path: .build/sync-server
+          persist-credentials: false
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: Native/Bridge
+          workspaces: |
+            Native/Bridge
+            .build/sync-server
+      - uses: actions/cache@v4
+        with:
+          path: .build/taskwarrior/build
+          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-v1
 
       - uses: actions/cache@v4
         with:
@@ -124,14 +145,30 @@ jobs:
             Core/.build
           key: native-swift-6.0.3-linux-${{ hashFiles('Native/Package.swift', 'Native/Sources/**', 'Native/Tests/**', 'Core/Package.swift', 'Core/Sources/**', 'Core/Tests/**', 'Native/Bridge/Cargo.*', 'Native/Bridge/src/**') }}
           restore-keys: native-swift-6.0.3-linux-
-      - name: Build native bridge and exercise persistent Core flows
+      - name: Build pinned Native test fixtures
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           scripts/build-native.sh host
+          cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
+          cmake -S .build/taskwarrior -B .build/taskwarrior/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build .build/taskwarrior/build --target task --parallel 2
           swift build --package-path Native --product tsk-native-probe
-          TSK_NATIVE_PROBE_BINARY="$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
-            TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" swift test --package-path Native
+      - name: Run persistent and Taskwarrior conformance tests with isolated synchronization
+        run: |
+          TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" \
+            python3 scripts/run-native-tests.py --target TskNativeTests \
+              --server .build/sync-server/target/release/taskchampion-sync-server \
+              --taskwarrior .build/taskwarrior/build/src/task \
+              --probe "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
+              --output .build/native-test-results
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-linux-results
+          path: .build/native-test-results
+          retention-days: 7
+          include-hidden-files: true
 
   ui-build:
     needs: changes
@@ -139,6 +176,8 @@ jobs:
     name: App · Shared UI products
     runs-on: xcode-27
     timeout-minutes: 35
+    env:
+      RUN_NATIVE_TESTS: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
     outputs:
       artifact_id: ${{ steps.products.outputs.artifact-id }}
     steps:
@@ -151,22 +190,36 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Check out pinned real TaskChampion sync server
-        if: needs.changes.outputs.server == 'true'
+        if: needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true'
         uses: actions/checkout@v4
         with:
           repository: GothenburgBitFactory/taskchampion-sync-server
           ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
           path: .build/sync-server
           persist-credentials: false
+      - name: Check out pinned Taskwarrior conformance client
+        if: env.RUN_NATIVE_TESTS == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: GothenburgBitFactory/taskwarrior
+          ref: 3419d5ba1e6a780fbbb0a8d68d8fd31e675c1bf8
+          submodules: recursive
+          path: .build/taskwarrior
+          persist-credentials: false
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             Native/Bridge
-            ${{ needs.changes.outputs.server == 'true' && '.build/sync-server' || '' }}
+            ${{ (needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true') && '.build/sync-server' || '' }}
+      - uses: actions/cache@v4
+        if: env.RUN_NATIVE_TESTS == 'true'
+        with:
+          path: .build/taskwarrior/build
+          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-v1
       - name: Build native runtime and selected synchronization tools
         env:
-          NEED_SERVER: ${{ needs.changes.outputs.server }}
-          NEED_PEER: ${{ needs.changes.outputs.peer }}
+          NEED_SERVER: ${{ needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
+          NEED_PEER: ${{ needs.changes.outputs.peer == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
         run: |
           scripts/build-native.sh simulator
           scripts/build-native.sh host
@@ -180,6 +233,24 @@ jobs:
             swift build --package-path Native --product tsk-native-probe
             cp "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" .build/ui-tools/
           fi
+      - name: Run Apple-framework Native tests
+        if: env.RUN_NATIVE_TESTS == 'true'
+        timeout-minutes: 10
+        run: |
+          cmake -S .build/taskwarrior -B .build/taskwarrior/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build .build/taskwarrior/build --target task --parallel 2
+          TSK_TASKCHAMPION_LIBRARY="$PWD/.build/ui-tools/libtsk_taskchampion.dylib" \
+            python3 scripts/run-native-tests.py --target TskNativeAppleTests \
+              --server .build/ui-tools/taskchampion-sync-server \
+              --taskwarrior .build/taskwarrior/build/src/task \
+              --probe .build/ui-tools/tsk-native-probe --output .build/native-apple-results
+      - uses: actions/upload-artifact@v4
+        if: always() && env.RUN_NATIVE_TESTS == 'true'
+        with:
+          name: native-apple-results
+          path: .build/native-apple-results
+          retention-days: 7
+          include-hidden-files: true
       - name: Run Calendar controller regressions
         timeout-minutes: 5
         run: TSK_TASKCHAMPION_LIBRARY="$PWD/.build/ui-tools/libtsk_taskchampion.dylib" swift test --package-path App/ControllerTests

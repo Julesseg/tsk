@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import TskNative
 
 struct TaskKeyboardCommand {
     let id: String
@@ -22,9 +23,9 @@ final class TaskKeyboardRouter: ObservableObject {
     private var installed: [ObjectIdentifier: (WeakKeyboardController, [UIKeyCommand])] = [:]
     private let registration = TaskKeyboardRegistration()
     private static var routers: [UUID: WeakKeyboardRouter] = [:]
+    #if DEBUG && targetEnvironment(simulator)
     private var lastDiagnostic: String?
     private var diagnostics: [[String: Any]] = []
-    #if DEBUG && targetEnvironment(simulator)
     private var recordingDiagnostic = false
     private var editingObserver: TaskKeyboardEditingObserver?
     private var editingDiagnosticCount = 0
@@ -38,7 +39,7 @@ final class TaskKeyboardRouter: ObservableObject {
     init() {
         Self.routers[id] = WeakKeyboardRouter(self)
         #if DEBUG && targetEnvironment(simulator)
-        if ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"].flatMap(UUID.init(uuidString:)) != nil {
+        if TaskParticipantDiagnostics.isEnabled {
             editingObserver = TaskKeyboardEditingObserver(router: self)
         }
         #endif
@@ -120,7 +121,8 @@ final class TaskKeyboardRouter: ObservableObject {
 
     func diagnostic(_ event: String, force: Bool = false) {
         #if DEBUG && targetEnvironment(simulator)
-        guard let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil, !recordingDiagnostic else { return }
+        guard TaskParticipantDiagnostics.isEnabled,
+              let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], !recordingDiagnostic else { return }
         recordingDiagnostic = true
         defer { recordingDiagnostic = false }
         let hosts = controllers.values.compactMap(\.value).map { String(describing: type(of: $0)) }
@@ -167,12 +169,8 @@ final class TaskKeyboardRouter: ObservableObject {
                             "removalCount": removalCount, "menuRebuildCount": menuRebuildCount])
         diagnostics = Array(diagnostics.suffix(80))
         NSLog("tsk keyboard %@ chain=%@", text, chain.joined(separator: ">"))
-        if let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
-            do {
-                let data = try JSONSerialization.data(withJSONObject: diagnostics, options: [.prettyPrinted, .sortedKeys])
-                let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("keyboard-fixture-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
-                try data.write(to: file, options: .atomic)
-            } catch { NSLog("tsk owned keyboard diagnostic failed: %@", error.localizedDescription) }
+        if let data = try? JSONSerialization.data(withJSONObject: diagnostics, options: [.prettyPrinted, .sortedKeys]) {
+            TaskParticipantDiagnostics.writeKeyboardReceipt(data, token: token)
         }
         #endif
     }
