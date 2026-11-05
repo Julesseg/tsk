@@ -117,13 +117,6 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
         with:
-          repository: GothenburgBitFactory/taskwarrior
-          ref: 3419d5ba1e6a780fbbb0a8d68d8fd31e675c1bf8
-          submodules: recursive
-          path: .build/taskwarrior
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
           repository: GothenburgBitFactory/taskchampion-sync-server
           ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
           path: .build/sync-server
@@ -136,7 +129,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .build/taskwarrior/build
-          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-v1
+          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-${{ hashFiles('scripts/build-taskwarrior-fixture.sh') }}
 
       - uses: actions/cache@v4
         with:
@@ -150,15 +143,14 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           scripts/build-native.sh host
           cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
-          cmake -S .build/taskwarrior -B .build/taskwarrior/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build .build/taskwarrior/build --target task --parallel 2
+          bash scripts/build-taskwarrior-fixture.sh
           swift build --package-path Native --product tsk-native-probe
       - name: Run persistent and Taskwarrior conformance tests with isolated synchronization
         run: |
           TSK_TASKCHAMPION_LIBRARY="$PWD/Native/Bridge/target/release/libtsk_taskchampion.so" \
             python3 scripts/run-native-tests.py --target TskNativeTests \
               --server .build/sync-server/target/release/taskchampion-sync-server \
-              --taskwarrior .build/taskwarrior/build/src/task \
+              --taskwarrior .build/taskwarrior-install/bin/task \
               --probe "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
               --output .build/native-test-results
           LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
@@ -197,15 +189,6 @@ jobs:
           ref: d206729d5ea7421d501b60111a7b40ecc2ddb87f
           path: .build/sync-server
           persist-credentials: false
-      - name: Check out pinned Taskwarrior conformance client
-        if: env.RUN_NATIVE_TESTS == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: GothenburgBitFactory/taskwarrior
-          ref: 3419d5ba1e6a780fbbb0a8d68d8fd31e675c1bf8
-          submodules: recursive
-          path: .build/taskwarrior
-          persist-credentials: false
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
@@ -215,7 +198,7 @@ jobs:
         if: env.RUN_NATIVE_TESTS == 'true'
         with:
           path: .build/taskwarrior/build
-          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-v1
+          key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-${{ hashFiles('scripts/build-taskwarrior-fixture.sh') }}
       - name: Build native runtime and selected synchronization tools
         env:
           NEED_SERVER: ${{ needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
@@ -237,12 +220,11 @@ jobs:
         if: env.RUN_NATIVE_TESTS == 'true'
         timeout-minutes: 10
         run: |
-          cmake -S .build/taskwarrior -B .build/taskwarrior/build -DCMAKE_BUILD_TYPE=Release
-          cmake --build .build/taskwarrior/build --target task --parallel 2
+          bash scripts/build-taskwarrior-fixture.sh
           TSK_TASKCHAMPION_LIBRARY="$PWD/.build/ui-tools/libtsk_taskchampion.dylib" \
             python3 scripts/run-native-tests.py --target TskNativeAppleTests \
               --server .build/ui-tools/taskchampion-sync-server \
-              --taskwarrior .build/taskwarrior/build/src/task \
+              --taskwarrior .build/taskwarrior-install/bin/task \
               --probe .build/ui-tools/tsk-native-probe --output .build/native-apple-results
       - uses: actions/upload-artifact@v4
         if: always() && env.RUN_NATIVE_TESTS == 'true'

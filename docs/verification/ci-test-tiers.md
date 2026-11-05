@@ -84,7 +84,11 @@ the real synchronization server and the native probe. The Mac producer runs
 `TskNativeAppleTests`, including App Intents, EventKit, item providers,
 notification content and owned Spotlight indexing, using the same fixture
 versions. Apple tests have their own SwiftPM target so Linux compilation cannot
-silently stand in for their execution. Each discovered sync test runs with a
+silently stand in for their execution. Both jobs use
+`scripts/build-taskwarrior-fixture.sh` to verify the official release archive's
+SHA-256, build its executable target and install the CLI with its runtime data
+under `.build/taskwarrior-install`. Release sources retain the exact `3.5.0`
+version contract used by conformance tests. Each discovered sync test runs with a
 fresh server/client/secret/database; other tests run together. The test runner
 records selections, logs and outcomes, requires an exact completed-method receipt
 without skips, rejects missing/ambiguous sync selectors,
