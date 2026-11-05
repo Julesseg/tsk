@@ -129,6 +129,7 @@ struct ContentView: View {
                         Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                             if view == store.selectedWorkspaceView {
                                 workspaceContent
+                                    .background { CaptureTabAction(capture: capture).frame(width: 0, height: 0).allowsHitTesting(false) }
                             }
                         }
                         .accessibilityIdentifier("tab-" + view.id)

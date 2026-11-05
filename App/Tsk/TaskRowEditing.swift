@@ -48,6 +48,7 @@ final class TaskRowEditing {
 
     init(capturing draft: TaskRowDraft, context: TaskCompletionFeedback.Context, tasks: [TaskRecord], now: Date) {
         isCapture = true
+        focusInset = 0
         self.draft = draft
         rowID = "capture-" + draft.original.id.uuidString
         self.context = context
