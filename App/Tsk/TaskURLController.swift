@@ -28,6 +28,7 @@ final class TaskURLController {
         defer { isExecuting = false }
         while !requests.isEmpty {
             let url = requests.removeFirst()
+            message = nil
             var callbacks: TaskActionCallbacks?
             var saved: TaskRecord?
             do {
@@ -103,6 +104,10 @@ struct TaskURLDestination: View {
     var body: some View {
         NavigationStack {
             TaskListView(store: store, calendar: TodayCalendarController(manager: store.manager), edit: { detailID = $0.id })
+                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                    guard let editing = store.rowEditing, editing.isExpanded, !editing.bounds.contains(tap.location) else { return }
+                    closeRow()
+                }, including: store.rowEditing == nil ? .subviews : .all)
                 .navigationTitle("Saved tasks")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -116,10 +121,6 @@ struct TaskURLDestination: View {
                     if let task = store.allTasks.first(where: { $0.id == id }) { TaskDetailView(store: store, task: task) }
                 }
         }
-        .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
-            guard let editing = store.rowEditing, editing.isExpanded, !editing.bounds.contains(tap.location) else { return }
-            closeRow()
-        }, including: store.rowEditing == nil ? .subviews : .all)
         .overlay { TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() }) }
         .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in
             closeRow { detailID = task.id }
@@ -134,5 +135,16 @@ struct TaskURLDestination: View {
     private func closeRow(after: (() -> Void)? = nil) {
         guard let row = store.rowEditing else { after?(); return }
         Task { if await row.saveAndCollapse(in: store, reduceMotion: reduceMotion) { after?() } }
+    }
+}
+
+struct TaskActionMessage: ViewModifier {
+    let controller: TaskURLController
+    var isActive = true
+
+    func body(content: Content) -> some View {
+        content.alert("Task action", isPresented: Binding(get: { isActive && controller.message != nil }, set: { if !$0 { controller.message = nil } })) {
+            Button("OK") { controller.message = nil }
+        } message: { Text(controller.message ?? "") }
     }
 }

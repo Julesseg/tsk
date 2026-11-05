@@ -5,6 +5,7 @@ struct TaskEditorView: View {
     let store: TaskStore
     let original: TaskRecord
     let onSave: ((TaskRecord) -> Void)?
+    @Environment(TaskURLController.self) private var automation
     @Environment(\.dismiss) private var dismiss
     @State private var taskActionDraftID = UUID()
     @State private var draft: TaskDraft
@@ -94,6 +95,7 @@ struct TaskEditorView: View {
             .taskKeyboardCommands(store.isSaving || isChoosingPriority ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
 
         }
+        .modifier(TaskActionMessage(controller: automation))
     }
 
     private func save() {

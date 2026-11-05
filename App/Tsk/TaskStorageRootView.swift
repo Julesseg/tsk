@@ -41,10 +41,9 @@ struct TaskStorageRootView: View {
             store?.presentedTaskPanels.isEmpty == true && spotlightRequest == nil ? automation.destination : nil
         }, set: { automation.destination = $0 })) { destination in
             TaskURLDestination(destination: destination)
+                .modifier(TaskActionMessage(controller: automation, isActive: destination.store.presentedTaskPanels.isEmpty))
         }
-        .alert("Task action", isPresented: Binding(get: { automation.message != nil }, set: { if !$0 { automation.message = nil } })) {
-            Button("OK") { automation.message = nil }
-        } message: { Text(automation.message ?? "") }
+        .modifier(TaskActionMessage(controller: automation, isActive: automation.destination == nil && store?.presentedTaskPanels.isEmpty != false && spotlightRequest == nil))
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
         }
@@ -53,6 +52,7 @@ struct TaskStorageRootView: View {
             else if let error { ContentUnavailableView("Task storage unavailable", systemImage: "exclamationmark.triangle", description: Text(error)) }
             else { ProgressView("Opening task storage…") }
         }
+        .environment(automation)
     }
 
     private func open() async {
