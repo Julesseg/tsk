@@ -19,6 +19,23 @@ final class TaskStore {
     var availableProjects: [String] = []
     var error: String?
     var presentedTaskPanels: Set<UUID> = []
+    @ObservationIgnored var taskActionDraftCommit: (id: UUID, save: @MainActor () async -> Bool)?
+
+    func prepareForTaskActionNavigation() async -> Bool {
+        guard !isSaving else { error = "A task is still saving. Try the URL again after it finishes."; return false }
+        let allowed = taskActionDraftCommit.map { Set([$0.id]) } ?? []
+        guard presentedTaskPanels.subtracting(allowed).isEmpty else {
+            error = "Finish the current editing panel before opening a task URL."
+            return false
+        }
+        if let commit = taskActionDraftCommit, !(await commit.save()) { return false }
+        if let row = rowEditing, !(await row.saveAndCollapse(in: self, reduceMotion: true, includingParameter: true)) {
+            error = row.error ?? error ?? "The current task is still saving or its editing panel is open."
+            return false
+        }
+        return true
+    }
+
     var isSaving = false
     var isLoading = false
     private let fixedDate: Date?

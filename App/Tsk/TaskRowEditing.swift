@@ -97,9 +97,9 @@ final class TaskRowEditing {
         error = nil
     }
 
-    func saveAndCollapse(in store: TaskStore, reduceMotion: Bool) async -> Bool {
+    func saveAndCollapse(in store: TaskStore, reduceMotion: Bool, includingParameter: Bool = false) async -> Bool {
         guard !isSaving, !store.isSaving, supportingPanel == nil, isExpanded else { return false }
-        if parameter != nil { parameter = nil; return false }
+        if parameter != nil && !includingParameter { parameter = nil; return false }
         isSaving = true
         do {
             if isCapture, draft.taskDraft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -121,6 +121,7 @@ final class TaskRowEditing {
                 return false
             }
             savedTask = saved
+            parameter = nil
             await setExpanded(false, reduceMotion: reduceMotion)
             store.rowEditing = nil
             if isCapture, !store.tasks.contains(where: { $0.id == saved.id }) {

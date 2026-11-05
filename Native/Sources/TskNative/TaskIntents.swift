@@ -8,16 +8,32 @@ public struct IntentTaskEntity: AppEntity {
     public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Task"
     public static let defaultQuery = IntentTaskQuery()
     public let id: UUID
-    public let description: String
-    public let status: String
+    @Property(title: "Full UUID") public var uuid: String
+    @Property(title: "Description") public var description: String
+    @Property(title: "Project") public var project: String?
+    @Property(title: "Tags") public var tags: [String]
+    @Property(title: "Priority") public var priority: String?
+    @Property(title: "Scheduled") public var scheduled: Date?
+    @Property(title: "Deadline") public var deadline: Date?
+    @Property(title: "Waiting until") public var waitingUntil: Date?
+    @Property(title: "Status") public var status: String
+    @Property(title: "Open Task URL") public var openTaskURL: URL
     public var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(description)", subtitle: "\(status.capitalized)")
     }
 
     public init(_ task: TaskRecord) {
         id = task.id
+        uuid = task.id.uuidString
         description = task.description
+        project = task.project.isEmpty ? nil : task.project
+        tags = task.tags
+        priority = task.priority.isEmpty ? nil : task.priority
+        scheduled = task.plannedDate
+        deadline = task.deadline
+        waitingUntil = task.waitUntil
         status = task.status
+        openTaskURL = TaskActionResult(task).openTaskURL
     }
 }
 
@@ -51,32 +67,6 @@ public enum IntentTaskStatus: String, AppEnum {
     ]
     var query: TaskQuery {
         switch self { case .unfinished: .unfinished; case .completed: .completed; case .all: .all }
-    }
-}
-
-@available(iOS 16, macOS 13, *)
-public struct CreateTaskIntent: AppIntent {
-    public static let title: LocalizedStringResource = "Create Task"
-    public static let description = IntentDescription("Save a task in tsk. Changes synchronize when a connection is available.")
-    public static let openAppWhenRun = false
-    @Parameter(title: "Description") public var taskDescription: String
-    @Parameter(title: "Project") public var project: String?
-    private var directory: URL?
-    public static var parameterSummary: some ParameterSummary { Summary("Create \(\.$taskDescription)") { \.$project } }
-
-    public init() {}
-    public init(description: String, project: String? = nil, directory: URL? = nil) {
-        taskDescription = description
-        self.project = project
-        self.directory = directory
-    }
-
-    public func perform() async throws -> some IntentResult & ReturnsValue<IntentTaskEntity> & ProvidesDialog {
-        let manager = try await IntentTaskSession.open(directory: directory)
-        var attributes: TaskAttributes = [:]
-        if let project { attributes["project"] = project }
-        let task = try await manager.create(TaskDraft(description: taskDescription, attributes: attributes))
-        return .result(value: IntentTaskEntity(task), dialog: "Saved locally: \(task.description)")
     }
 }
 

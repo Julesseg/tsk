@@ -71,8 +71,8 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 76 iPhone methods without skips,
-partitioned 39 workspace / 37 task-row methods. The retired iPad-only class and
+in existing methods. Full coverage retains all 80 iPhone methods without skips,
+partitioned 43 workspace / 37 task-row methods. The retired iPad-only class and
 its seven-phase transport case are removed; the iPhone workspace/editor journey
 still requires all nine phases, alongside annotation and native-control coverage.
 Historical reports before ADR 0007 include retired iPad runs and do not establish
@@ -140,7 +140,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 39 methods | 37 methods |
+| iPhone | 43 methods | 37 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers

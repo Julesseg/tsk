@@ -9,7 +9,7 @@ import TskNative
 @Test func nativeIntentPerformCreatesFindsAndReopensTheAppDatasetWithStableIdentity() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let created = try await CreateTaskIntent(description: "Buy train tickets", project: "Travel", directory: directory).perform()
+    let created = try await AddTaskIntent(description: "Buy train tickets", project: "Travel", directory: directory).perform()
     let entity = try #require(created.value)
     let found = try await FindTasksIntent(searchText: "TRAIN", directory: directory).perform()
     #expect(found.value?.map(\.id) == [entity.id])
@@ -22,7 +22,7 @@ import TskNative
     #expect(unfinished.value?.isEmpty == true)
     let completed = try await FindTasksIntent(status: .completed, directory: directory).perform()
     #expect(completed.value?.map(\.id) == [entity.id])
-    await #expect(throws: TaskManagementError.emptyDescription) { try await CreateTaskIntent(description: "  ", directory: directory).perform() }
+    await #expect(throws: TaskManagementError.emptyDescription) { try await AddTaskIntent(description: "  ", directory: directory).perform() }
     #expect(try await app.tasks().count == 1)
 }
 #endif
@@ -39,7 +39,7 @@ func nativeIntentCaptureUsesPersistedConnectionAndAutomaticallyReachesAnIndepend
     let identity = try #require(UUID(uuidString: client))
     let configuration = try SyncConfiguration(serverURL: try #require(environment["TSK_SYNC_TEST_URL"]), clientID: identity, encryptionSecret: try #require(environment["TSK_SYNC_TEST_SECRET"]))
     try await SyncConfigurationStore(directory: directory).save(configuration)
-    let result = try await CreateTaskIntent(description: "Automatic native intent fixture", directory: directory).perform()
+    let result = try await AddTaskIntent(description: "Automatic native intent fixture", directory: directory).perform()
     let taskID = try #require(result.value?.id)
     let peer = TaskManager(replica: TaskChampionReplica(directory: root.appendingPathComponent("peer")))
     let deadline = ContinuousClock.now.advanced(by: .seconds(10))
@@ -52,5 +52,33 @@ func nativeIntentCaptureUsesPersistedConnectionAndAutomaticallyReachesAnIndepend
         guard ContinuousClock.now < deadline else { throw TaskManagementError.storage("The persisted intent capture did not synchronize") }
         try await Task.sleep(for: .milliseconds(50))
     }
+}
+#endif
+
+#if canImport(AppIntents)
+@available(macOS 13, iOS 16, *)
+@Test func rebuiltAddIntentPersistsEveryNamedInputAndReturnsDiscoverableTaskProperties() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let scheduled = Date(timeIntervalSince1970: 1793867400)
+    let deadline = Date(timeIntervalSince1970: 1793953800)
+    let waiting = Date(timeIntervalSince1970: 1793781000)
+    let result = try await AddTaskIntent(description: "Book trip", project: "Travel", tags: ["trip", "rail"], priority: .high, scheduled: scheduled, deadline: deadline, waitingUntil: waiting, directory: directory).perform()
+    let entity = try #require(result.value)
+    let reopened = try await TaskChampionSession.open(directory: directory)
+    let record = try await reopened.task(id: entity.id)
+    #expect(record.project == "Travel")
+    #expect(record.tags == ["rail", "trip"])
+    #expect(record.priority == "H")
+    #expect(record.plannedDate == scheduled && record.deadline == deadline && record.waitUntil == waiting)
+    #expect(entity.uuid == entity.id.uuidString)
+    #expect(entity.project == "Travel" && entity.tags == ["rail", "trip"])
+    #expect(entity.priority == "H" && entity.scheduled == scheduled && entity.deadline == deadline && entity.waitingUntil == waiting)
+    #expect(entity.status == "pending")
+    #expect(entity.openTaskURL.absoluteString == "tsk://open-task?id=" + entity.id.uuidString)
+    await #expect(throws: (any Error).self) { try await AddTaskIntent(description: "Invalid", tags: ["two words"], directory: directory).perform() }
+    #expect(try await reopened.tasks().count == 1)
+    let plain = try await AddTaskIntent(description: "No dates", directory: directory).perform()
+    #expect(plain.value?.scheduled == nil && plain.value?.deadline == nil && plain.value?.waitingUntil == nil)
 }
 #endif

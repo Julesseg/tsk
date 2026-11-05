@@ -3,6 +3,7 @@ import TskNative
 import CoreSpotlight
 
 struct TaskStorageRootView: View {
+    @State private var automation = TaskURLController()
     @State private var store: TaskStore?
     @State private var error: String?
     @State private var spotlightRequest: SpotlightRequest?
@@ -27,6 +28,23 @@ struct TaskStorageRootView: View {
             }
         }
         .task { await open() }
+        .onOpenURL { url in
+            Task {
+                await automation.receive(url, store: store)
+                if store == nil, let error { await automation.storageUnavailable(SharedStorageError.initialization(error)) }
+            }
+        }
+        .onChange(of: store == nil) { _, missing in
+            if !missing, let store { Task { await automation.executePending(in: store) } }
+        }
+        .sheet(item: Binding(get: {
+            store?.presentedTaskPanels.isEmpty == true && spotlightRequest == nil ? automation.destination : nil
+        }, set: { automation.destination = $0 })) { destination in
+            TaskURLDestination(destination: destination)
+        }
+        .alert("Task action", isPresented: Binding(get: { automation.message != nil }, set: { if !$0 { automation.message = nil } })) {
+            Button("OK") { automation.message = nil }
+        } message: { Text(automation.message ?? "") }
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
         }
@@ -46,7 +64,7 @@ struct TaskStorageRootView: View {
             try await cleanReminderFixtureIfRequested()
             try addForegroundReminderFixtureIfRequested()
             if let description = ProcessInfo.processInfo.environment["TSK_TEST_INTENT_DESCRIPTION"] {
-                _ = try await CreateTaskIntent(description: description).perform()
+                _ = try await AddTaskIntent(description: description).perform()
             }
             try await installRecordedRecurrenceFixture()
             try await runTaskAutomationFixture()
@@ -61,6 +79,9 @@ struct TaskStorageRootView: View {
             #endif
             store = opened
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.localizedDescription
+            await automation.storageUnavailable(error)
+        }
     }
 }

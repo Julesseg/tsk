@@ -111,8 +111,10 @@ xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphones
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
 share_status=0
-if [[ "$test_phases" == *share* ]]; then
+if [[ "$test_phases" == *share* || "${test_filters[*]}" == *TaskAddURLUITests* ]]; then
     xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
+fi
+if [[ "$test_phases" == *share* ]]; then
     share_command=(xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult")
     if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
         python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/share" --owned-simulator --monitor-device -- "${share_command[@]}" || share_status=$?
