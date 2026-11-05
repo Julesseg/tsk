@@ -89,3 +89,19 @@ private actor CaptureReplica: TaskReplica {
     #expect(editing.parameter == nil)
     #expect(try await manager.task(id: original.id).description == "Original")
 }
+
+@MainActor @Test func captureEndsSelectionBeforeFreezingTheDraftList() async throws {
+    let manager = TaskManager(replica: CaptureReplica())
+    let task = try await manager.create(TaskDraft(description: "Existing task"))
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    await store.reload()
+    store.selectedTaskIDs = [task.id]
+    store.isSelectionGestureActive = true
+    store.selectionGestureTasks = []
+    store.selectionGestureDays = []
+    await store.beginCapture(reduceMotion: true)
+    #expect(store.rowEditing?.isCapture == true)
+    #expect(!store.isSelectingTasks)
+    #expect(!store.isSelectionGestureActive)
+    #expect(store.visibleTasks.map(\.description) == ["Existing task"])
+}

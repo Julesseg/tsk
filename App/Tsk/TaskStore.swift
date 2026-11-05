@@ -41,12 +41,26 @@ final class TaskStore {
         return editing.draft.original
     }
 
+    func endSelectionGesture() {
+        isSelectionGestureActive = false
+        selectionGestureTasks = nil
+        selectionGestureDays = nil
+    }
+
+    func endTaskSelection() {
+        isSelectionPressActive = false
+        taskSelectionGeneration += 1
+        selectedTaskIDs = []
+        endSelectionGesture()
+    }
+
     func beginCapture(reduceMotion: Bool) async {
         guard !isSaving else { return }
         if let editing = rowEditing {
             guard !editing.isCapture, await editing.saveAndCollapse(in: self, reduceMotion: reduceMotion) else { return }
         }
         guard rowEditing == nil else { return }
+        endTaskSelection()
         captureConfirmation = nil
         let draft = TaskRowDraft(capturing: customView == nil ? query : .unfinished,
                                  project: customView == nil ? projectSelection : .all, now: currentDate)
