@@ -85,7 +85,8 @@ import XCTest
         XCTAssertTrue(taskRow(named: "Saved before URL", app: app).waitForExistence(timeout: 10))
         taskRow(named: "Saved before URL", app: app).tap()
         XCTAssertTrue(title.waitForExistence(timeout: 10))
-        replaceTaskText(title, with: "", app: app)
+        let invalidDescription = "   "
+        replaceTaskText(title, with: invalidDescription, app: app)
         capture("Current invalid draft before URL navigation", app)
         host.terminate()
         _ = try send("tsk://add?description=Must%20not%20exist")
@@ -100,7 +101,7 @@ import XCTest
             add(hierarchy)
         }
         XCTAssertTrue(retained)
-        XCTAssertEqual(title.value as? String, "")
+        XCTAssertEqual(title.value as? String, invalidDescription)
         XCTAssertTrue(app.staticTexts["draft-error"].exists)
         XCTAssertFalse(app.buttons["task-url-back"].exists)
         capture("Invalid current draft remains editable after rejected URL navigation", app)
