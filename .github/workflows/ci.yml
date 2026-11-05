@@ -109,10 +109,10 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Install pinned Rust toolchain
+      - name: Install Native test prerequisites and pinned Rust toolchain
         run: |
           apt-get update
-          apt-get install -y curl gcc g++ sqlite3 cmake uuid-dev git
+          apt-get install -y curl gcc g++ sqlite3 cmake uuid-dev git python3
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.99.0
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
