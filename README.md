@@ -58,8 +58,9 @@ The default triage labels are `needs-triage`, `needs-info`, `ready-for-agent`,
 and `docs/adr/`, created when terms or architecture decisions need recording.
 
 CI runs Core tests and XCUITest smoke coverage on pull requests, with full UI
-coverage nightly or by explicit request. Installable PR builds are opt-in. Signing, TestFlight,
-installable PR builds, and agent dispatch need their own configuration;
+coverage nightly or by explicit request. Installable builds publish automatically
+for every PR. Signing, TestFlight, installable PR builds, and agent dispatch need
+their own configuration;
 see [template setup](docs/template-setup.md),
 [release pipeline docs](ci/README.md), and
 [agent dispatch setup](docs/agents/auto-dispatch.md).

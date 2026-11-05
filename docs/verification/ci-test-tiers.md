@@ -235,7 +235,8 @@ acceptance and cannot satisfy canonical branch protection by themselves.
 Documentation-only changes run routing and named UI workers on Linux without
 Xcode or simulators. Unknown/mixed/empty/invalid diffs run normal tests. Nightly
 and manual dispatch always request real coverage. The installable Release
-workflow is separately opt-in; see [release documentation](../../ci/README.md).
+workflow runs automatically for every PR, with manual rebuilds also available;
+see [release documentation](../../ci/README.md).
 
 Inspect selections without booting a simulator:
 

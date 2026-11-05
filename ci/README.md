@@ -1,6 +1,6 @@
 # Installable PR builds — pipeline internals
 
-The release workflow builds a **signed, installable `.ipa`** for an explicitly requested PR and
+The release workflow builds a **signed, installable `.ipa`** for every PR and
 publishes it to a GitHub Pages site, so you can install any PR's build on your
 iPhone straight from Safari. The app, Share, widgets and fixture target iPhone
 only (`UIDeviceFamily = [1]`). Builds use the repository's `xcode-27` runner.
@@ -12,7 +12,7 @@ covers how the pipeline works.
 The pipeline lives at [`.github/workflows/release.yml`](../.github/workflows/release.yml).
 
 ```
-Manual request with PR number
+PR opened, reopened or updated (or manual request with PR number)
    └─ request (Linux)     resolve source and signing configuration
         └─ build (xcode-27) archive + export an ad-hoc–signed app.ipa
         └─ deploy (ubuntu) upsert this PR's slot, prune to 5, push build-history, deploy Pages
@@ -54,10 +54,10 @@ stays green — the installable build simply doesn't run.
   version, so reinstalling the same PR after a new push registers as an update.
 - **Xcode:** the build uses the runner's latest-stable Xcode, matching `ci.yml`.
 
-## Request an installable
+## Automatic builds and manual rebuilds
 
-PR pushes run validation without automatically building/publishing an installable.
-Request one when it is needed:
+Opening or reopening a PR and every new push automatically build and publish an
+installable, including documentation-only changes. A manual rebuild remains available:
 
 ```sh
 gh workflow run release.yml --repo Julesseg/tsk -f pr_number=<number>
