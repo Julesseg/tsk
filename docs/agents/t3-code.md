@@ -16,6 +16,11 @@ when setting up another environment. Core tests need no worktree setup;
 build the native bridge before building the app. Actions run on demand and
 leave simulator booting to runtime verification.
 
+For Linux sessions with an SSH Mac device source, use the
+[remote iOS workflow](../remote-ios.md) for source sync, Xcode builds,
+installation and focused UI tests. Device streaming alone does not sync code
+or route project build actions to the Mac.
+
 ## Shared skills inside T3
 
 Keep the shared skill's task, constraints and acceptance criteria. Replace
