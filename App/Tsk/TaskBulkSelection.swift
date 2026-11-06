@@ -41,7 +41,7 @@ extension TaskStore {
     }
 
     func completeSelection() async {
-        guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return }
+        guard !isSaving, !isSelectionGestureActive, selectionDateField == nil, !selectedTaskIDs.isEmpty else { return }
         let ids = selectedTaskIDs
         isSaving = true
         defer { isSaving = false }
@@ -53,6 +53,26 @@ extension TaskStore {
             selectedTaskIDs.formIntersection(remaining)
             if selectedTaskIDs.isEmpty { endTaskSelection() }
         } catch { self.error = error.localizedDescription }
+    }
+
+    func changeSelectionDate(field: TaskDateField, change: TaskDateChange) async -> Bool {
+        guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return false }
+        let ids = selectedTaskIDs
+        let generation = taskSelectionGeneration
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await manager.changeDate(ids: Array(ids), field: field, change: change)
+            await reload()
+            if generation == taskSelectionGeneration {
+                selectedTaskIDs.formIntersection(Set(tasks.filter(\.canComplete).map(\.id)))
+                if selectedTaskIDs.isEmpty { endTaskSelection() }
+            }
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
     }
 
     private func finishRowEditingForSelection() async -> Bool {
@@ -73,7 +93,7 @@ struct TaskSelectionBar: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            if let error = store.error {
+            if let error = store.error, store.selectionDateField == nil {
                 Text(error).font(.callout).foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16).padding(.vertical, 10)
@@ -81,22 +101,28 @@ struct TaskSelectionBar: View {
                     .accessibilityIdentifier("task-selection-error")
             }
             GlassEffectContainer(spacing: 8) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) {
-                        doneButton
-                        selectionCount
-                        completeButton
+                VStack(spacing: 8) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            doneButton
+                            selectionCount
+                            completeButton
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        VStack(spacing: 10) {
+                            doneButton
+                            selectionCount
+                            completeButton
+                        }
                     }
-                    .fixedSize(horizontal: true, vertical: false)
-                    VStack(spacing: 10) {
-                        doneButton
-                        selectionCount
-                        completeButton
+                    .font(.subheadline.weight(.semibold))
+                    .controlSize(.large)
+                    .buttonBorderShape(.capsule)
+                    HStack(spacing: 16) {
+                        dateButton(.scheduled)
+                        dateButton(.deadline)
                     }
                 }
-                .font(.subheadline.weight(.semibold))
-                .controlSize(.large)
-                .buttonBorderShape(.capsule)
             }
         }
         .frame(maxWidth: .infinity)
@@ -105,6 +131,28 @@ struct TaskSelectionBar: View {
         .offset(y: reduceMotion || appeared ? 0 : 12)
         .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
         .disabled(store.isSaving || store.isSelectionGestureActive)
+    }
+
+    private func dateButton(_ field: TaskDateField) -> some View {
+        let parameter: TaskRowParameter = field == .scheduled ? .scheduled : .deadline
+        return Button {
+            store.error = nil
+            store.selectionDateField = field
+        } label: {
+            TaskRowParameterLabel(parameter: parameter, value: parameter.title)
+        }
+        .buttonStyle(TaskRowParameterButtonStyle())
+        .accessibilityLabel(field == .scheduled ? "Change scheduled day for selected tasks" : "Change deadline for selected tasks")
+        .accessibilityIdentifier("selection-" + field.rawValue)
+        .popover(isPresented: Binding(
+            get: { store.selectionDateField == field },
+            set: { if !$0 && store.selectionDateField == field { store.selectionDateField = nil } }
+        )) {
+            TaskSelectionDatePicker(store: store, field: field)
+                .frame(width: 340)
+                .presentationCompactAdaptation(.popover)
+                .interactiveDismissDisabled(store.isSaving)
+        }
     }
 
     private var doneButton: some View {

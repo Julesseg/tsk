@@ -41,9 +41,7 @@ public extension TaskDraft {
     }
 
     mutating func schedule(on day: Date, calendar: Calendar = .autoupdatingCurrent) {
-        let time = plannedDate.map { calendar.dateComponents([.hour, .minute, .second], from: $0) }
-        plannedDate = calendar.date(bySettingHour: time?.hour ?? 0, minute: time?.minute ?? 0,
-                                    second: time?.second ?? 0, of: day)
+        plannedDate = taskDate(on: day, keepingTimeFrom: plannedDate, calendar: calendar)
     }
 
     var deadline: Date? {
@@ -52,8 +50,14 @@ public extension TaskDraft {
     }
 }
 
-private func planningDate(_ raw: String?) -> Date? {
+func planningDate(_ raw: String?) -> Date? {
     guard let raw, let seconds = TimeInterval(raw), seconds.isFinite,
           abs(seconds) <= 253402300799 else { return nil }
     return Date(timeIntervalSince1970: seconds)
+}
+
+func taskDate(on day: Date, keepingTimeFrom date: Date?, calendar: Calendar) -> Date? {
+    let time = date.map { calendar.dateComponents([.hour, .minute, .second], from: $0) }
+    return calendar.date(bySettingHour: time?.hour ?? 0, minute: time?.minute ?? 0,
+                         second: time?.second ?? 0, of: day)
 }

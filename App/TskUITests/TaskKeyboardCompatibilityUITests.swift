@@ -18,6 +18,7 @@ import XCTest
             return
         }
         let app = taskTestApplication()
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
@@ -60,6 +61,34 @@ import XCTest
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [editorClosed], timeout: 10), .completed)
         XCTAssertEqual(revisedRow.identifier, identity)
+        try command("selectBulkForCancel")
+        XCTAssertTrue(app.staticTexts["task-selection-count"].waitForExistence(timeout: 5))
+        app.buttons["selection-scheduled"].tap()
+        app.buttons["selection-date-today"].tap()
+        XCTAssertEqual(app.buttons["selection-date-today"].value as? String, "Selected")
+        try command("cancelBulkDate")
+        XCTAssertTrue(app.buttons["apply-selection-date"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "1 selected")
+        app.buttons["task-selection-done"].tap()
+        revisedRow.tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
+        closeTaskRow(app)
+        try command("selectBulkForApply")
+        XCTAssertTrue(app.staticTexts["task-selection-count"].waitForExistence(timeout: 5))
+        app.buttons["selection-deadline"].tap()
+        app.buttons["selection-date-tomorrow"].tap()
+        try command("applyBulkDate")
+        XCTAssertTrue(app.buttons["apply-selection-date"].waitForNonExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "1 selected")
+        app.buttons["task-selection-done"].tap()
+        revisedRow.tap()
+        XCTAssertTrue(app.buttons["row-deadline"].waitForExistence(timeout: 5))
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
+        let deadline = Calendar.current.startOfDay(for: tomorrow).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en_US")))
+        XCTAssertEqual(app.buttons["row-deadline"].value as? String, deadline)
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
+        closeTaskRow(app)
         try command("complete")
         XCTAssertTrue(revisedRow.waitForNonExistence(timeout: 10))
         try command("completedView")

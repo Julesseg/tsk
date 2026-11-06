@@ -20,7 +20,7 @@ class SelectionTests(unittest.TestCase):
     def test_smoke_is_a_bounded_subset_of_full_coverage(self):
         smoke = selection.selected_methods(selection.selection("smoke", "iPhone"))
         full = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(smoke), 8)
+        self.assertEqual(len(smoke), 11)
         self.assertLess(smoke, full)
         for suite in ("smoke", "full", "keyboard", "text", "menu", "regression", "diagnostic"):
             with self.subTest(suite=suite), self.assertRaisesRegex(ValueError, "Only iPhone"):
@@ -50,10 +50,10 @@ class SelectionTests(unittest.TestCase):
     def test_partition_cli_preserves_the_original_full_selection(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 37)
+        self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 40)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (44, 37)),):
+        for family, counts in (('iPhone', (44, 40)),):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -83,7 +83,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
         self.assertEqual(phone, selection.test_methods())
-        self.assertEqual(len(phone), 81)
+        self.assertEqual(len(phone), 84)
         self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", phone)
         self.assertEqual(sum("/CalendarPresentationUITests/" in case for case in phone), 6)
         self.assertEqual(sum("/TaskPresentationUITests/" in case for case in phone), 4)

@@ -15,7 +15,7 @@ import uuid
 
 CASE = 'TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys'
 CASES = {CASE: ['commandReturn'], 'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['secondNoteCommandN', 'secondNoteSave', 'editSelectAll', 'editedNoteSave']}
-CASES['TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'] = ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'complete', 'completedView', 'captureAfterReturn', 'saveAfterReturn']
+CASES['TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus'] = ['capture', 'saveNew', 'select', 'edit', 'saveEdit', 'selectBulkForCancel', 'cancelBulkDate', 'selectBulkForApply', 'applyBulkDate', 'complete', 'completedView', 'captureAfterReturn', 'saveAfterReturn']
 MARKER = b'TSK_KEYBOARD_COMMAND_REQUEST_V1 '
 
 
