@@ -105,6 +105,14 @@ watchers, scheduled prompts or shell polling.
 
 ## Simulator verification
 
+Use the `simulator-lease` skill before `device_open`, simulator tests or any
+other simulator use. Reserve on the Mac hosting the device; keep its token
+through runtime work and shutdown, then release. Other sessions wait for
+the reservation. `scripts/run-ui-tests.sh` automatically uses the shared
+`~/.config/bin/simulator-lease` helper when installed. For an existing
+interactive reservation, pass its token as `SIMULATOR_LEASE_TOKEN` so the
+runner joins it. Generic builds that never boot a device need no reservation.
+
 Record already-booted devices before runtime work and preserve them. Discover
 devices with `device_list`, open the chosen host/device using `device_open`,
 and use the returned `agent-device` command for app launches, interaction,

@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+lease_helper="$HOME/.config/bin/simulator-lease"
+if [[ -x "$lease_helper" ]]; then
+    if [[ -n "${SIMULATOR_LEASE_TOKEN:-}" ]]; then
+        "$lease_helper" check --token "$SIMULATOR_LEASE_TOKEN" --device "${1:?Pass the target simulator UDID}" > /dev/null
+    else
+        exec "$lease_helper" run --owner "tsk UI tests: $PWD" --device "${1:?Pass the target simulator UDID}" --wait 3600 -- /bin/bash "$0" "$@"
+    fi
+fi
 simulator_id=${1:?Pass the target simulator UDID followed by xcodebuild arguments}
 shift
 spotlight_capture_pid=""

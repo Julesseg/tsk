@@ -29,7 +29,7 @@
     },
     {
       "name": "Agent integration checks",
-      "command": "env -u ELECTRON_RUN_AS_NODE bash -c 'python3 scripts/test-agent-dispatch.py && python3 scripts/test-agent-hooks.py && python3 scripts/test-remote-ios.py'",
+      "command": "env -u ELECTRON_RUN_AS_NODE bash -c 'python3 scripts/test-agent-dispatch.py && python3 scripts/test-agent-hooks.py && python3 scripts/test-remote-ios.py && python3 scripts/test-ui-test-lease.py'",
       "icon": "test"
     }
   ]
