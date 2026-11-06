@@ -373,7 +373,7 @@ struct ContentView: View {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
+                    if let error = store.error, !store.isSelectingTasks, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
@@ -447,7 +447,7 @@ struct ContentView: View {
     }
 
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
+        guard store.selectionDateField == nil, !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
               !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }

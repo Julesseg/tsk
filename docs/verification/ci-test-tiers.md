@@ -8,8 +8,8 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
-| Smoke | 8 methods | PR, main push, explicit dispatch |
-| Full | 76 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Smoke | 11 methods | PR, main push, explicit dispatch |
+| Full | 79 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | `diagnostic_only=true` |
 | Keyboard | 12 methods | Explicit dispatch |
 | Text | 4 methods | Explicit dispatch |
@@ -19,7 +19,9 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
 vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
-duplicates, failure retention, view changes and editor validation. Hardware keyboard, installed Share/widgets/Spotlight,
+duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
+add explicit Apply, cancelled date choice, durable mixed-value edits, atomic failure retention and
+Upcoming membership reconciliation. Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.
@@ -51,6 +53,8 @@ the annotation presentation/editor scope, and a cross-family workspace/row-edito
 journey. The latter starts without focused input, captures and saves with actual
 commands, checks plain typing and selected-row editing/completion/view commands,
 then verifies capture/save after returning from Settings and durable results.
+It also enters bulk selection with native Command-Shift-S and sends Escape to cancel a pending bulk scheduled edit and Return
+to apply a bulk deadline edit, checking unchanged Scheduled and retained selection.
 The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
 Transport ownership and complete case-specific phase acknowledgements must match
 the native UI outcomes; a fallback action or transport ACK alone is insufficient.
@@ -71,10 +75,10 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 80 iPhone methods without skips,
-partitioned 43 workspace / 37 task-row methods. The retired iPad-only class and
+in existing methods. Full coverage retains all 83 iPhone methods without skips,
+partitioned 43 workspace / 40 task-row methods. The retired iPad-only class and
 its seven-phase transport case are removed; the iPhone workspace/editor journey
-still requires all nine phases, alongside annotation and native-control coverage.
+still requires all thirteen phases, alongside annotation and native-control coverage.
 Historical reports before ADR 0007 include retired iPad runs and do not establish
 current iPhone acceptance. Focused diagnostics do not replace clean-head full
 coverage or physical-device verification.
@@ -140,7 +144,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 43 methods | 37 methods |
+| iPhone | 43 methods | 40 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers
