@@ -2,7 +2,7 @@
 set -euo pipefail
 lease_helper="$HOME/.config/bin/simulator-lease"
 if [[ -x "$lease_helper" ]]; then
-    if [[ -n "${SIMULATOR_LEASE_TOKEN:-}" ]]; then
+    if [[ -n "${SIMULATOR_LEASE_TOKEN:-}" && "${SIMULATOR_LEASE_MANAGED:-}" == 1 ]]; then
         "$lease_helper" check --token "$SIMULATOR_LEASE_TOKEN" --device "${1:?Pass the target simulator UDID}" > /dev/null
     else
         exec "$lease_helper" run --owner "tsk UI tests: $PWD" --device "${1:?Pass the target simulator UDID}" --wait 3600 -- /bin/bash "$0" "$@"
