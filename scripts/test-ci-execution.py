@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -122,8 +123,37 @@ class ExecutionTests(unittest.TestCase):
             child = monitor.process
             now[0] = 18
             self.assertFalse(monitor.poll())
+            child.wait(timeout=3)
             self.assertIsNotNone(child.returncode)
         finally:
+            monitor.close()
+
+    def test_slow_query_reap_cannot_abort_ui_execution(self):
+        now = [0]
+        events = []
+        child = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(10)'])
+        original_wait = child.wait
+        reaped = threading.Event()
+        def delayed_wait(timeout=None):
+            if timeout is not None:
+                raise subprocess.TimeoutExpired(child.args, timeout)
+            result = original_wait()
+            reaped.set()
+            return result
+        monitor = boundaries.DeviceMonitor('owned', lambda *args, **kwargs: events.append((args, kwargs)), clock=lambda: now[0])
+        try:
+            with patch.object(boundaries.subprocess, 'Popen', return_value=child), patch.object(child, 'wait', side_effect=delayed_wait):
+                now[0] = 15
+                self.assertFalse(monitor.poll())
+                now[0] = 18
+                self.assertFalse(monitor.poll())
+                self.assertTrue(reaped.wait(timeout=2))
+                self.assertIsNone(monitor.process)
+                self.assertFalse(any(event[0][0] == 'owned-device-unavailable' for event in events))
+        finally:
+            if child.poll() is None:
+                child.kill()
+            original_wait(timeout=3)
             monitor.close()
 
     def test_method_boundaries_retain_initial_failure_and_later_independent_results(self):

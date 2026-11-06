@@ -203,7 +203,10 @@ import XCTest
         }
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
         if !nativeIdentifiers { app.launchEnvironment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] = "0" }
-        if crowded { app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1" }
+        if crowded {
+            app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1"
+            app.launchEnvironment["TSK_UI_DIAGNOSTICS"] = "1"
+        }
         var records: [[String: Any]] = []
         func add(_ id: String, _ attributes: [String: String]) {
             records.append(["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }])
