@@ -105,3 +105,25 @@ private actor CaptureReplica: TaskReplica {
     #expect(!store.isSelectionGestureActive)
     #expect(store.visibleTasks.map(\.description) == ["Existing task"])
 }
+
+@MainActor @Test func taskURLPreparationRetainsInvalidCaptureAndSavesItsCorrectedFields() async throws {
+    let manager = TaskManager(replica: CaptureReplica())
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    await store.beginCapture(reduceMotion: true)
+    let editing = try #require(store.rowEditing)
+    await editing.setExpanded(true, reduceMotion: true)
+    editing.draft.taskDraft.description = "Capture before URL"
+    editing.parameter = .tags
+    editing.draft.tagInput = "bad tag"
+    #expect(!(await store.prepareForTaskActionNavigation()))
+    #expect(store.rowEditing === editing)
+    #expect(editing.parameter == .tags)
+    #expect(editing.draft.tagInput == "bad tag")
+    #expect(try await manager.tasks().isEmpty)
+    editing.draft.tagInput = "trip"
+    #expect(await store.prepareForTaskActionNavigation())
+    #expect(store.rowEditing == nil)
+    let saved = try #require(try await manager.tasks().first)
+    #expect(saved.description == "Capture before URL")
+    #expect(saved.tags == ["trip"])
+}
