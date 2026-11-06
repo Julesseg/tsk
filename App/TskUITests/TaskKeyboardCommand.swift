@@ -43,7 +43,7 @@ final class TaskKeyboardSession {
             switch self {
             case .native: ["commandReturn"]
             case .annotations: ["secondNoteCommandN", "secondNoteSave", "editSelectAll", "editedNoteSave"]
-            case .workspaceCompatibility: ["capture", "saveNew", "select", "edit", "saveEdit", "complete", "completedView", "captureAfterReturn", "saveAfterReturn"]
+            case .workspaceCompatibility: ["capture", "saveNew", "select", "edit", "saveEdit", "selectBulkForCancel", "cancelBulkDate", "selectBulkForApply", "applyBulkDate", "complete", "completedView", "captureAfterReturn", "saveAfterReturn"]
             }
         }
     }

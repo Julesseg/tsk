@@ -1057,6 +1057,10 @@ class FileAndMappingTests(unittest.TestCase):
             relay.COMPATIBILITY: {'capture': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')), 'saveNew': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'select': ((227,'DOWN'),(81,'DOWN'),(81,'UP'),(227,'UP')), 'edit': ((227,'DOWN'),(8,'DOWN'),(8,'UP'),(227,'UP')), 'saveEdit': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')), 'complete': ((227,'DOWN'),(225,'DOWN'),(40,'DOWN'),(40,'UP'),(225,'UP'),(227,'UP')), 'completedView': ((227,'DOWN'),(33,'DOWN'),(33,'UP'),(227,'UP'))}}
         expected[relay.COMPATIBILITY] = {
             **expected[relay.COMPATIBILITY],
+            'selectBulkForCancel': ((227,'DOWN'),(225,'DOWN'),(22,'DOWN'),(22,'UP'),(225,'UP'),(227,'UP')),
+            'selectBulkForApply': ((227,'DOWN'),(225,'DOWN'),(22,'DOWN'),(22,'UP'),(225,'UP'),(227,'UP')),
+            'cancelBulkDate': ((41,'DOWN'),(41,'UP')),
+            'applyBulkDate': ((40,'DOWN'),(40,'UP')),
             'captureAfterReturn': ((227,'DOWN'),(17,'DOWN'),(17,'UP'),(227,'UP')),
             'saveAfterReturn': ((227,'DOWN'),(40,'DOWN'),(40,'UP'),(227,'UP')),
         }

@@ -192,8 +192,145 @@ import XCTest
         app.buttons["task-selection-done"].tap()
     }
 
+    func testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch() throws {
+        let app = try launch()
+        selectPair(app)
+        app.buttons["selection-scheduled"].tap()
+        let apply = app.buttons["apply-selection-date"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        XCTAssertFalse(apply.isEnabled, "Opening mixed dates must not choose a replacement")
+        app.buttons["selection-choose-day"].tap()
+        app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
+        XCTAssertTrue(app.staticTexts["selection-date-pending"].exists)
+        XCTAssertTrue(app.staticTexts["selection-date-pending"].isHittable)
+        captureBulkDateEvidence("Calendar changes remain pending before Cancel", app: app)
+        app.buttons["cancel-selection-date"].tap()
+        app.buttons["task-selection-done"].tap()
+        app.buttons["task-" + first].tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792231200))
+        XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792238400))
+        closeTaskRow(app)
+        selectPair(app)
+        app.buttons["selection-scheduled"].tap()
+        XCTAssertFalse(apply.isEnabled, "A dismissed operation must not be restored")
+        app.buttons["selection-date-tomorrow"].tap()
+        XCTAssertEqual(app.buttons["selection-date-tomorrow"].value as? String, "Selected")
+        captureBulkDateEvidence("Scheduled pending explicit Apply", app: app)
+        apply.tap()
+        XCTAssertTrue(apply.waitForNonExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected")
+        captureBulkDateEvidence("Successful Apply retains selection", app: app)
+        app.buttons["selection-deadline"].tap()
+        XCTAssertFalse(apply.isEnabled)
+        app.buttons["selection-date-remove"].tap()
+        captureBulkDateEvidence("Deadline removal pending Apply", app: app)
+        apply.tap()
+        XCTAssertTrue(apply.waitForNonExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected")
+        app.buttons["task-selection-done"].tap()
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
+        app.launch()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        selectAllTasks(app)
+        app.buttons["task-" + first].tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792231200))
+        XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
+        closeTaskRow(app)
+        app.buttons["task-" + second].tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(Calendar.current.startOfDay(for: tomorrow).timeIntervalSince1970))
+        XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
+    }
+
+    func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() throws {
+        let app = try launch(invalidOccurrence: true)
+        selectPair(app)
+        app.buttons["selection-scheduled"].tap()
+        app.buttons["selection-date-remove"].tap()
+        let pending = app.staticTexts["selection-date-pending"]
+        let original = pending.label
+        let apply = app.buttons["apply-selection-date"]
+        apply.tap()
+        XCTAssertTrue(app.staticTexts["selection-date-error"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["selection-date-error"].isHittable, "The failure must be visible beside Apply without scrolling")
+        XCTAssertTrue(pending.isHittable)
+        XCTAssertEqual(pending.label, original)
+        XCTAssertTrue(apply.isEnabled)
+        captureBulkDateEvidence("Atomic failure retains pending operation", app: app)
+        apply.tap()
+        XCTAssertTrue(app.staticTexts["selection-date-error"].exists)
+        app.buttons["cancel-selection-date"].tap()
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected")
+        app.buttons["task-selection-done"].tap()
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
+        app.launch()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Upcoming"].tap()
+        XCTAssertEqual(upcomingRows(first, app: app).count, 2, "Failure must preserve both original dates")
+        selectAllTasks(app)
+        app.buttons["task-" + second].tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
+    }
+
+    func testBulkDatesReconcileUpcomingByIdentityAndExitWhenNothingMatches() throws {
+        let app = try launch()
+        app.tabBars.buttons["Upcoming"].tap()
+        let rows = upcomingRows(first, app: app)
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(rows.count, 2)
+        rows.firstMatch.press(forDuration: 0.8)
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "1 selected")
+        captureBulkDateEvidence("Upcoming selection action bar", app: app)
+        app.buttons["selection-scheduled"].tap()
+        app.buttons["selection-date-today"].tap()
+        app.buttons["apply-selection-date"].tap()
+        XCTAssertTrue(app.buttons["apply-selection-date"].waitForNonExistence(timeout: 10))
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "1 selected")
+        app.buttons["selection-deadline"].tap()
+        app.buttons["selection-date-remove"].tap()
+        app.buttons["apply-selection-date"].tap()
+        XCTAssertTrue(app.staticTexts["task-selection-count"].waitForNonExistence(timeout: 10))
+        XCTAssertEqual(rows.count, 0)
+        captureBulkDateEvidence("Upcoming exits selection when no tasks match", app: app)
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.buttons["task-" + first].waitForExistence(timeout: 10))
+    }
+
+    private func selectPair(_ app: XCUIApplication) {
+        let list = app.collectionViews["task-list"]
+        let row = app.buttons["task-" + first]
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: row.frame.midY))
+        let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + second].frame.midY - row.frame.midY))
+        start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
+        XCTAssertTrue(app.staticTexts["task-selection-count"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected")
+    }
+
+    private func upcomingRows(_ id: String, app: XCUIApplication) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-", id))
+    }
+
+    private func formatted(_ seconds: TimeInterval) -> String {
+        Date(timeIntervalSince1970: seconds).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en_US")))
+    }
+
+    private func captureBulkDateEvidence(_ name: String, app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true) throws -> XCUIApplication {
         let app = taskTestApplication()
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"

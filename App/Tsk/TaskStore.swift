@@ -48,6 +48,7 @@ final class TaskStore {
     var taskSelectionGeneration = 0
     var isSelectingTasks: Bool { !selectedTaskIDs.isEmpty }
     var selectedTaskIDs: Set<UUID> = []
+    var selectionDateField: TaskDateField?
     var isSelectionGestureActive = false
     var selectionGestureTasks: [TaskRecord]?
     var selectionGestureDays: [UpcomingDay]?
@@ -68,6 +69,7 @@ final class TaskStore {
         isSelectionPressActive = false
         taskSelectionGeneration += 1
         selectedTaskIDs = []
+        selectionDateField = nil
         endSelectionGesture()
     }
 
