@@ -35,6 +35,45 @@ final class TaskStore {
     var selectionGestureTasks: [TaskRecord]?
     var selectionGestureDays: [UpcomingDay]?
     var rowEditing: TaskRowEditing?
+    var captureConfirmation: TaskRecord?
+    var captureTask: TaskRecord? {
+        guard let editing = rowEditing, editing.isCapture, editing.context == completionContext else { return nil }
+        return editing.draft.original
+    }
+
+    func endSelectionGesture() {
+        isSelectionGestureActive = false
+        selectionGestureTasks = nil
+        selectionGestureDays = nil
+    }
+
+    func endTaskSelection() {
+        isSelectionPressActive = false
+        taskSelectionGeneration += 1
+        selectedTaskIDs = []
+        endSelectionGesture()
+    }
+
+    func beginCapture(reduceMotion: Bool) async {
+        guard !isSaving else { return }
+        if let editing = rowEditing {
+            guard !editing.isCapture, await editing.saveAndCollapse(in: self, reduceMotion: reduceMotion) else { return }
+        }
+        guard rowEditing == nil else { return }
+        endTaskSelection()
+        captureConfirmation = nil
+        let draft = TaskRowDraft(capturing: customView == nil ? query : .unfinished,
+                                 project: customView == nil ? projectSelection : .all, now: currentDate)
+        rowEditing = TaskRowEditing(capturing: draft, context: completionContext, tasks: visibleTasks, now: currentDate)
+    }
+
+    func confirmCapture(_ task: TaskRecord) {
+        captureConfirmation = task
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if captureConfirmation?.id == task.id { captureConfirmation = nil }
+        }
+    }
     var completionContext: TaskCompletionFeedback.Context {
         .init(query: query, project: projectSelection, customViewID: customView?.id, filter: customView.map { UTF8String($0.expression) })
     }

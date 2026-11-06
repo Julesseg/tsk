@@ -5,10 +5,9 @@ The app identity is already configured as `Tsk` / `com.julesseguin.tsk`.
 
 ## Enabling installable PR builds (one-time)
 
-Installables are opt-in. After configuration, request an open PR build with
-`gh workflow run release.yml -f pr_number=<number>`; ordinary PR pushes run CI
-without publishing an installable.
-
+After configuration, opening or reopening a PR and every new push automatically
+build and publish an installable. To rebuild an open PR manually, use
+`gh workflow run release.yml -f pr_number=<number>`.
 
 The release pipeline builds a signed `.ipa` per PR and publishes it to
 `https://<owner>.github.io/<repo>/` (URL derived automatically — nothing to

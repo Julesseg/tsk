@@ -232,3 +232,44 @@ func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp
     #expect(reopened.taskDraft.attributes["wait"] == "1806357600")
     #expect(try reopened.changes().isEmpty)
 }
+
+@Test func captureDefaultsRemainEditableAndSaveAsAnOrdinaryTask() async throws {
+    let now = Date(timeIntervalSince1970: 1792144800)
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    var draft = TaskRowDraft(capturing: .today, now: now, calendar: calendar)
+    #expect(draft.taskDraft.plannedDate == Date(timeIntervalSince1970: 1792108800))
+    #expect(draft.taskDraft.project.isEmpty)
+    draft.taskDraft.description = "Capture in place"
+    draft.noteInput = "Keep this note"
+    draft.tagInput = "next"
+    let manager = TaskManager(replica: TestReplica(), now: { now })
+    let saved = try await manager.create(draft.creationDraft(at: now))
+    #expect(saved.description == "Capture in place")
+    #expect(saved.tags == ["next"])
+    #expect(saved.annotations.map(\.text) == ["Keep this note"])
+    #expect(try await manager.tasks() == [saved])
+}
+
+@Test func captureInOtherViewsLeavesSchedulingUnsetAndProjectCanBeChanged() throws {
+    let now = Date(timeIntervalSince1970: 1792144800)
+    for query in [TaskQuery.unfinished, .upcoming, .completed, .all] {
+        var draft = TaskRowDraft(capturing: query, project: .project("Work"), now: now)
+        #expect(draft.taskDraft.plannedDate == nil)
+        #expect(draft.taskDraft.project == "Work")
+        draft.taskDraft.project = "Home"
+        draft.taskDraft.description = "Changed default"
+        #expect(try draft.creationDraft(at: now).project == "Home")
+    }
+}
+
+@Test func invalidCaptureRetainsPendingTagsAndDescriptionForCorrection() throws {
+    var draft = TaskRowDraft(capturing: .unfinished, now: .now)
+    draft.taskDraft.description = "Keep my input"
+    draft.tagInput = "two words"
+    #expect(throws: TaskManagementError.invalidTag("two words")) { try draft.creationDraft(at: .now) }
+    #expect(draft.tagInput == "two words")
+    #expect(draft.taskDraft.description == "Keep my input")
+    draft.tagInput = "valid"
+    #expect(try draft.creationDraft(at: .now).tags == ["valid"])
+}

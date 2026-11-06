@@ -11,12 +11,12 @@ final class TemporalFilterUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
-        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.tap()
         description.typeText("Relative deadline")
         setDateSwitch("deadline-enabled", to: true, app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(taskRow(named: "Relative deadline", app: app).waitForExistence(timeout: 10))
         openWorkspaceSetting("custom-views", app: app)
         app.buttons["new-custom-view"].tap()

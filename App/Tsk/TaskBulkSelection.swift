@@ -40,19 +40,6 @@ extension TaskStore {
         return true
     }
 
-    func endSelectionGesture() {
-        isSelectionGestureActive = false
-        selectionGestureTasks = nil
-        selectionGestureDays = nil
-    }
-
-    func endTaskSelection() {
-        isSelectionPressActive = false
-        taskSelectionGeneration += 1
-        selectedTaskIDs = []
-        endSelectionGesture()
-    }
-
     func completeSelection() async {
         guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return }
         let ids = selectedTaskIDs

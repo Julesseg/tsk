@@ -87,7 +87,7 @@ extension XCTestCase {
                 var editorVisible = false
                 var identities: [String] = []
                 while let snapshot = pending.popLast() {
-                    if snapshot.identifier == "task-editor-form" { editorVisible = true }
+                    if snapshot.identifier == "task-editor-form" || snapshot.identifier == "task-row-editor" { editorVisible = true }
                     if snapshot.elementType == .button, snapshot.identifier.hasPrefix("task-"),
                        let identity = TaskRowControlIdentity(snapshot.identifier),
                        snapshot.label == description || snapshot.label.hasPrefix(description + ", ") {
@@ -127,6 +127,11 @@ extension XCTestCase {
     }
 
     func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, in containerID: String = "task-editor-form", keyboardDismissIdentifier: String = "dismiss-editor-keyboard", file: StaticString = #filePath, line: UInt = #line) {
+        if app.buttons["collapse-task-row"].exists {
+            let parameter = ["planned-day-enabled": "scheduled", "deadline-enabled": "deadline", "waiting-date-enabled": "waiting-date"][identifier]!
+            setCaptureDate(parameter, enabled: enabled, app: app)
+            return
+        }
         let tutorial = app.buttons["Continue"]
         if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
         let keyboardDone = app.buttons[keyboardDismissIdentifier]

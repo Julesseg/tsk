@@ -15,7 +15,7 @@ final class TskPlanningUITests: XCTestCase {
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
         capture("Independent planned day and deadline editors", app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForExistence(timeout: 10))
         selectToday(app)
         XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForExistence(timeout: 10))
@@ -32,7 +32,7 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["task-planned-day"].firstMatch, in: "task-detail-form", app: app))
         app.buttons["edit-task"].tap()
         tapButton("plan-tomorrow", app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForExistence(timeout: 10))
@@ -40,7 +40,7 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.buttons["edit-task"].tap()
         setDateSwitch("deadline-enabled", to: false, app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(taskRow(named: "Planned and due independently", app: app).waitForNonExistence(timeout: 2))
@@ -51,7 +51,7 @@ final class TskPlanningUITests: XCTestCase {
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.buttons["edit-task"].tap()
         tapButton("plan-today", app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         selectToday(app)
@@ -74,7 +74,7 @@ final class TskPlanningUITests: XCTestCase {
     }
 
     private func enterDescription(_ text: String, app: XCUIApplication) {
-        let field = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let field = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(text)

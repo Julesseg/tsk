@@ -10,16 +10,16 @@ final class SynchronizationUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
-        let draft = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let draft = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
         draft.typeText("Offline work survives server failure")
         XCTAssertEqual(draft.value as? String, "Offline work survives server failure")
-        let keyboardDone = app.buttons["dismiss-editor-keyboard"]
+        let keyboardDone = app.buttons[taskEditorKeyboardDismissIdentifier(app)]
         XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5))
         tapTaskControlAtCenter(keyboardDone, app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        tapTaskControl(app.buttons["save-task"], app: app)
+        tapTaskControl(taskEditorSaveButton(app), app: app)
         XCTAssertTrue(waitForTaskSave(app, named: "Offline work survives server failure", timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()
@@ -82,12 +82,12 @@ final class SynchronizationUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
-        let draft = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let draft = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
         draft.typeText("Hosted task " + token)
-        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
-        app.buttons["save-task"].tap()
+        if app.buttons[taskEditorKeyboardDismissIdentifier(app)].exists { tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app) }
+        taskEditorSaveButton(app).tap()
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Hosted task " + token, app: app), timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))
         app.buttons["synchronization-settings"].tap()

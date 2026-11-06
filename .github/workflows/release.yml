@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       pr_number:
@@ -17,12 +18,12 @@ env:
   BUNDLE_ID: com.julesseguin.tsk
 
 concurrency:
-  group: release-pr-${{ inputs.pr_number }}
+  group: release-pr-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
   request:
-    name: Resolve requested installable
+    name: Resolve PR installable
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -37,7 +38,7 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,title,headRefOid,state,isCrossRepository > "$RUNNER_TEMP/pr.json"
           python3 - <<'PYTHON'

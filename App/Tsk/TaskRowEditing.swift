@@ -15,6 +15,7 @@ final class TaskRowEditing {
         }
     }
 
+    let isCapture: Bool
     let rowID: String
     let context: TaskCompletionFeedback.Context
     let tasks: [TaskRecord]
@@ -36,12 +37,24 @@ final class TaskRowEditing {
     @ObservationIgnored private var motion: TaskRowMotion?
 
     init(task: TaskRecord, rowID: String, context: TaskCompletionFeedback.Context, tasks: [TaskRecord], now: Date) {
+        isCapture = false
         self.rowID = rowID
         self.context = context
         self.tasks = tasks
         referenceDate = now
         upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
         draft = TaskRowDraft(task: task)
+    }
+
+    init(capturing draft: TaskRowDraft, context: TaskCompletionFeedback.Context, tasks: [TaskRecord], now: Date) {
+        isCapture = true
+        focusInset = 0
+        self.draft = draft
+        rowID = "capture-" + draft.original.id.uuidString
+        self.context = context
+        self.tasks = tasks
+        referenceDate = now
+        upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
     }
 
     func setExpanded(_ expanded: Bool, reduceMotion: Bool) async {
@@ -89,8 +102,19 @@ final class TaskRowEditing {
         if parameter != nil { parameter = nil; return false }
         isSaving = true
         do {
-            _ = try draft.changes()
-            let saved = await store.updateRow(draft)
+            if isCapture, draft.taskDraft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                await setExpanded(false, reduceMotion: reduceMotion)
+                store.rowEditing = nil
+                return true
+            }
+            let saved: TaskRecord?
+            if isCapture {
+                let creation = try draft.creationDraft(at: store.currentDate)
+                saved = await store.perform { try await $0.create(creation) }
+            } else {
+                _ = try draft.changes()
+                saved = await store.updateRow(draft)
+            }
             guard let saved else {
                 error = store.error
                 isSaving = false
@@ -99,6 +123,9 @@ final class TaskRowEditing {
             savedTask = saved
             await setExpanded(false, reduceMotion: reduceMotion)
             store.rowEditing = nil
+            if isCapture, !store.tasks.contains(where: { $0.id == saved.id }) {
+                store.confirmCapture(saved)
+            }
             return true
         } catch {
             self.error = error.localizedDescription

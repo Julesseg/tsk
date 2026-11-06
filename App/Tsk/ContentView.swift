@@ -27,7 +27,6 @@ struct ContentView: View {
     @State private var isConfiguringNotifications = false
     @State private var continuousReminders: ContinuousReminderController
     @State private var isConfiguringContinuousReminders = false
-    @State private var isCapturing = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
     @State private var tabsBeforeEditingViews: [WorkspaceView]?
@@ -41,6 +40,7 @@ struct ContentView: View {
     @State private var linkedTaskIDs: Set<UUID> = []
     @State private var sidebarError: String?
     @State private var projectPath = NavigationPath()
+    @State private var isRequestingCapture = false
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
@@ -57,6 +57,7 @@ struct ContentView: View {
             calendarWorkspace
                 .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
                     guard let editing = store.rowEditing, editing.isExpanded,
+                          tap.location.y < editing.viewport.maxY,
                           !editing.bounds.contains(tap.location) else { return }
                     closeRow()
                 }, including: store.rowEditing == nil ? .subviews : .all)
@@ -72,6 +73,7 @@ struct ContentView: View {
     private func closeRow(after: (() -> Void)? = nil) {
         guard let editing = store.rowEditing else { return }
         Task {
+            guard !isRequestingCapture else { return }
             if await editing.saveAndCollapse(in: store, reduceMotion: reduceMotion) { after?() }
         }
     }
@@ -127,6 +129,7 @@ struct ContentView: View {
                         Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
                             if view == store.selectedWorkspaceView {
                                 workspaceContent
+                                    .background { CaptureTabAction(capture: capture).frame(width: 0, height: 0).allowsHitTesting(false) }
                             }
                         }
                         .accessibilityIdentifier("tab-" + view.id)
@@ -237,7 +240,6 @@ struct ContentView: View {
 
     private var editorSheets: some View {
         integrationSheets
-        .sheet(isPresented: $isCapturing) { TaskEditorView(store: store) }
         .sheet(isPresented: $isChoosingCustomView, onDismiss: {
             tabsBeforeEditingViews = nil
             Task { await loadSavedViews() }
@@ -353,6 +355,12 @@ struct ContentView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
+                    if let saved = store.captureConfirmation {
+                        Label("Saved: " + saved.description, systemImage: "checkmark.circle.fill")
+                            .font(.callout).padding(8)
+                            .accessibilityIdentifier("capture-confirmation")
+                            .accessibilityAddTraits(.updatesFrequently)
+                    }
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
@@ -431,7 +439,7 @@ struct ContentView: View {
 
     private var workspaceActions: TaskWorkspaceActions? {
         guard !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
-              !isCapturing, !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
+              !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
         #endif
@@ -451,10 +459,26 @@ struct ContentView: View {
     }
 
     private func capture() {
-        if store.customView == nil, store.selectedWorkspaceView != .projects, store.workspaceViews.active.contains(.unfinished) {
-            tabSelection.wrappedValue = .unfinished
+        guard !isRequestingCapture else { return }
+        isRequestingCapture = true
+        if store.rowEditing == nil {
+            selectedTaskID = nil
+            if isProjectWorkspace {
+                if projectPath.isEmpty {
+                    store.projectSelection = .unassigned
+                    projectPath.append(TaskProjectSelection.unassigned)
+                } else {
+                    projectPath = NavigationPath([store.projectSelection])
+                }
+            } else {
+                path = []
+            }
         }
-        isCapturing = true
+        Task {
+            await store.beginCapture(reduceMotion: reduceMotion)
+            await Task.yield()
+            isRequestingCapture = false
+        }
     }
 
     private func openView(_ query: TaskQuery) {
@@ -495,7 +519,9 @@ struct TaskRowDismissalOverlay: View {
         GeometryReader { geometry in
             if let editing, editing.isExpanded, editing.bounds != .zero {
                 let origin = geometry.frame(in: .global).origin
-                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y), size: geometry.size, close: close)
+                let height = max(0, min(geometry.size.height, editing.viewport.maxY - origin.y))
+                TaskRowDismissal(bounds: editing.bounds.offsetBy(dx: -origin.x, dy: -origin.y),
+                                 size: CGSize(width: geometry.size.width, height: height), close: close)
                     .allowsHitTesting(false)
             }
         }

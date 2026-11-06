@@ -15,10 +15,10 @@ final class TaskActivityUITests: XCTestCase {
         app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5)); description.typeText("Act on independent plans")
-        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
+        if app.buttons[taskEditorKeyboardDismissIdentifier(app)].exists { tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app) }
         setDateSwitch("planned-day-enabled", to: true, app: app)
         setDateSwitch("deadline-enabled", to: true, app: app)
-        app.buttons["save-task"].tap()
+        taskEditorSaveButton(app).tap()
         let row = taskRow(named: "Act on independent plans", app: app)
         XCTAssertTrue(waitForTaskSave(app, row: row, timeout: 15))
         let id = String(row.identifier.dropFirst(5))

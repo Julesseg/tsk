@@ -89,9 +89,9 @@ final class ReminderImportUITests: XCTestCase {
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText("Task after denied Reminders access")
         XCTAssertEqual(description.value as? String, "Task after denied Reminders access")
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        tapTaskControl(app.buttons["save-task"], app: app)
+        tapTaskControl(taskEditorSaveButton(app), app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task after denied Reminders access", app: app), timeout: 10))
     }
 

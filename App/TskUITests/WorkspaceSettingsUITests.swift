@@ -59,9 +59,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
             XCTAssertTrue(app.buttons["workspace-settings"].waitForExistence(timeout: 5))
         }
         tapTaskControl(create, app: app)
-        XCTAssertTrue(app.buttons["save-task"].waitForExistence(timeout: 5))
-        tapTaskControl(app.buttons["Cancel"], app: app)
-        XCTAssertTrue(app.buttons["save-task"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(taskEditorSaveButton(app).waitForExistence(timeout: 5))
+        tapTaskControl(app.buttons["collapse-task-row"], app: app)
+        XCTAssertTrue(taskEditorSaveButton(app).waitForNonExistence(timeout: 5))
         XCTAssertTrue(create.exists)
     }
 
@@ -184,11 +184,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         focusTaskText(description, app: app)
         description.typeText("Prepare launch")
-        let project = app.textFields["task-project"]
-        focusTaskText(project, app: app)
-        project.typeText("Launch")
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
-        tapTaskControl(app.buttons["save-task"], app: app)
+        setCaptureProject("Launch", app: app)
+        tapTaskControl(taskEditorSaveButton(app), app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Prepare launch", app: app), timeout: 15))
         tapTaskControl(app.tabBars.buttons["Projects"], app: app)
         XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 10))

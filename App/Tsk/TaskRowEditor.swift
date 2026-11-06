@@ -30,8 +30,10 @@ struct TaskRowEditor: View {
                         .accessibilityAddTraits(.updatesFrequently)
                 }
                 HStack(alignment: .top) {
-                    Button("More task information", systemImage: "info.circle", action: information)
-                        .accessibilityIdentifier("task-row-information")
+                    if !editing.isCapture {
+                        Button("More task information", systemImage: "info.circle", action: information)
+                            .accessibilityIdentifier("task-row-information")
+                    }
                     Spacer()
                     Button("Save and close", systemImage: "checkmark", action: rowActions.close)
                         .labelStyle(.iconOnly)
@@ -116,6 +118,7 @@ private struct TaskRowEditorContent: View {
                                 focusedNote = nil
                             }
                         }
+                        if !editing.isCapture {
                         Button { open(.dependency) } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "arrow.triangle.branch")
@@ -130,6 +133,7 @@ private struct TaskRowEditorContent: View {
                         .accessibilityValue("\(task.dependencyReferences.count) dependencies")
                         .accessibilityIdentifier("row-dependencies")
                         TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
+                        }
                     }.padding(.horizontal, 4)
                 }
             }
@@ -137,11 +141,13 @@ private struct TaskRowEditorContent: View {
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
+            if !editing.isCapture {
             VStack(alignment: .leading, spacing: 12) {
                 TaskAvailabilityView(task: task, store: store)
                 TaskRecurrenceSection(task: task, store: store)
             }
             .padding(.vertical, 8)
+            }
 
         }
         .padding(.bottom, 8)

@@ -18,13 +18,13 @@ final class TaskAnnotationUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
-        let description = app.textFields["task-description"].exists ? app.textFields["task-description"] : app.textViews["task-description"]
+        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         focusTaskText(description, app: app)
         description.typeText("Task with supporting notes")
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
+        tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app)
         XCTAssertEqual(description.value as? String, "Task with supporting notes")
-        tapTaskControl(app.buttons["save-task"], app: app)
+        tapTaskControl(taskEditorSaveButton(app), app: app)
         XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Task with supporting notes", app: app), timeout: 10))
         openTaskInformation(taskRow(named: "Task with supporting notes", app: app), app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["add-annotation"], in: "task-detail-form", app: app))
