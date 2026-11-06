@@ -74,6 +74,9 @@ import XCTest
         XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
         closeTaskRow(app)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
+        }, object: nil)], timeout: 10), .completed)
         try command("selectBulkForApply")
         XCTAssertTrue(app.staticTexts["task-selection-count"].waitForExistence(timeout: 5))
         app.buttons["selection-deadline"].tap()
@@ -89,6 +92,9 @@ import XCTest
         XCTAssertEqual(app.buttons["row-deadline"].value as? String, deadline)
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
         closeTaskRow(app)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
+        }, object: nil)], timeout: 10), .completed)
         try command("complete")
         XCTAssertTrue(revisedRow.waitForNonExistence(timeout: 10))
         try command("completedView")
