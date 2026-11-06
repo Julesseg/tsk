@@ -8,10 +8,12 @@ import sys
 import time
 
 
-def capture(device, output, stop, maximum_seconds=60):
+def capture(device, output, stop, maximum_seconds=60, notification_source=False):
     path = pathlib.Path(output)
     stop = pathlib.Path(stop)
     predicate = 'process == "corespotlightd" OR subsystem CONTAINS[c] "corespotlight" OR subsystem BEGINSWITH[c] "com.apple.spotlight" OR (process == "searchd" AND (eventMessage CONTAINS[c] "IndexAgent" OR eventMessage CONTAINS[c] "SearchAgent")) OR (process == "Tsk" AND subsystem != "com.apple.dt.xctest" AND eventMessage CONTAINS[c] "spotlight")'
+    if notification_source:
+        predicate = '(process == "usernotificationsd" OR process == "SpringBoard" OR subsystem BEGINSWITH[c] "com.apple.usernotifications") AND (eventMessage CONTAINS[c] "com.julesseguin.tsk" OR eventMessage CONTAINS[c] "Source is not authorized")'
     command = ['xcrun', 'simctl', 'spawn', device, 'log', 'stream', '--style', 'compact', '--level', 'debug', '--predicate', predicate]
     metadata = dict(device=device, startedUTC=datetime.datetime.now(datetime.timezone.utc).isoformat(), maximumSeconds=maximum_seconds, command=command)
     child = None
@@ -55,4 +57,5 @@ def capture(device, output, stop, maximum_seconds=60):
 
 
 if __name__ == '__main__':
-    capture(*sys.argv[1:])
+    notifications = sys.argv[1] == '--notifications'
+    capture(*(sys.argv[2:] if notifications else sys.argv[1:]), maximum_seconds=600 if notifications else 60, notification_source=notifications)

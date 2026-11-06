@@ -5,7 +5,9 @@ struct TaskEditorView: View {
     let store: TaskStore
     let original: TaskRecord
     let onSave: ((TaskRecord) -> Void)?
+    @Environment(TaskURLController.self) private var automation
     @Environment(\.dismiss) private var dismiss
+    @State private var taskActionDraftID = UUID()
     @State private var draft: TaskDraft
     @State private var error: String?
     @State private var tagInput = ""
@@ -77,24 +79,41 @@ struct TaskEditorView: View {
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
-            .onAppear { focusedField = .description }
+            .onAppear {
+                focusedField = .description
+                store.presentedTaskPanels.insert(taskActionDraftID)
+                store.taskActionDraftCommit = (taskActionDraftID, {
+                    let saved = await saveDraft()
+                    if saved { dismiss() }
+                    return saved
+                })
+            }
+            .onDisappear {
+                store.presentedTaskPanels.remove(taskActionDraftID)
+                if store.taskActionDraftCommit?.id == taskActionDraftID { store.taskActionDraftCommit = nil }
+            }
             .taskKeyboardCommands(store.isSaving || isChoosingPriority ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
-            .modifier(TaskWorkspacePanel(store: store))
+
         }
+        .modifier(TaskActionMessage(controller: automation))
     }
 
     private func save() {
         guard !store.isSaving, !isChoosingPriority else { return }
         focusedField = nil
-        Task {
-            if !tagInput.isEmpty, !addTag() { return }
-            let didSave: Bool
-            if let saved = await store.update(id: original.id, changes: changes) {
-                onSave?(saved)
-                didSave = true
-            } else { didSave = false }
-            if didSave { dismiss() } else { error = store.error }
+        Task { if await saveDraft() { dismiss() } }
+    }
+
+    private func saveDraft() async -> Bool {
+        guard !store.isSaving, !isChoosingPriority else {
+            error = "Finish choosing the priority before leaving this draft."
+            store.error = error
+            return false
         }
+        if !tagInput.isEmpty, !addTag() { store.error = tagError; return false }
+        if let saved = await store.update(id: original.id, changes: changes) { onSave?(saved); return true }
+        error = store.error
+        return false
     }
 
     private func addTag() -> Bool {

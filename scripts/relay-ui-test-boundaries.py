@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import termios
+import threading
 import time
 
 
@@ -84,7 +85,10 @@ class DeviceMonitor:
         if self.process is not None:
             if self.process.poll() is None:
                 self.process.kill()
-            self.process.wait(timeout=3)
+            try:
+                self.process.wait(timeout=0)
+            except subprocess.TimeoutExpired:
+                threading.Thread(target=self.process.wait, name='tsk-device-monitor-reaper', daemon=True).start()
             self.process = None
         if self.output is not None:
             self.output.close()
@@ -139,7 +143,7 @@ class BoundaryCapture:
                 pathlib.Path(entry['stop']).touch()
             except OSError as error:
                 self.record('stop-file-error', method=method, error=str(error))
-            self.record('spotlight-window-stop', method=method, reason=reason)
+            self.record(entry['kind'] + '-window-stop', method=method, reason=reason)
 
     def widget_context(self, name):
         if name in self.widget_contexts:
@@ -172,6 +176,17 @@ class BoundaryCapture:
         if method:
             suite, name, state, outcome, seconds = method.groups()
             self.record('method-start' if state == 'started.' else 'method-end', method=suite + '/' + name, outcome=outcome, seconds=float(seconds) if seconds else None)
+            if suite in ('TaskNotificationUITests', 'MissedNotificationUITests'):
+                key = 'DEBUG-issue82-notifications-' + name
+                if state == 'started.':
+                    stop = self.evidence / (key + '.stop')
+                    stop.unlink(missing_ok=True)
+                    entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), '--notifications', self.device,
+                                        str(self.evidence / (key + '.log')), str(stop)], 'notification', key, str(stop))
+                    if entry:
+                        self.active[key] = entry
+                else:
+                    self.stop(key, 'test-end')
             if outcome == 'failed' and self.first_failure is None:
                 self.first_failure = utc()
                 self.record('first-test-failure', method=suite + '/' + name)

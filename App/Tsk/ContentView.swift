@@ -15,6 +15,7 @@ struct ContentView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(TaskURLController.self) private var automation
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
@@ -286,6 +287,14 @@ struct ContentView: View {
 
     private var participantLifecycle: some View {
         taskLifecycle
+        .task(id: store.workspaceViewsLoaded ? automation.taskToOpen?.id : nil) {
+            guard store.workspaceViewsLoaded, let task = automation.taskToOpen else { return }
+            await store.reload()
+            guard !Task.isCancelled else { return }
+            linkedTaskIDs.insert(task.id)
+            showInformation(task)
+            automation.taskToOpen = nil
+        }
         .task(id: scenePhase) {
             if scenePhase == .active { await continuousReminders.observeStatus() }
         }
