@@ -9,6 +9,7 @@ final class TskDependencyUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1791972000"
         app.launch()
+        selectAllTasks(app)
         captureTask("Prerequisite outside Today", planned: false, waiting: false, app: app)
         captureTask("Planned dependent", planned: true, waiting: true, app: app)
         app.tabBars.buttons["Today"].tap()
@@ -82,7 +83,7 @@ final class TskDependencyUITests: XCTestCase {
         if planned { setDateSwitch("planned-day-enabled", to: true, app: app) }
         if waiting { setDateSwitch("waiting-date-enabled", to: true, app: app) }
         taskEditorSaveButton(app).tap()
-        XCTAssertTrue(taskRow(named: description, app: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForTaskSave(app, named: description, timeout: 10))
     }
 
     private func tap(_ element: XCUIElement, in app: XCUIApplication) {

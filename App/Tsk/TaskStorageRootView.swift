@@ -37,7 +37,7 @@ struct TaskStorageRootView: View {
         .onChange(of: store == nil) { _, missing in
             if !missing, let store { Task { await automation.executePending(in: store) } }
         }
-        .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && spotlightRequest == nil))
+        .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && store?.rowEditing?.parameter == nil && spotlightRequest == nil))
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
             spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
         }
