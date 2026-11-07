@@ -9,7 +9,7 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 8 methods | PR, main push, explicit dispatch |
-| Full | 76 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 80 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | `diagnostic_only=true` |
 | Keyboard | 12 methods | Explicit dispatch |
 | Text | 4 methods | Explicit dispatch |

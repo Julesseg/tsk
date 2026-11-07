@@ -123,6 +123,7 @@ import XCTest
         host.terminate()
         _ = try send("tsk://add?description=Rejected%20capture%20navigation")
         XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        capture("URL navigation error above the retained invalid capture tag picker", app)
         app.alerts.buttons["OK"].tap()
         XCTAssertTrue(captureDraft.waitForExistence(timeout: 5))
         XCTAssertEqual(captureDraft.value as? String, "Capture before URL")

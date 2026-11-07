@@ -11,6 +11,7 @@ final class TypedFilterUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launch()
+        selectAllTasks(app)
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
