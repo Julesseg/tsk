@@ -20,8 +20,9 @@ Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
 vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
 duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
-add explicit Apply, cancelled date choice, durable mixed-value edits, atomic failure retention and
-Upcoming membership reconciliation. Hardware keyboard, installed Share/widgets/Spotlight,
+stage both dates and completion until Done, discard every pending change with the toolbar X,
+keep unchanged controls neutral and tint modified controls. The glass date controls expand in place;
+Done commits mixed-value edits atomically and reconciles Upcoming membership. Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.
@@ -53,8 +54,9 @@ the annotation presentation/editor scope, and a cross-family workspace/row-edito
 journey. The latter starts without focused input, captures and saves with actual
 commands, checks plain typing and selected-row editing/completion/view commands,
 then verifies capture/save after returning from Settings and durable results.
-It also enters bulk selection with native Command-Shift-S and sends Escape to cancel a pending bulk scheduled edit and Return
-to apply a bulk deadline edit, checking unchanged Scheduled and retained selection.
+It also enters bulk selection with native Command-Shift-S, sends Escape to collapse a pending Scheduled picker,
+and uses the toolbar X to discard the selection. Return invokes Done to commit a pending Deadline change,
+checking unchanged Scheduled and selection exit.
 The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
 Transport ownership and complete case-specific phase acknowledgements must match
 the native UI outcomes; a fallback action or transport ACK alone is insufficient.

@@ -4,113 +4,95 @@ import TskCore
 struct TaskSelectionDatePicker: View {
     let store: TaskStore
     let field: TaskDateField
-    @State private var change: TaskDateChange?
-    @State private var choosingDate = false
-    @State private var selectedDate: Date
     @State private var referenceDay: Date
-    @State private var error: String?
 
     init(store: TaskStore, field: TaskDateField) {
         self.store = store
         self.field = field
         let day = Calendar.autoupdatingCurrent.startOfDay(for: store.currentDate)
-        _selectedDate = State(initialValue: day)
         _referenceDay = State(initialValue: day)
     }
 
     private var parameter: TaskRowParameter { field == .scheduled ? .scheduled : .deadline }
 
+    private var selectedDate: Binding<Date> {
+        Binding(get: {
+            let values = store.selectionTasks.map { $0.attributes[parameter.attribute] }
+            let first = values.first ?? nil
+            let common = values.allSatisfy { $0 == first } ? first : nil
+            let original = field == .scheduled ? store.selectionTasks.first?.plannedDate : store.selectionTasks.first?.deadline
+            if let change = store.selectionChanges[field], let date = try? change.resolvedDate(replacing: common) { return date }
+            return common == nil ? referenceDay : original ?? referenceDay
+        }, set: { date in
+            store.error = nil
+            store.selectionChanges[field] = .set(date)
+        })
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Label(parameter.title, systemImage: parameter.symbol).font(.headline)
-                    Text("Change \(store.selectedTaskIDs.count) selected tasks. Only \(parameter.title.lowercased()) changes when you apply.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    choice("Today", id: "today", change: .day(referenceDay))
-                    if let tomorrow = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: referenceDay) {
-                        choice("Tomorrow", id: "tomorrow", change: .day(tomorrow))
-                    }
-                    Button {
-                        choosingDate = true
-                        change = .set(selectedDate)
-                    } label: {
-                        Label("Choose day", systemImage: choosingDate ? "checkmark.circle.fill" : "calendar")
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    }
-                    .accessibilityIdentifier("selection-choose-day")
-                    if choosingDate {
-                        TaskParameterDatePicker(parameter: parameter, selection: $selectedDate)
-                            .onChange(of: selectedDate) { _, date in change = .set(date) }
-                    }
-                    choice(field == .scheduled ? "Remove scheduled day" : "Remove deadline", id: "remove", change: .remove)
-                }
-                .padding(16)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            Divider()
-            VStack(alignment: .leading, spacing: 12) {
-                if let change {
-                    Text(summary(change)).font(.callout)
-                        .accessibilityIdentifier("selection-date-pending")
-                }
-                if let error {
-                    Text(error + " Review the selection or retry Apply.")
-                        .font(.callout).foregroundStyle(.red)
-                        .accessibilityIdentifier("selection-date-error")
-                }
+        VStack(spacing: 12) {
+            Button { store.selectionDateField = nil } label: {
                 HStack {
-                    Button("Cancel") { store.selectionDateField = nil }
-                        .frame(minHeight: 44)
-                        .keyboardShortcut(.cancelAction)
-                        .accessibilityIdentifier("cancel-selection-date")
+                    Label(parameter.title, systemImage: parameter.symbol)
                     Spacer()
-                    Button("Apply") {
-                        guard let change else { return }
-                        Task {
-                            if await store.changeSelectionDate(field: field, change: change) { store.selectionDateField = nil }
-                            else { error = store.error }
+                    Image(systemName: "chevron.down")
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
+            .accessibilityIdentifier("close-selection-date")
+            ScrollView {
+                VStack(spacing: 12) {
+                    HStack {
+                        choice("Today", id: "today", change: .day(referenceDay))
+                        if let tomorrow = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: referenceDay) {
+                            choice("Tomorrow", id: "tomorrow", change: .day(tomorrow))
                         }
                     }
-                    .frame(minHeight: 44)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(change == nil)
-                    .accessibilityIdentifier("apply-selection-date")
+                    TaskParameterDatePicker(parameter: parameter, selection: selectedDate)
+                    HStack {
+                        choice("Remove", id: "remove", change: .remove)
+                        Spacer()
+                        Button("Reset") { store.selectionChanges[field] = nil }
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("reset-selection-date")
+                    }
+                    if let change = store.selectionChanges[field], store.selectionDateIsModified(field) {
+                        Text(summary(change)).font(.footnote).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("selection-date-pending")
+                    }
                 }
             }
-            .padding(16)
+            .frame(maxHeight: 400)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(idealHeight: preferredHeight, maxHeight: preferredHeight)
-        .buttonStyle(.borderless)
-        .disabled(store.isSaving)
+        .padding(16)
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
         .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isModal)
         .accessibilityIdentifier("selection-date-picker")
     }
 
-    private var preferredHeight: CGFloat {
-        if choosingDate { return 650 }
-        if error != nil { return 600 }
-        return change == nil ? 410 : 480
-    }
-
-    private func choice(_ title: String, id: String, change proposed: TaskDateChange) -> some View {
-        Button {
-            choosingDate = false
-            change = proposed
+    private func choice(_ title: String, id: String, change: TaskDateChange) -> some View {
+        let selected = store.selectionChanges[field] == change
+        return Button {
+            store.error = nil
+            store.selectionChanges[field] = change
         } label: {
-            Label(title, systemImage: change == proposed ? "checkmark.circle.fill" : "circle")
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            Text(title).frame(minHeight: 44).padding(.horizontal, 12)
         }
-        .accessibilityValue(change == proposed ? "Selected" : "Not selected")
+        .background(selected ? Color.accentColor.opacity(0.2) : .clear, in: Capsule())
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityLabel(id == "remove" ? "Remove " + parameter.title.lowercased() : title)
         .accessibilityIdentifier("selection-date-" + id)
     }
 
     private func summary(_ change: TaskDateChange) -> String {
         switch change {
-        case .remove: "Pending: remove \(parameter.title.lowercased())."
-        case .day(let date): "Pending: \(date.formatted(date: .abbreviated, time: .omitted)). Existing times are kept."
-        case .set(let date): "Pending: \(date.formatted(date: .abbreviated, time: .shortened))."
+        case .remove: "Remove \(parameter.title.lowercased()) when you tap Done."
+        case .day(let date): "\(date.formatted(date: .abbreviated, time: .omitted)). Existing times are kept. Tap Done to save."
+        case .set(let date): "\(date.formatted(date: .abbreviated, time: .shortened)). Tap Done to save."
         }
     }
 }

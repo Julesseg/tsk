@@ -46,10 +46,10 @@ extension TaskManager {
         guard occurrence.status == "pending", [45, 87].contains(Array(parent.attributes["mask"]!.utf8)[index]) else {
             throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.")
         }
-        if completing { return 43 }
         if changes.keys.contains("due"), (changes["due"] ?? nil)?.isEmpty != false {
             throw TaskManagementError.storage("A generated occurrence must retain its due date. Change its deadline instead, or deselect it before removing deadlines. No tasks were changed.")
         }
+        if completing { return 43 }
         let value = changes.keys.contains("wait") ? changes["wait"] ?? nil : occurrence.attributes["wait"]
         if let value, let seconds = TimeInterval(value), seconds.isFinite { return seconds > now().timeIntervalSince1970 ? 87 : 45 }
         if value == nil { return 45 }

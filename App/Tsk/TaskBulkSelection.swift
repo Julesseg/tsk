@@ -40,39 +40,46 @@ extension TaskStore {
         return true
     }
 
-    func completeSelection() async {
-        guard !isSaving, !isSelectionGestureActive, selectionDateField == nil, !selectedTaskIDs.isEmpty else { return }
+    var selectionTasks: [TaskRecord] { allTasks.filter { selectedTaskIDs.contains($0.id) } }
+
+    func selectionDateIsModified(_ field: TaskDateField) -> Bool {
+        (try? selectionChanges.modifies(field, tasks: selectionTasks)) ?? true
+    }
+
+    func toggleSelectionCompletion() {
+        guard !isSaving, !isSelectionGestureActive else { return }
+        selectionChanges.complete.toggle()
+        error = nil
+    }
+
+    func commitTaskSelection() async {
+        guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return }
+        if !selectionChanges.complete && !TaskDateField.allCases.contains(where: selectionDateIsModified) {
+            endTaskSelection()
+            return
+        }
         let ids = selectedTaskIDs
+        let generation = taskSelectionGeneration
+        let changes = selectionChanges
         isSaving = true
         defer { isSaving = false }
         do {
-            _ = try await manager.complete(ids: Array(ids))
-            selectedTaskIDs.subtract(ids)
+            _ = try await manager.applySelection(ids: Array(ids), changes: changes)
+            if generation == taskSelectionGeneration { endTaskSelection() }
             await reload()
-            let remaining = Set(tasks.filter(\.canComplete).map(\.id))
-            selectedTaskIDs.formIntersection(remaining)
-            if selectedTaskIDs.isEmpty { endTaskSelection() }
         } catch { self.error = error.localizedDescription }
     }
 
-    func changeSelectionDate(field: TaskDateField, change: TaskDateChange) async -> Bool {
-        guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return false }
-        let ids = selectedTaskIDs
-        let generation = taskSelectionGeneration
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            _ = try await manager.changeDate(ids: Array(ids), field: field, change: change)
-            await reload()
-            if generation == taskSelectionGeneration {
-                selectedTaskIDs.formIntersection(Set(tasks.filter(\.canComplete).map(\.id)))
-                if selectedTaskIDs.isEmpty { endTaskSelection() }
-            }
-            return true
-        } catch {
-            self.error = error.localizedDescription
-            return false
-        }
+    var selectionKeyboardCommands: [TaskKeyboardCommand] {
+        [
+            TaskKeyboardCommand(id: "selection-done", input: "\r", modifiers: [], title: "Done", action: { Task { await self.commitTaskSelection() } }),
+            TaskKeyboardCommand(id: "selection-cancel", input: UIKeyCommand.inputEscape, modifiers: [], title: "Cancel", action: {
+                guard !self.isSaving, !self.isSelectionGestureActive else { return }
+                if self.selectionDateField != nil { self.selectionDateField = nil }
+                else { self.endTaskSelection() }
+            }),
+            TaskKeyboardCommand(id: "selection-complete", input: "\r", modifiers: [.command, .shift], title: "Complete Selected Tasks", action: self.toggleSelectionCompletion)
+        ]
     }
 
     private func finishRowEditingForSelection() async -> Bool {
@@ -89,75 +96,87 @@ extension TaskStore {
 struct TaskSelectionBar: View {
     let store: TaskStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var glass
     @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 8) {
-            if let error = store.error, store.selectionDateField == nil {
+        VStack(alignment: .trailing, spacing: 12) {
+            if let error = store.error {
                 Text(error).font(.callout).foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
                     .accessibilityIdentifier("task-selection-error")
             }
-            GlassEffectContainer(spacing: 8) {
-                VStack(spacing: 8) {
+            GlassEffectContainer(spacing: 12) {
+                VStack(alignment: .trailing, spacing: 12) {
+                    dateControl(.scheduled)
+                    dateControl(.deadline)
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 12) {
-                            doneButton
-                            selectionCount
+                            doneButton.fixedSize()
+                            Spacer(minLength: 0)
+                            selectionCount.fixedSize()
                             completeButton
                         }
-                        .fixedSize(horizontal: true, vertical: false)
-                        VStack(spacing: 10) {
-                            doneButton
+                        VStack(alignment: .trailing, spacing: 12) {
                             selectionCount
-                            completeButton
+                            HStack {
+                                doneButton
+                                Spacer()
+                                completeButton
+                            }
                         }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .controlSize(.large)
-                    .buttonBorderShape(.capsule)
-                    HStack(spacing: 16) {
-                        dateButton(.scheduled)
-                        dateButton(.deadline)
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity)
+        .font(.subheadline.weight(.semibold))
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 16).padding(.vertical, 8)
+        .animation(reduceMotion ? nil : .bouncy(duration: 0.35), value: store.selectionDateField)
         .opacity(appeared ? 1 : 0)
         .offset(y: reduceMotion || appeared ? 0 : 12)
         .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
         .disabled(store.isSaving || store.isSelectionGestureActive)
     }
 
-    private func dateButton(_ field: TaskDateField) -> some View {
+    @ViewBuilder private func dateControl(_ field: TaskDateField) -> some View {
         let parameter: TaskRowParameter = field == .scheduled ? .scheduled : .deadline
-        return Button {
-            store.error = nil
-            store.selectionDateField = field
-        } label: {
-            TaskRowParameterLabel(parameter: parameter, value: parameter.title)
-        }
-        .buttonStyle(TaskRowParameterButtonStyle())
-        .accessibilityLabel(field == .scheduled ? "Change scheduled day for selected tasks" : "Change deadline for selected tasks")
-        .accessibilityIdentifier("selection-" + field.rawValue)
-        .popover(isPresented: Binding(
-            get: { store.selectionDateField == field },
-            set: { if !$0 && store.selectionDateField == field { store.selectionDateField = nil } }
-        )) {
+        let modified = store.selectionDateIsModified(field)
+        if store.selectionDateField == field {
             TaskSelectionDatePicker(store: store, field: field)
-                .frame(width: 340)
-                .presentationCompactAdaptation(.popover)
-                .interactiveDismissDisabled(store.isSaving)
+                .frame(maxWidth: 340)
+                .glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear), in: RoundedRectangle(cornerRadius: 28))
+                .glassEffectID(field, in: glass)
+                .glassEffectTransition(.matchedGeometry)
+        } else {
+            Button {
+                store.error = nil
+                store.selectionDateField = field
+            } label: {
+                Label(parameter.title, systemImage: parameter.symbol)
+                    .frame(minWidth: 116)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .glassEffect(.regular.tint(modified ? Color.accentColor : .clear).interactive(), in: Capsule())
+            .glassEffectID(field, in: glass)
+            .glassEffectTransition(.matchedGeometry)
+            .accessibilityLabel(field == .scheduled ? "Scheduled for selected tasks" : "Deadline for selected tasks")
+            .accessibilityValue(modified ? "Modified" : "Unchanged")
+            .accessibilityIdentifier("selection-" + field.rawValue)
         }
     }
 
     private var doneButton: some View {
-        Button("Done") { store.endTaskSelection() }
-            .buttonStyle(.glass)
+        Button("Done") { Task { await store.commitTaskSelection() } }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .glassEffect(.regular.interactive(), in: Capsule())
             .accessibilityIdentifier("task-selection-done")
     }
 
@@ -175,9 +194,13 @@ struct TaskSelectionBar: View {
     }
 
     private var completeButton: some View {
-        Button("Complete", systemImage: "checkmark") { Task { await store.completeSelection() } }
-            .buttonStyle(.glassProminent)
-            .disabled(store.selectedTaskIDs.isEmpty)
+        Button("Complete selected tasks", systemImage: "checkmark") { store.toggleSelectionCompletion() }
+            .labelStyle(.iconOnly)
+            .frame(width: 44, height: 44)
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor : .clear).interactive(), in: Circle())
+            .accessibilityValue(store.selectionChanges.complete ? "Modified" : "Unchanged")
             .accessibilityIdentifier("complete-task-selection")
     }
 }
