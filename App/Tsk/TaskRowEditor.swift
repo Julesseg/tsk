@@ -254,6 +254,7 @@ private struct TaskRowMenuUnfocusGesture: ViewModifier {
 }
 
 struct TaskRowParameterPicker: View {
+    @Environment(TaskURLController.self) private var automation
     @Bindable var editing: TaskRowEditing
     let parameter: TaskRowParameter
     let tags: [String]
@@ -280,6 +281,7 @@ struct TaskRowParameterPicker: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("row-parameter-picker")
         .accessibilityAddTraits(.isModal)
+        .modifier(TaskActionMessage(controller: automation))
     }
 
     private var content: some View {

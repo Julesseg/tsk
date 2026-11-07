@@ -168,8 +168,7 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         }) else { return }
         tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(taskEditorSaveButton(app).isHittable)
-        taskEditorSaveButton(app).tap()
+        tapTaskControl(taskEditorSaveButton(app), app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
         let saveDeadline = ProcessInfo.processInfo.systemUptime + 10
         XCTAssertTrue(waitForTaskSave(app, named: "Durable work while automatic sync fails",
                                       timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime)))
