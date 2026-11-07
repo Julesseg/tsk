@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 87,
+    "title": "fix(ci): repair retained nightly capture journeys",
+    "sha": "7266f21",
+    "time": "2026-11-07T11:16:02.262Z"
+  },
+  {
+    "pr": 85,
+    "title": "fix(agents): reserve simulator access before UI tests",
+    "sha": "af9ae5e",
+    "time": "2026-11-07T11:08:04.006Z"
+  },
+  {
+    "pr": 86,
+    "title": "feat(tasks): bulk edit scheduled dates and deadlines",
+    "sha": "156f1f6",
+    "time": "2026-11-06T22:44:32.902Z"
+  },
+  {
+    "pr": 82,
+    "title": "feat(automation): rebuild Add Task for Shortcuts and URLs",
+    "sha": "2766b53",
+    "time": "2026-11-06T10:53:03.358Z"
+  },
+  {
+    "pr": 80,
+    "title": "feat(capture): add inline capture and restore automatic PR builds",
+    "sha": "74e406e",
+    "time": "2026-11-05T16:28:17.871Z"
+  }
+]
