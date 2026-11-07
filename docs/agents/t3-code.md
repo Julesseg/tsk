@@ -113,6 +113,12 @@ the reservation. `scripts/run-ui-tests.sh` automatically uses the shared
 interactive reservation, pass its token as `SIMULATOR_LEASE_TOKEN` so the
 runner joins it. Generic builds that never boot a device need no reservation.
 
+Finish the runtime phase with `simulator-lease finish --token <token>` before
+editing code, reviewing, waiting for CI, handing off, pausing or replying.
+This shuts down the owned device and releases the reservation. Renew the token
+before interactive device operations; idle interactive reservations expire
+after 15 minutes. Wrapped commands remain protected until they finish.
+
 Record already-booted devices before runtime work and preserve them. Discover
 devices with `device_list`, open the chosen host/device using `device_open`,
 and use the returned `agent-device` command for app launches, interaction,
