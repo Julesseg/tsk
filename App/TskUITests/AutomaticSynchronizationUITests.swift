@@ -171,14 +171,14 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         tapTaskControl(taskEditorSaveButton(app), app: app, deadline: hideDeadline, beforeSample: dismissPasswordBeforeSample)
         let saveDeadline = ProcessInfo.processInfo.systemUptime + 10
         XCTAssertTrue(waitForTaskSave(app, named: "Durable work while automatic sync fails",
-                                      timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime)))
+                                      timeout: max(0, saveDeadline - ProcessInfo.processInfo.systemUptime),
+                                      beforeSample: dismissPasswordBeforeSample))
         guard ProcessInfo.processInfo.systemUptime < saveDeadline else {
             XCTFail("Task save completion exceeded its original ten-second budget")
             return
         }
-        let passwordPreviouslyDismissed = dismissedPassword
         dismissPasswordBeforeSample(saveDeadline)
-        if !passwordPreviouslyDismissed && dismissedPassword {
+        if dismissedPassword {
             guard let passwordDialog = observedPasswordDialog?.element,
                   ProcessInfo.processInfo.systemUptime < saveDeadline else {
                 XCTFail("The admitted post-save password prompt has no remaining completion budget")
