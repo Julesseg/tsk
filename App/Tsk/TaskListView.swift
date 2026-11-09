@@ -164,7 +164,7 @@ struct TaskListRow: View {
                     Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
                 } label: {
                     Image(systemName: checked ? "checkmark.circle.fill" : "circle")
-                        .font(.title2).foregroundStyle(.secondary)
+                        .font(.body).foregroundStyle(Color.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
                         .frame(minWidth: 44, minHeight: 44)
@@ -381,8 +381,8 @@ private struct TaskRowSpacing: ViewModifier {
     func body(content: Content) -> some View {
         let progress = editing?.revealProgress ?? 0
         content
-            .padding(.top, 4 + (editing?.focusInset ?? 0) * progress)
-            .padding(.bottom, 4 + 12 * progress)
+            .padding(.top, 2 + (editing?.focusInset ?? 0) * progress)
+            .padding(.bottom, 2 + 12 * progress)
     }
 }
 
