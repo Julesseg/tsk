@@ -146,7 +146,7 @@ import XCTest
         let checkbox = app.buttons["complete-task-row-" + taskID]
         let header = checkbox.frame
         let compact = app.buttons["task-" + taskID].frame
-        XCTAssertLessThanOrEqual(before.height, 53, "Compact rows use four points of padding on each edge")
+        XCTAssertLessThanOrEqual(before.height, 49, "Compact rows use two points of padding on each edge")
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
         XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
@@ -688,6 +688,9 @@ import XCTest
         let row = app.buttons["task-" + taskID]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let compact = row.frame
+        let collapsedTitle = app.descendants(matching: .any).matching(identifier: "task-row-title-" + taskID).firstMatch
+        XCTAssertTrue(collapsedTitle.waitForExistence(timeout: 5))
+        let compactTitle = collapsedTitle.frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
         let circle = checkbox.frame
         XCTAssertEqual(circle.midY, compact.midY, accuracy: 1)
@@ -695,7 +698,9 @@ import XCTest
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertEqual(title.frame.minX, compact.minX, accuracy: 1)
-        XCTAssertEqual(title.frame.minY, compact.minY, accuracy: 1)
+        XCTAssertEqual(title.frame.minY, compactTitle.minY, accuracy: 1)
+        XCTAssertEqual(title.frame.width, compactTitle.width, accuracy: 1)
+        XCTAssertEqual(title.frame.height, compactTitle.height, accuracy: 1)
         XCTAssertEqual(checkbox.frame.minY, circle.minY, accuracy: 1)
         let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
         XCTAssertTrue(notes.exists)
