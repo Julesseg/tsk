@@ -30,28 +30,28 @@ struct TaskPlanningCaption: View {
     let today: Date
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
+        VStack(alignment: .trailing, spacing: 0) {
             if let offset = task.scheduledDayOffset(relativeTo: today) {
-                Text("\(Image(systemName: "calendar")) \(label(offset))")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("\(Image(systemName: "calendar")) \(label(offset, abbreviated: true))")
+                    .font(.caption2).foregroundStyle(.secondary)
                     .accessibilityLabel("Scheduled \(label(offset))")
                     .accessibilityIdentifier("task-row-scheduled-\(task.id.uuidString)")
             }
             if let offset = task.deadlineDayOffset(relativeTo: today) {
-                Text("\(Image(systemName: "flag")) \(label(offset))")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
+                    .font(.caption2).foregroundStyle(.secondary)
                     .accessibilityLabel("Deadline \(label(offset))")
                     .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
             }
         }
     }
 
-    private func label(_ offset: Int) -> String {
+    private func label(_ offset: Int, abbreviated: Bool = false) -> String {
         switch offset {
         case -1: "Yesterday"
         case 0: "Today"
         case 1: "Tomorrow"
-        case ..<0: "\(-offset) days ago"
+        case ..<0: abbreviated ? "\(-offset)d ago" : "\(-offset) days ago"
         default: "In \(offset) days"
         }
     }
