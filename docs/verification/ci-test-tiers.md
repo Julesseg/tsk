@@ -8,8 +8,8 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
-| Smoke | 11 methods | PR, main push, explicit dispatch |
-| Full | 84 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Smoke | 12 methods | PR, main push, explicit dispatch |
+| Full | 85 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | `diagnostic_only=true` |
 | Keyboard | 12 methods | Explicit dispatch |
 | Text | 4 methods | Explicit dispatch |
@@ -20,12 +20,18 @@ Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
 vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
 duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
-stage both dates and completion until Done, discard every pending change with the toolbar X,
-keep unchanged controls neutral and tint modified controls. The glass date controls expand in place;
-Done commits mixed-value edits atomically and reconciles Upcoming membership. The compact calendar/time picker
-keeps Today, Tomorrow, Reset and Remove together in one glass action row without an outer scroll view;
-the glass checkmark and an outside list tap collapse it while retaining pending values. Outside taps
-do not change selection. Selection activates after a quarter-second hold; ordinary swipes remain unselected.
+stage both dates and completion until Apply, discard every pending change with the toolbar X,
+keep unchanged controls neutral and tint modified controls. The count becomes an enabled
+Apply button only for actual changes. Changed collapsed values include an orange Reset;
+Reset is enabled only for modified fields. The glass date controls expand in place;
+Apply commits mixed-value edits atomically and reconciles Upcoming membership. The compact
+calendar/time picker keeps Reset, Remove, Today and Tomorrow in a bottom action row without
+an outer scroll view, using filled controls on one glass surface. Its checkmark and an
+outside list tap collapse it while retaining pending values. Outside taps do not change
+selection. Selection activates after a quarter-second hold; ordinary swipes remain unselected.
+The animation-enabled selection regression samples presentation frames across direct calendar
+input, quick actions and Reset, requiring the bottom actions to remain within one point.
+Controls fade in and out symmetrically, while tint fades are isolated from picker layout.
 Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
@@ -81,8 +87,8 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 84 iPhone methods without skips,
-partitioned 44 workspace / 40 task-row methods. The retired iPad-only class and
+in existing methods. Full coverage retains all 85 iPhone methods without skips,
+partitioned 44 workspace / 41 task-row methods. The retired iPad-only class and
 its seven-phase transport case are removed; the iPhone workspace/editor journey
 still requires all thirteen phases, alongside annotation and native-control coverage.
 Historical reports before ADR 0007 include retired iPad runs and do not establish
@@ -150,7 +156,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 44 methods | 40 methods |
+| iPhone | 44 methods | 41 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers
