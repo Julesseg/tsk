@@ -18,7 +18,7 @@ import XCTest
 
     func testLongPressSelectionDoesNotRequireNativeAccessibilityIdentifiers() throws {
         let app = try launch(animationsEnabled: true, nativeIdentifiers: false)
-        app.buttons["task-" + first].press(forDuration: 0.8)
+        app.buttons["task-" + first].press(forDuration: 0.4)
         let count = app.staticTexts["task-selection-count"]
         XCTAssertTrue(count.waitForExistence(timeout: 5))
         XCTAssertEqual(count.label, "1 selected")
@@ -74,7 +74,7 @@ import XCTest
         XCTAssertEqual(proof["offsetsStable"] as? Bool, true)
         XCTAssertEqual(proof["rowsStable"] as? Bool, true)
         XCTAssertEqual(proof["refreshWhileTouchDown"] as? Bool, true)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(proof["activationDuration"] as? Double), 0.5)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(proof["activationDuration"] as? Double), 0.25)
         XCTAssertLessThanOrEqual(try XCTUnwrap(proof["activationDistance"] as? Double), 10, "Selection activates during the stationary hold, before vertical dragging")
         let width = try XCTUnwrap(proof["columnWidth"] as? Double)
         XCTAssertEqual(width, list.frame.width, accuracy: 2)
@@ -226,11 +226,29 @@ import XCTest
         captureBulkDateEvidence("Neutral glass controls and toolbar cancellation", app: app)
         scheduled.tap()
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
+        assertCompactPicker(app, field: "scheduled")
         app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
         captureBulkDateEvidence("Glass Scheduled control expanded into date and time", app: app)
-        app.buttons["close-selection-date"].tap()
+        let rowFrame = app.buttons["task-" + first].frame
+        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rowFrame.midX, dy: rowFrame.minY + 4))
+        outside.tap()
+        XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected", "An outside row tap closes the picker without changing selection")
         XCTAssertEqual(scheduled.value as? String, "Modified")
+        scheduled.tap()
+        let pickerFrame = app.otherElements["selection-date-picker"].frame
+        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX - 6), dy: pickerFrame.midY))
+        besidePicker.tap()
+        XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected", "Empty space beside the picker also collapses it without changing selection")
+        XCTAssertEqual(scheduled.value as? String, "Modified")
+        app.buttons["task-" + third].tap()
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "3 selected", "Row selection resumes after the picker closes")
+        app.buttons["task-" + third].tap()
+        XCTAssertEqual(app.staticTexts["task-selection-count"].label, "2 selected")
+        captureBulkDateEvidence("Outside tap collapses picker and retains pending selection", app: app)
         deadline.tap()
+        assertCompactPicker(app, field: "deadline")
         app.buttons["selection-date-remove"].tap()
         app.buttons["close-selection-date"].tap()
         complete.tap()
@@ -288,6 +306,19 @@ import XCTest
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(Calendar.current.startOfDay(for: tomorrow).timeIntervalSince1970))
         XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
+        app.terminate()
+        let fresh = try launch()
+        selectPair(fresh)
+        captureBulkDateEvidence("Fresh neutral compact glass controls", app: fresh)
+        fresh.buttons["selection-scheduled"].tap()
+        assertCompactPicker(fresh, field: "scheduled")
+        captureBulkDateEvidence("Fresh compact Scheduled picker and glass actions", app: fresh)
+        fresh.buttons["selection-date-remove"].tap()
+        captureBulkDateEvidence("Removed date with distinct Remove action", app: fresh)
+        fresh.buttons["reset-selection-date"].tap()
+        fresh.buttons["close-selection-date"].tap()
+        XCTAssertEqual(fresh.buttons["selection-scheduled"].value as? String, "Unchanged")
+        fresh.buttons["cancel-task-selection"].tap()
     }
 
     func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() throws {
@@ -390,6 +421,18 @@ import XCTest
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func assertCompactPicker(_ app: XCUIApplication, field: String, file: StaticString = #filePath, line: UInt = #line) {
+        let actions = ["selection-date-today", "selection-date-tomorrow", "reset-selection-date", "selection-date-remove"].map { app.buttons[$0] }
+        for action in actions {
+            XCTAssertTrue(action.isHittable, "Every quick action is visible without scrolling", file: file, line: line)
+            XCTAssertEqual(action.frame.midY, actions[0].frame.midY, accuracy: 1, file: file, line: line)
+        }
+        let calendar = app.datePickers[field + "-picker"]
+        XCTAssertGreaterThanOrEqual(calendar.frame.minY, app.frame.minY, file: file, line: line)
+        XCTAssertLessThanOrEqual(calendar.frame.maxY, app.frame.maxY, "The whole date/time picker fits on screen", file: file, line: line)
+        XCTAssertTrue(app.buttons["close-selection-date"].isHittable, file: file, line: line)
     }
 
     private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true) throws -> XCUIApplication {

@@ -22,7 +22,11 @@ vertical dragging, held-touch stability during refresh, atomic completion, Upcom
 duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
 stage both dates and completion until Done, discard every pending change with the toolbar X,
 keep unchanged controls neutral and tint modified controls. The glass date controls expand in place;
-Done commits mixed-value edits atomically and reconciles Upcoming membership. Hardware keyboard, installed Share/widgets/Spotlight,
+Done commits mixed-value edits atomically and reconciles Upcoming membership. The compact calendar/time picker
+keeps Today, Tomorrow, Reset and Remove together in one glass action row without an outer scroll view;
+the glass checkmark and an outside list tap collapse it while retaining pending values. Outside taps
+do not change selection. Selection activates after a quarter-second hold; ordinary swipes remain unselected.
+Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.

@@ -65,6 +65,18 @@ struct TaskListView: View {
         }
         .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
         .scrollDisabled(store.isSelectionGestureActive)
+        .overlay(alignment: .top) {
+            if store.selectionDateField != nil {
+                Button { store.selectionDateField = nil } label: {
+                    Color.clear
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close date picker")
+                .accessibilityIdentifier("dismiss-selection-date")
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if store.isSelectingTasks { TaskSelectionBar(store: store) }
         }

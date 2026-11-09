@@ -5,6 +5,7 @@ struct TaskSelectionDatePicker: View {
     let store: TaskStore
     let field: TaskDateField
     @State private var referenceDay: Date
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(store: TaskStore, field: TaskDateField) {
         self.store = store
@@ -30,59 +31,62 @@ struct TaskSelectionDatePicker: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            Button { store.selectionDateField = nil } label: {
-                HStack {
-                    Label(parameter.title, systemImage: parameter.symbol)
-                    Spacer()
-                    Image(systemName: "chevron.down")
+        VStack(spacing: 4) {
+            HStack {
+                Label(parameter.title, systemImage: parameter.symbol)
+                Spacer()
+                Button { store.selectionDateField = nil } label: {
+                    Image(systemName: "checkmark")
+                        .frame(width: 32, height: 32)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+                .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
+                .accessibilityIdentifier("close-selection-date")
             }
-            .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
-            .accessibilityIdentifier("close-selection-date")
-            ScrollView {
-                VStack(spacing: 12) {
-                    HStack {
-                        choice("Today", id: "today", change: .day(referenceDay))
-                        if let tomorrow = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: referenceDay) {
-                            choice("Tomorrow", id: "tomorrow", change: .day(tomorrow))
-                        }
-                    }
-                    TaskParameterDatePicker(parameter: parameter, selection: selectedDate)
-                    HStack {
-                        choice("Remove", id: "remove", change: .remove)
-                        Spacer()
-                        Button("Reset") { store.selectionChanges[field] = nil }
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("reset-selection-date")
-                    }
-                    if let change = store.selectionChanges[field], store.selectionDateIsModified(field) {
-                        Text(summary(change)).font(.footnote).foregroundStyle(.secondary)
-                            .accessibilityIdentifier("selection-date-pending")
-                    }
+            HStack(spacing: 6) {
+                choice("Today", id: "today", change: .day(referenceDay))
+                if let tomorrow = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: referenceDay) {
+                    choice("Tomorrow", id: "tomorrow", change: .day(tomorrow))
                 }
+                Button { store.selectionChanges[field] = nil } label: {
+                    actionLabel("Reset", color: .orange)
+                }
+                .accessibilityIdentifier("reset-selection-date")
+                choice("Remove", id: "remove", change: .remove, color: .red)
             }
-            .frame(maxHeight: 400)
-            .scrollBounceBehavior(.basedOnSize)
+            .font(.caption.weight(.semibold))
+            TaskParameterDatePicker(parameter: parameter, selection: selectedDate)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(10)
+        .fixedSize(horizontal: false, vertical: true)
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("selection-date-picker")
+        .accessibilityValue(store.selectionChanges[field].map(summary) ?? "Unchanged")
     }
 
-    private func choice(_ title: String, id: String, change: TaskDateChange) -> some View {
+    private func actionLabel(_ title: String, color: Color = .primary, tint: Color = .accentColor, selected: Bool = false) -> some View {
+        Text(title)
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .glassEffect(.regular.tint(selected ? tint.opacity(0.2) : .clear).interactive(), in: Capsule())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selected)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+    }
+
+    private func choice(_ title: String, id: String, change: TaskDateChange, color: Color = .primary) -> some View {
         let selected = store.selectionChanges[field] == change
         return Button {
             store.error = nil
             store.selectionChanges[field] = change
         } label: {
-            Text(title).frame(minHeight: 44).padding(.horizontal, 12)
+            actionLabel(title, color: color, tint: change == .remove ? .red : .accentColor, selected: selected)
         }
-        .background(selected ? Color.accentColor.opacity(0.2) : .clear, in: Capsule())
         .accessibilityValue(selected ? "Selected" : "Not selected")
         .accessibilityLabel(id == "remove" ? "Remove " + parameter.title.lowercased() : title)
         .accessibilityIdentifier("selection-date-" + id)

@@ -6,6 +6,7 @@ import TskCore
 extension TaskStore {
     func toggleSelection(_ id: UUID) {
         guard !isSelectionPressActive, !isSaving else { return }
+        if selectionDateField != nil { selectionDateField = nil; return }
         let generation = taskSelectionGeneration
         let context = completionContext
         Task {
@@ -26,7 +27,7 @@ extension TaskStore {
     }
 
     func activateSelectionGesture() -> Bool {
-        guard !isSaving else { return false }
+        guard !isSaving, selectionDateField == nil else { return false }
         selectionGestureTasks = visibleTasks
         selectionGestureDays = upcomingDays
         isSelectionGestureActive = true
@@ -100,7 +101,7 @@ struct TaskSelectionBar: View {
     @State private var appeared = false
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 12) {
+        VStack(alignment: .trailing, spacing: 8) {
             if let error = store.error {
                 Text(error).font(.callout).foregroundStyle(.red)
                     .multilineTextAlignment(.center)
@@ -109,8 +110,8 @@ struct TaskSelectionBar: View {
                     .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
                     .accessibilityIdentifier("task-selection-error")
             }
-            GlassEffectContainer(spacing: 12) {
-                VStack(alignment: .trailing, spacing: 12) {
+            GlassEffectContainer(spacing: 8) {
+                VStack(alignment: .trailing, spacing: 8) {
                     dateControl(.scheduled)
                     dateControl(.deadline)
                     ViewThatFits(in: .horizontal) {
@@ -134,7 +135,7 @@ struct TaskSelectionBar: View {
         }
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.horizontal, 16).padding(.vertical, 8)
+        .padding(.horizontal, 12).padding(.vertical, 4)
         .animation(reduceMotion ? nil : .bouncy(duration: 0.35), value: store.selectionDateField)
         .opacity(appeared ? 1 : 0)
         .offset(y: reduceMotion || appeared ? 0 : 12)
@@ -147,8 +148,9 @@ struct TaskSelectionBar: View {
         let modified = store.selectionDateIsModified(field)
         if store.selectionDateField == field {
             TaskSelectionDatePicker(store: store, field: field)
-                .frame(maxWidth: 340)
+                .frame(maxWidth: 360)
                 .glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear), in: RoundedRectangle(cornerRadius: 28))
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modified)
                 .glassEffectID(field, in: glass)
                 .glassEffectTransition(.matchedGeometry)
         } else {
@@ -163,6 +165,7 @@ struct TaskSelectionBar: View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .glassEffect(.regular.tint(modified ? Color.accentColor : .clear).interactive(), in: Capsule())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modified)
             .glassEffectID(field, in: glass)
             .glassEffectTransition(.matchedGeometry)
             .accessibilityLabel(field == .scheduled ? "Scheduled for selected tasks" : "Deadline for selected tasks")
@@ -200,6 +203,7 @@ struct TaskSelectionBar: View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor : .clear).interactive(), in: Circle())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.selectionChanges.complete)
             .accessibilityValue(store.selectionChanges.complete ? "Modified" : "Unchanged")
             .accessibilityIdentifier("complete-task-selection")
     }
