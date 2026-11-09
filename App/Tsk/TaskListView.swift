@@ -149,7 +149,7 @@ struct TaskListRow: View {
     private var expanded: Bool { editing?.isExpanded == true }
     private var displayedTask: TaskRecord { editing?.savedTask ?? task }
     private var hasProject: Bool { !displayedTask.project.isEmpty }
-    private var attributesOverlap: CGFloat { hasProject ? max(0, titleContentHeight - titleHeight - 2) : 0 }
+    private var attributesOverlap: CGFloat { hasProject ? max(0, titleContentHeight - titleHeight) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
     private var selected: Bool { store.selectedTaskIDs.contains(task.id) }
@@ -182,12 +182,12 @@ struct TaskListRow: View {
             }
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: hasProject ? 2 : 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         TextField("What needs to be done?", text: Binding(
                             get: { editing?.savedTask?.description ?? editing?.draft.taskDraft.description ?? task.description },
                             set: { editing?.draft.taskDraft.description = $0 }
                         ), axis: .vertical)
-                        .font(.subheadline)
+                        .font(.subheadline.leading(.tight))
                         .foregroundStyle(checked ? .secondary : .primary)
                         .strikethrough(checked)
                         .textFieldStyle(.plain)

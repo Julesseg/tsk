@@ -49,8 +49,8 @@ struct TaskPlanningCaption: View {
     private func label(_ offset: Int, abbreviated: Bool = false) -> String {
         switch offset {
         case -1: "Yesterday"
-        case 0: "Today"
-        case 1: "Tomorrow"
+        case 0: abbreviated ? "tod." : "Today"
+        case 1: abbreviated ? "tom." : "Tomorrow"
         case ..<0: abbreviated ? "\(-offset)d ago" : "\(-offset) days ago"
         default: "In \(offset) days"
         }
