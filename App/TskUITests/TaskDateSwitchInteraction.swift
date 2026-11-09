@@ -76,10 +76,12 @@ extension XCTestCase {
         return true
     }
 
-    func waitForTaskSave(_ app: XCUIApplication, named description: String, timeout: TimeInterval, file: StaticString = #filePath, line: UInt = #line) -> Bool {
+    func waitForTaskSave(_ app: XCUIApplication, named description: String, timeout: TimeInterval, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) -> Bool {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
         var lastSample = "not sampled"
         func saved() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            beforeSample?(deadline)
             guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
             let started = ProcessInfo.processInfo.systemUptime
             do {
