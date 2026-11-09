@@ -103,7 +103,6 @@ struct TaskSelectionBar: View {
     let store: TaskStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var glass
-    @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
@@ -130,10 +129,7 @@ struct TaskSelectionBar: View {
         .font(.subheadline.weight(.semibold))
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 12).padding(.vertical, 4)
-        .animation(reduceMotion ? nil : .bouncy(duration: 0.35), value: store.selectionDateField)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: reduceMotion || appeared ? 0 : 12)
-        .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: store.selectionDateField)
         .disabled(store.isSaving)
         .allowsHitTesting(!store.isSelectionGestureActive)
     }
@@ -144,8 +140,9 @@ struct TaskSelectionBar: View {
         if store.selectionDateField == field {
             TaskSelectionDatePicker(store: store, field: field)
                 .frame(maxWidth: 360)
-                .glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear), in: RoundedRectangle(cornerRadius: 28))
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modified)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { content in
+                    content.glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear), in: RoundedRectangle(cornerRadius: 28))
+                }
                 .glassEffectID(field, in: glass)
                 .glassEffectTransition(.matchedGeometry)
         } else {
@@ -157,6 +154,7 @@ struct TaskSelectionBar: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
+                    .transition(.opacity)
                     .accessibilityLabel("Reset " + parameter.title.lowercased())
                     .accessibilityIdentifier("reset-selection-" + field.rawValue)
                 }
@@ -167,7 +165,7 @@ struct TaskSelectionBar: View {
                     HStack(spacing: 6) {
                         Image(systemName: parameter.symbol)
                         if modified, let change = store.selectionChanges[field] {
-                            Text(dateValue(change))
+                            Text(dateValue(change)).transition(.opacity)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -181,7 +179,7 @@ struct TaskSelectionBar: View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .glassEffect(.regular.tint(modified ? Color.accentColor : .clear).interactive(), in: Capsule())
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modified)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: modified)
             .glassEffectID(field, in: glass)
             .glassEffectTransition(.matchedGeometry)
         }
@@ -205,8 +203,8 @@ struct TaskSelectionBar: View {
         }
         .buttonStyle(TaskSelectionApplyStyle())
         .glassEffect(.regular.tint(store.hasSelectionChanges ? Color.accentColor : .clear).interactive(), in: Capsule())
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.hasSelectionChanges)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.hasSelectionChanges)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: store.selectedTaskIDs.count)
         .disabled(!store.hasSelectionChanges)
         .accessibilityIdentifier("task-selection-apply")
         #if DEBUG
@@ -221,7 +219,7 @@ struct TaskSelectionBar: View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor : .clear).interactive(), in: Circle())
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.selectionChanges.complete)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.selectionChanges.complete)
             .accessibilityValue(store.selectionChanges.complete ? "Modified" : "Unchanged")
             .accessibilityIdentifier("complete-task-selection")
     }

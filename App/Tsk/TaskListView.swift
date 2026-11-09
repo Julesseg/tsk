@@ -78,7 +78,12 @@ struct TaskListView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if store.isSelectingTasks { TaskSelectionBar(store: store) }
+            VStack(spacing: 0) {
+                if store.isSelectingTasks {
+                    TaskSelectionBar(store: store).transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.isSelectingTasks)
         }
         .onChange(of: store.completionContext) { _, _ in store.endTaskSelection() }
         .modifier(TaskRowFocusOffset(editing: store.rowEditing))

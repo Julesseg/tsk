@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import TskCore
 
 struct TaskSelectionDatePicker: View {
@@ -61,6 +62,13 @@ struct TaskSelectionDatePicker: View {
                 }
             }
             .font(.caption.weight(.semibold))
+            #if DEBUG
+            .background {
+                if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_MOTION"] == "1" {
+                    TaskSelectionMotionProbe(operation: String(describing: store.selectionChanges[field]))
+                }
+            }
+            #endif
         }
         .padding(10)
         .fixedSize(horizontal: false, vertical: true)
@@ -80,7 +88,7 @@ struct TaskSelectionDatePicker: View {
         .frame(maxWidth: symbol == nil ? .infinity : nil)
         .frame(minWidth: 36, minHeight: 36)
         .background(color.opacity(selected ? 0.22 : 0.08), in: Capsule())
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: selected)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: selected)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
     }
@@ -106,3 +114,65 @@ struct TaskSelectionDatePicker: View {
         }
     }
 }
+
+#if DEBUG
+private struct TaskSelectionMotionProbe: UIViewRepresentable {
+    let operation: String
+
+    func makeUIView(context: Context) -> Probe { Probe(frame: .zero) }
+    func updateUIView(_ view: Probe, context: Context) { view.operation = operation }
+
+    final class Probe: UIView {
+        var operation = ""
+        private var link: CADisplayLink?
+        private var started: CFTimeInterval = 0
+        private var changed: CFTimeInterval = 0
+        private var lastOperation = ""
+        private var previousY: CGFloat?
+        private var baselineY: CGFloat = 0
+        private var maximumDrift: CGFloat = 0
+        private var changes = 0
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isAccessibilityElement = true
+            accessibilityIdentifier = "selection-picker-motion"
+            accessibilityLabel = "Picker animation measurements"
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            link?.invalidate()
+            link = nil
+            guard window != nil else { return }
+            started = CACurrentMediaTime()
+            let display = CADisplayLink(target: self, selector: #selector(sample))
+            display.add(to: .main, forMode: .common)
+            link = display
+        }
+
+        @objc private func sample(_ display: CADisplayLink) {
+            let presentation = layer.presentation() ?? layer
+            let y = presentation.convert(presentation.bounds, to: nil).minY
+            let ready = display.timestamp - started > 1
+            if ready, operation != lastOperation, let previousY {
+                baselineY = previousY
+                changed = display.timestamp
+                changes += 1
+            }
+            if ready, changed > 0, display.timestamp - changed < 0.8 {
+                maximumDrift = max(maximumDrift, abs(y - baselineY))
+            }
+            lastOperation = operation
+            previousY = y
+            let proof: [String: Any] = ["ready": ready, "changes": changes, "maximumVerticalDrift": maximumDrift]
+            if let data = try? JSONSerialization.data(withJSONObject: proof) {
+                accessibilityValue = String(decoding: data, as: UTF8.self)
+            }
+        }
+    }
+}
+#endif

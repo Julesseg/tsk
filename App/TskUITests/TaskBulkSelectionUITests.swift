@@ -403,6 +403,38 @@ import XCTest
         XCTAssertTrue(app.buttons["task-" + first].waitForExistence(timeout: 10))
     }
 
+    func testSelectionPickerValueChangesKeepQuickActionsStationary() throws {
+        let app = try launch(animationsEnabled: true, motionProbe: true)
+        selectPair(app)
+        app.buttons["selection-scheduled"].tap()
+        let probe = app.otherElements["selection-picker-motion"]
+        XCTAssertTrue(probe.waitForExistence(timeout: 5))
+        func proof() -> [String: Any] {
+            guard let value = probe.value as? String, let data = value.data(using: .utf8),
+                  let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+            return result
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in proof()["ready"] as? Bool == true }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        captureBulkDateEvidence("Animation-enabled picker before value changes", app: app)
+        app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
+        app.datePickers["scheduled-picker"].buttons["Tuesday, October 20"].tap()
+        for id in ["selection-date-today", "selection-date-tomorrow", "selection-date-remove", "reset-selection-date"] {
+            app.buttons[id].tap()
+        }
+        let measurements = proof()
+        let attachment = XCTAttachment(string: String(describing: measurements))
+        attachment.name = "Picker presentation-frame movement"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(measurements["changes"] as? Int), 6)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(measurements["maximumVerticalDrift"] as? Double), 1, "Value changes must not move the bottom actions during animation")
+        captureBulkDateEvidence("Animation-enabled picker after value changes", app: app)
+        app.buttons["close-selection-date"].tap()
+        app.buttons["cancel-task-selection"].tap()
+        XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 5))
+    }
+
     private func selectPair(_ app: XCUIApplication) {
         let list = app.collectionViews["task-list"]
         let row = app.buttons["task-" + first]
@@ -455,7 +487,7 @@ import XCTest
         XCTAssertTrue(app.buttons["close-selection-date"].isHittable, file: file, line: line)
     }
 
-    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true) throws -> XCUIApplication {
+    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true, motionProbe: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -465,6 +497,7 @@ import XCTest
             app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1"
             app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0"
         }
+        if motionProbe { app.launchEnvironment["TSK_TEST_SELECTION_MOTION"] = "1" }
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
         if !nativeIdentifiers { app.launchEnvironment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] = "0" }
         if crowded {
