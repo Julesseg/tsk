@@ -394,10 +394,14 @@ struct ContentView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             if store.isSelectingTasks {
-                Button("Cancel selection", systemImage: "xmark") { store.endTaskSelection() }
+                Button("Cancel selection", systemImage: "xmark") {
+                    guard !store.isSelectionGestureActive else { return }
+                    store.endTaskSelection()
+                }
                     .labelStyle(.iconOnly)
                     .tint(.primary)
-                    .disabled(store.isSaving || store.isSelectionGestureActive)
+                    .disabled(store.isSaving)
+                    .allowsHitTesting(!store.isSelectionGestureActive)
                     .accessibilityIdentifier("cancel-task-selection")
             } else {
                 Button("Settings", systemImage: "gearshape") { isShowingSettings = true }

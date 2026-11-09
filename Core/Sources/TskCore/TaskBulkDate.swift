@@ -53,6 +53,11 @@ public struct TaskSelectionChanges: Equatable, Sendable {
         set { if field == .scheduled { scheduled = newValue } else { deadline = newValue } }
     }
 
+    public func modifies(tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) throws -> Bool {
+        guard !tasks.isEmpty else { return false }
+        return try complete || TaskDateField.allCases.contains { try modifies($0, tasks: tasks, calendar: calendar) }
+    }
+
     public func modifies(_ field: TaskDateField, tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) throws -> Bool {
         guard let change = self[field] else { return false }
         return try tasks.contains { try change.value(replacing: $0.attributes[field.attribute], calendar: calendar) != $0.attributes[field.attribute] }

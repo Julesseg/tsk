@@ -47,6 +47,15 @@ extension TaskStore {
         (try? selectionChanges.modifies(field, tasks: selectionTasks)) ?? true
     }
 
+    var hasSelectionChanges: Bool {
+        (try? selectionChanges.modifies(tasks: selectionTasks)) ?? true
+    }
+
+    func resetSelectionDate(_ field: TaskDateField) {
+        selectionChanges[field] = nil
+        error = nil
+    }
+
     func toggleSelectionCompletion() {
         guard !isSaving, !isSelectionGestureActive else { return }
         selectionChanges.complete.toggle()
@@ -54,11 +63,7 @@ extension TaskStore {
     }
 
     func commitTaskSelection() async {
-        guard !isSaving, !isSelectionGestureActive, !selectedTaskIDs.isEmpty else { return }
-        if !selectionChanges.complete && !TaskDateField.allCases.contains(where: selectionDateIsModified) {
-            endTaskSelection()
-            return
-        }
+        guard !isSaving, !isSelectionGestureActive, hasSelectionChanges else { return }
         let ids = selectedTaskIDs
         let generation = taskSelectionGeneration
         let changes = selectionChanges
@@ -73,7 +78,7 @@ extension TaskStore {
 
     var selectionKeyboardCommands: [TaskKeyboardCommand] {
         [
-            TaskKeyboardCommand(id: "selection-done", input: "\r", modifiers: [], title: "Done", action: { Task { await self.commitTaskSelection() } }),
+            TaskKeyboardCommand(id: "selection-done", input: "\r", modifiers: [], title: "Apply to \(selectedTaskIDs.count)", action: { Task { await self.commitTaskSelection() } }),
             TaskKeyboardCommand(id: "selection-cancel", input: UIKeyCommand.inputEscape, modifiers: [], title: "Cancel", action: {
                 guard !self.isSaving, !self.isSelectionGestureActive else { return }
                 if self.selectionDateField != nil { self.selectionDateField = nil }
@@ -114,21 +119,10 @@ struct TaskSelectionBar: View {
                 VStack(alignment: .trailing, spacing: 8) {
                     dateControl(.scheduled)
                     dateControl(.deadline)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) {
-                            doneButton.fixedSize()
-                            Spacer(minLength: 0)
-                            selectionCount.fixedSize()
-                            completeButton
-                        }
-                        VStack(alignment: .trailing, spacing: 12) {
-                            selectionCount
-                            HStack {
-                                doneButton
-                                Spacer()
-                                completeButton
-                            }
-                        }
+                    HStack(spacing: 12) {
+                        applyButton
+                        Spacer(minLength: 0)
+                        completeButton
                     }
                 }
             }
@@ -140,7 +134,8 @@ struct TaskSelectionBar: View {
         .opacity(appeared ? 1 : 0)
         .offset(y: reduceMotion || appeared ? 0 : 12)
         .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { appeared = true } }
-        .disabled(store.isSaving || store.isSelectionGestureActive)
+        .disabled(store.isSaving)
+        .allowsHitTesting(!store.isSelectionGestureActive)
     }
 
     @ViewBuilder private func dateControl(_ field: TaskDateField) -> some View {
@@ -154,13 +149,34 @@ struct TaskSelectionBar: View {
                 .glassEffectID(field, in: glass)
                 .glassEffectTransition(.matchedGeometry)
         } else {
-            Button {
-                store.error = nil
-                store.selectionDateField = field
-            } label: {
-                Label(parameter.title, systemImage: parameter.symbol)
-                    .frame(minWidth: 116)
-                    .padding(.horizontal, 16).padding(.vertical, 12)
+            HStack(spacing: 0) {
+                if modified {
+                    Button { store.resetSelectionDate(field) } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .foregroundStyle(.orange)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Reset " + parameter.title.lowercased())
+                    .accessibilityIdentifier("reset-selection-" + field.rawValue)
+                }
+                Button {
+                    store.error = nil
+                    store.selectionDateField = field
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: parameter.symbol)
+                        if modified, let change = store.selectionChanges[field] {
+                            Text(dateValue(change))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel(field == .scheduled ? "Scheduled for selected tasks" : "Deadline for selected tasks")
+                .accessibilityValue(modified ? "Modified" : "Unchanged")
+                .accessibilityIdentifier("selection-" + field.rawValue)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
@@ -168,32 +184,34 @@ struct TaskSelectionBar: View {
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modified)
             .glassEffectID(field, in: glass)
             .glassEffectTransition(.matchedGeometry)
-            .accessibilityLabel(field == .scheduled ? "Scheduled for selected tasks" : "Deadline for selected tasks")
-            .accessibilityValue(modified ? "Modified" : "Unchanged")
-            .accessibilityIdentifier("selection-" + field.rawValue)
         }
     }
 
-    private var doneButton: some View {
-        Button("Done") { Task { await store.commitTaskSelection() } }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .glassEffect(.regular.interactive(), in: Capsule())
-            .accessibilityIdentifier("task-selection-done")
+    private func dateValue(_ change: TaskDateChange) -> String {
+        switch change {
+        case .remove: "None"
+        case .day(let date): date.formatted(date: .abbreviated, time: .omitted)
+        case .set(let date): date.formatted(date: .abbreviated, time: .shortened)
+        }
     }
 
-    private var selectionCount: some View {
-        Text("\(store.selectedTaskIDs.count) selected")
-            .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
-            .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
-            .monospacedDigit()
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .glassEffect(.regular, in: Capsule())
-            .accessibilityIdentifier("task-selection-count")
-            #if DEBUG
-            .accessibilityValue(store.selectionGestureProof)
-            #endif
+    private var applyButton: some View {
+        Button { Task { await store.commitTaskSelection() } } label: {
+            Text(store.hasSelectionChanges ? "Apply to \(store.selectedTaskIDs.count)" : "\(store.selectedTaskIDs.count) selected")
+                .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(TaskSelectionApplyStyle())
+        .glassEffect(.regular.tint(store.hasSelectionChanges ? Color.accentColor : .clear).interactive(), in: Capsule())
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.hasSelectionChanges)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.selectedTaskIDs.count)
+        .disabled(!store.hasSelectionChanges)
+        .accessibilityIdentifier("task-selection-apply")
+        #if DEBUG
+        .accessibilityValue(store.selectionGestureProof)
+        #endif
     }
 
     private var completeButton: some View {
@@ -206,5 +224,11 @@ struct TaskSelectionBar: View {
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.selectionChanges.complete)
             .accessibilityValue(store.selectionChanges.complete ? "Modified" : "Unchanged")
             .accessibilityIdentifier("complete-task-selection")
+    }
+}
+
+private struct TaskSelectionApplyStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

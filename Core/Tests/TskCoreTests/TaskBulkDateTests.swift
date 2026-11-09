@@ -148,3 +148,19 @@ import TskCore
     #expect(try TaskDateChange.set(edited).resolvedDate(replacing: nil, calendar: calendar) == edited)
     #expect(try TaskDateChange.remove.resolvedDate(replacing: "1792144800", calendar: calendar) == nil)
 }
+
+@Test func selectionApplyRequiresAnActualChangeAndSelectedTasks() throws {
+    let task = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "200"])
+    var changes = TaskSelectionChanges(scheduled: .set(Date(timeIntervalSince1970: 200)), deadline: .remove)
+    #expect(try !changes.modifies(tasks: [task]))
+    changes.scheduled = .remove
+    #expect(try changes.modifies(tasks: [task]))
+    changes.scheduled = nil
+    #expect(try !changes.modifies(tasks: [task]))
+    changes.complete = true
+    #expect(try changes.modifies(tasks: [task]))
+    #expect(try !changes.modifies(tasks: []))
+    changes.complete = false
+    changes.deadline = .set(Date(timeIntervalSince1970: 300))
+    #expect(try changes.modifies(tasks: [task]))
+}
