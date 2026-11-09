@@ -704,6 +704,7 @@ import XCTest
         XCTAssertEqual(checkbox.frame.minY, circle.minY, accuracy: 1)
         let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
         XCTAssertTrue(notes.exists)
+        XCTAssertGreaterThanOrEqual(notes.frame.minY, title.frame.maxY)
         XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 6)
         XCTAssertGreaterThan(app.buttons["row-project"].frame.minY, notes.frame.minY)
         XCTAssertTrue(checkbox.isEnabled)

@@ -149,7 +149,8 @@ struct TaskListRow: View {
     private var expanded: Bool { editing?.isExpanded == true }
     private var displayedTask: TaskRecord { editing?.savedTask ?? task }
     private var hasProject: Bool { !displayedTask.project.isEmpty }
-    private var attributesOverlap: CGFloat { hasProject ? max(0, titleContentHeight - titleHeight) : 0 }
+    private var titleBottom: CGFloat { max(0, (headerHeight - titleContentHeight) / 2) + titleHeight }
+    private var attributesOverlap: CGFloat { hasProject ? max(0, headerHeight - titleBottom - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
     private var selected: Bool { store.selectedTaskIDs.contains(task.id) }
@@ -210,8 +211,8 @@ struct TaskListRow: View {
                                 .accessibilityHidden(true)
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleContentHeight = $0 }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     if displayedTask.plannedDate != nil || displayedTask.deadline != nil {
                         TimelineView(.periodic(from: .now, by: 60)) { _ in
                             TaskPlanningCaption(task: displayedTask, today: store.currentDate)
