@@ -409,6 +409,15 @@ import XCTest
     func testSelectionPickerValueChangesKeepQuickActionsStationary() throws {
         let app = try launch(animationsEnabled: true, motionProbe: true)
         selectPair(app)
+        for field in ["scheduled", "deadline", "scheduled"] {
+            app.buttons["selection-" + field].tap()
+            XCTAssertTrue(app.otherElements["selection-date-picker"].waitForExistence(timeout: 5))
+            XCTAssertEqual(app.buttons.matching(identifier: "close-selection-date").count, 1)
+            app.buttons["close-selection-date"].tap()
+            XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["close-selection-date"].exists)
+            XCTAssertFalse(app.datePickers[field + "-picker"].exists)
+        }
         app.buttons["selection-scheduled"].tap()
         let probe = app.otherElements["selection-picker-motion"]
         XCTAssertTrue(probe.waitForExistence(timeout: 5))
