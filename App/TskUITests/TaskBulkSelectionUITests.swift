@@ -153,6 +153,9 @@ import XCTest
 
     func testSelectionResolvesValidEditorAndRetainsInvalidDraft() throws {
         let app = try launch(crowded: true)
+        let thirdRow = app.buttons["task-" + third]
+        XCTAssertTrue(thirdRow.waitForExistence(timeout: 10))
+        let selectionDistance = thirdRow.frame.midY - app.buttons["task-" + first].frame.midY
         app.buttons["task-" + first].tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 10))
@@ -162,7 +165,7 @@ import XCTest
         func selectExpandedRow(continuingVertically: Bool = false) {
             let circle = app.buttons["complete-task-row-" + first]
             let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 24, dy: circle.frame.midY))
-            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: 0, dy: continuingVertically ? 104 : 0)), withVelocity: .slow, thenHoldForDuration: 1)
+            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: 0, dy: continuingVertically ? selectionDistance : 0)), withVelocity: .slow, thenHoldForDuration: 1)
         }
         selectExpandedRow()
         XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 10))
