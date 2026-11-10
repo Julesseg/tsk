@@ -150,7 +150,6 @@ struct TaskSelectionBar: View {
                 if modified {
                     Button { store.resetSelectionDate(field) } label: {
                         Image(systemName: "arrow.counterclockwise")
-                            .foregroundStyle(.orange)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -168,8 +167,8 @@ struct TaskSelectionBar: View {
                             Text(dateValue(change)).transition(.opacity)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
+                    .padding(.horizontal, modified ? 16 : 0)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .accessibilityLabel(field == .scheduled ? "Scheduled for selected tasks" : "Deadline for selected tasks")
@@ -178,7 +177,7 @@ struct TaskSelectionBar: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
-            .glassEffect(.regular.tint(modified ? Color.accentColor : .clear).interactive(), in: Capsule())
+            .glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Capsule())
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: modified)
             .glassEffectID(field, in: glass)
             .glassEffectTransition(.matchedGeometry)
@@ -202,7 +201,7 @@ struct TaskSelectionBar: View {
                 .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .buttonStyle(TaskSelectionApplyStyle())
-        .glassEffect(.regular.tint(store.hasSelectionChanges ? Color.accentColor : .clear).interactive(), in: Capsule())
+        .glassEffect(.regular.tint(store.hasSelectionChanges ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Capsule())
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.hasSelectionChanges)
         .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: store.selectedTaskIDs.count)
         .disabled(!store.hasSelectionChanges)
@@ -218,7 +217,7 @@ struct TaskSelectionBar: View {
             .frame(width: 44, height: 44)
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
-            .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor : .clear).interactive(), in: Circle())
+            .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Circle())
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.selectionChanges.complete)
             .accessibilityValue(store.selectionChanges.complete ? "Modified" : "Unchanged")
             .accessibilityIdentifier("complete-task-selection")

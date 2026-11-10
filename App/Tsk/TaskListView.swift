@@ -368,11 +368,16 @@ struct TaskListRow: View {
 
 private struct TaskRowTapButtonStyle: PrimitiveButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.taskSelectionScope) private var scope
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.onTapGesture {
-            if isEnabled { configuration.trigger() }
-        }
+        configuration.label
+            .overlay {
+                TaskRowTapTarget(scope: scope, isEnabled: isEnabled, action: configuration.trigger)
+            }
+            .accessibilityAction {
+                if isEnabled { configuration.trigger() }
+            }
     }
 }
 

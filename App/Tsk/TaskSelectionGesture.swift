@@ -27,6 +27,7 @@ struct TaskSelectionGesture: UIViewRepresentable {
         let view = SelectionAnchor()
         view.recognizer.store = store
         view.recognizer.scope = scope
+        scope.selectionRecognizer = view.recognizer
         return view
     }
 

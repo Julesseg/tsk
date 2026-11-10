@@ -222,6 +222,9 @@ import XCTest
         XCTAssertEqual(scheduled.value as? String, "Unchanged")
         XCTAssertEqual(deadline.value as? String, "Unchanged")
         XCTAssertEqual(complete.value as? String, "Unchanged")
+        for button in [scheduled, deadline, complete] {
+            XCTAssertEqual(button.frame.width, button.frame.height, accuracy: 1)
+        }
         XCTAssertEqual(scheduled.frame.maxX, deadline.frame.maxX, accuracy: 1)
         XCTAssertLessThan(scheduled.frame.maxY, deadline.frame.minY)
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
@@ -254,7 +257,7 @@ import XCTest
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 3", "Row selection resumes after the picker closes")
         app.buttons["task-" + third].tap()
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2")
-        captureBulkDateEvidence("Collapsed pending value with orange Reset", app: app)
+        captureBulkDateEvidence("Collapsed pending value with neutral Reset", app: app)
         let reset = app.buttons["reset-selection-scheduled"]
         XCTAssertTrue(reset.isHittable)
         XCTAssertLessThan(reset.frame.maxX, scheduled.frame.maxX)
