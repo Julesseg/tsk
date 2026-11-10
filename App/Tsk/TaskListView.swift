@@ -136,9 +136,9 @@ struct TaskListRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @FocusState private var titleFocused: Bool
-    @State private var headerHeight: CGFloat = 44
-    @State private var titleHeight: CGFloat = 44
-    @State private var titleContentHeight: CGFloat = 44
+    @State private var headerHeight: CGFloat = 28
+    @State private var titleHeight: CGFloat = 28
+    @State private var titleContentHeight: CGFloat = 28
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @Environment(\.taskRowAvailableHeight) private var availableHeight
@@ -168,7 +168,7 @@ struct TaskListRow: View {
                         .font(.body).foregroundStyle(Color.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minWidth: 44, minHeight: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -195,7 +195,6 @@ struct TaskListRow: View {
                         .focused($titleFocused)
                         .disabled(!expanded || editing?.isSaving == true)
                         .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
-                        .frame(minHeight: hasProject ? 0 : 44, alignment: .leading)
                         .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
                         .accessibilityLabel("Task title")
                         .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
@@ -212,7 +211,7 @@ struct TaskListRow: View {
                         }
                     }
                     .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleContentHeight = $0 }
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
                     if displayedTask.plannedDate != nil || displayedTask.deadline != nil {
                         TimelineView(.periodic(from: .now, by: 60)) { _ in
                             TaskPlanningCaption(task: displayedTask, today: store.currentDate)

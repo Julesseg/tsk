@@ -146,7 +146,7 @@ import XCTest
         let checkbox = app.buttons["complete-task-row-" + taskID]
         let header = checkbox.frame
         let compact = app.buttons["task-" + taskID].frame
-        XCTAssertLessThanOrEqual(before.height, 49, "Compact rows use two points of padding on each edge")
+        XCTAssertLessThanOrEqual(before.height, 33, "Compact rows use a 28-point minimum and two points of padding on each edge")
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
         XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
