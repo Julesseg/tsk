@@ -176,7 +176,9 @@ import XCTest
         XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
         host.terminate()
         _ = try send("tsk://find?description=No%20such%20task")
-        XCTAssertTrue(app.otherElements["find-results-empty"].waitForExistence(timeout: 15))
+        let emptyTitle = app.staticTexts.matching(identifier: "find-results-empty").matching(NSPredicate(format: "label == %@", "No matching tasks")).firstMatch
+        XCTAssertTrue(emptyTitle.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["No saved tasks match the supplied filters."].exists)
         capture("Find URL successful empty state", app)
         app.buttons["close-find-results"].tap()
         XCTAssertTrue(app.tabBars.buttons["All"].isSelected)

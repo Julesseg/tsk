@@ -127,3 +127,36 @@ have checked-in XCUITest assertions and screenshot attachments, but were not
 executed locally. The UI-report builder declined to create an HTML report with
 zero captures; no visual report or screenshot evidence is claimed. Full iPhone
 CI and external Shortcuts discovery/invocation remain pending acceptance.
+
+
+## Rebase and first full iPhone findings
+
+After main added the per-calendar visibility test, the combined full selection
+is 83 methods (46 workspace, 37 task-row). Post-rebase local checks pass:
+Core 192, Controller 75, Native 134 executed with 50 environment-gated skips,
+and signed generic arm64 build-for-testing plus artifact admission.
+
+The first full run, 42933624960 at superseded commit `e0ad295`, completed all
+82 then-selected tests with two failures and no skips. The Find callback test
+passed, including actual installed delivery, a rich page, an empty list and
+explicit oversized-result failure. The visible Find journey passed populated
+results and task-detail navigation. It failed at the empty-state query because
+SwiftUI exposes `find-results-empty` on StaticText children, not an Other
+container. The original failure hierarchy and recording both show “No matching
+tasks” and its explanation. The test now queries that observed title role and
+also requires the explanation, retaining the original 15-second deadline.
+The later workspace-relaunch/Settings assertions need fresh execution.
+
+The other failure was the existing occurrence/large-text row test at
+`TaskRowEditingUITests.swift:562`, waiting for the tag input after its opener.
+No Find or URL request runs in that case, and the row code was unchanged by
+this PR. Its verdict remains a full-acceptance gap; its deadline and assertions
+are preserved. The rebased source requires a new exact-head full run; the
+failed superseded run is not accepted or hidden by the rebase.
+
+A 199,026-byte standalone UI report now contains the original CI populated
+capture, the empty-state frame extracted at 44.8 seconds of its XCTest recording,
+and both successful callback screenshots. It labels the old source and failed
+run explicitly. Local machine path:
+`/Users/julesseguin/.local/share/ui-reports/tsk/agent-issue-66/find-tasks.html`.
+External Shortcuts/Siri discovery and invocation remain unverified.
