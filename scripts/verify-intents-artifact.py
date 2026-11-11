@@ -53,12 +53,12 @@ if activation.get("NSExtensionActivationSupportsText") is not True or activation
     raise SystemExit("The embedded share extension does not activate for text and web URLs")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent'}.issubset(metadata['actions']):
-    raise SystemExit('The app metadata is missing its add/find/complete/modify/delete actions')
+if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(metadata['actions']):
+    raise SystemExit('The app metadata is missing its add/find/complete/modify/delete/open actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
-if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent'}.issubset(shortcuts):
+if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and five App Shortcuts')
+print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and seven App Shortcuts')
 
 if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
     raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')
@@ -104,3 +104,11 @@ if len(parameters) != 1 or parameters[0]['name'] != 'task' or parameters[0]['isO
 if metadata['actions']['DeleteTaskIntent']['outputType'] != metadata['actions']['CompleteTaskIntent']['outputType']:
     raise SystemExit('Delete Task must return the shared rich task entity')
 print('Verified one required Delete Task entity and shared rich entity result')
+
+if 'IntentTaskViewEntity' not in metadata['entities']:
+    raise SystemExit('Open View must expose its native existing-view picker')
+for action, parameter in [('OpenTaskIntent', 'task'), ('OpenTaskViewIntent', 'view')]:
+    parameters = metadata['actions'][action]['parameters']
+    if len(parameters) != 1 or parameters[0]['name'] != parameter or parameters[0]['isOptional']:
+        raise SystemExit(action + ' must require its native entity parameter')
+print('Verified Open Task and Open View discovery metadata and required entity pickers')

@@ -211,7 +211,7 @@ struct TaskListRow: View {
                         .strikethrough(checked)
                         .textFieldStyle(.plain)
                         .focused($titleFocused)
-                        .disabled(!expanded || editing?.isSaving == true)
+                        .disabled(!expanded || editing?.isSaving == true || !task.canEdit)
                         .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
                         .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
                         .accessibilityLabel("Task title")

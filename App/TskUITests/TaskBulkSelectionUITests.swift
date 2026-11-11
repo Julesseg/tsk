@@ -37,13 +37,13 @@ import XCTest
             add(hierarchy)
         }
         XCTAssertTrue(selectionAppeared)
-        XCTAssertEqual(count.label, "3 selected")
         let data = try XCTUnwrap((count.value as? String)?.data(using: .utf8))
         let proof = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
         attachment.name = "Held selection runtime proof"
         attachment.lifetime = .keepAlways
         add(attachment)
+        XCTAssertEqual(count.label, "3 selected")
         XCTAssertEqual(proof["selectedWhileTouchDown"] as? Bool, true)
         XCTAssertEqual(proof["maximumSelectedWhileTouchDown"] as? Int, 3)
         XCTAssertEqual(proof["scrollingDisabled"] as? Bool, true)

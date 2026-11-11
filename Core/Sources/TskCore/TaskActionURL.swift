@@ -7,6 +7,7 @@ public enum TaskActionURL: Equatable, Sendable {
     case openTask(UUID)
     case complete(UUID)
     case delete(UUID)
+    case openView(TaskNavigationView)
 
     public init(url: URL) throws {
         let components = try Self.components(url)
@@ -16,9 +17,10 @@ public enum TaskActionURL: Equatable, Sendable {
         case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
         case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "waiting-until-from", "waiting-until-through", "sort", "limit", "offset", "x-success", "x-error"]
         case "modify": allowed = ["id", "description", "project", "tags", "tag-operation", "priority", "scheduled", "deadline", "waiting-until", "clear-project", "clear-priority", "clear-scheduled", "clear-deadline", "clear-waiting-until", "x-success", "x-error"]
-        case "open-task": allowed = ["id"]
-        case "complete": allowed = ["id", "x-success", "x-error"]
         case "delete": allowed = ["id", "x-success", "x-error"]
+        case "complete": allowed = ["id", "x-success", "x-error"]
+        case "open-task": allowed = ["id", "x-success", "x-error"]
+        case "open-view": allowed = ["view", "project", "id", "x-success", "x-error"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
         var values: [String: [String]] = [:]
@@ -29,14 +31,32 @@ public enum TaskActionURL: Equatable, Sendable {
             }
             values[item.name, default: []].append(value)
         }
-        if components.host == "open-task" || components.host == "complete" || components.host == "delete" {
+        _ = try TaskActionCallbacks(url: url)
+        if components.host == "open-view" {
+            let view: TaskNavigationView
+            switch values["view"]?.first {
+            case "today": view = .today
+            case "upcoming": view = .upcoming
+            case "unfinished": view = .unfinished
+            case "done": view = .done
+            case "projects": view = .projects
+            case "project":
+                guard let name = values["project"]?.first, !name.isEmpty else { throw TaskActionError.invalidInput("Open View requires an exact project name.") }
+                view = .project(name)
+            case "saved":
+                guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open View requires a full saved-view UUID.") }
+                view = .saved(id)
+            default: throw TaskActionError.invalidInput("Choose today, upcoming, unfinished, done, projects, project, or saved.")
+            }
+            guard (values["project"] == nil || { if case .project = view { return true }; return false }()),
+                  (values["id"] == nil || { if case .saved = view { return true }; return false }()) else { throw TaskActionError.invalidInput("Arguments do not belong to this view.") }
+            self = .openView(view)
+        } else if components.host == "open-task" || components.host == "complete" || components.host == "delete" {
             let id = try Self.taskID(values["id"]?.first)
-            _ = try TaskActionCallbacks(url: url)
             if components.host == "complete" { self = .complete(id) }
             else if components.host == "delete" { self = .delete(id) }
             else { self = .openTask(id) }
         } else if components.host == "find" {
-            _ = try TaskActionCallbacks(url: url)
             guard let status = FindTaskStatus(rawValue: values["status"]?.first ?? "unfinished"),
                   let sort = FindTaskSort(rawValue: values["sort"]?.first ?? "created-desc") else {
                 throw TaskActionError.invalidInput("Unsupported Find status or sort choice.")
@@ -58,7 +78,6 @@ public enum TaskActionURL: Equatable, Sendable {
             try input.validate()
             self = .find(input)
         } else if components.host == "modify" {
-            _ = try TaskActionCallbacks(url: url)
             let id = try Self.taskID(values["id"]?.first)
             guard let operation = TaskTagOperation(rawValue: values["tag-operation"]?.first ?? "add") else { throw TaskActionError.invalidInput("Tag operation must be add, remove, replace, or clear.") }
             let input = ModifyTaskInput(description: values["description"]?.first, project: values["project"]?.first, tags: values["tags"], tagOperation: operation, priority: values["priority"]?.first,
@@ -67,7 +86,6 @@ public enum TaskActionURL: Equatable, Sendable {
             _ = try input.validatedChanges(for: TaskRecord(id: id, attributes: [:]))
             self = .modify(id, input)
         } else {
-            _ = try TaskActionCallbacks(url: url)
             let input = AddTaskInput(description: values["description"]?.first ?? "", project: values["project"]?.first, tags: values["tags"] ?? [], priority: values["priority"]?.first,
                                      scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first), waitingUntil: try Self.date(values["waiting-until"]?.first))
             _ = try input.validatedDraft()
