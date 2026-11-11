@@ -158,7 +158,7 @@ struct TaskNotificationFixtureControls: View {
         var evidence = try load(token)
         let base = Int64(Date().timeIntervalSince1970) + 7200
         let task = try await controller.store.manager.create(TaskDraft(description: "Notification mutation " + token, attributes: ["due": String(base), "foreign_alert": "preserve"]))
-        _ = try await RescheduleTaskIntent(task: IntentTaskEntity(task), role: .deadline, date: Date(timeIntervalSince1970: Double(base + 3600)), directory: controller.store.directory).perform()
+        _ = try await ModifyTaskIntent(task: IntentTaskEntity(task), deadline: Date(timeIntervalSince1970: Double(base + 3600)), directory: controller.store.directory).perform()
         let changed = try await controller.store.manager.task(id: task.id)
         let center = UNTaskNotificationCenter()
         let pending = try await center.pending().filter { $0.request?.taskID == task.id }

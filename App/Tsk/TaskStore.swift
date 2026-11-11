@@ -18,8 +18,25 @@ final class TaskStore {
     var projectSelection: TaskProjectSelection = .all
     var availableProjects: [String] = []
     var error: String?
-    var presentedTaskPanels: Set<UUID> = []
-    @ObservationIgnored var taskActionDraftCommit: (id: UUID, save: @MainActor () async -> Bool)?
+    private var taskActionPanels: Set<UUID> = []
+    @ObservationIgnored private var taskActionCommit: (id: UUID, save: @MainActor () async -> Bool)?
+    @ObservationIgnored private weak var taskActionSource: TaskStore?
+
+    var presentedTaskPanels: Set<UUID> {
+        get { taskActionSource?.presentedTaskPanels ?? taskActionPanels }
+        set {
+            if let taskActionSource { taskActionSource.presentedTaskPanels = newValue }
+            else { taskActionPanels = newValue }
+        }
+    }
+
+    var taskActionDraftCommit: (id: UUID, save: @MainActor () async -> Bool)? {
+        get { taskActionSource?.taskActionDraftCommit ?? taskActionCommit }
+        set {
+            if let taskActionSource { taskActionSource.taskActionDraftCommit = newValue }
+            else { taskActionCommit = newValue }
+        }
+    }
 
     func prepareForTaskActionNavigation() async -> Bool {
         guard !isSaving else { error = "A task is still saving. Try the URL again after it finishes."; return false }
@@ -29,6 +46,11 @@ final class TaskStore {
             return false
         }
         if let commit = taskActionDraftCommit, !(await commit.save()) { return false }
+        return await saveRowForTaskActionNavigation()
+    }
+
+    func saveRowForTaskActionNavigation() async -> Bool {
+        guard !isSaving else { error = "A task is still saving. Try the URL again after it finishes."; return false }
         if let row = rowEditing, !(await row.saveAndCollapse(in: self, reduceMotion: true, includingParameter: true)) {
             error = row.error ?? error ?? "The current task is still saving or its editing panel is open."
             return false
@@ -180,7 +202,9 @@ final class TaskStore {
     }
 
     func linkedTaskStore() -> TaskStore {
-        TaskStore(manager: manager, directory: directory, fixedDate: fixedDate)
+        let store = TaskStore(manager: manager, directory: directory, fixedDate: fixedDate)
+        store.taskActionSource = taskActionSource ?? self
+        return store
     }
 
     func observeParticipantChanges(reconcileWorkspace: Bool = true) async {
