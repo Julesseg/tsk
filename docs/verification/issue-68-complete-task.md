@@ -33,7 +33,7 @@ Valid drafts save first; invalid drafts remain editable and block the action.
 Committed actions are never retried or undone when callback encoding/delivery
 fails.
 
-## Available evidence
+## Initial implementation evidence
 
 | Seam | Evidence | Limits |
 | --- | --- | --- |
@@ -79,3 +79,27 @@ PR smoke and manually dispatched full iPhone CI must be checked at the published
 head. Green smoke does not establish full acceptance. No merge is authorized.
 The owning top-level thread retains PR babysitting; later sequential issues are
 launched only by the coordinator.
+
+## CI compatibility follow-up
+
+The initial PR Linux Core job failed to compile the nested throwing `#require`
+inside `#expect` with Swift 6.0.3. UUID unwrapping now precedes the same exact-enum
+assertion. All 187 Core tests pass in the official Swift 6.0.3 Linux arm64 Docker
+image, and the focused Mac test passes. Application and UI-test sources are
+unchanged. The old full run was superseded before its queued UI producer started;
+canonical acceptance still requires CI on the replacement head.
+
+
+## Rebase onto current main
+
+Rebased onto `7c8a7bee141f5d1a00f39d5d0e9f396f0973de8b`, preserving the
+reviewed nightly/on-demand consolidation and new bulk-selection behavior. Both
+Complete URL methods have an explicit nightly cadence: 32 nightly methods
+(21 workspace / 11 task-row), 27 on-demand, and 3 smoke. All 17 UI-selection
+checks, 201 Core tests on Linux Swift 6.0.3, and both focused draft-navigation
+controller tests pass after the rebase.
+
+The previous full run at `c6195ff` failed five existing notification, Spotlight
+and large-text/keyboard assertions; both Complete URL methods passed. That run
+is failed evidence, not acceptance for this source. Assertions are preserved;
+canonical acceptance awaits full CI at the rebased head.

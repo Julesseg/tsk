@@ -43,7 +43,8 @@ import Testing
 @Test func completeURLRequiresExactlyOneFullUUIDAndValidatesCallbacksBeforeExecution() throws {
     let id = "12345678-1234-1234-1234-123456789ABC"
     let parsed = try TaskActionURL(url: #require(URL(string: "tsk://complete?id=" + id + "&x-success=caller%3A%2F%2Fdone")))
-    #expect(parsed == .complete(try #require(UUID(uuidString: id))))
+    let expectedID = try #require(UUID(uuidString: id))
+    #expect(parsed == .complete(expectedID))
     for query in ["", "id=1", "id=12345678123412341234123456789ABC", "id=" + id + "&id=" + id, "id=" + id + "&description=Other", "id=" + id + "&x-success=tsk%3A%2F%2Fcomplete", "id=" + id + "&x-error=caller%3A%2F%2Ferror&x-error=caller%3A%2F%2Fother"] {
         #expect(throws: (any Error).self) { try TaskActionURL(url: #require(URL(string: "tsk://complete?" + query))) }
     }
