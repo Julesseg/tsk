@@ -221,6 +221,8 @@ class RunnerTests(unittest.TestCase):
     def run_runner(self, filters=(), share_status=0, main_status=0, prebuilt=False, owned_ci=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
+            test_home = root / "home"
+            test_home.mkdir()
             if prebuilt:
                 (root / "DerivedData/Build/Products/Debug-iphonesimulator/Tsk.app").mkdir(parents=True)
             log = root / "calls.jsonl"
@@ -242,7 +244,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             for name in ("xcrun", "xcodebuild", "osascript", "codesign"):
                 (root / name).symlink_to(tool)
             environment = {key: value for key, value in os.environ.items() if not key.startswith(("TSK_", "TEST_RUNNER_"))}
-            environment.update(PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_SHARE_STATUS=str(share_status), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
+            environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_SHARE_STATUS=str(share_status), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
             if owned_ci:
                 environment.update(CI="true", TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR="1", TSK_EVENTKIT_EVIDENCE_DIR=str(root / "evidence"))
             result = subprocess.run([
