@@ -160,3 +160,47 @@ and both successful callback screenshots. It labels the old source and failed
 run explicitly. Local machine path:
 `/Users/julesseguin/.local/share/ui-reports/tsk/agent-issue-66/find-tasks.html`.
 External Shortcuts/Siri discovery and invocation remain unverified.
+
+## CI repair after the rebased run
+
+At `aed84c4`, smoke failed the bulk-selection row opener and the completion-circle
+geometry admission; both unchanged cases pass in the local original three-case
+run. Full row-editing again failed the occurrence/XXXL Tags step. The original
+three-case local invocation reproduces that same Tags failure, with the two
+smoke cases passing (one failure across three cases).
+
+The failure hierarchy shows `row-tags` at `(160.7, 467.3, 74.7, 55.3)` beneath a
+supporting scroll viewport with zero height. Its computed tap `(198, 495)` lands
+on the overlapping More task information control and attempts the intentionally
+invalid occurrence save. The test now clears retained title focus using the
+real Hide Keyboard button, requires that focus control to disappear, then
+reveals Tags fully inside the supporting scroll before the existing opener.
+The picker timeout, invalid fixture, failure message, unsaved title, retained
+tag and Save and close assertions are unchanged. No application handler,
+assertion, timeout or native menu/keyboard transport was weakened.
+
+The first two verification attempts used a dismissal helper that requires an
+onscreen software-keyboard rectangle. Captured geometry instead shows a visible
+focus-dismiss control with an offscreen software-keyboard frame. The final test
+uses the existing ordinary native-control helper to clear focus; shared helpers
+and their keyboard requirements remain unchanged.
+
+The corrected original occurrence case passes on local iPhone 17/iOS 27.0
+(39.140 seconds, zero failures). Signed generic simulator build, intent artifact
+admission and all 16 selection checks pass; full selection remains 83 methods.
+The simulator was reserved, shut down and released after each runtime phase.
+Local success is diagnostic evidence; fresh exact-head smoke/full CI remains
+the acceptance gate. No same-head infrastructure rerun has been used.
+
+## Rebase onto the explicit UI cadence
+
+Rebased onto main `7c8a7be` after bulk-selection Apply, the upstream large-text
+Tags repair and the reviewed UI-suite consolidation merged. The consolidation
+removed the duplicated occurrence/XXXL case, so this branch preserves that
+removal and retains its earlier diagnosis above as historical evidence.
+
+The two structured Find workflows are explicitly registered as nightly system
+journeys. Current coverage is three smoke methods, 32 nightly methods (21
+workspace / 11 task-row) and 27 on-demand methods: 59 retained methods, each
+with exactly one cadence. The older 83-case totals and runtime results above
+refer to superseded sources and do not establish current-head acceptance.
