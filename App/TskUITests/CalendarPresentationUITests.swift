@@ -153,6 +153,59 @@ import XCTest
         capture("Calendar settings accessibility XXXL", accessible)
     }
 
+    func testCalendarVisibilityTogglesFilterIndependentlyAndPersistAcrossLaunches() throws {
+        let replica = UUID().uuidString
+        let app = try launch("populated", replica: replica)
+        XCTAssertTrue(event("Team offsite", app).waitForExistence(timeout: 10))
+        capture("Visibility before hiding calendars", app)
+        openCalendarSettings(app)
+        let work = app.switches["calendar-visibility-presentation"]
+        let personal = app.switches["calendar-visibility-personal"]
+        let empty = app.switches["calendar-visibility-empty"]
+        XCTAssertTrue(work.waitForExistence(timeout: 10))
+        XCTAssertEqual(work.value as? String, "1")
+        XCTAssertEqual(personal.value as? String, "1")
+        XCTAssertEqual(empty.value as? String, "1")
+        capture("Visibility Settings all calendars including empty calendar", app)
+        setCalendarVisibility("calendar-visibility-presentation", visible: false, app: app)
+        XCTAssertEqual(work.value as? String, "0")
+        closeCalendarSettings(app)
+        XCTAssertTrue(event("Team offsite", app).waitForNonExistence(timeout: 10))
+        XCTAssertFalse(event("Design review with the product team", app).exists)
+        XCTAssertFalse(event("Overnight support", app).exists)
+        XCTAssertTrue(event("Untitled event", app).exists)
+        XCTAssertTrue(taskRow(named: "Prepare the release", app: app).exists)
+        capture("Visibility one calendar hidden leaves other calendar and tasks", app)
+        app.terminate()
+
+        let reopened = try launch("populated", replica: replica)
+        XCTAssertTrue(event("Untitled event", reopened).waitForExistence(timeout: 10))
+        XCTAssertFalse(event("Team offsite", reopened).exists)
+        openCalendarSettings(reopened)
+        XCTAssertEqual(reopened.switches["calendar-visibility-presentation"].value as? String, "0")
+        setCalendarVisibility("calendar-visibility-personal", visible: false, app: reopened)
+        closeCalendarSettings(reopened)
+        assertCalendarHidden(reopened)
+        XCTAssertTrue(taskRow(named: "Prepare the release", app: reopened).isHittable)
+        capture("Visibility all event calendars hidden leaves tasks usable", reopened)
+        openCalendarSettings(reopened)
+        setCalendarVisibility("calendar-visibility-presentation", visible: true, app: reopened)
+        closeCalendarSettings(reopened)
+        XCTAssertTrue(event("Team offsite", reopened).waitForExistence(timeout: 10))
+        XCTAssertFalse(event("Untitled event", reopened).exists)
+        capture("Visibility re-enabled calendar restores its events", reopened)
+        reopened.terminate()
+
+        let accessible = try launch("populated", largeText: true, replica: replica)
+        openCalendarSettings(accessible)
+        let accessibleWork = accessible.switches["calendar-visibility-presentation"]
+        XCTAssertTrue(revealTaskElement(accessibleWork, in: "calendar-display-settings-form", app: accessible, requireFullVisibility: true))
+        XCTAssertEqual(accessibleWork.value as? String, "1")
+        capture("Visibility Settings accessibility XXXL", accessible)
+        setCalendarVisibility("calendar-visibility-presentation", visible: false, app: accessible)
+        XCTAssertEqual(accessibleWork.value as? String, "0")
+    }
+
     private func assertCalendarHidden(_ app: XCUIApplication) {
         assertTodayTaskList(app)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch.exists)
@@ -202,5 +255,23 @@ import XCTest
         attachment.name = "Calendar presentation \(name)"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+@MainActor extension XCTestCase {
+    func setCalendarVisibility(_ identifier: String, visible: Bool, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let row = app.switches[identifier].firstMatch
+        guard revealTaskElement(row, in: "calendar-display-settings-form", app: app, requireFullVisibility: true, file: file, line: line) else { return }
+        let control = row.switches.firstMatch.exists ? row.switches.firstMatch : row
+        guard control.isEnabled, control.isHittable else {
+            XCTFail("Calendar switch is not ready: \(identifier)", file: file, line: line)
+            return
+        }
+        recordTaskSwitchInteraction(row: row, selected: control, phase: "before", app: app)
+        // The native switch's press recognizer can reject XCUITest's shortest taps.
+        control.press(forDuration: 0.15)
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", visible ? "1" : "0"), object: row)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed, file: file, line: line)
+        recordTaskSwitchInteraction(row: row, selected: control, phase: "after", app: app)
     }
 }

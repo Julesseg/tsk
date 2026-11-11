@@ -53,6 +53,7 @@ actor CalendarProofSource: CalendarEventSource {
         await withCheckedContinuation { permission = $0 }
         if failure { throw Failure.notReady }
     }
+    func calendars() -> [CalendarSnapshot] { [] }
     func events(in window: DateInterval) -> [CalendarEventSnapshot] { eventReads += 1; return values }
     func setEvent(_ title: String, holdFinalRead: Bool = false) {
         let start = Date(timeIntervalSince1970: 1792144800)

@@ -31,5 +31,6 @@ private actor NativeCalendarFixtureSource: CalendarEventSource {
     func fail() { failing = true }
     func authorization() -> CalendarReadAuthorization { .fullAccess }
     func requestReadAccess() {}
+    func calendars() -> [CalendarSnapshot] { [] }
     func events(in window: DateInterval) throws -> [CalendarEventSnapshot] { if failing { throw CocoaError(.fileReadUnknown) }; return [event] }
 }

@@ -4,22 +4,25 @@ import TskCore
 import TskNative
 
 @MainActor @Observable final class TodayCalendarController {
-    let preferences = CalendarOverviewPreferences.shared
+    let preferences: CalendarOverviewPreferences
     let manager: TaskManager
     let source: any CalendarEventSource
-    private(set) var snapshot: TodayCalendarSnapshot?
+    private var unfilteredSnapshot: TodayCalendarSnapshot?
+    var snapshot: TodayCalendarSnapshot? { unfilteredSnapshot?.showing(preferences.visibility) }
     private(set) var isLoading = false
     private(set) var fixtureError: String?
     private(set) var fixtureVerified = false
     var isDisplayingToday = false
+    var isDisplayingSettings = false
     private var generation = UUID()
     private var refreshTask: Task<Void, Never>?
     private var preparedFixture = false
     private var accessRefreshInProgress = false
     private var accessRefreshWaiters: [UUID: (cancellation: CalendarRefreshCancellation, continuation: CheckedContinuation<Void, Never>)] = [:]
 
-    init(manager: TaskManager, source: any CalendarEventSource = EventKitCalendarSource()) {
+    init(manager: TaskManager, source: any CalendarEventSource = EventKitCalendarSource(), preferences: CalendarOverviewPreferences = .shared) {
         self.manager = manager
+        self.preferences = preferences
         #if DEBUG && targetEnvironment(simulator)
         if let fixture = CalendarPresentationFixture(environment: ProcessInfo.processInfo.environment) {
             self.source = fixture
@@ -43,6 +46,11 @@ import TskNative
     func refreshAuthorization() async {
         let authorization = await source.authorization()
         if snapshot == nil || snapshot?.authorization != authorization { await refresh() }
+    }
+
+    func refreshSettings() async {
+        if snapshot?.readError == nil { await refresh() }
+        else { await refreshAuthorization() }
     }
 
     private func refreshAccessPhase() async -> Bool {
@@ -95,13 +103,13 @@ import TskNative
             TaskUIBoundaryDiagnostics.event("calendar.refresh.discarded", details: ["request": request.uuidString, "generation": generation.uuidString])
             return
         }
-        snapshot = value; isLoading = false
+        unfilteredSnapshot = value; isLoading = false
         TaskUIBoundaryDiagnostics.event("calendar.refresh.published", details: ["request": request.uuidString, "authorization": String(describing: value.authorization), "hasReadError": String(value.readError != nil)])
     }
 
     func sourceChanged() {
         TaskUIBoundaryDiagnostics.event("calendar.source.changed", details: ["displayingToday": String(isDisplayingToday), "generation": generation.uuidString])
-        guard isDisplayingToday else { return }
+        guard isDisplayingToday || isDisplayingSettings else { return }
         refreshTask?.cancel()
         refreshTask = Task {
             do { try await Task.sleep(for: .milliseconds(250)); try Task.checkCancellation(); await refresh() } catch {}
@@ -114,6 +122,7 @@ private struct FailingCalendarFixtureSource: CalendarEventSource {
     let source: any CalendarEventSource
     func authorization() async -> CalendarReadAuthorization { await source.authorization() }
     func requestReadAccess() async throws { try await source.requestReadAccess() }
+    func calendars() async throws -> [CalendarSnapshot] { try await source.calendars() }
     func events(in window: DateInterval) throws -> [CalendarEventSnapshot] { throw CalendarFixtureReadFailure() }
 }
 private struct CalendarFixtureReadFailure: LocalizedError {

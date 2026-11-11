@@ -96,6 +96,21 @@ public actor EventKitCalendarSource: CalendarEventSource {
     }
     #endif
 
+    public func calendars() async throws -> [CalendarSnapshot] {
+        try await requireAccess()
+        store.reset()
+        let values = store.calendars(for: .event).map { calendar in
+            #if os(macOS)
+            let color = Self.calendarColor(calendar.color?.cgColor)
+            #else
+            let color = Self.calendarColor(calendar.cgColor)
+            #endif
+            return CalendarSnapshot(calendarID: calendar.calendarIdentifier, title: calendar.title, sourceTitle: calendar.source.title, color: color)
+        }
+        try await requireAccess()
+        return values
+    }
+
     public func events(in window: DateInterval) async throws -> [CalendarEventSnapshot] {
         try await requireAccess()
         guard window.start.timeIntervalSince1970.isFinite, window.end.timeIntervalSince1970.isFinite, window.duration > 0 else { throw CalendarReadError.invalidWindow }

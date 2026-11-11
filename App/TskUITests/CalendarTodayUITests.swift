@@ -37,6 +37,24 @@ import XCTest
         app.buttons["calendar-fixture-add"].tap()
         XCTAssertTrue(event("Calendar fixture observed change", app).waitForExistence(timeout: 20), "Actual EKEventStoreChanged must refresh Today")
         capture("Actual EventKit change notification refresh", app)
+        openCalendarSettings(app)
+        let ownedCalendar = app.switches.containing(NSPredicate(format: "label CONTAINS %@", "tsk Calendar fixture \(token)")).firstMatch
+        XCTAssertTrue(revealTaskElement(ownedCalendar, in: "calendar-display-settings-form", app: app, requireFullVisibility: true))
+        XCTAssertEqual(ownedCalendar.value as? String, "1")
+        capture("Actual EventKit calendar available in visibility settings", app)
+        let ownedCalendarID = ownedCalendar.identifier
+        setCalendarVisibility(ownedCalendarID, visible: false, app: app)
+        closeCalendarSettings(app)
+        XCTAssertTrue(timed.waitForNonExistence(timeout: 10))
+        XCTAssertFalse(event("Calendar fixture all day", app).exists)
+        XCTAssertFalse(event("Calendar fixture observed change", app).exists)
+        openCalendarSettings(app)
+        XCTAssertTrue(revealTaskElement(ownedCalendar, in: "calendar-display-settings-form", app: app, requireFullVisibility: true))
+        setCalendarVisibility(ownedCalendarID, visible: true, app: app)
+        closeCalendarSettings(app)
+        XCTAssertTrue(timed.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["calendar-fixture-verified"].exists)
+        capture("Actual EventKit events restored without changing source", app)
         select(.unfinished, app)
         XCTAssertFalse(event("Calendar fixture timed", app).exists)
         app.terminate(); app.launch(); select(.today, app)
@@ -112,7 +130,7 @@ import XCTest
         let calendar = app.buttons["calendar-display-settings"]
         XCTAssertTrue(revealTaskElement(calendar, in: "workspace-settings-list", app: app, requireFullVisibility: true))
         tapTaskControl(calendar, app: app)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.collectionViews["calendar-display-settings-form"].waitForExistence(timeout: 10))
     }
 
     private func closeCalendarSettings(_ app: XCUIApplication) {

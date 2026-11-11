@@ -8,10 +8,14 @@ import TskCore
     var hours: CalendarDisplayHours {
         didSet { defaults.set(try? JSONEncoder().encode(hours), forKey: "calendar-overview-hours") }
     }
+    var visibility: CalendarVisibility {
+        didSet { defaults.set(try? JSONEncoder().encode(visibility), forKey: "calendar-visibility") }
+    }
 
     init(defaults: UserDefaults? = nil) {
         let defaults = defaults ?? Self.applicationDefaults()
         self.defaults = defaults
+        visibility = defaults.data(forKey: "calendar-visibility").flatMap { try? JSONDecoder().decode(CalendarVisibility.self, from: $0) } ?? CalendarVisibility()
         hours = defaults.data(forKey: "calendar-overview-hours").flatMap { try? JSONDecoder().decode(CalendarDisplayHours.self, from: $0) } ?? CalendarDisplayHours()
     }
 

@@ -53,7 +53,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len(selection.selected_methods(result.stdout.splitlines())), 37)
 
     def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (43, 37)),):
+        for family, counts in (('iPhone', (44, 37)),):
             for partition, count in zip(('workspace', 'row-editing'), counts):
                 filters = selection.selection('full', family, partition)
                 self.assertEqual(len(selection.selected_methods(filters)), count)
@@ -83,9 +83,9 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(selection.selection("full", "iPhone"), [])
         phone = selection.selected_methods(selection.selection("full", "iPhone"))
         self.assertEqual(phone, selection.test_methods())
-        self.assertEqual(len(phone), 80)
+        self.assertEqual(len(phone), 81)
         self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", phone)
-        self.assertEqual(sum("/CalendarPresentationUITests/" in case for case in phone), 5)
+        self.assertEqual(sum("/CalendarPresentationUITests/" in case for case in phone), 6)
         self.assertEqual(sum("/TaskPresentationUITests/" in case for case in phone), 4)
         self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 12)
 
