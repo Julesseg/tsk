@@ -36,14 +36,20 @@ final class TaskURLController {
                 case .add(let input):
                     task = try await store.manager.addTask(input)
                     saved = task
+                case .modify(let id, let input):
+                    task = try await store.manager.modifyTask(id: id, input: input)
+                    saved = task
                 case .openTask(let id): task = try await store.manager.task(id: id)
                 }
                 let callback = try callbacks?.successURL(for: task)
                 await store.reload()
                 if let callback {
                     await deliver(callback, saved: saved)
-                } else if case .openTask = action {
-                    taskToOpen = task
+                } else {
+                    switch action {
+                    case .modify, .openTask: taskToOpen = task
+                    case .add: break
+                    }
                 }
             } catch {
                 let code = TaskActionFailureCode(error: error, savedLocally: saved != nil).rawValue
@@ -79,7 +85,7 @@ final class TaskURLController {
         let accepted = await UIApplication.shared.open(url)
         if accepted { message = nil }
         else if let saved {
-            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone. Opening Add again creates another task."
+            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone or retried. Opening Add again creates another task."
         } else { message = "The callback could not be delivered. " + (message ?? "") }
     }
 }

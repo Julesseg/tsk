@@ -48,3 +48,20 @@ Failure JSON uses `success:false`, `savedLocally:false`, and `error:{"code":"inv
 The final encoded callback URL has an 8192-byte limit. Oversized results are reported as `result_too_large`, never truncated. If saving already succeeded, this error has `savedLocally:true` and the saved `uuid`, and is sent to `x-error` (or `x-success` if no error callback was supplied). If only one callback is provided, it receives either outcome; the JSON success flag distinguishes them. Failed OS delivery after saving explicitly reports local success and the UUID. It does not undo storage or automatically retry creation. A caller that retries an Add URL explicitly creates another task.
 
 A successful OS URL-open acknowledgement means the system accepted delivery; it is not an acknowledgement that the caller processed the JSON.
+
+## Modify Task
+
+Modify Task in Shortcuts and `tsk://modify?id=<full UUID>` change exactly one saved task. Select a Task entity in Shortcuts; URLs accept only its full UUID, never a numeric ID, partial UUID, filter or task list. For bulk workflows, use Find followed by explicit iteration. Modify replaces the old standalone Reschedule action; saved shortcuts using Reschedule may break. Delete and the remaining named navigation actions are tracked separately.
+
+The seven fields use the same names and date formats as Add. All omitted values preserve existing data. Empty optional text or an empty Shortcuts tag list also preserves data, including with Replace selected. Blank Description preserves the saved description. Clear project, Clear priority, Clear Scheduled, Clear Deadline and Clear Waiting until remove those optional fields; URLs use `clear-project=true`, `clear-priority=true`, `clear-scheduled=true`, `clear-deadline=true`, and `clear-waiting-until=true`. Clear arguments accept only `true` or `false`. Supplying a nonempty value and its Clear control together is an error.
+
+Tag operation (`tag-operation` in URLs) offers Add, Remove, Replace and Clear. Add is the default. Repeat `tags` for individual tags. Add and Remove act on byte-exact names; Replace replaces all tags when values are supplied. Omitted/empty tag lists preserve tags in these three modes. Clear explicitly removes all tags and rejects supplied tag values. Canonically equivalent Unicode spellings remain distinct.
+
+```text
+tsk://modify?id=12345678-1234-1234-1234-123456789ABC&project=Travel&tags=rail&tag-operation=add&scheduled=2026-11-05T08%3A30%3A30Z&clear-deadline=true
+tsk://modify?id=12345678-1234-1234-1234-123456789ABC&tag-operation=clear&clear-priority=true
+```
+
+All fields validate and save together under the shared mutation lease. A failed validation or persistence operation leaves the saved task unchanged. Completed tasks remain editable; deleted and missing tasks report errors. Identity, completion state, unknown attributes, annotations and unrelated fields are preserved. Recurring templates remain guarded; generated occurrences use the existing atomic occurrence bookkeeping and cannot clear their required Deadline. No raw recurrence attributes are accepted.
+
+Modify uses the same durable offline acknowledgement, rich Task entity and JSON callbacks described above. Callback encoding/delivery failure after saving does not undo or replay the operation. Without callbacks it reveals the saved task through the existing linked-task navigation, even when its changed dates or project no longer match the current view. The existing draft gate saves valid edits before modifying and retains invalid drafts without applying the action.

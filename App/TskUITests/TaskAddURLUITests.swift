@@ -149,6 +149,107 @@ import XCTest
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "task-", "Undeliverable callback")).count, 1)
     }
 
+    func testModifySystemURLSavesAllFieldsTagModesClearsAndAtomicRejections() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try actionURL(description: "Modify original", extra: []))
+        defer { host.terminate() }
+        let created = try XCTUnwrap(try callback(host)["task"] as? [String: Any])
+        let id = try XCTUnwrap(created["uuid"] as? String)
+        func modify(_ items: [URLQueryItem]) throws -> [String: Any] {
+            host.terminate()
+            var url = URLComponents(string: "tsk://modify")!
+            url.queryItems = [URLQueryItem(name: "id", value: id), URLQueryItem(name: "x-success", value: "tsk-action-fixture://done?token=a%2Bb&token=second"), URLQueryItem(name: "x-error", value: "tsk-action-fixture://error?token=a%2Bb&token=second")] + items
+            _ = try send(try XCTUnwrap(url.url?.absoluteString))
+            return try callback(host)
+        }
+        let changes = [URLQueryItem(name: "description", value: "Modified timed task"), URLQueryItem(name: "project", value: "Travel"), URLQueryItem(name: "priority", value: "H"), URLQueryItem(name: "tags", value: "café"), URLQueryItem(name: "tags", value: "cafe\u{301}"), URLQueryItem(name: "scheduled", value: "2026-11-05T08:30:30Z"), URLQueryItem(name: "deadline", value: "2026-11-06T09:45:00Z"), URLQueryItem(name: "waiting-until", value: "2026-11-04T07:15:00Z")]
+        let result = try modify(changes)
+        XCTAssertEqual(result["savedLocally"] as? Bool, true)
+        let task = try XCTUnwrap(result["task"] as? [String: Any])
+        XCTAssertEqual(task["uuid"] as? String, id)
+        XCTAssertEqual(task["scheduled"] as? String, "2026-11-05T08:30:30Z")
+        XCTAssertEqual(task["deadline"] as? String, "2026-11-06T09:45:00Z")
+        XCTAssertEqual(task["waitingUntil"] as? String, "2026-11-04T07:15:00Z")
+        capture("Modify delivered all timed fields through the installed URL callback", host)
+        let omitted = try XCTUnwrap(try modify([])["task"] as? [String: Any])
+        XCTAssertEqual(omitted["project"] as? String, "Travel")
+        XCTAssertEqual(omitted["priority"] as? String, "H")
+        XCTAssertEqual(omitted["scheduled"] as? String, "2026-11-05T08:30:30Z")
+        let removed = try XCTUnwrap(try modify([URLQueryItem(name: "tags", value: "café"), URLQueryItem(name: "tag-operation", value: "remove")])["task"] as? [String: Any])
+        XCTAssertEqual((removed["tags"] as? [String])?.map { Array($0.utf8) }, [Array("cafe\u{301}".utf8)])
+        let replaced = try XCTUnwrap(try modify([URLQueryItem(name: "tags", value: "rail"), URLQueryItem(name: "tag-operation", value: "replace")])["task"] as? [String: Any])
+        XCTAssertEqual(replaced["tags"] as? [String], ["rail"])
+        let rejected = try modify([URLQueryItem(name: "description", value: "Must not save"), URLQueryItem(name: "priority", value: "H"), URLQueryItem(name: "clear-priority", value: "true")])
+        XCTAssertEqual(rejected["savedLocally"] as? Bool, false)
+        let retained = try XCTUnwrap(try modify([])["task"] as? [String: Any])
+        XCTAssertEqual(retained["description"] as? String, "Modified timed task")
+        let cleared = try XCTUnwrap(try modify([URLQueryItem(name: "tag-operation", value: "clear")] + ["project", "priority", "scheduled", "deadline", "waiting-until"].map { URLQueryItem(name: "clear-" + $0, value: "true") })["task"] as? [String: Any])
+        for key in ["project", "priority", "scheduled", "deadline", "waitingUntil"] { XCTAssertTrue(cleared[key] is NSNull) }
+        XCTAssertEqual(cleared["tags"] as? [String], [])
+        host.terminate()
+        app.terminate()
+        app.launch()
+        selectAllTasks(app)
+        XCTAssertTrue(taskRow(named: "Modified timed task", app: app).waitForExistence(timeout: 15))
+        XCTAssertFalse(taskRow(named: "Must not save", app: app).exists)
+        capture("Modified task retains identity and survives relaunch after explicit clearing", app)
+    }
+
+    func testModifyURLSettlesActiveEditingRevealsTimedResultAndPreservesInvalidDraft() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_INTENT_DESCRIPTION"] = "Before Modify"
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let row = taskRow(named: "Before Modify", app: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        let id = try XCTUnwrap(UUID(uuidString: String(row.identifier.dropFirst(5)))).uuidString
+        row.tap()
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        replaceTaskText(title, with: "Draft saved before Modify", app: app)
+        let host = try send("tsk://modify?id=\(id)&scheduled=2026-11-05T08:30:30Z&deadline=2026-11-06T09:45:00Z&waiting-until=2026-11-04T07:15:00Z")
+        defer { host.terminate() }
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        XCTAssertEqual(title.value as? String, "Draft saved before Modify")
+        XCTAssertTrue(app.buttons["row-scheduled"].exists && app.buttons["row-deadline"].exists && app.buttons["row-waiting-date"].exists)
+        capture("Modify reveals the saved task with independent timed dates after settling an active edit", app)
+        replaceTaskText(title, with: "   ", app: app)
+        host.terminate()
+        _ = try send("tsk://modify?id=\(id)&description=Must%20not%20save")
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "   ")
+        XCTAssertTrue(app.staticTexts["draft-error"].exists)
+        capture("Invalid active draft remains editable after rejected Modify navigation", app)
+        replaceTaskText(title, with: "Draft saved before Modify", app: app)
+        app.buttons["task-row-information"].tap()
+        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
+        app.buttons["edit-task"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        replaceTaskText(title, with: "   ", app: app)
+        host.terminate()
+        _ = try send("tsk://modify?id=\(id)&description=Must%20not%20save")
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "   ")
+        XCTAssertTrue(app.staticTexts["draft-error"].exists)
+        capture("Invalid nested Edit sheet remains after rejected Modify navigation", app)
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_INTENT_DESCRIPTION")
+        app.launch()
+        selectAllTasks(app)
+        XCTAssertTrue(taskRow(named: "Draft saved before Modify", app: app).waitForExistence(timeout: 15))
+        XCTAssertFalse(taskRow(named: "Must not save", app: app).exists)
+    }
+
     private func send(_ url: String) throws -> XCUIApplication {
         let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
         host.launchEnvironment["TSK_ACTION_FIXTURE_URL"] = url

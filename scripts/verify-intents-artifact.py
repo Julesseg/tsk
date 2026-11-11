@@ -35,8 +35,8 @@ if widget_info['CFBundleIdentifier'] != 'com.julesseguin.tsk.widgets' or widget_
     raise SystemExit('The app must embed the real WidgetKit extension')
 verify_group(widget)
 widget_metadata = json.loads((widget / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if 'AddTaskIntent' in widget_metadata['actions']:
-    raise SystemExit('Add Task must run in the app, not the widget extension')
+if {'AddTaskIntent', 'ModifyTaskIntent'} & widget_metadata['actions'].keys():
+    raise SystemExit('Add and Modify must run in the app, not the widget extension')
 if not {'TaskWidgetConfiguration', 'CompleteTaskIntent'}.issubset(widget_metadata['actions']):
     raise SystemExit('Widget metadata is missing native view configuration or common completion action')
 if 'WidgetTaskViewEntity' not in widget_metadata['entities']:
@@ -53,15 +53,15 @@ if activation.get("NSExtensionActivationSupportsText") is not True or activation
     raise SystemExit("The embedded share extension does not activate for text and web URLs")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(metadata['actions']):
-    raise SystemExit('The app metadata is missing its add/find/complete/reschedule actions')
+if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent'}.issubset(metadata['actions']):
+    raise SystemExit('The app metadata is missing its add/find/complete/modify actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
-if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(shortcuts):
+if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
 print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and four App Shortcuts')
 
-if 'CreateTaskIntent' in metadata['actions']:
-    raise SystemExit('The retired Create Task intent must not remain as a compatibility action')
+if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
+    raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')
 info = plistlib.loads((app / 'Info.plist').read_bytes())
 if not any('tsk' in item.get('CFBundleURLSchemes', []) for item in info.get('CFBundleURLTypes', [])):
     raise SystemExit('The app must register the tsk URL scheme')
@@ -78,3 +78,13 @@ properties = {item['identifier'] for item in metadata['entities']['IntentTaskEnt
 if not {'uuid', 'description', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'status', 'openTaskURL'}.issubset(properties):
     raise SystemExit('The task entity must expose all rich result properties')
 print('Verified seven Add Task inputs, native dates, required Description, rich entity properties and tsk URL registration')
+
+modify_parameters = {item['name']: item for item in metadata['actions']['ModifyTaskIntent']['parameters']}
+if set(modify_parameters) != {'task', 'taskDescription', 'project', 'tags', 'tagOperation', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'clearProject', 'clearPriority', 'clearScheduled', 'clearDeadline', 'clearWaitingUntil'}:
+    raise SystemExit('Modify Task must expose its task, seven fields, tag operation and five clear controls')
+if modify_parameters['task']['isOptional'] or any(not modify_parameters[name]['isOptional'] for name in ('taskDescription', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil')):
+    raise SystemExit('Modify requires one task and permits omitted field values')
+for name in ('scheduled', 'deadline', 'waitingUntil'):
+    if modify_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
+        raise SystemExit('Modify Task date inputs must be native dates: ' + name)
+print('Verified Modify Task inputs and removal of standalone Reschedule')
