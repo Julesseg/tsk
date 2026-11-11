@@ -55,7 +55,7 @@ extension XCTestCase {
         if !settings.exists {
             let button = app.buttons["workspace-settings"]
             XCTAssertTrue(button.waitForExistence(timeout: 15), file: file, line: line)
-            tapTaskControl(button, app: app, beforeSample: beforeSample, file: file, line: line)
+            tapTaskControlAtCenter(button, app: app, beforeSample: beforeSample, file: file, line: line)
         }
         return revealTaskElement(app.buttons[identifier], in: "workspace-settings-list", app: app, initialScrollUp: initialScrollUp, file: file, line: line)
     }
