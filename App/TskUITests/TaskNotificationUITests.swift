@@ -4,7 +4,7 @@ import XCTest
 final class TaskNotificationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testActualClosedAppDeliveryCapacityAndLocalMutationReconciliation() throws {
+    func testActualClosedAppDeliveryAndLocalMutationReconciliation() throws {
         let app = application()
         app.launch()
         openNotifications(app)
@@ -46,13 +46,6 @@ final class TaskNotificationUITests: XCTestCase {
         reveal(delivered, in: app); delivered.tap()
         XCTAssertTrue(wait(status, prefix: "DELIVERED 1", timeout: 15), app.debugDescription)
         capture("Delivered readback after closed-app trigger without reseeding", app)
-        let capacity = app.buttons["notification-fixture-capacity"]
-        reveal(capacity, in: app); capacity.tap()
-        XCTAssertTrue(wait(status, prefix: "CAPACITY attempted=100 retained=", timeout: 40), app.debugDescription)
-        let retained = try XCTUnwrap(Int(status.label.components(separatedBy: "retained=").last ?? ""))
-        XCTAssertGreaterThan(retained, 0)
-        XCTAssertLessThanOrEqual(retained, 100)
-        capture("Actual iOS capacity readback with per-add evidence", app)
         let mutation = app.buttons["notification-fixture-mutation"]
         reveal(mutation, in: app); mutation.tap()
         XCTAssertTrue(wait(status, prefix: "MUTATION VERIFIED", timeout: 20), app.debugDescription)

@@ -17,207 +17,163 @@ PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelau
 
 
 class SelectionTests(unittest.TestCase):
-    def test_smoke_is_a_bounded_subset_of_full_coverage(self):
-        smoke = selection.selected_methods(selection.selection("smoke", "iPhone"))
-        full = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(len(smoke), 12)
-        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary", smoke)
-        self.assertLess(smoke, full)
-        for suite in ("smoke", "full", "keyboard", "text", "menu", "regression", "diagnostic"):
+    def test_smoke_is_the_three_reviewed_product_journeys(self):
+        filters = selection.selection("smoke", "iPhone")
+        self.assertEqual(selection.selected_methods(filters), {
+            "TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelaunch",
+            "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
+            "TskUITests/TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably",
+        })
+        self.assertTrue(all(item.count("/") == 2 for item in filters))
+        self.assertEqual(selection.phases(filters), ["main"])
+        self.assertFalse(selection.requires_native_keyboard(filters))
+        self.assertFalse(selection.requires_sync_server(filters))
+        self.assertFalse(selection.requires_sync_peer(filters))
+
+    def test_nightly_and_on_demand_classify_every_method_once(self):
+        nightly = selection.selected_methods(selection.selection("full", "iPhone"))
+        diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
+        self.assertEqual(len(nightly), 30)
+        self.assertEqual(len(diagnostic), 27)
+        self.assertFalse(nightly & diagnostic)
+        self.assertEqual(nightly | diagnostic, selection.test_methods())
+        self.assertLess(selection.selected_methods(selection.selection("smoke", "iPhone")), nightly)
+        self.assertIn("TskUITests/TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask", nightly)
+        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft", nightly)
+        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary", diagnostic)
+        for suite in selection.SUITES:
+            filters = selection.selection(suite, "iPhone")
+            self.assertTrue(all(item.count("/") == 2 for item in filters))
+            self.assertTrue(selection.selected_methods(filters) <= nightly | diagnostic)
             with self.subTest(suite=suite), self.assertRaisesRegex(ValueError, "Only iPhone"):
                 selection.selection(suite, "iPad")
+        with self.assertRaisesRegex(ValueError, "Unknown UI suite"):
+            selection.selection("missing", "iPhone")
 
-    def test_partitions_run_every_selected_method_once_and_preserve_all_native_cases(self):
-        spec = importlib.util.spec_from_file_location("partition_owner", ROOT / "scripts/with-native-keyboard-hid.py")
-        owner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(owner)
-        for suite in ("full",):
-            for family in ("iPhone",):
-                with self.subTest(suite=suite, family=family):
-                    original = selection.selected_methods(selection.selection(suite, family))
-                    groups = [selection.selection(suite, family, partition) for partition in ("workspace", "row-editing")]
-                    methods = [selection.selected_methods(group) for group in groups]
-                    self.assertEqual(methods[0] | methods[1], original)
-                    self.assertFalse(methods[0] & methods[1])
-                    self.assertEqual(sum("/TaskRowEditingUITests/" in method for method in methods[1]), 13)
-                    self.assertFalse(any("/TaskRowEditingUITests/" in method for method in methods[0]))
-                    self.assertEqual(owner.selected_cases(groups[0]), owner.selected_cases(selection.selection(suite, family)))
-                    self.assertFalse(owner.selected_cases(groups[1]))
-                    command = ["xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned", "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never", "-resultBundlePath", "Results.xcresult", *groups[0], "-skip-testing:TskUITests/ShareCaptureUITests"]
-                    owner.validate_command(command, "owned")
-                    self.assertEqual(selection.requires_sync_peer(groups[0]), selection.requires_sync_peer(selection.selection(suite, family)))
-                    self.assertFalse(selection.requires_sync_peer(groups[1]))
+    def test_new_and_multiply_registered_methods_require_a_cadence_decision(self):
+        available = selection.test_methods()
+        with patch.object(selection, "test_methods", return_value=available | {"TskUITests/NewTests/testNew"}):
+            with self.assertRaisesRegex(ValueError, "explicit cadence.*NewTests/testNew"):
+                selection.selection("full", "iPhone")
+        for name, value in (("NIGHTLY", selection.NIGHTLY + (selection.NIGHTLY[0],)),
+                            ("ON_DEMAND", selection.ON_DEMAND + (selection.NIGHTLY[0],))):
+            with patch.object(selection, name, value):
+                with self.assertRaisesRegex(ValueError, "exactly one cadence"):
+                    selection.selection("full", "iPhone")
+        with patch.object(selection, "PHONE_SMOKE", selection.PHONE_SMOKE + (selection.ON_DEMAND[0],)):
+            with self.assertRaisesRegex(ValueError, "subset of nightly"):
+                selection.selection("smoke", "iPhone")
 
-    def test_partition_cli_preserves_the_original_full_selection(self):
+    def test_discovery_includes_inline_actor_attributes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory)
+            (path / "ActorTests.swift").write_text("""import XCTest
+@MainActor final class ActorTests: XCTestCase {
+    @MainActor func testInlineAttribute() {}
+    @MainActor
+    func testSeparateAttribute() {}
+    func testPlain() {}
+}
+""")
+            with patch.object(selection, "TEST_ROOT", path):
+                self.assertEqual(selection.test_methods(), {
+                    "TskUITests/ActorTests/testInlineAttribute",
+                    "TskUITests/ActorTests/testSeparateAttribute",
+                    "TskUITests/ActorTests/testPlain",
+                })
+
+    def test_shards_cover_nightly_once_and_keep_system_fixtures_in_workspace(self):
+        nightly = selection.selected_methods(selection.selection("full", "iPhone"))
+        groups = {name: selection.selection("full", "iPhone", name) for name in ("workspace", "row-editing")}
+        workspace = selection.selected_methods(groups["workspace"])
+        rows = selection.selected_methods(groups["row-editing"])
+        self.assertEqual(workspace | rows, nightly)
+        self.assertFalse(workspace & rows)
+        self.assertEqual((len(workspace), len(rows)), (19, 11))
+        for partition, filters in groups.items():
+            self.assertEqual(selection.requires_native_keyboard(filters), partition == "workspace")
+            self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
+            self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
+        for cls in ("ShareCaptureUITests", "WidgetUITests", "SpotlightUITests", "CalendarTodayUITests",
+                    "TaskNotificationUITests", "MissedNotificationUITests", "ReminderImportUITests"):
+            self.assertTrue(any("/" + cls + "/" in case for case in workspace), cls)
+        self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        methods = selection.selected_methods(result.stdout.splitlines())
-        self.assertEqual(len(methods), 41)
-        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary", methods)
+        self.assertEqual(selection.selected_methods(result.stdout.splitlines()), rows)
 
-    def test_balanced_partitions_keep_hardware_and_server_dependencies_out_of_task_worker(self):
-        for family, counts in (('iPhone', (44, 41)),):
-            for partition, count in zip(('workspace', 'row-editing'), counts):
-                filters = selection.selection('full', family, partition)
-                self.assertEqual(len(selection.selected_methods(filters)), count)
-                self.assertEqual(selection.requires_sync_server(filters), partition == 'workspace')
-        for family in ('iPhone',):
-            filters = selection.selection('smoke', family)
-            self.assertEqual(selection.requires_sync_server(filters), family == 'iPhone')
-        for case in ('SpotlightUITests', 'MissedNotificationUITests', 'SynchronizationUITests'):
-            self.assertTrue(selection.requires_sync_server(['-only-testing:TskUITests/' + case]))
-        self.assertFalse(selection.requires_sync_server(selection.selection('text', 'iPhone')))
-
-    def test_smoke_covers_task_round_trip_without_hardware_or_installed_system_tours(self):
-        for family in ("iPhone",):
-            smoke = selection.selected_methods(selection.selection("smoke", family))
-            full = selection.selected_methods(selection.selection("full", family))
-            self.assertIn("TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion", smoke)
-            self.assertNotIn("TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys", smoke)
-            self.assertIn("TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys", full)
-            self.assertFalse(selection.requires_native_keyboard(selection.selection("smoke", family)))
-            self.assertTrue(selection.requires_native_keyboard(selection.selection("full", family)))
-            self.assertEqual(selection.phases(selection.selection("smoke", family)), ["main"])
-            for suite in ("ShareCaptureUITests", "WidgetUITests", "SpotlightUITests"):
-                self.assertFalse(any("/" + suite + "/" in case for case in smoke))
-                self.assertTrue(any("/" + suite + "/" in case for case in full))
-
-    def test_full_keeps_every_iphone_method_without_skips(self):
-        self.assertEqual(selection.selection("full", "iPhone"), [])
-        phone = selection.selected_methods(selection.selection("full", "iPhone"))
-        self.assertEqual(phone, selection.test_methods())
-        self.assertEqual(len(phone), 85)
-        self.assertIn("TskUITests/RecurringTemplateUITests/testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch", phone)
-        self.assertEqual(sum("/CalendarPresentationUITests/" in case for case in phone), 6)
-        self.assertEqual(sum("/TaskPresentationUITests/" in case for case in phone), 4)
-        self.assertEqual(len(selection.selected_methods(selection.selection("diagnostic", "iPhone"))), 12)
-
-    def test_keyboard_diagnostics_keep_existing_state_and_transport_checks_on_both_devices(self):
-        for family in ("iPhone",):
-            selected = selection.selected_methods(selection.selection("keyboard", family))
-            self.assertEqual(len(selected), 12 if family == "iPhone" else 10)
-            self.assertIn("TskUITests/CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable", selected)
-            self.assertIn("TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor", selected)
-            self.assertIn("TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer", selected)
-            self.assertIn("TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations", selected)
-            self.assertIn("TskUITests/TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion", selected)
-            self.assertEqual("TskUITests/TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday" in selected, family == "iPhone")
-            self.assertEqual("TskUITests/TskUITests/testOrganizationProjectViewsAndListActionsPersist" in selected, family == "iPhone")
-
-    def test_renamed_tests_fail_instead_of_silently_disappearing(self):
-        with patch.object(selection, "test_methods", return_value=set()):
-            with self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
-                selection.selection("smoke", "iPhone")
-        for filters in (["-only-testing:TskUITests/MissingTests"], [PHONE, "-only-testing:TskUITests/MissingTests"], [PHONE, "-skip-testing:TskUITests/MissingTests"]):
-            with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
-                selection.phases(filters)
-
-    def test_text_diagnostics_cover_editing_share_and_native_transport_without_sync(self):
-        for family in ("iPhone",):
-            filters = selection.selection("text", family)
-            selected = selection.selected_methods(filters)
-            self.assertEqual(selected, {
-                "TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
-                "TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-                "TskUITests/SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
-                "TskUITests/TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
-            })
-            self.assertLess(selected, selection.selected_methods(selection.selection("full", family)))
-            self.assertEqual(selection.phases(filters), ["share", "main"])
-            self.assertFalse(selection.requires_sync_peer(filters))
-
-    def test_full_and_diagnostics_retain_required_keyboard_transport_cases(self):
-        spec = importlib.util.spec_from_file_location("hid_owner", ROOT / "scripts/with-native-keyboard-hid.py")
-        owner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(owner)
-        for suite, family in (("full", "iPhone"), ("diagnostic", "iPhone"), ("keyboard", "iPhone"), ("text", "iPhone")):
-            with self.subTest(suite=suite, family=family):
-                command = [
-                    "xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",
-                    "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never",
-                    "-resultBundlePath", "Results.xcresult", *selection.selection(suite, family),
-                    "-skip-testing:TskUITests/ShareCaptureUITests",
-                ]
-                owner.validate_command(command, "owned")
-
-    def test_regression_selection_covers_failed_journeys_without_replacing_full(self):
-        common = {
-            "TskUITests/ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
-            "TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
-            "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-            "TskUITests/TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
-            "TskUITests/WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
-        }
-        filters = selection.selection("regression", "iPhone")
-        self.assertEqual(selection.selected_methods(filters), common)
-        self.assertEqual(len(filters), 5)
-        self.assertLess(common, selection.selected_methods(selection.selection("full", "iPhone")))
-        self.assertEqual(selection.phases(filters), ["share", "main"])
-        self.assertFalse(selection.requires_sync_peer(filters))
-        self.assertFalse(selection.requires_sync_server(filters))
-        self.assertFalse(selection.requires_native_keyboard(filters))
-        spec = importlib.util.spec_from_file_location("regression_plan", ROOT / "scripts/plan-ui-tests.py")
-        planner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(planner)
-        planned = planner.plan("regression")
-        self.assertEqual(planned["families"], ["iPhone"])
-        self.assertEqual(planned["partitions"], ["all"])
-        self.assertFalse(planned["server"])
-        self.assertFalse(planned["peer"])
-
-    def test_menu_selection_preserves_native_menu_and_real_command_compatibility(self):
-        expected = {
+    def test_focused_suites_keep_product_input_and_original_menu_contracts(self):
+        keyboard = selection.selected_methods(selection.selection("keyboard", "iPhone"))
+        self.assertEqual(keyboard, {
+            "TskUITests/TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
+            "TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
+        })
+        menu = selection.selected_methods(selection.selection("menu", "iPhone"))
+        self.assertEqual(menu - keyboard, {
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
-            "TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-            "TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-            "TskUITests/TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
-        }
-        for family in ("iPhone",):
-            filters = selection.selection("menu", family)
-            selected = expected
-            self.assertEqual(selection.selected_methods(filters), selected)
-            self.assertEqual(selection.phases(filters), ["main"])
-            self.assertFalse(selection.requires_sync_peer(filters))
-            self.assertFalse(selection.requires_sync_server(filters))
-            self.assertTrue(selection.requires_native_keyboard(filters))
-            self.assertLess(selected, selection.selected_methods(selection.selection("full", family)))
+        })
+        text = selection.selection("text", "iPhone")
+        self.assertEqual(len(selection.selected_methods(text)), 3)
+        self.assertEqual(selection.phases(text), ["share", "main"])
+        self.assertFalse(selection.requires_sync_server(text))
+        for suite in ("keyboard", "text", "menu", "diagnostic"):
+            self.assertTrue(selection.requires_native_keyboard(selection.selection(suite, "iPhone")))
+            self.assertFalse(selection.requires_sync_server(selection.selection(suite, "iPhone")))
+        regression = selection.selection("regression", "iPhone")
+        self.assertEqual(len(selection.selected_methods(regression)), 5)
+        self.assertEqual(selection.phases(regression), ["share", "main"])
+        self.assertFalse(selection.requires_sync_server(regression))
+        self.assertFalse(selection.requires_sync_peer(regression))
+        self.assertFalse(selection.requires_native_keyboard(regression))
 
-    def test_transport_selection_matches_owner_for_every_declared_case_and_partition(self):
+    def test_renamed_and_unknown_selectors_fail_instead_of_disappearing(self):
+        with patch.object(selection, "test_methods", return_value=set()):
+            with self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
+                selection.selection("smoke", "iPhone")
+        for filters in (["-only-testing:TskUITests/MissingTests"], [PHONE, "-only-testing:TskUITests/MissingTests"],
+                        [PHONE, "-skip-testing:TskUITests/MissingTests"]):
+            with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
+                selection.phases(filters)
+
+    def test_transport_selection_matches_owner_for_every_method_and_suite(self):
         spec = importlib.util.spec_from_file_location("transport_owner", ROOT / "scripts/with-native-keyboard-hid.py")
         owner = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(owner)
         for method in selection.test_methods():
             filters = ["-only-testing:" + method]
             self.assertEqual(selection.requires_native_keyboard(filters), bool(owner.selected_cases(filters)), method)
-        for family in ("iPhone",):
-            for partition, required in (("workspace", True), ("row-editing", False)):
-                self.assertEqual(selection.requires_native_keyboard(selection.selection("full", family, partition)), required)
-
-    def test_transport_cli_reports_required_input_and_rejects_unknown_tests(self):
+        for suite in selection.SUITES:
+            filters = selection.selection(suite, "iPhone")
+            if selection.requires_native_keyboard(filters):
+                command = ["xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",
+                           "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never", "-resultBundlePath", "Results.xcresult",
+                           *filters, "-skip-testing:TskUITests/ShareCaptureUITests"]
+                owner.validate_command(command, "owned")
         script = str(ROOT / "scripts/ui-test-selection.py")
-        for filters, expected in ((selection.selection("smoke", "iPhone"), "no"), (selection.selection("full", "iPhone", "workspace"), "yes")):
-            result = subprocess.run(["python3", script, "native-keyboard", "--", *filters], capture_output=True, text=True)
+        for suite, expected in (("smoke", "no"), ("full", "yes")):
+            result = subprocess.run(["python3", script, "native-keyboard", "--", *selection.selection(suite, "iPhone")], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), expected)
-        result = subprocess.run(["python3", script, "native-keyboard", "--", "-only-testing:TskUITests/MissingTests"], capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
 
-    def test_filters_control_share_and_main_phases(self):
+    def test_filters_control_share_phases_and_real_sync_requirements(self):
         self.assertEqual(selection.phases([]), ["share", "main"])
         self.assertEqual(selection.phases([SHARE]), ["share"])
         self.assertEqual(selection.phases([PHONE]), ["main"])
         self.assertEqual(selection.phases(["-only-testing:TskUITests", "-skip-testing:TskUITests/ShareCaptureUITests"]), ["main"])
         with self.assertRaises(ValueError):
             selection.phases([SHARE, "-skip-testing:TskUITests/ShareCaptureUITests"])
-
-    def test_independent_peer_requires_the_matching_real_sync_ui_scenario(self):
-        for suite, family, expected in (("smoke", "iPhone", True), ("full", "iPhone", True), ("diagnostic", "iPhone", True)):
-            with self.subTest(suite=suite, family=family):
-                self.assertEqual(selection.requires_sync_peer(selection.selection(suite, family)), expected)
-        filters = selection.selection("smoke", "iPhone") + ["-skip-testing:TskUITests/SynchronizationUITests"]
-        self.assertFalse(selection.requires_sync_peer(filters))
+        full = selection.selection("full", "iPhone")
+        self.assertTrue(selection.requires_sync_peer(full))
+        self.assertFalse(selection.requires_sync_peer(full + ["-skip-testing:TskUITests/SynchronizationUITests"]))
+        for case in selection.NIGHTLY + selection.ON_DEMAND:
+            filters = ["-only-testing:TskUITests/" + case]
+            expected = case in {
+                "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
+                "MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion",
+            }
+            self.assertEqual(selection.requires_sync_server(filters), expected, case)
 
 
 class RunnerTests(unittest.TestCase):
@@ -258,7 +214,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             return result, calls
 
-    def test_pad_smoke_builds_once_without_share_launch_or_fixture_install(self):
+    def test_smoke_builds_once_without_share_launch_or_fixture_install(self):
         result, calls = self.run_runner([PHONE])
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
@@ -304,7 +260,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
         self.assertFalse(any(call["name"] == "xcodebuild" for call in calls))
 
     def test_owned_native_selection_rejects_missing_transport_before_launching_tests(self):
-        filters = ["-only-testing:TskUITests/TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys"]
+        filters = ["-only-testing:TskUITests/TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus"]
         result, calls = self.run_runner(filters, owned_ci=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Selected hardware-keyboard tests require the owned native transport", result.stderr)

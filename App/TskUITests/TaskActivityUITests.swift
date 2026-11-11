@@ -48,60 +48,6 @@ final class TaskActivityUITests: XCTestCase {
         capture("Completion clears activity without offering accidental reopen", app)
     }
 
-    func testRecordedRealOccurrenceStartsStopsAndCompletesThroughItsSeries() throws {
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
-        let data = try Data(contentsOf: url)
-        let records = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
-        let child = try XCTUnwrap(records.first { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
-        let id = try XCTUnwrap(child["id"] as? String)
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
-        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: data, as: UTF8.self)
-        app.launch()
-        selectAllTasks(app)
-        let row = app.buttons["task-" + id]
-        XCTAssertTrue(row.waitForExistence(timeout: 20)); openTaskInformation(row, app: app)
-        XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
-        XCTAssertTrue(waitForEnabledTaskControl(app.buttons["stop-task"], app: app, timeout: 10))
-        capture("Recorded generated occurrence supports active work independently of waiting", app)
-        app.buttons["stop-task"].tap()
-        XCTAssertTrue(waitForEnabledTaskControl(app.buttons["start-task"], app: app, timeout: 10)); app.buttons["start-task"].tap()
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app)); app.buttons["complete-task"].tap()
-        waitForLabel("Completed", on: app.staticTexts["task-detail-status"])
-        XCTAssertFalse(app.buttons["stop-task"].exists)
-        XCTAssertFalse(app.buttons["start-task"].exists)
-        capture("Occurrence completion removes its active marker", app)
-        app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        XCTAssertFalse(row.exists)
-    }
-
-    func testInvalidOccurrenceStartShowsVisibleFailureAndKeepsSavedTaskUnchanged() throws {
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
-        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
-        let parentIndex = try XCTUnwrap(records.firstIndex { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "mask" } })
-        var attributes = try XCTUnwrap(records[parentIndex]["attributes"] as? [[String: String]])
-        let maskIndex = try XCTUnwrap(attributes.firstIndex { $0["key"] == "mask" })
-        attributes[maskIndex]["value"] = "?WW"; records[parentIndex]["attributes"] = attributes
-        let child = try XCTUnwrap(records.first { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
-        let id = try XCTUnwrap(child["id"] as? String)
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 20)); openTaskInformation(app.buttons["task-" + id], app: app)
-        XCTAssertTrue(revealTaskElement(app.buttons["start-task"], in: "task-detail-form", app: app)); app.buttons["start-task"].tap()
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))
-        XCTAssertTrue(app.staticTexts["task-action-error"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-action-error"].label.contains("No tasks were changed"))
-        XCTAssertFalse(app.buttons["stop-task"].exists)
-        capture("Invalid recurrence state reports a visible genuine start failure", app)
-    }
-
     private func waitForLabel(_ text: String, on element: XCUIElement) {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", text), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)

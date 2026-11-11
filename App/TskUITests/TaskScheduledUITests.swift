@@ -65,47 +65,6 @@ final class TaskScheduledUITests: XCTestCase {
         app.terminate()
     }
 
-    func testMidnightScheduledSurvivesUnrelatedEdits() throws {
-        let app = try launch()
-        selectAllTasks(app)
-        let id = "A6400000-0000-0000-0000-000000000002"
-        let expected = formatted(Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1792250100)).timeIntervalSince1970)
-        let row = app.buttons["task-" + id]
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        row.tap()
-        let title = app.textFields["task-description"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, expected)
-        title.tap()
-        title.typeText(" revised")
-        app.buttons["dismiss-row-keyboard"].tap()
-        closeTaskRow(app)
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        openTaskInformation(row, app: app)
-        app.buttons["edit-task"].tap()
-        let field = app.descendants(matching: .any)["task-description"].firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
-        field.typeText(" shared")
-        tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(revealTaskElement(app.datePickers["planned-day-picker"], in: "task-editor-form", app: app, bottomInset: app.buttons["dismiss-editor-keyboard"]))
-        app.buttons["save-task"].tap()
-        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
-        app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectAllTasks(app)
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        XCTAssertTrue(row.label.contains("revised"))
-        XCTAssertTrue(row.label.contains("shared"))
-        row.tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, expected)
-        app.terminate()
-    }
-
     private func formatted(_ seconds: TimeInterval) -> String {
         Date(timeIntervalSince1970: seconds).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en_US")))
     }

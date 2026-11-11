@@ -92,30 +92,6 @@ import XCTest
         select(.unfinished, app)
     }
 
-    func testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable() {
-        let app = configuredApp(UUID().uuidString)
-        app.launchEnvironment["TSK_TEST_CALENDAR_READ_FAILURE"] = "1"
-        app.resetAuthorizationStatus(for: .calendar)
-        defer { app.terminate(); app.resetAuthorizationStatus(for: .calendar) }
-        app.launch(); select(.today, app)
-        assertCalendarHidden(app)
-        openCalendarSettings(app)
-        app.buttons["calendar-request-access"].tap(); permission(allow: true)
-        XCTAssertTrue(app.buttons["calendar-request-access"].waitForNonExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["calendar-read-error"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.staticTexts["calendar-read-error"].label, "Calendar unavailable")
-        XCTAssertEqual(app.buttons["calendar-refresh"].label, "Retry")
-        capture("Injected protocol read failure is managed in Settings", app)
-        closeCalendarSettings(app)
-        assertCalendarHidden(app)
-        capture("Injected protocol read failure hides Calendar; ordinary task controls remain available", app)
-        createTask("Calendar failure task", app)
-        let row = taskRow(named: "Calendar failure task", app: app)
-        XCTAssertTrue(row.waitForExistence(timeout: 15)); openTaskInformation(row, app: app)
-        XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 10))
-        app.buttons["complete-task"].tap()
-    }
-
     private func assertCalendarHidden(_ app: XCUIApplication) {
         assertTodayTaskList(app)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch.exists)

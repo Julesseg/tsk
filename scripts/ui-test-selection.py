@@ -5,48 +5,89 @@ import re
 
 
 PHONE_SMOKE = (
-    "TskUITests/testCaptureReviewCancelSaveAndRelaunch",
-    "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-    "TaskBulkSelectionUITests",
-    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
-    "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
+    'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
+    'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
+    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
 )
-DIAGNOSTIC = (
-    "ShareCaptureUITests", "CustomViewsUITests", "TaskAnnotationUITests", "MissedNotificationUITests",
-    "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-    "ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks",
-    "ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory",
-    "SpotlightUITests", "WidgetUITests",
+
+NIGHTLY = (
+    'AutomaticSynchronizationUITests/testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch',
+    'CalendarTodayUITests/testRealCalendarTodayReadOnlyClippingStoreChangeForegroundAndRevocation',
+    'ContinuousReminderImportUITests/testActualSourceEditIntoRecurringRuleIsPreservedAndAutomaticMovePauses',
+    'ContinuousReminderImportUITests/testInterruptionAndActualPermissionResetAfterCommitLeaveSourceAndTaskAvailable',
+    'ContinuousReminderImportUITests/testRealContinuousMoveSourceChangesForegroundRescanAndDurableReopen',
+    'CustomViewsUITests/testRawViewValidationSaveEditReopenResultsActionsAndDeletion',
+    'MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion',
+    'ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks',
+    'ReminderRecurrenceUITests/testActualCurrentWeeklyMoveRemovesOnlyVerifiedRemainderAfterDurableTemplateSave',
+    'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
+    'SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate',
+    'ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor',
+    'SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
+    'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
+    'TaskAddURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
+    'TaskAddURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
+    'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
+    'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch',
+    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
+    'TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft',
+    'TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus',
+    'TaskNotificationUITests/testActualClosedAppDeliveryAndLocalMutationReconciliation',
+    'TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope',
+    'TaskRowEditingUITests/testDependencyLinksSaveSourceAndExpandTargetWithReturnRoute',
+    'TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening',
+    'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
+    'TaskRowEditingUITests/testSupportingInformationEditsKeepTheExpandedDraftAndPersist',
+    'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
+    'WidgetUITests/testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError',
+    'WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch',
 )
+
+ON_DEMAND = (
+    'CalendarPresentationUITests/testCalendarVisibilityTogglesFilterIndependentlyAndPersistAcrossLaunches',
+    'CalendarPresentationUITests/testOverviewHoursSaveAcrossLaunchAndKeepEventsOutsideTheRange',
+    'CalendarPresentationUITests/testPopulatedCalendarOnlyShowsTimeAndTitleAboveTasksAcrossAppearances',
+    'CalendarPresentationUITests/testReadFailureHidesCalendarAndSettingsRetryRecoversWithTasksUsable',
+    'RecurringTemplateUITests/testRecordedRealGeneratorOccurrenceEditsAndCompletesWithoutChangingItsTemplate',
+    'RecurringTemplateUITests/testRecurringTemplateValidationCreationInspectionAndPersistentReopen',
+    'ReminderImportUITests/testDeniedRealRemindersPermissionKeepsOrdinaryTaskWorkspaceUsable',
+    'ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory',
+    'SpotlightUITests/testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
+    'SynchronizationUITests/testConnectionValidationPersistenceAndServerFailureRetainOfflineTask',
+    'TaskActivityUITests/testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState',
+    'TaskAddURLUITests/testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd',
+    'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations',
+    'TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary',
+    'TaskNotificationUITests/testActualPermissionRevocationStillAllowsDurableTaskCreation',
+    'TaskPresentationUITests/testMatchedPopulatedTaskListsAcrossAppearanceAndAccessibilityText',
+    'TaskRowEditingUITests/testAppearanceAndAccessibilityOverflow',
+    'TaskRowEditingUITests/testLongTitleNearBottomKeepsKeyboardAndScrollingUsable',
+    'TaskRowEditingUITests/testMiddleRowOpensSpaceAroundItsFixedHeader',
+    'TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal',
+    'TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard',
+    'TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen',
+    'TaskRowEditingUITests/testSupportingInformationOverflowAndEmptyActionsAtAccessibilitySize',
+    'TaskRowEditingUITests/testUpcomingAnchorAndMembershipChangeAfterCollapse',
+    'TaskScheduledUITests/testNonMidnightScheduledEditsKeepOtherDatesAndPersist',
+    'WorkspaceSettingsUITests/testSettingsRemainReachableAtLargestTextSize',
+    'WorkspaceSettingsUITests/testSynchronizationProgressStaysBesideWorkspaceTitle',
+)
+
+DIAGNOSTIC = ON_DEMAND
 KEYBOARD = (
     "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
-    "CalendarTodayUITests/testInjectedCalendarReadFailureKeepsTaskCaptureAndCompletionUsable",
-    "WorkspaceSettingsUITests/testPlacementAndEverySettingsDestination",
-    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-    "ShareCaptureUITests",
-    "AutomaticSynchronizationUITests",
-    "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
-)
-PHONE_KEYBOARD = (
-    "TskDependencyUITests/testDependencySelectionCycleFailureCompletionAndRemovalPersistInToday",
-    "TskUITests/testOrganizationProjectViewsAndListActionsPersist",
 )
 TEXT = (
-    "ShareCaptureUITests",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
+    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
     "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
-    "TypedFilterUITests/testComputedArithmeticViewErrorsEditsReopenAndCompletion",
 )
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
     "TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
-    "TaskAnnotationUITests/testIndependentNativeTextViewRecognizesPlainAndCommandKeys",
-    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
+    *KEYBOARD,
 )
 REGRESSION = (
     "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
@@ -55,20 +96,21 @@ REGRESSION = (
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
+SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
+              keyboard=KEYBOARD, text=TEXT, menu=MENU, regression=REGRESSION)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
-    'TaskActivityUITests', 'TaskAutomationUITests', 'TaskBulkSelectionUITests',
-    'TaskRowEditingUITests', 'TaskScheduledUITests', 'TypedFilterUITests',
+    'TaskActivityUITests', 'TaskBulkSelectionUITests', 'TaskRowEditingUITests',
+    'TaskScheduledUITests', 'TskUITests',
 }
-PHONE_TASK_PARTITION = {'TemporalFilterUITests', 'TskDependencyUITests', 'TskUITests', 'TskUpcomingUITests', 'TskWaitingUITests'}
 
 
 def test_methods():
     return {
         f"TskUITests/{path.stem}/{method}"
         for path in TEST_ROOT.glob("*.swift")
-        for method in re.findall(r"^\s*func (test\w+)\(", path.read_text(), re.MULTILINE)
+        for method in re.findall(r"^\s*(?:@\w+(?:\([^\n]*?\))?[ \t]+)*func (test\w+)\(", path.read_text(), re.MULTILINE)
     }
 
 
@@ -90,23 +132,28 @@ def selected_methods(filters):
     }
 
 
+def validate_cadence():
+    available = test_methods()
+    registered = ["TskUITests/" + case for case in NIGHTLY + ON_DEMAND]
+    if len(registered) != len(set(registered)):
+        raise ValueError("Each UI test must have exactly one cadence")
+    unknown = set(registered) - available
+    if unknown:
+        raise ValueError("Unknown UI test selector: " + ", ".join(sorted(unknown)))
+    unregistered = available - set(registered)
+    if unregistered:
+        raise ValueError("UI tests need an explicit cadence: " + ", ".join(sorted(unregistered)))
+    if not set(PHONE_SMOKE) <= set(NIGHTLY):
+        raise ValueError("Smoke must be a subset of nightly coverage")
+
+
 def selection(suite, family, partition="all"):
     if family != "iPhone":
         raise ValueError("Only iPhone UI coverage is supported")
-    if suite == "menu":
-        tests = MENU
-    elif suite == "regression":
-        tests = REGRESSION
-    elif suite == "text":
-        tests = TEXT
-    elif suite == "keyboard":
-        tests = KEYBOARD + PHONE_KEYBOARD
-    elif suite == "diagnostic":
-        tests = DIAGNOSTIC
-    elif suite == "full":
-        tests = ()
-    else:
-        tests = PHONE_SMOKE
+    validate_cadence()
+    if suite not in SUITES:
+        raise ValueError("Unknown UI suite: " + suite)
+    tests = SUITES[suite]
     filters = ["-only-testing:TskUITests/" + test for test in tests]
     available = test_methods()
     for item in filters:
@@ -117,8 +164,7 @@ def selection(suite, family, partition="all"):
         return filters
     selected = selected_methods(filters)
     rows = {test for test in selected if matches(test, "TskUITests/TaskRowEditingUITests")}
-    task_classes = TASK_PARTITION | PHONE_TASK_PARTITION
-    row_group = {test for test in selected if test.split('/')[1] in task_classes}
+    row_group = {test for test in selected if test.split('/')[1] in TASK_PARTITION}
     if partition == "row-editing":
         chosen = row_group
     elif partition == "workspace":
@@ -143,7 +189,10 @@ def requires_sync_peer(filters):
 
 
 def requires_sync_server(filters):
-    return any(test.split('/')[1] in ('SynchronizationUITests', 'MissedNotificationUITests', 'SpotlightUITests') for test in selected_methods(filters))
+    return bool(selected_methods(filters) & {
+        "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
+        "TskUITests/MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion",
+    })
 
 
 def requires_native_keyboard(filters):

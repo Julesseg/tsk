@@ -1,5 +1,83 @@
 # Test suite consolidation
 
+## November 2026 reduction
+
+The reviewed selection now runs three PR methods instead of twelve and thirty
+nightly methods instead of eighty-five. Twenty-eight redundant methods are
+deleted; twenty-seven distinct layout/system variants run only on demand.
+The source target retains 57 methods. The previously undiscovered inline
+`@MainActor` intent readback is also deleted. Core, Native, Apple-framework,
+controller, native HID protocol and result-integrity checks remain.
+
+The exact keep lists are `PHONE_SMOKE`, `NIGHTLY` and `ON_DEMAND` in
+[the selector](../../scripts/ui-test-selection.py). Routing rejects unclassified
+methods, missing selectors and duplicate cadences. Full now names the reviewed
+nightly contract rather than every method compiled into the UI target.
+
+| Removed UI repetition | Retained evidence |
+| --- | --- |
+| Decimal occurrence position repeating the same UI helper | Native `decimalOccurrencePositionSurvivesNativeEditingCompletionAndReopen`; ordinary occurrence circle success/failure stays nightly |
+| Malformed occurrence completion/start and occurrence activity variants | Core/Native occurrence/activity checks, genuine occurrence-circle failure and inline row activity mutation |
+| DEBUG startup intent action/readback tests | Apple Native actual `perform()` tests with durable storage; these UI fixtures never invoked external Shortcuts/Siri |
+| Relative-date/arithmetic saved-view variants | Core and pinned Taskwarrior Native conformance; one raw-filter UI authoring/validation/result lifecycle stays |
+| Waiting, carry-forward, midnight, Upcoming day-group and organization round trips | Core/Native date/view/persistence checks; actual row controls, bulk Apply and durable completion stay |
+| Separate selection holds/toggles, Upcoming duplication/failure and last-result membership case | The retained gesture runs without native list IDs and covers sweep deselection/re-entry; Core selection identity and Native atomic membership checks remain, alongside nightly Apply failure/editor retention |
+| Injected Calendar empty/access/error matrices | Core/controller/Native policies and real Calendar grant/deny/change/foreground journey; display/recovery/overflow UI stays on demand |
+| Peer-completion Spotlight fixture | Apple Native received-encrypted-sync/common-effects/index regression; real system search/tap stays nightly |
+| Separate URL add/readback | Current-tab/no-editor assertions join actual caller/callback creation and durable UUID readback |
+| Four-configuration notification-control existence tour and duplicate Upcoming completion feedback | Real notification registration/delivery UI and controller checked-feedback lifecycle checks |
+| Settings destination and Projects/color tours | Retained feature journeys reach their Settings destinations; screenshots did not assert colors |
+| Standalone UIKit keyboard baseline control | Real product HID/focus journey nightly, annotation HID on demand and protocol/ownership host checks |
+
+This deliberately reduces exhaustive per-view UI wiring: Today waiting captions,
+Upcoming regrouping/duplicate-circle/view-change behavior, Projects-only routes
+and detail dependency-cycle errors rely more heavily on host behavior checks.
+Appearance/large text, geometry, animation drift, Project-menu stress/focus/scroll,
+Calendar settings, permission revocation, detail activity/annotations, recurring
+authoring/copy, stale Spotlight and failed callback delivery remain callable on
+demand. These are accepted frequency/coverage tradeoffs, not equivalent assertions
+proven by a different journey. Run the relevant on-demand cases when changing
+those paths.
+
+The retained bulk-date test drops its final repeated fresh-app screenshot pass.
+The notification delivery test drops a 100-request capacity probe whose assertion
+allowed any retained count from one through one hundred; it did not prove an
+exact capacity or which tasks survived. Closed-app delivery and actual mutation
+reconciliation remain. The native menu stress/retention and animation cases keep
+their original loops, untouched intervals, assertions and deadlines on demand.
+
+### Timing baseline and validation limits
+
+[PR run 43016545565](https://github.com/Julesseg/tsk/actions/runs/43016545565)
+passed twelve methods on 11 November. They totaled 1,159.0 seconds (19.3 minutes).
+The three retained method durations totaled 408.2 seconds (6.8 minutes) in that
+same run. This is a counterfactual selection comparison, before the assertion
+joins; it is not a measured new-suite runtime. The original worker took 24.7
+minutes, its producer 6.1 minutes and an execution queue added about 21 minutes.
+
+[Scheduled run 42589919139](https://github.com/Julesseg/tsk/actions/runs/42589919139)
+passed all eighty selected methods on 9 November at `8b7ae9b`. Summed method
+time was 103.9 minutes across two parallel workers. Twenty-eight matching retained
+methods cost 44.2 minutes there; the two newer retained bulk-date methods add
+roughly 3.6 minutes using PR timings. Revisions and method bodies differ, so
+roughly half the test execution is an estimate. Builds, setup, cleanup and queues
+do not shrink proportionally. The incomplete 11 November nightly is excluded
+from this baseline.
+
+The two nightly workers retain nineteen workspace and eleven task/row methods.
+Native HID, installed integrations and UI server/peer consumers remain together
+in workspace. Smoke no longer starts a UI server/peer. The shared producer still
+builds the server/probe for Native conformance and runs its real synchronization
+fixtures.
+
+Acceptance requires existing routing/ownership/gate regressions, signed test
+product compilation, PR smoke and the reduced full selection at the exact
+implementation head. Inspect selected/completed methods, skips, duplicates,
+source/toolchain identity and native receipts, then measure actual execution and
+wall time separately. No post-change runtime is claimed by this baseline.
+
+## Earlier consolidation (historical)
+
 The requested reduction targets expensive UI repetition rather than fast Core
 coverage. Before consolidation, the successful iPhone smoke run on `08c5e4d`
 (run 40511713919) spent 1,777.152 seconds executing 22 methods, excluding setup

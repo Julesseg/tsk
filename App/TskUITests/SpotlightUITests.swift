@@ -43,24 +43,6 @@ import XCTest
         capture("Real stale system result resolves unavailable without a replacement task", app)
     }
 
-    func testReceivedEncryptedPeerCompletionReconcilesActualIndex() throws {
-        let token = UUID().uuidString
-        let app = configuredApp(token)
-        for key in ["TSK_UI_SYNC_SERVER_URL", "TSK_UI_SYNC_CLIENT_ID", "TSK_UI_SYNC_SECRET"] {
-            app.launchEnvironment[key] = try XCTUnwrap(ProcessInfo.processInfo.environment[key], "Canonical owned sync fixture must be configured")
-        }
-        defer { clean(app) }
-        app.launch()
-        let id = create("tsk remote " + token, app)
-        openSettings(app); query(app, id: id, present: true)
-        XCTAssertTrue(revealTaskElement(app.buttons["spotlight-sync-fixture"], in: "spotlight-settings-form", app: app))
-        app.buttons["spotlight-sync-fixture"].tap()
-        XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].waitForExistence(timeout: 45))
-        XCTAssertTrue(app.staticTexts["spotlight-fixture-result"].label.contains("Actual encrypted peer completion received"), app.staticTexts["spotlight-query-error"].label)
-        query(app, id: id, present: false)
-        capture("Actual received encrypted sync completion reconciles scoped Spotlight index", app)
-    }
-
     private func clean(_ app: XCUIApplication) {
         app.terminate()
         app.launchEnvironment["TSK_TEST_SPOTLIGHT_CLEANUP"] = "1"
