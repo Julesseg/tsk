@@ -309,12 +309,8 @@ struct TaskRowParameterPicker: View {
             case .tags:
                 TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
             default:
-                DatePicker(parameter.title, selection: $selectedDate,
-                           displayedComponents: [.date, .hourAndMinute])
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
+                TaskParameterDatePicker(parameter: parameter, selection: $selectedDate)
                     .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
-                    .accessibilityIdentifier(parameter.identifier + "-picker")
             }
             if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
                 Button("Remove " + parameter.title.lowercased(), role: .destructive) {
@@ -344,6 +340,19 @@ struct TaskRowParameterPicker: View {
             dismiss()
         }
         .accessibilityIdentifier("close-row-parameter")
+    }
+}
+
+struct TaskParameterDatePicker: View {
+    let parameter: TaskRowParameter
+    @Binding var selection: Date
+
+    var body: some View {
+        DatePicker(parameter.title, selection: $selection, displayedComponents: [.date, .hourAndMinute])
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .accessibilityLabel(parameter.title)
+            .accessibilityIdentifier(parameter.identifier + "-picker")
     }
 }
 

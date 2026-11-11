@@ -27,6 +27,7 @@ struct TaskSelectionGesture: UIViewRepresentable {
         let view = SelectionAnchor()
         view.recognizer.store = store
         view.recognizer.scope = scope
+        scope.selectionRecognizer = view.recognizer
         return view
     }
 
@@ -87,7 +88,7 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
         super.init(target: nil, action: nil)
         delegate = self
         cancelsTouchesInView = true
-        minimumPressDuration = 0.5
+        minimumPressDuration = 0.25
         allowableMovement = 10
         addTarget(self, action: #selector(handlePress))
     }
@@ -97,7 +98,8 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
         trace("began", details: ["touches": "\(touches.count)", "activeTouch": "\(activeTouch != nil)", "rows": "\(rows.count)"])
         recordedFirstMovement = false
         #endif
-        guard activeTouch == nil, touches.count == 1, let touch = touches.first, let store, !store.isSaving else { state = state == .possible ? .failed : .cancelled; finish(); return }
+        guard activeTouch == nil, touches.count == 1, let touch = touches.first, let store, !store.isSaving,
+              store.selectionDateField == nil else { state = state == .possible ? .failed : .cancelled; finish(); return }
         generation += 1
         preparation?.cancel()
         collapsedLayout?.resume()

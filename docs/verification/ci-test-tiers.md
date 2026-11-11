@@ -8,8 +8,8 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
-| Smoke | 8 methods | PR, main push, explicit dispatch |
-| Full | 81 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Smoke | 12 methods | PR, main push, explicit dispatch |
+| Full | 85 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | `diagnostic_only=true` |
 | Keyboard | 12 methods | Explicit dispatch |
 | Text | 4 methods | Explicit dispatch |
@@ -19,7 +19,24 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 Smoke covers capture, validation, cancellation, durable row editing/completion,
 view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
 vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
-duplicates, failure retention, view changes and editor validation. Hardware keyboard, installed Share/widgets/Spotlight,
+duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
+stage both dates and completion until Apply, discard every pending change with the toolbar X,
+keep unchanged controls neutral and tint modified controls. The count becomes an enabled
+Apply button only for actual changes. Changed collapsed values include a neutral Reset icon;
+Reset is enabled only for modified fields. The glass date controls expand in place;
+Apply commits mixed-value edits atomically and reconciles Upcoming membership. The compact
+calendar/time picker keeps Reset, Remove, Today and Tomorrow in a bottom action row without
+an outer scroll view, using filled controls on one glass surface. Its checkmark and an
+outside list tap collapse it while retaining pending values. Outside taps do not change
+selection. Selection activates after a quarter-second hold; ordinary swipes remain unselected.
+The animation-enabled selection regression samples presentation frames across direct calendar
+input, quick actions and Reset, requiring the bottom actions to remain within one point.
+Controls fade in and out symmetrically, while tint fades are isolated from picker layout.
+Selection calendars reuse native controls during selection and detach them when closed.
+Repeated opening and closing requires one close button and no hidden native picker after dismissal.
+The picker morph and safe-area layout share a 0.22-second smooth animation; collapsing a focused
+row also dismisses its keyboard before selection controls appear.
+Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
 behavior outside smoke. Moving frequency does not establish acceptance.
@@ -51,6 +68,9 @@ the annotation presentation/editor scope, and a cross-family workspace/row-edito
 journey. The latter starts without focused input, captures and saves with actual
 commands, checks plain typing and selected-row editing/completion/view commands,
 then verifies capture/save after returning from Settings and durable results.
+It also enters bulk selection with native Command-Shift-S, sends Escape to collapse a pending Scheduled picker,
+and uses the toolbar X to discard the selection. Return invokes Done to commit a pending Deadline change,
+checking unchanged Scheduled and selection exit.
 The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
 Transport ownership and complete case-specific phase acknowledgements must match
 the native UI outcomes; a fallback action or transport ACK alone is insufficient.
@@ -71,10 +91,10 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 81 iPhone methods without skips,
-partitioned 44 workspace / 37 task-row methods. The retired iPad-only class and
+in existing methods. Full coverage retains all 85 iPhone methods without skips,
+partitioned 44 workspace / 41 task-row methods. The retired iPad-only class and
 its seven-phase transport case are removed; the iPhone workspace/editor journey
-still requires all nine phases, alongside annotation and native-control coverage.
+still requires all thirteen phases, alongside annotation and native-control coverage.
 Historical reports before ADR 0007 include retired iPad runs and do not establish
 current iPhone acceptance. Focused diagnostics do not replace clean-head full
 coverage or physical-device verification.
@@ -140,7 +160,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 44 methods | 37 methods |
+| iPhone | 44 methods | 41 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers
@@ -196,6 +216,14 @@ item or button within five seconds, and actual clear/readback assertions. Each
 sample binds the unique native candidate from one scoped query; its observed
 geometry supplies the touch without re-querying the disappearing menu. Empty
 application frames require containment in an actual owned window.
+
+Keyboard geometry comes from one snapshot traversal without visiting individual key
+contents. Geometry diagnostics print after admission and input, so log output
+cannot consume the readiness deadline. Password prompts require valid geometry
+from their owning application before querying a native hit point.
+Capture typing resumes after a confirmed password interruption only when the
+entered text remains an exact prefix; complete readback and durable save are
+still required.
 
 Transient GitHub jobs-API HTTP 429/500/502/503/504 responses and request timeouts
 retain upstream retries, up to three attempts. Requests and backoff consume the

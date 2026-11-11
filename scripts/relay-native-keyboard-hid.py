@@ -33,7 +33,7 @@ def chord(key, shift=False):
 CHORDS = {
     CASE: {'commandReturn': CHORD},
     ANNOTATIONS: {'secondNoteCommandN': chord(17), 'secondNoteSave': CHORD, 'editSelectAll': chord(4), 'editedNoteSave': CHORD},
-    COMPATIBILITY: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'complete': chord(40, shift=True), 'completedView': chord(33), 'captureAfterReturn': chord(17), 'saveAfterReturn': CHORD},
+    COMPATIBILITY: {'capture': chord(17), 'saveNew': CHORD, 'select': chord(81), 'edit': chord(8), 'saveEdit': CHORD, 'selectBulkForCancel': chord(22, shift=True), 'cancelBulkDate': ((41, 'DOWN'), (41, 'UP')), 'selectBulkForApply': chord(22, shift=True), 'applyBulkDate': ((40, 'DOWN'), (40, 'UP')), 'complete': chord(40, shift=True), 'completedView': chord(33), 'captureAfterReturn': chord(17), 'saveAfterReturn': CHORD},
 }
 BOUNDARY = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \([\d.,]+ seconds\)\.)$")
 TIMEOUT = re.compile(rb"^Test Case '-\[(?:TskUITests\.)?(\w+) (\w+)\]' exceeded execution time allowance of [\d.,]+ (?:seconds|minutes)\. .+$")

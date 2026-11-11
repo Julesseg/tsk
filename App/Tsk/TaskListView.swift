@@ -65,9 +65,27 @@ struct TaskListView: View {
         }
         .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
         .scrollDisabled(store.isSelectionGestureActive)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if store.isSelectingTasks { TaskSelectionBar(store: store) }
+        .overlay(alignment: .top) {
+            if store.selectionDateField != nil {
+                Button { store.selectionDateField = nil } label: {
+                    Color.clear
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close date picker")
+                .accessibilityIdentifier("dismiss-selection-date")
+            }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                if store.isSelectingTasks {
+                    TaskSelectionBar(store: store).transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.isSelectingTasks)
+        }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: store.selectionDateField)
         .onChange(of: store.completionContext) { _, _ in store.endTaskSelection() }
         .modifier(TaskRowFocusOffset(editing: store.rowEditing))
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
@@ -281,7 +299,8 @@ struct TaskListRow: View {
             }
         }
         .onChange(of: expanded) { _, expanded in
-            if expanded, editing?.isCapture == true { titleFocused = true }
+            if !expanded { titleFocused = false }
+            else if editing?.isCapture == true { titleFocused = true }
         }
         .onAppear {
             if let editing {
@@ -351,11 +370,16 @@ struct TaskListRow: View {
 
 private struct TaskRowTapButtonStyle: PrimitiveButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.taskSelectionScope) private var scope
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.onTapGesture {
-            if isEnabled { configuration.trigger() }
-        }
+        configuration.label
+            .overlay {
+                TaskRowTapTarget(scope: scope, isEnabled: isEnabled, action: configuration.trigger)
+            }
+            .accessibilityAction {
+                if isEnabled { configuration.trigger() }
+            }
     }
 }
 

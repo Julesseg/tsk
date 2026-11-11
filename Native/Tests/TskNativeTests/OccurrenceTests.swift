@@ -5,6 +5,67 @@ import TskNative
 
 @Suite(.serialized)
 struct OccurrenceTests {
+    @Test @MainActor func selectionDoneRollsBackBothDatesAndCompletionThenPersistsAllTogether() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let replica = TaskChampionReplica(directory: directory)
+        let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-W", "opaque": "series"])
+        let first = try await replica.create(id: UUID(), attributes: ["status": "pending", "scheduled": "200", "due": "400", "parent": parent.id.uuidString, "imask": "0.0"])
+        let second = try await replica.create(id: UUID(), attributes: ["status": "pending", "due": "500", "wait": "300", "parent": parent.id.uuidString, "imask": "1", "opaque": "retain"])
+        let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+        let original = try await manager.tasks()
+        let count = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
+        try sqlite(directory, "CREATE TRIGGER fail_selection BEFORE INSERT ON operations WHEN (SELECT COUNT(*) FROM operations) > \(count.trimmingCharacters(in: .whitespacesAndNewlines)) BEGIN SELECT RAISE(ABORT, 'selection rollback fixture'); END;")
+        let changes = TaskSelectionChanges(scheduled: .remove, deadline: .set(Date(timeIntervalSince1970: 800)), complete: true)
+        await #expect(throws: (any Error).self) { try await manager.applySelection(ids: [first.id, second.id], changes: changes) }
+        #expect(try await manager.tasks() == original)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == count)
+        try sqlite(directory, "DROP TRIGGER fail_selection;")
+        _ = try await manager.applySelection(ids: [first.id, second.id], changes: changes)
+        let reopened = try await TaskChampionSession.open(directory: directory)
+        #expect(try await reopened.task(id: parent.id).attributes["mask"] == "++")
+        for id in [first.id, second.id] {
+            let saved = try await reopened.task(id: id)
+            #expect(saved.status == "completed" && saved.attributes["end"] == "100")
+            #expect(saved.attributes["scheduled"] == nil && saved.attributes["due"] == "800")
+        }
+        #expect(try await reopened.task(id: second.id).attributes["opaque"] == "retain")
+    }
+
+    @Test @MainActor func bulkDatesRollBackOnDiskFailureAndPersistIndependentFieldsAfterRetry() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let replica = TaskChampionReplica(directory: directory)
+        let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-W", "opaque": "series"])
+        let first = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "First", "scheduled": "200", "due": "400", "parent": parent.id.uuidString, "imask": "0.00", "opaque": "e\u{301}"])
+        let second = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Second", "due": "500", "wait": "300", "parent": parent.id.uuidString, "imask": "1"])
+        let plain = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Plain", "due": "600", "project": "work"])
+        let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+        let original = try await manager.tasks()
+        let operationCount = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
+        try sqlite(directory, "CREATE TRIGGER fail_dates BEFORE INSERT ON operations WHEN (SELECT COUNT(*) FROM operations) > \(operationCount.trimmingCharacters(in: .whitespacesAndNewlines)) BEGIN SELECT RAISE(ABORT, 'bulk date rollback fixture'); END;")
+        let ids = [first.id, second.id, plain.id, first.id]
+        await #expect(throws: (any Error).self) { try await manager.changeDate(ids: ids, field: .scheduled, change: .set(Date(timeIntervalSince1970: 700))) }
+        #expect(try await manager.tasks() == original)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == operationCount)
+        try sqlite(directory, "DROP TRIGGER fail_dates;")
+        #expect(try await manager.changeDate(ids: ids, field: .scheduled, change: .set(Date(timeIntervalSince1970: 700))).count == 3)
+        let scheduled = try await manager.tasks()
+        await #expect(throws: (any Error).self) { try await manager.changeDate(ids: ids, field: .deadline, change: .remove) }
+        #expect(try await manager.tasks() == scheduled)
+        _ = try await manager.changeDate(ids: ids, field: .scheduled, change: .remove)
+        _ = try await manager.changeDate(ids: ids, field: .deadline, change: .set(Date(timeIntervalSince1970: 800)))
+        let reopened = try await TaskChampionSession.open(directory: directory)
+        #expect(try await reopened.task(id: parent.id) == parent)
+        for original in [first, second, plain] {
+            var expected = original
+            expected.attributes["scheduled"] = nil
+            expected.attributes["due"] = "800"
+            expected.attributes["modified"] = "100"
+            #expect(try await reopened.task(id: original.id) == expected)
+        }
+    }
+
     @Test @MainActor func decimalOccurrencePositionSurvivesNativeEditingCompletionAndReopen() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -230,7 +230,7 @@ struct ContentView: View {
 
     private var integrationSheets: some View {
         navigationWorkspace
-        .taskKeyboardCommands(workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended)
+        .taskKeyboardCommands(keyboardCommands)
         #if DEBUG && targetEnvironment(simulator)
         .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
         #endif
@@ -373,7 +373,7 @@ struct ContentView: View {
                     if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
                         Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
-                    if let error = store.error, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
+                    if let error = store.error, !store.isSelectingTasks, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
@@ -393,8 +393,20 @@ struct ContentView: View {
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
-                .accessibilityIdentifier("workspace-settings")
+            if store.isSelectingTasks {
+                Button("Cancel selection", systemImage: "xmark") {
+                    guard !store.isSelectionGestureActive else { return }
+                    store.endTaskSelection()
+                }
+                    .labelStyle(.iconOnly)
+                    .tint(.primary)
+                    .disabled(store.isSaving)
+                    .allowsHitTesting(!store.isSelectionGestureActive)
+                    .accessibilityIdentifier("cancel-task-selection")
+            } else {
+                Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                    .accessibilityIdentifier("workspace-settings")
+            }
         }
     }
 
@@ -446,8 +458,14 @@ struct ContentView: View {
         store.customView == nil && store.query == .upcoming ? store.upcomingDays.flatMap(\.entries).map(\.task) : store.visibleTasks
     }
 
+    private var keyboardCommands: [TaskKeyboardCommand] {
+        guard !store.isSaving, !store.isSelectionGestureActive else { return TaskKeyboardCommand.suspended }
+        guard store.isSelectingTasks else { return workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended }
+        return (workspaceActions?.keyboardCommands.filter { $0.id != "complete" } ?? []) + store.selectionKeyboardCommands
+    }
+
     private var workspaceActions: TaskWorkspaceActions? {
-        guard !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
+        guard store.selectionDateField == nil, !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
               !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
         #if DEBUG && targetEnvironment(simulator)
         guard !isShowingSpotlightDiagnostics else { return nil }
@@ -455,7 +473,7 @@ struct ContentView: View {
         return TaskWorkspaceActions(
             capture: capture,
             edit: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
-            complete: store.isSelectingTasks ? { Task { await store.completeSelection() } } : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
+            complete: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
             move: moveSelection,
             reveal: selectedTask.map { task in {
                 if isProjectWorkspace { projectPath.append(task.id) }

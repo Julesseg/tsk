@@ -18,6 +18,7 @@ import XCTest
             return
         }
         let app = taskTestApplication()
+        app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
@@ -59,7 +60,41 @@ import XCTest
             !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [editorClosed], timeout: 10), .completed)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Closing the focused editor dismisses its keyboard before selection controls appear")
         XCTAssertEqual(revisedRow.identifier, identity)
+        try command("selectBulkForCancel")
+        XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 5))
+        app.buttons["selection-scheduled"].tap()
+        app.buttons["selection-date-today"].tap()
+        XCTAssertEqual(app.buttons["selection-date-today"].value as? String, "Selected")
+        try command("cancelBulkDate")
+        XCTAssertTrue(app.datePickers["scheduled-picker"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["selection-scheduled"].value as? String, "Modified")
+        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 1")
+        app.buttons["cancel-task-selection"].tap()
+        revisedRow.tap()
+        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
+        closeTaskRow(app)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
+        }, object: nil)], timeout: 10), .completed)
+        try command("selectBulkForApply")
+        XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 5))
+        app.buttons["selection-deadline"].tap()
+        app.buttons["selection-date-tomorrow"].tap()
+        try command("applyBulkDate")
+        XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 10))
+        revisedRow.tap()
+        XCTAssertTrue(app.buttons["row-deadline"].waitForExistence(timeout: 5))
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
+        let deadline = Calendar.current.startOfDay(for: tomorrow).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en_US")))
+        XCTAssertEqual(app.buttons["row-deadline"].value as? String, deadline)
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
+        closeTaskRow(app)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
+        }, object: nil)], timeout: 10), .completed)
         try command("complete")
         XCTAssertTrue(revisedRow.waitForNonExistence(timeout: 10))
         try command("completedView")

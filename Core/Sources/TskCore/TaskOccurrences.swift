@@ -30,16 +30,8 @@ extension TaskManager {
         let rawMask = parent.attributes["mask"]!
         var mask = Array(rawMask.utf8)
         if occurrence.status == "completed", completing, mask[index] == 43 { return occurrence }
-        guard occurrence.status == "pending", [45, 87].contains(mask[index]) else { throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.") }
         guard let atomic = replica as? any TaskAtomicMutatingReplica else { throw TaskManagementError.storage("This storage adapter cannot save recurrence bookkeeping atomically.") }
-        if completing { mask[index] = 43 }
-        else {
-            if changes.keys.contains("due"), (changes["due"] ?? nil)?.isEmpty != false { throw TaskManagementError.storage("A generated occurrence must retain its due date. No tasks were changed.") }
-            let value = changes.keys.contains("wait") ? changes["wait"] ?? nil : occurrence.attributes["wait"]
-            if let value, let seconds = TimeInterval(value), seconds.isFinite { mask[index] = seconds > now().timeIntervalSince1970 ? 87 : 45 }
-            else if value == nil { mask[index] = 45 }
-            else { throw TaskManagementError.storage("The occurrence wait date is invalid. No tasks were changed.") }
-        }
+        mask[index] = try occurrenceMutationMask(occurrence, changes: changes, parent: parent, index: index, completing: completing)
         let parentChanges: TaskAttributePatch = String(decoding: mask, as: UTF8.self).matchesBytes(rawMask) ? [:] : ["mask": String(decoding: mask, as: UTF8.self), "modified": String(Int(now().timeIntervalSince1970))]
         let saved = try await atomic.updateAtomically([
             TaskAtomicUpdate(id: occurrence.id, expected: occurrence.attributes, changes: changes),
@@ -48,6 +40,20 @@ extension TaskManager {
         guard let result = saved.first(where: { $0.id == occurrence.id }) else { throw TaskManagementError.storage("The atomic save returned no occurrence.") }
         await localChangeWasCommitted(tasks: saved)
         return result
+    }
+
+    func occurrenceMutationMask(_ occurrence: TaskRecord, changes: TaskAttributePatch, parent: TaskRecord, index: Int, completing: Bool = false) throws -> UInt8 {
+        guard occurrence.status == "pending", [45, 87].contains(Array(parent.attributes["mask"]!.utf8)[index]) else {
+            throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.")
+        }
+        if changes.keys.contains("due"), (changes["due"] ?? nil)?.isEmpty != false {
+            throw TaskManagementError.storage("A generated occurrence must retain its due date. Change its deadline instead, or deselect it before removing deadlines. No tasks were changed.")
+        }
+        if completing { return 43 }
+        let value = changes.keys.contains("wait") ? changes["wait"] ?? nil : occurrence.attributes["wait"]
+        if let value, let seconds = TimeInterval(value), seconds.isFinite { return seconds > now().timeIntervalSince1970 ? 87 : 45 }
+        if value == nil { return 45 }
+        throw TaskManagementError.storage("The occurrence wait date is invalid. No tasks were changed.")
     }
 
     func occurrencePosition(_ occurrence: TaskRecord, in records: [TaskRecord]) throws -> (TaskRecord, Int) {
