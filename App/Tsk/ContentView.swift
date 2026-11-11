@@ -234,7 +234,7 @@ struct ContentView: View {
         #if DEBUG && targetEnvironment(simulator)
         .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
         #endif
-        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications) }
+        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications).modifier(TaskWorkspacePanel(store: store)) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
     }
@@ -248,14 +248,14 @@ struct ContentView: View {
             CustomViewsView(store: store, select: {
                 tabsBeforeEditingViews = nil
                 tabSelection.wrappedValue = $0
-            })
+            }).modifier(TaskWorkspacePanel(store: store))
         }
         .sheet(isPresented: $isConfiguringSync) {
-            SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError)
+            SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError).modifier(TaskWorkspacePanel(store: store))
         }
-        .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store) }
+        .sheet(isPresented: $isShowingRecurring) { RecurringTemplatesView(store: store).modifier(TaskWorkspacePanel(store: store)) }
         .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
-            TaskSettingsView(calendar: calendar, choose: chooseWorkspaceSetting)
+            TaskSettingsView(calendar: calendar, choose: chooseWorkspaceSetting).modifier(TaskWorkspacePanel(store: store))
         }
         .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
     }
