@@ -11,18 +11,24 @@ struct TaskFindResultsView: View {
     let results: TaskFindResults
     let store: TaskStore
 
+    private var currentTasks: [TaskRecord] {
+        results.tasks.compactMap { result in
+            store.allTasks.first { $0.id == result.id && $0.status != "deleted" }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
-                if results.tasks.isEmpty {
+                if currentTasks.isEmpty {
                     ContentUnavailableView("No matching tasks", systemImage: "magnifyingglass", description: Text("No saved tasks match the supplied filters."))
                         .accessibilityIdentifier("find-results-empty")
                 } else {
                     List {
                         Section {
-                            ForEach(results.tasks) { task in
+                            ForEach(currentTasks) { task in
                                 NavigationLink {
-                                    TaskDetailView(store: store, task: task)
+                                    TaskFindResultDestination(store: store, taskID: task.id)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(task.description)
@@ -33,7 +39,7 @@ struct TaskFindResultsView: View {
                                 .accessibilityIdentifier("find-task-" + task.id.uuidString)
                             }
                         } header: {
-                            Text("\(results.tasks.count) matching tasks")
+                            Text("\(currentTasks.count) matching tasks")
                         } footer: {
                             Text("Results from this Find request. Your saved views and favorites are unchanged.")
                         }
@@ -48,6 +54,19 @@ struct TaskFindResultsView: View {
                     Button("Done") { dismiss() }.accessibilityIdentifier("close-find-results")
                 }
             }
+        }
+    }
+}
+
+private struct TaskFindResultDestination: View {
+    let store: TaskStore
+    let taskID: UUID
+
+    var body: some View {
+        if let task = store.allTasks.first(where: { $0.id == taskID && $0.status != "deleted" }) {
+            TaskDetailView(store: store, task: task)
+        } else {
+            ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
         }
     }
 }

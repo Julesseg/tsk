@@ -132,8 +132,8 @@ async fn execute(request: Request) -> Result<Value, String> {
                 return Err("Reserved task attribute cannot be changed by this action".into());
             }
             if let Some(status) = changes.iter().find(|attribute| attribute.key == "status") {
-                if status.value.as_deref() != Some("completed") { return Err("Unsupported status transition".into()); }
-                if task.get("status") == Some("completed") { return Ok(record(task)); }
+                if !matches!(status.value.as_deref(), Some("completed") | Some("deleted")) { return Err("Unsupported status transition".into()); }
+                if task.get("status") == status.value.as_deref() { return Ok(record(task)); }
             }
             let mut operations = vec![taskchampion::Operation::UndoPoint];
             for Attribute { key, value } in changes { task.update(key, value, &mut operations); }

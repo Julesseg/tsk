@@ -7,5 +7,6 @@ struct TskShortcuts: AppShortcutsProvider {
         AppShortcut(intent: FindTasksIntent(), phrases: ["Find tasks in \(.applicationName)", "Show my tasks in \(.applicationName)"], shortTitle: "Find Tasks", systemImageName: "checklist")
         AppShortcut(intent: CompleteTaskIntent(), phrases: ["Complete a task in \(.applicationName)"], shortTitle: "Complete Task", systemImageName: "checkmark.circle")
         AppShortcut(intent: ModifyTaskIntent(), phrases: ["Modify a task in \(.applicationName)"], shortTitle: "Modify Task", systemImageName: "square.and.pencil")
+        AppShortcut(intent: DeleteTaskIntent(), phrases: ["Delete a task in \(.applicationName)"], shortTitle: "Delete Task", systemImageName: "trash")
     }
 }

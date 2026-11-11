@@ -25,4 +25,26 @@ public struct CompleteTaskIntent: AppIntent {
     }
 }
 
+@available(iOS 16, macOS 13, *)
+public struct DeleteTaskIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Delete Task"
+    public static let description = IntentDescription("Immediately mark one task deleted without confirmation. Its identity and history remain stored. The deletion is saved locally before the action finishes, including offline.")
+    public static let openAppWhenRun = false
+    @Parameter(title: "Task") public var task: IntentTaskEntity
+    private var directory: URL?
+    public static var parameterSummary: some ParameterSummary { Summary("Delete \(\.$task)") }
+
+    public init() {}
+    public init(task: IntentTaskEntity, directory: URL? = nil) {
+        self.task = task
+        self.directory = directory
+    }
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<IntentTaskEntity> & ProvidesDialog {
+        let manager = try await IntentTaskSession.open(directory: directory)
+        let saved = try await manager.delete(id: task.id)
+        return .result(value: IntentTaskEntity(saved), dialog: "Deletion saved locally: \(saved.description)")
+    }
+}
+
 #endif
