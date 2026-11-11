@@ -109,6 +109,10 @@ private actor CaptureReplica: TaskReplica {
 @MainActor @Test func taskURLPreparationRetainsInvalidCaptureAndSavesItsCorrectedFields() async throws {
     let manager = TaskManager(replica: CaptureReplica())
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    let openPanel = UUID()
+    store.presentedTaskPanels.insert(openPanel)
+    #expect(!(await store.prepareForTaskActionNavigation()))
+    store.presentedTaskPanels.remove(openPanel)
     await store.beginCapture(reduceMotion: true)
     let editing = try #require(store.rowEditing)
     await editing.setExpanded(true, reduceMotion: true)
