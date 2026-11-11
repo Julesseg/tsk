@@ -64,6 +64,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
     case unsupportedTaskKind
     case reservedAttribute(String)
     case taskNotFound(UUID)
+    case taskDeleted(UUID)
     case storage(String)
 
     public var errorDescription: String? {
@@ -80,6 +81,7 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         case .unsupportedTaskKind: "This action is unavailable for recurring templates or this saved task state. Its attributes remain preserved."
         case .reservedAttribute(let name): "The \(name) attribute requires its dedicated task action."
         case .taskNotFound: "This task is no longer available."
+        case .taskDeleted: "This task has been deleted. No tasks were changed."
         case .storage(let message): "Local task storage failed: \(message)"
         }
     }
@@ -142,10 +144,11 @@ public actor TaskManager {
         return UpcomingDay.groups(tasks: records, at: now(), calendar: calendar)
     }
 
-    public func task(id: UUID) async throws -> TaskRecord {
+    public func task(id: UUID, includingDeleted: Bool = true) async throws -> TaskRecord {
         guard let task = try await tasks().first(where: { $0.id == id }) else {
             throw TaskManagementError.taskNotFound(id)
         }
+        guard includingDeleted || task.status != "deleted" else { throw TaskManagementError.taskDeleted(id) }
         return task
     }
 
@@ -203,7 +206,7 @@ public actor TaskManager {
     public func complete(id: UUID) async throws -> TaskRecord {
         let lease = try await beginMutation()
         defer { endMutation(lease) }
-        let task = try await self.task(id: id)
+        let task = try await self.task(id: id, includingDeleted: false)
         if task.isOccurrence {
             let timestamp = String(Int(now().timeIntervalSince1970))
             return try await saveOccurrence(task, changes: ["status": "completed", "end": task.attributes["end"] ?? timestamp, "modified": timestamp, "start": nil], completing: true)

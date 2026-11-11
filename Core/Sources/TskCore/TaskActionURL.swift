@@ -5,6 +5,7 @@ public enum TaskActionURL: Equatable, Sendable {
     case find(FindTasksInput)
     case modify(UUID, ModifyTaskInput)
     case openTask(UUID)
+    case complete(UUID)
 
     public init(url: URL) throws {
         let components = try Self.components(url)
@@ -15,6 +16,7 @@ public enum TaskActionURL: Equatable, Sendable {
         case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "waiting-until-from", "waiting-until-through", "sort", "limit", "offset", "x-success", "x-error"]
         case "modify": allowed = ["id", "description", "project", "tags", "tag-operation", "priority", "scheduled", "deadline", "waiting-until", "clear-project", "clear-priority", "clear-scheduled", "clear-deadline", "clear-waiting-until", "x-success", "x-error"]
         case "open-task": allowed = ["id"]
+        case "complete": allowed = ["id", "x-success", "x-error"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
         var values: [String: [String]] = [:]
@@ -25,8 +27,10 @@ public enum TaskActionURL: Equatable, Sendable {
             }
             values[item.name, default: []].append(value)
         }
-        if components.host == "open-task" {
-            self = .openTask(try Self.taskID(values["id"]?.first))
+        if components.host == "open-task" || components.host == "complete" {
+            let id = try Self.taskID(values["id"]?.first)
+            _ = try TaskActionCallbacks(url: url)
+            self = components.host == "complete" ? .complete(id) : .openTask(id)
         } else if components.host == "find" {
             _ = try TaskActionCallbacks(url: url)
             guard let status = FindTaskStatus(rawValue: values["status"]?.first ?? "unfinished"),

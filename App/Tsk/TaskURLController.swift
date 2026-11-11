@@ -29,6 +29,9 @@ final class TaskURLController {
             do {
                 callbacks = try TaskActionCallbacks(url: url)
                 let action = try TaskActionURL(url: url)
+                if case .complete(let id) = action {
+                    _ = try await store.manager.task(id: id, includingDeleted: false)
+                }
                 guard await store.prepareForTaskActionNavigation() else {
                     throw TaskActionError.navigationFailed(store.error ?? "Finish the current editing panel before opening a task URL.")
                 }
@@ -50,14 +53,17 @@ final class TaskURLController {
                     task = try await store.manager.modifyTask(id: id, input: input)
                     saved = task
                 case .openTask(let id): task = try await store.manager.task(id: id)
+                case .complete(let id):
+                    task = try await store.manager.complete(id: id)
+                    saved = task
                 }
-                let callback = try callbacks?.successURL(for: task)
                 await store.reload()
+                let callback = try callbacks?.successURL(for: task)
                 if let callback {
                     await deliver(callback, saved: saved)
                 } else {
                     switch action {
-                    case .modify, .openTask: taskToOpen = task
+                    case .modify, .openTask, .complete: taskToOpen = task
                     case .add, .find: break
                     }
                 }
@@ -95,7 +101,7 @@ final class TaskURLController {
         let accepted = await UIApplication.shared.open(url)
         if accepted { message = nil }
         else if let saved {
-            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone or retried. Opening Add again creates another task."
+            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone or retried."
         } else { message = "The callback could not be delivered. " + (message ?? "") }
     }
 }

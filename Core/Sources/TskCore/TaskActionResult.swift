@@ -132,6 +132,7 @@ public enum TaskActionFailureCode: String, Sendable {
     case storageError = "storage_error"
     case navigationError = "navigation_error"
     case taskNotFound = "task_not_found"
+    case taskDeleted = "task_deleted"
     case resultTooLarge = "result_too_large"
     case resultError = "result_error"
 
@@ -143,6 +144,7 @@ public enum TaskActionFailureCode: String, Sendable {
             switch taskError {
             case .storage: self = .storageError
             case .taskNotFound: self = .taskNotFound
+            case .taskDeleted: self = .taskDeleted
             default: self = .invalidInput
             }
         } else { self = error is TaskActionError ? .invalidInput : .storageError }
