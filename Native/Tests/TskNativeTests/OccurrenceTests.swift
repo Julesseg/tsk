@@ -256,6 +256,34 @@ struct OccurrenceTests {
         #expect(try await manager.task(id: second.id).status == "completed")
     }
 
+    @Test @MainActor func deletionRollsBackAndThenPersistsAtomicOccurrenceMaskWithoutPurgingOperations() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let replica = TaskChampionReplica(directory: directory)
+        let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "+-", "recur": "daily", "opaque": "parent"])
+        let child = try await replica.create(id: UUID(), attributes: ["status": "completed", "description": "Delete occurrence", "parent": parent.id.uuidString, "imask": "0", "end": "50", "due": "200", "opaque": "child"])
+        let sibling = try await replica.create(id: UUID(), attributes: ["status": "pending", "parent": parent.id.uuidString, "imask": "1", "due": "300"])
+        let manager = TaskManager(replica: replica)
+        let before = try await manager.tasks()
+        let operations = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
+        try sqlite(directory, "CREATE TRIGGER fail_delete BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'delete rollback fixture'); END;")
+        await #expect(throws: (any Error).self) { try await manager.delete(id: child.id) }
+        #expect(try await manager.tasks() == before)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == operations)
+        try sqlite(directory, "DROP TRIGGER fail_delete;")
+        let deleted = try await manager.delete(id: child.id)
+        let reopened = try await TaskChampionSession.open(directory: directory)
+        #expect(try await reopened.task(id: child.id) == deleted)
+        #expect(deleted.attributes["end"] == "50")
+        #expect(deleted.attributes["opaque"] == "child")
+        #expect(try await reopened.task(id: parent.id).attributes["mask"] == "X-")
+        #expect(try await reopened.task(id: sibling.id) == sibling)
+        #expect(Int(try sqlite(directory, "SELECT COUNT(*) FROM operations;").trimmingCharacters(in: .whitespacesAndNewlines))! > Int(operations.trimmingCharacters(in: .whitespacesAndNewlines))!)
+        let after = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
+        #expect(try await reopened.delete(id: child.id) == deleted)
+        #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == after)
+    }
+
     @discardableResult @MainActor private func sqlite(_ directory: URL, _ sql: String) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")

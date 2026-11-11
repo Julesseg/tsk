@@ -27,6 +27,8 @@ NIGHTLY = (
     'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
+    'TaskActionURLUITests/testSystemDeleteCallbackReturnsDurableDeletedResultAndRejectsSubsequentOpen',
+    'TaskActionURLUITests/testSystemDeletePreservesInvalidLinkedDraftThenConfirmsWithoutOpeningDeletedEditor',
     'TaskActionURLUITests/testSystemFindCallbackReturnsRichPagesEmptyListsAndExplicitOversizeFailure',
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',

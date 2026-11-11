@@ -4,6 +4,7 @@ public enum TaskActionURL: Equatable, Sendable {
     case add(AddTaskInput)
     case find(FindTasksInput)
     case openTask(UUID)
+    case delete(UUID)
 
     public init(url: URL) throws {
         let components = try Self.components(url)
@@ -13,6 +14,7 @@ public enum TaskActionURL: Equatable, Sendable {
         case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
         case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "waiting-until-from", "waiting-until-through", "sort", "limit", "offset", "x-success", "x-error"]
         case "open-task": allowed = ["id"]
+        case "delete": allowed = ["id", "x-success", "x-error"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
         var values: [String: [String]] = [:]
@@ -23,9 +25,10 @@ public enum TaskActionURL: Equatable, Sendable {
             }
             values[item.name, default: []].append(value)
         }
-        if components.host == "open-task" {
-            guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open Task requires a full UUID.") }
-            self = .openTask(id)
+        if components.host == "open-task" || components.host == "delete" {
+            _ = try TaskActionCallbacks(url: url)
+            guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("This action requires one full task UUID.") }
+            self = components.host == "delete" ? .delete(id) : .openTask(id)
         } else if components.host == "find" {
             _ = try TaskActionCallbacks(url: url)
             guard let status = FindTaskStatus(rawValue: values["status"]?.first ?? "unfinished"),

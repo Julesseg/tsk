@@ -307,6 +307,12 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await spotlight.observe() }
         }
+        .onChange(of: automation.deletedTaskID) { _, id in
+            if let id, selectedTaskID == id || linkedTaskIDs.contains(id) || editingTask?.id == id {
+                editingTask = nil
+                resetNavigation()
+            }
+        }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
         .onChange(of: path) { _, newPath in selectedTaskID = newPath.last }

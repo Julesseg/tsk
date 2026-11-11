@@ -176,7 +176,7 @@ import XCTest
         XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
         host.terminate()
         _ = try send("tsk://find?description=No%20such%20task")
-        XCTAssertTrue(app.otherElements["find-results-empty"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 15))
         capture("Find URL successful empty state", app)
         app.buttons["close-find-results"].tap()
         XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
@@ -237,6 +237,92 @@ import XCTest
         XCTAssertEqual((oversized["error"] as? [String: Any])?["code"] as? String, "result_too_large")
         XCTAssertNil(oversized["tasks"])
         capture("Find callback explicitly rejects an oversized result without truncation", host)
+    }
+
+    func testSystemDeleteCallbackReturnsDurableDeletedResultAndRejectsSubsequentOpen() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try actionURL(description: "Delete callback", extra: [URLQueryItem(name: "project", value: "Travel"), URLQueryItem(name: "tags", value: "trip")]))
+        defer { host.terminate() }
+        let created = try callback(host)
+        let task = try XCTUnwrap(created["task"] as? [String: Any])
+        let id = try XCTUnwrap(task["uuid"] as? String)
+        host.terminate()
+        _ = try send("tsk://find?description=Delete%20callback&status=all")
+        XCTAssertTrue(app.buttons["find-task-" + id].waitForExistence(timeout: 15))
+        let url = "tsk://delete?id=" + id + "&x-success=tsk-action-fixture%3A%2F%2Fdone%3Ftoken%3Da%252Bb%26token%3Dsecond"
+        for _ in 0..<2 {
+            host.terminate()
+            _ = try send(url)
+            let result = try callback(host)
+            XCTAssertEqual(result["success"] as? Bool, true)
+            XCTAssertEqual(result["savedLocally"] as? Bool, true)
+            let deleted = try XCTUnwrap(result["task"] as? [String: Any])
+            XCTAssertEqual(deleted["uuid"] as? String, id)
+            XCTAssertEqual(deleted["status"] as? String, "deleted")
+            XCTAssertEqual(deleted["project"] as? String, "Travel")
+            XCTAssertEqual(deleted["tags"] as? [String], ["trip"])
+        }
+        capture("Installed caller receives idempotent durable deletion result", host)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["No matching tasks"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["find-task-" + id].exists)
+        capture("Existing Find results remove a task after URL deletion", app)
+        app.buttons["close-find-results"].tap()
+        host.terminate()
+        _ = try send("tsk://find?status=all&description=Delete%20callback&x-success=tsk-action-fixture%3A%2F%2Fdone%3Ftoken%3Da%252Bb%26token%3Dsecond")
+        let found = try callback(host)
+        XCTAssertEqual((found["tasks"] as? [[String: Any]])?.count, 0)
+        host.terminate()
+        _ = try send("tsk://open-task?id=" + id)
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.alerts.staticTexts["This task is no longer available."].exists)
+        app.alerts.buttons["OK"].tap()
+        XCTAssertFalse(app.textFields["task-description"].exists)
+        app.terminate()
+        app.launch()
+        selectAllTasks(app)
+        XCTAssertFalse(taskRow(named: "Delete callback", app: app).exists)
+    }
+
+    func testSystemDeletePreservesInvalidLinkedDraftThenConfirmsWithoutOpeningDeletedEditor() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try actionURL(description: "Delete after draft", extra: []))
+        defer { host.terminate() }
+        let created = try callback(host)
+        let id = try XCTUnwrap((created["task"] as? [String: Any])?["uuid"] as? String)
+        host.terminate()
+        _ = try send("tsk://open-task?id=" + id)
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        replaceTaskText(title, with: "   ", app: app)
+        host.terminate()
+        _ = try send("tsk://delete?id=" + id)
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertEqual(title.value as? String, "   ")
+        replaceTaskText(title, with: "Saved before deletion", app: app)
+        host.terminate()
+        _ = try send("tsk://delete?id=" + id)
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.alerts.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Deletion saved locally: Saved before deletion")).firstMatch.exists)
+        capture("Delete URL confirms local success without opening deleted task", app)
+        app.alerts.buttons["OK"].tap()
+        XCTAssertFalse(title.exists)
+        XCTAssertFalse(app.buttons["back-from-linked-task"].exists)
+        XCTAssertFalse(app.staticTexts["task-detail-description"].exists)
+        host.terminate()
+        _ = try send("tsk://delete?id=" + UUID().uuidString)
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.alerts.staticTexts["This task is no longer available."].exists)
     }
 
     private func send(_ url: String) throws -> XCUIApplication {
