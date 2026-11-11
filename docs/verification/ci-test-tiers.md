@@ -217,6 +217,14 @@ sample binds the unique native candidate from one scoped query; its observed
 geometry supplies the touch without re-querying the disappearing menu. Empty
 application frames require containment in an actual owned window.
 
+Keyboard geometry comes from one snapshot traversal without visiting individual key
+contents. Geometry diagnostics print after admission and input, so log output
+cannot consume the readiness deadline. Password prompts require valid geometry
+from their owning application before querying a native hit point.
+Capture typing resumes after a confirmed password interruption only when the
+entered text remains an exact prefix; complete readback and durable save are
+still required.
+
 Transient GitHub jobs-API HTTP 429/500/502/503/504 responses and request timeouts
 retain upstream retries, up to three attempts. Requests and backoff consume the
 same 90-second run-ID convergence budget. Authorization errors, malformed responses

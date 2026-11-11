@@ -287,6 +287,8 @@ extension XCTestCase {
 
     private func activateTaskControl(_ element: XCUIElement, app: XCUIApplication, deadline: TimeInterval? = nil, beforeSample: ((TimeInterval) -> Void)? = nil, keyboardRequirement: TaskControlKeyboardRequirement = .none, file: StaticString, line: UInt, action: (TaskControlReadinessGeometry) -> Void) {
         var lastSampleReads = "not sampled"
+        var keyboardSamples: [String] = []
+        defer { keyboardSamples.forEach { print($0) } }
         let attempt = TaskControlReadinessAttempt(now: { ProcessInfo.processInfo.systemUptime }, deadline: deadline, beforeSample: beforeSample) {
             var sample = TaskControlReadinessSample(exists: nil)
             var reads: [String] = []
@@ -308,22 +310,34 @@ extension XCTestCase {
                 sample.appFrame = application.frame
                 sample.appWindowFrames = application.children.filter { $0.elementType == .window }.map { $0.frame }
                 if keyboardRequirement == .visible || keyboardRequirement == .dismissal && snapshot.identifier.hasPrefix("dismiss-") {
-                    var pending = [application]
-                    var keyboardFrames: [CGRect] = []
-                    while let child = pending.popLast() {
-                        if child.elementType == .keyboard { keyboardFrames.append(child.frame) }
-                        pending.append(contentsOf: child.children.reversed())
+                    let layout = measured("keyboard.geometry") {
+                        var pending = [application]
+                        var keyboards: [CGRect] = []
+                        var assistant: CGRect?
+                        while let child = pending.popLast() {
+                            if child.elementType == .keyboard {
+                                keyboards.append(child.frame)
+                            }
+                            if child.identifier == "inputAssistantView" {
+                                if assistant == nil { assistant = child.frame }
+                                continue
+                            }
+                            if child.elementType == .key { continue }
+                            pending.append(contentsOf: child.children.reversed())
+                        }
+                        return (keyboards: keyboards, assistant: assistant)
                     }
+                    var keyboardFrames = layout.keyboards
                     if keyboardFrames.isEmpty,
                        let keyboard = try? measured("owned-keyboard.snapshot", read: { try app.keyboards.firstMatch.snapshot() }) {
                         keyboardFrames = [keyboard.frame]
                     }
                     sample.keyboardFrames = keyboardFrames
                     if let keyboard = keyboardFrames.first, !keyboard.isEmpty,
-                       let assistant = self.taskSnapshot("inputAssistantView", in: application) {
-                        sample.keyboardFrames?.append(assistant.frame)
+                       let assistant = layout.assistant {
+                        sample.keyboardFrames?.append(assistant)
                     }
-                    print("Keyboard layout sample: id=\(snapshot.identifier) \(sample.diagnostic)")
+                    keyboardSamples.append("Keyboard layout sample: id=\(snapshot.identifier) \(sample.diagnostic) reads=[\(reads.joined(separator: ", "))]")
                 }
             } catch {
                 sample.snapshotError = String(describing: error)

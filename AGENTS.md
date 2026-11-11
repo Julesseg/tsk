@@ -57,6 +57,14 @@ platform. The `App/` target is a thin SwiftUI layer over it, verified by the
 XCUITest suite. When implementing a feature, put the behavior in Core with unit
 tests first, then wire the UI on top.
 
+### Text-size verification priorities
+
+Use standard Dynamic Type for UI work, screenshots and focused verification.
+Add targeted runs or investigate enlarged/accessibility text variants only when
+the user explicitly asks. Existing full CI coverage can run as configured;
+treat failures isolated to those variants as non-blocking for other work,
+report them briefly and continue with standard-size behavior.
+
 ### Always implement the UI part of an issue — never ask
 
 **If an issue requires UI work, implement it. Do not ask whether you should,

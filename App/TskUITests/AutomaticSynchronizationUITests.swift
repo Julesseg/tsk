@@ -27,13 +27,15 @@ final class AutomaticSynchronizationUITests: XCTestCase {
             passwordAction = "queryRoot=\(queryRoot) title=Save Password? action=notRequested"
             let notNow = dialog.buttons["Not Now"]
             guard notNow.exists, let snapshot = try? notNow.snapshot(),
-                  snapshot.isEnabled, notNow.isHittable,
-                  let application = try? app.snapshot() else { return false }
+                  snapshot.isEnabled else { return false }
+            let owner = queryRoot == "com.apple.AuthenticationServicesUI" ? authenticationService : app
+            guard let application = try? owner.snapshot() else { return false }
             let sample = TaskControlReadinessSample(exists: true, enabled: snapshot.isEnabled, hittable: true,
                                                     elementFrame: snapshot.frame, appFrame: application.frame,
                                                     appWindowFrames: application.children.filter { $0.elementType == .window }.map { $0.frame })
             passwordAction += " button=Not Now frame=\(snapshot.frame)"
-            guard sample.failureReason == nil, deadline.map({ ProcessInfo.processInfo.systemUptime < $0 }) ?? true else { return false }
+            guard sample.failureReason == nil, notNow.isHittable,
+                  deadline.map({ ProcessInfo.processInfo.systemUptime < $0 }) ?? true else { return false }
             dismissedPassword = true
             passwordAction += " action=requested"
             notNow.tap()
@@ -157,8 +159,30 @@ final class AutomaticSynchronizationUITests: XCTestCase {
         }
         XCTAssertTrue(prepareCaptureFocus())
         focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
-        description.typeText("Durable work while automatic sync fails")
-        XCTAssertEqual(description.value as? String, "Durable work while automatic sync fails")
+        let capturedTitle = "Durable work while automatic sync fails"
+        description.typeText(capturedTitle)
+        if let prefix = description.value as? String, prefix != capturedTitle {
+            guard !dismissedPassword, capturedTitle.hasPrefix(prefix) else {
+                XCTFail("Capture typing changed without an eligible password interruption: \(prefix)")
+                return
+            }
+            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
+            let interrupted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                dismissPasswordBeforeSample(deadline)
+                return dismissedPassword && ProcessInfo.processInfo.systemUptime < deadline
+            }, object: nil)
+            guard XCTWaiter.wait(for: [interrupted], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)) == .completed,
+                  let dialog = observedPasswordDialog?.element,
+                  dialog.waitForNonExistence(timeout: min(5, max(0, deadline - ProcessInfo.processInfo.systemUptime))) else {
+                XCTFail("Partial capture input requires an observed and dismissed Save Password? prompt")
+                return
+            }
+            passwordAction += " interruptedPrefixCharacters=\(prefix.count)"
+            focusTaskText(description, app: app, beforeSample: dismissPasswordBeforeSample)
+            XCTAssertEqual(description.value as? String, prefix)
+            description.typeText(String(capturedTitle.dropFirst(prefix.count)))
+        }
+        XCTAssertEqual(description.value as? String, capturedTitle)
         XCTAssertTrue(app.buttons[taskEditorKeyboardDismissIdentifier(app)].waitForExistence(timeout: 5))
         let hideDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         guard prepareKeyboardIntroduction(app, deadline: hideDeadline, beforeSample: { deadline in
