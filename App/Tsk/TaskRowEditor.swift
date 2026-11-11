@@ -18,6 +18,7 @@ struct TaskRowEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             ScrollView {
                 TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, focusedNote: $focusedNote)
+                    .disabled(!editing.isCapture && !editing.draft.original.canEdit)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -35,7 +36,7 @@ struct TaskRowEditor: View {
                             .accessibilityIdentifier("task-row-information")
                     }
                     Spacer()
-                    Button("Save and close", systemImage: "checkmark", action: rowActions.close)
+                    Button(editing.draft.original.canEdit || editing.isCapture ? "Save and close" : "Close", systemImage: "checkmark", action: rowActions.close)
                         .labelStyle(.iconOnly)
                         .frame(minWidth: 44, minHeight: 44, alignment: .top)
                         .accessibilityIdentifier("collapse-task-row")

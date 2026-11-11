@@ -53,12 +53,12 @@ if activation.get("NSExtensionActivationSupportsText") is not True or activation
     raise SystemExit("The embedded share extension does not activate for text and web URLs")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(metadata['actions']):
+if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(metadata['actions']):
     raise SystemExit('The app metadata is missing its add/find/complete/reschedule actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
-if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent'}.issubset(shortcuts):
+if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'RescheduleTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and four App Shortcuts')
+print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and six App Shortcuts')
 
 if 'CreateTaskIntent' in metadata['actions']:
     raise SystemExit('The retired Create Task intent must not remain as a compatibility action')
@@ -78,3 +78,11 @@ properties = {item['identifier'] for item in metadata['entities']['IntentTaskEnt
 if not {'uuid', 'description', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'status', 'openTaskURL'}.issubset(properties):
     raise SystemExit('The task entity must expose all rich result properties')
 print('Verified seven Add Task inputs, native dates, required Description, rich entity properties and tsk URL registration')
+
+if 'IntentTaskViewEntity' not in metadata['entities']:
+    raise SystemExit('Open View must expose its native existing-view picker')
+for action, parameter in [('OpenTaskIntent', 'task'), ('OpenTaskViewIntent', 'view')]:
+    parameters = metadata['actions'][action]['parameters']
+    if len(parameters) != 1 or parameters[0]['name'] != parameter or parameters[0]['isOptional']:
+        raise SystemExit(action + ' must require its native entity parameter')
+print('Verified Open Task and Open View discovery metadata and required entity pickers')

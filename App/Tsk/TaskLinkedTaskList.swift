@@ -7,6 +7,9 @@ struct TaskLinkedTaskList: View {
         let isLink: Bool
     }
 
+    private let source: TaskStore
+    @State private var taskActionDraftID = UUID()
+    @Environment(TaskURLController.self) private var automation
     let taskID: UUID
     @State private var store: TaskStore
     @State private var calendar: TodayCalendarController
@@ -15,6 +18,7 @@ struct TaskLinkedTaskList: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(source: TaskStore, taskID: UUID) {
+        self.source = source
         self.taskID = taskID
         _store = State(initialValue: source.linkedTaskStore())
         _calendar = State(initialValue: TodayCalendarController(manager: source.manager))
@@ -43,6 +47,15 @@ struct TaskLinkedTaskList: View {
             finish()
         }, including: store.rowEditing == nil ? .subviews : .all)
         .overlay { TaskRowDismissalOverlay(editing: store.rowEditing, close: { finish() }) }
+        .modifier(TaskActionMessage(controller: automation, isActive: store.rowEditing?.parameter == nil && store.presentedTaskPanels.subtracting([taskActionDraftID]).isEmpty))
+        .onAppear {
+            source.presentedTaskPanels.insert(taskActionDraftID)
+            source.taskActionDraftCommit = (taskActionDraftID, { [store] in await store.saveRowForTaskActionNavigation() })
+        }
+        .onDisappear {
+            source.presentedTaskPanels.remove(taskActionDraftID)
+            if source.taskActionDraftCommit?.id == taskActionDraftID { source.taskActionDraftCommit = nil }
+        }
         .navigationDestination(isPresented: Binding(
             get: { destination != nil },
             set: { if !$0 { destination = nil } }

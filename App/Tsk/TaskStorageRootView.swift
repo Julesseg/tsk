@@ -62,6 +62,7 @@ struct TaskStorageRootView: View {
             }
             try await installRecordedRecurrenceFixture()
             try await runTaskAutomationFixture()
+            try await installNavigationFixture()
             try await installWidgetFixture()
             #endif
             let opened = try TaskStore()
@@ -74,6 +75,7 @@ struct TaskStorageRootView: View {
             store = opened
             error = nil
         } catch {
+            ForegroundTaskNavigation.shared.connect { _ in throw error }
             self.error = error.localizedDescription
             await automation.storageUnavailable(error)
         }

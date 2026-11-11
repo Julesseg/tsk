@@ -3,6 +3,7 @@ import Foundation
 public enum TaskActionURL: Equatable, Sendable {
     case add(AddTaskInput)
     case openTask(UUID)
+    case openView(TaskNavigationView)
 
     public init(url: URL) throws {
         let components = try Self.components(url)
@@ -10,7 +11,8 @@ public enum TaskActionURL: Equatable, Sendable {
         let allowed: Set<String>
         switch components.host {
         case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
-        case "open-task": allowed = ["id"]
+        case "open-task": allowed = ["id", "x-success", "x-error"]
+        case "open-view": allowed = ["view", "project", "id", "x-success", "x-error"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
         var values: [String: [String]] = [:]
@@ -21,11 +23,30 @@ public enum TaskActionURL: Equatable, Sendable {
             }
             values[item.name, default: []].append(value)
         }
-        if components.host == "open-task" {
+        _ = try TaskActionCallbacks(url: url)
+        if components.host == "open-view" {
+            let view: TaskNavigationView
+            switch values["view"]?.first {
+            case "today": view = .today
+            case "upcoming": view = .upcoming
+            case "unfinished": view = .unfinished
+            case "done": view = .done
+            case "projects": view = .projects
+            case "project":
+                guard let name = values["project"]?.first, !name.isEmpty else { throw TaskActionError.invalidInput("Open View requires an exact project name.") }
+                view = .project(name)
+            case "saved":
+                guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open View requires a full saved-view UUID.") }
+                view = .saved(id)
+            default: throw TaskActionError.invalidInput("Choose today, upcoming, unfinished, done, projects, project, or saved.")
+            }
+            guard (values["project"] == nil || { if case .project = view { return true }; return false }()),
+                  (values["id"] == nil || { if case .saved = view { return true }; return false }()) else { throw TaskActionError.invalidInput("Arguments do not belong to this view.") }
+            self = .openView(view)
+        } else if components.host == "open-task" {
             guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open Task requires a full UUID.") }
             self = .openTask(id)
         } else {
-            _ = try TaskActionCallbacks(url: url)
             let input = AddTaskInput(description: values["description"]?.first ?? "", project: values["project"]?.first, tags: values["tags"] ?? [], priority: values["priority"]?.first,
                                      scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first), waitingUntil: try Self.date(values["waiting-until"]?.first))
             _ = try input.validatedDraft()
