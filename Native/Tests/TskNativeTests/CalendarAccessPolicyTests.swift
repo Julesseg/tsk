@@ -102,6 +102,7 @@ private actor CalendarPolicySource: CalendarEventSource {
         guard try await access.requestAccess(authorization: { current }, request: request) else { throw CocoaError(.fileReadNoPermission) }
     }
 
+    func calendars() -> [CalendarSnapshot] { [] }
     func events(in window: DateInterval) async throws -> [CalendarEventSnapshot] {
         guard try await access.requireAccess(authorization: { current }, request: request) else { throw CocoaError(.fileReadNoPermission) }
         reads += 1

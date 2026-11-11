@@ -9,7 +9,7 @@ Nightly runs use full iPhone coverage. The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 8 methods | PR, main push, explicit dispatch |
-| Full | 80 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 81 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 12 methods | `diagnostic_only=true` |
 | Keyboard | 12 methods | Explicit dispatch |
 | Text | 4 methods | Explicit dispatch |
@@ -71,8 +71,8 @@ corroboration to classify a reset; an AX-only gap remains incomplete. Selection/
 original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
 need native scrolling again. A reset stops the case without replaying input.
 This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 80 iPhone methods without skips,
-partitioned 43 workspace / 37 task-row methods. The retired iPad-only class and
+in existing methods. Full coverage retains all 81 iPhone methods without skips,
+partitioned 44 workspace / 37 task-row methods. The retired iPad-only class and
 its seven-phase transport case are removed; the iPhone workspace/editor journey
 still requires all nine phases, alongside annotation and native-control coverage.
 Historical reports before ADR 0007 include retired iPad runs and do not establish
@@ -140,7 +140,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 43 methods | 37 methods |
+| iPhone | 44 methods | 37 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers

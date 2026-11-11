@@ -7,7 +7,37 @@ public enum CalendarReadAuthorization: Equatable, Sendable {
 public protocol CalendarEventSource: Sendable {
     func authorization() async -> CalendarReadAuthorization
     func requestReadAccess() async throws
+    func calendars() async throws -> [CalendarSnapshot]
     func events(in window: DateInterval) async throws -> [CalendarEventSnapshot]
+}
+
+public struct CalendarSnapshot: Equatable, Sendable, Identifiable {
+    public let calendarID: String
+    public let title: String
+    public let sourceTitle: String
+    public let color: CalendarColor?
+    public var id: UTF8String { UTF8String(calendarID) }
+
+    public init(calendarID: String, title: String, sourceTitle: String, color: CalendarColor? = nil) {
+        self.calendarID = calendarID; self.title = title; self.sourceTitle = sourceTitle; self.color = color
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.title.matchesBytes(rhs.title) && lhs.sourceTitle.matchesBytes(rhs.sourceTitle) && lhs.color == rhs.color
+    }
+}
+
+public struct CalendarVisibility: Codable, Equatable, Sendable {
+    public private(set) var hiddenCalendarIDs: Set<UTF8String>
+
+    public init(hiddenCalendarIDs: Set<UTF8String> = []) { self.hiddenCalendarIDs = hiddenCalendarIDs }
+
+    public func isVisible(_ calendarID: String) -> Bool { !hiddenCalendarIDs.contains(UTF8String(calendarID)) }
+
+    public mutating func setVisible(_ visible: Bool, calendarID: String) {
+        if visible { hiddenCalendarIDs.remove(UTF8String(calendarID)) }
+        else { hiddenCalendarIDs.insert(UTF8String(calendarID)) }
+    }
 }
 
 public struct CalendarEventIdentity: Hashable, Sendable {
@@ -66,9 +96,15 @@ public struct TodayCalendarSnapshot: Equatable, Sendable {
     public let day: DateInterval?
     public let timeZone: TimeZone
     public let authorization: CalendarReadAuthorization
+    public let calendars: [CalendarSnapshot]
     public let events: [TodayCalendarEvent]
     public let readError: String?
     public let omittedEntryCount: Int
+
+    public func showing(_ visibility: CalendarVisibility) -> Self {
+        Self(day: day, timeZone: timeZone, authorization: authorization, calendars: calendars,
+             events: events.filter { visibility.isVisible($0.event.calendarID) }, readError: readError, omittedEntryCount: omittedEntryCount)
+    }
 }
 
 public extension TaskManager {
@@ -77,8 +113,9 @@ public extension TaskManager {
         dateCalendar.timeZone = calendar.timeZone
         var access = await source.authorization()
         var day = dateCalendar.dateInterval(of: .day, for: now())
+        var calendars: [CalendarSnapshot] = []
         func snapshot(events: [TodayCalendarEvent] = [], error: String? = nil, omitted: Int = 0) -> TodayCalendarSnapshot {
-            TodayCalendarSnapshot(day: day, timeZone: dateCalendar.timeZone, authorization: access, events: events, readError: error, omittedEntryCount: omitted)
+            TodayCalendarSnapshot(day: day, timeZone: dateCalendar.timeZone, authorization: access, calendars: access == .fullAccess ? calendars : [], events: events, readError: error, omittedEntryCount: omitted)
         }
         var requestingPermission = false
         do {
@@ -91,6 +128,12 @@ public extension TaskManager {
             day = dateCalendar.dateInterval(of: .day, for: now())
             guard access == .fullAccess else { return snapshot() }
             guard let window = day, window.duration > 0 else { return snapshot(error: "Today's Calendar date window could not be determined.") }
+            let available = try await source.calendars()
+            calendars = available.sorted {
+                if UTF8String($0.title) != UTF8String($1.title) { return UTF8String($0.title) < UTF8String($1.title) }
+                if UTF8String($0.sourceTitle) != UTF8String($1.sourceTitle) { return UTF8String($0.sourceTitle) < UTF8String($1.sourceTitle) }
+                return $0.id < $1.id
+            }
             let values = try await source.events(in: window)
             access = await source.authorization()
             guard access == .fullAccess else { return snapshot() }

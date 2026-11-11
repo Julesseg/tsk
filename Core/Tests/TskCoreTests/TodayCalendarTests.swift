@@ -41,6 +41,8 @@ actor CalendarTestSource: CalendarEventSource {
     var access: CalendarReadAuthorization
     let values: [CalendarEventSnapshot]
     var requestedWindows: [DateInterval] = []
+    var availableCalendars: [CalendarSnapshot] = []
+    var calendarReads = 0
     var permissionRequests = 0
     var revokes = false
     var fails = false
@@ -49,6 +51,8 @@ actor CalendarTestSource: CalendarEventSource {
     init(access: CalendarReadAuthorization = .fullAccess, events: [CalendarEventSnapshot] = []) { self.access = access; values = events }
     func authorization() -> CalendarReadAuthorization { access }
     func requestReadAccess() { permissionRequests += 1; access = .fullAccess }
+    func setCalendars(_ values: [CalendarSnapshot]) { availableCalendars = values }
+    func calendars() -> [CalendarSnapshot] { calendarReads += 1; return availableCalendars }
     func events(in window: DateInterval) throws -> [CalendarEventSnapshot] { requestedWindows.append(window); if revokes { access = .denied }; if fails { throw CocoaError(.fileReadUnknown) }; return values }
 }
 
@@ -90,4 +94,56 @@ actor CalendarTestSource: CalendarEventSource {
     #expect(Set(today.events.map(\.id)).count == 2)
     #expect(today.omittedEntryCount == 2)
     #expect(try await manager.tasks().isEmpty)
+}
+
+@Test func calendarVisibilityFiltersByIdentityAndPreservesTheCalendarCatalog() async throws {
+    let now = calendarInstant("2026-11-01T16:00:00Z")
+    let manager = TaskManager(replica: TestReplica(), now: { now })
+    let source = CalendarTestSource(events: [
+        CalendarEventSnapshot(calendarID: "work", eventID: "meeting", title: "Meeting", calendarTitle: "Calendar", start: now, end: now.addingTimeInterval(3600)),
+        CalendarEventSnapshot(calendarID: "personal", eventID: "birthday", title: "Birthday", calendarTitle: "Calendar", start: now, end: now.addingTimeInterval(3600), isAllDay: true)
+    ])
+    await source.setCalendars([
+        CalendarSnapshot(calendarID: "work", title: "Calendar", sourceTitle: "Work account"),
+        CalendarSnapshot(calendarID: "personal", title: "Calendar", sourceTitle: "Personal account"),
+        CalendarSnapshot(calendarID: "empty", title: "Empty", sourceTitle: "Local")
+    ])
+    let snapshot = await manager.todayCalendar(from: source)
+    #expect(snapshot.calendars.map(\.calendarID) == ["personal", "work", "empty"])
+    var visibility = CalendarVisibility()
+    #expect(snapshot.showing(visibility).events.count == 2)
+    visibility.setVisible(false, calendarID: "work")
+    let filtered = snapshot.showing(visibility)
+    #expect(filtered.events.map(\.event.title) == ["Birthday"])
+    #expect(filtered.calendars == snapshot.calendars)
+    visibility.setVisible(false, calendarID: "personal")
+    #expect(snapshot.showing(visibility).events.isEmpty)
+    #expect(visibility.isVisible("new-calendar"))
+    visibility.setVisible(true, calendarID: "work")
+    #expect(snapshot.showing(visibility).events.map(\.event.title) == ["Meeting"])
+    #expect(snapshot.events.count == 2)
+    #expect(try await manager.tasks().isEmpty)
+    let encoded = try JSONEncoder().encode(visibility)
+    #expect(try JSONDecoder().decode(CalendarVisibility.self, from: encoded) == visibility)
+}
+
+@Test func calendarCatalogRequiresAccessAndClearsOnRevocation() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let source = CalendarTestSource(access: .notDetermined)
+    await source.setCalendars([CalendarSnapshot(calendarID: "local", title: "Local", sourceTitle: "On My iPhone")])
+    #expect(await manager.todayCalendar(from: source).calendars.isEmpty)
+    #expect(await source.calendarReads == 0)
+    #expect(await manager.todayCalendar(from: source, requestingAccess: true).calendars.count == 1)
+    await source.revokeOnRead()
+    #expect(await manager.todayCalendar(from: source).calendars.isEmpty)
+}
+
+@Test func calendarVisibilityPreservesByteDistinctCalendarIdentities() throws {
+    let composed = "caf\u{E9}"
+    let decomposed = "cafe\u{301}"
+    var visibility = CalendarVisibility()
+    visibility.setVisible(false, calendarID: composed)
+    let restored = try JSONDecoder().decode(CalendarVisibility.self, from: JSONEncoder().encode(visibility))
+    #expect(!restored.isVisible(composed))
+    #expect(restored.isVisible(decomposed))
 }

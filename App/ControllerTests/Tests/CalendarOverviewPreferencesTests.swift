@@ -15,3 +15,19 @@ import TskCore
     defaults.set(Data("not json".utf8), forKey: "calendar-overview-hours")
     #expect(CalendarOverviewPreferences(defaults: defaults).hours == CalendarDisplayHours())
 }
+
+@MainActor @Test func calendarVisibilityPersistsAndRecoversInvalidData() throws {
+    let name = "CalendarVisibilityProof.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: name))
+    defer { defaults.removePersistentDomain(forName: name) }
+    let first = CalendarOverviewPreferences(defaults: defaults)
+    #expect(first.visibility.isVisible("work"))
+    first.visibility.setVisible(false, calendarID: "work")
+    let reopened = CalendarOverviewPreferences(defaults: defaults)
+    #expect(!reopened.visibility.isVisible("work"))
+    #expect(reopened.visibility.isVisible("personal"))
+    reopened.visibility.setVisible(true, calendarID: "work")
+    #expect(CalendarOverviewPreferences(defaults: defaults).visibility.isVisible("work"))
+    defaults.set(Data("not json".utf8), forKey: "calendar-visibility")
+    #expect(CalendarOverviewPreferences(defaults: defaults).visibility == CalendarVisibility())
+}

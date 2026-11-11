@@ -26,11 +26,16 @@ actor CalendarPresentationFixture: CalendarEventSource {
 
     func authorization() -> CalendarReadAuthorization { access }
     func requestReadAccess() { if access == .notDetermined || access == .writeOnly || access == .unavailable { access = .fullAccess } }
+    func calendars() -> [CalendarSnapshot] {
+        [CalendarSnapshot(calendarID: "presentation", title: "Work", sourceTitle: "iCloud", color: CalendarColor(red: 0.2, green: 0.6, blue: 0.8)),
+         CalendarSnapshot(calendarID: "personal", title: "Personal", sourceTitle: "iCloud"),
+         CalendarSnapshot(calendarID: "empty", title: "Empty calendar", sourceTitle: "On My iPhone")]
+    }
     func events(in window: DateInterval) throws -> [CalendarEventSnapshot] {
         if shouldFail { shouldFail = false; throw CocoaError(.fileReadUnknown) }
         if state == .empty { return [] }
         func event(_ id: String, _ title: String, start: Date, end: Date, allDay: Bool = false) -> CalendarEventSnapshot {
-            CalendarEventSnapshot(calendarID: "presentation", eventID: id, title: title, calendarTitle: "Hidden calendar name", location: "Hidden event location", start: start, end: end, isAllDay: allDay, color: id == "instant" ? nil : id == "timed" ? CalendarColor(red: 0.9, green: 0.4, blue: 0.1) : CalendarColor(red: 0.2, green: 0.6, blue: 0.8))
+            CalendarEventSnapshot(calendarID: id == "instant" ? "personal" : "presentation", eventID: id, title: title, calendarTitle: "Hidden calendar name", location: "Hidden event location", start: start, end: end, isAllDay: allDay, color: id == "instant" ? nil : id == "timed" ? CalendarColor(red: 0.9, green: 0.4, blue: 0.1) : CalendarColor(red: 0.2, green: 0.6, blue: 0.8))
         }
         var events = [
             event("all-day", "Team offsite", start: window.start, end: window.end, allDay: true),
