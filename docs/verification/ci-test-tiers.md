@@ -22,7 +22,7 @@ vertical dragging, held-touch stability during refresh, atomic completion, Upcom
 duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
 stage both dates and completion until Apply, discard every pending change with the toolbar X,
 keep unchanged controls neutral and tint modified controls. The count becomes an enabled
-Apply button only for actual changes. Changed collapsed values include an orange Reset;
+Apply button only for actual changes. Changed collapsed values include a neutral Reset icon;
 Reset is enabled only for modified fields. The glass date controls expand in place;
 Apply commits mixed-value edits atomically and reconciles Upcoming membership. The compact
 calendar/time picker keeps Reset, Remove, Today and Tomorrow in a bottom action row without
@@ -32,6 +32,10 @@ selection. Selection activates after a quarter-second hold; ordinary swipes rema
 The animation-enabled selection regression samples presentation frames across direct calendar
 input, quick actions and Reset, requiring the bottom actions to remain within one point.
 Controls fade in and out symmetrically, while tint fades are isolated from picker layout.
+Selection calendars reuse native controls during selection and detach them when closed.
+Repeated opening and closing requires one close button and no hidden native picker after dismissal.
+The picker morph and safe-area layout share a 0.22-second smooth animation; collapsing a focused
+row also dismisses its keyboard before selection controls appear.
 Hardware keyboard, installed Share/widgets/Spotlight,
 permissions, notification delivery and other system integrations retain their
 full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or

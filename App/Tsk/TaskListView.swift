@@ -85,6 +85,7 @@ struct TaskListView: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.isSelectingTasks)
         }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: store.selectionDateField)
         .onChange(of: store.completionContext) { _, _ in store.endTaskSelection() }
         .modifier(TaskRowFocusOffset(editing: store.rowEditing))
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
@@ -298,7 +299,8 @@ struct TaskListRow: View {
             }
         }
         .onChange(of: expanded) { _, expanded in
-            if expanded, editing?.isCapture == true { titleFocused = true }
+            if !expanded { titleFocused = false }
+            else if editing?.isCapture == true { titleFocused = true }
         }
         .onAppear {
             if let editing {

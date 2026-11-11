@@ -5,12 +5,14 @@ import TskCore
 struct TaskSelectionDatePicker: View {
     let store: TaskStore
     let field: TaskDateField
+    let calendars: TaskSelectionCalendars
     @State private var referenceDay: Date
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(store: TaskStore, field: TaskDateField) {
+    init(store: TaskStore, field: TaskDateField, calendars: TaskSelectionCalendars) {
         self.store = store
         self.field = field
+        self.calendars = calendars
         let day = Calendar.autoupdatingCurrent.startOfDay(for: store.currentDate)
         _referenceDay = State(initialValue: day)
     }
@@ -46,7 +48,7 @@ struct TaskSelectionDatePicker: View {
                 .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
                 .accessibilityIdentifier("close-selection-date")
             }
-            TaskParameterDatePicker(parameter: parameter, selection: selectedDate)
+            TaskSelectionCalendar(calendars: calendars, field: field, selection: selectedDate)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
                 Button { store.resetSelectionDate(field) } label: {

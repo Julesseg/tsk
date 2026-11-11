@@ -60,6 +60,7 @@ import XCTest
             !field.exists && !app.otherElements["task-row-editor"].exists && revisedRow.exists && revisedRow.isEnabled
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [editorClosed], timeout: 10), .completed)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Closing the focused editor dismisses its keyboard before selection controls appear")
         XCTAssertEqual(revisedRow.identifier, identity)
         try command("selectBulkForCancel")
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 5))
