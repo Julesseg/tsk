@@ -557,6 +557,8 @@ import XCTest
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         title.tap()
         title.typeText(" unsaved")
+        tapTaskControl(app.buttons["dismiss-row-keyboard"], app: app)
+        XCTAssertTrue(revealTaskElement(app.buttons["row-tags"], in: app.scrollViews["task-row-supporting-scroll"], app: app, requireFullVisibility: true))
         openTaskRowParameter("tags", app: app)
         let tagInput = app.textFields["row-tag-input"]
         XCTAssertTrue(tagInput.waitForExistence(timeout: 5))
