@@ -149,6 +149,131 @@ import XCTest
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "task-", "Undeliverable callback")).count, 1)
     }
 
+    func testCompleteURLReturnsRichSavedTaskRevealsItAndProtectsNestedDrafts() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try actionURL(description: "Complete URL train", extra: [
+            URLQueryItem(name: "project", value: "Travel"), URLQueryItem(name: "tags", value: "trip"),
+            URLQueryItem(name: "priority", value: "H"), URLQueryItem(name: "scheduled", value: "2026-11-05T08:30:00Z"),
+            URLQueryItem(name: "deadline", value: "2026-11-06T08:00:00Z"), URLQueryItem(name: "waiting-until", value: "2026-11-04T09:00:00Z")
+        ]))
+        defer { host.terminate() }
+        let added = try XCTUnwrap(try callback(host)["task"] as? [String: Any])
+        let id = try XCTUnwrap(added["uuid"] as? String)
+        host.terminate()
+        _ = try send(try completionURL(id: id))
+        let result = try callback(host)
+        XCTAssertEqual(result["savedLocally"] as? Bool, true)
+        let completed = try XCTUnwrap(result["task"] as? [String: Any])
+        XCTAssertEqual(completed["status"] as? String, "completed")
+        for key in ["uuid", "description", "project", "tags", "priority", "scheduled", "deadline", "waitingUntil", "openTaskURL"] {
+            XCTAssertEqual(completed[key] as? NSObject, added[key] as? NSObject, key)
+        }
+        capture("Installed caller receives rich saved completion", host)
+        host.terminate()
+        _ = try send(try completionURL(id: id))
+        XCTAssertEqual(try callback(host)["task"] as? NSDictionary, completed as NSDictionary)
+        host.terminate()
+        _ = try send("tsk://complete?id=" + id)
+        let title = app.textFields["task-description"]
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        XCTAssertEqual(title.value as? String, "Complete URL train")
+        XCTAssertTrue(app.buttons["back-from-linked-task"].exists)
+        capture("Completed task expands in its containing list", app)
+        host.terminate()
+        _ = try send("tsk://complete?id=" + id)
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        replaceTaskText(title, with: " ", app: app)
+        host.terminate()
+        _ = try send(try completionURL(id: id))
+        let failure = try callback(host)
+        XCTAssertEqual((failure["error"] as? [String: Any])?["code"] as? String, "navigation_error")
+        XCTAssertEqual(failure["savedLocally"] as? Bool, false)
+        host.terminate()
+        _ = try send("tsk://open-task?id=" + id)
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(title.exists)
+        XCTAssertEqual(title.value as? String, " ")
+        capture("Invalid nested draft remains after rejected completion", app)
+        replaceTaskText(title, with: "Must stay unsaved for missing target", app: app)
+        host.terminate()
+        _ = try send(try completionURL(id: UUID().uuidString))
+        let missing = try callback(host)
+        XCTAssertEqual((missing["error"] as? [String: Any])?["code"] as? String, "task_not_found")
+        app.terminate()
+        app.launch()
+        selectDoneTasks(app)
+        XCTAssertTrue(taskRow(named: "Complete URL train", app: app).waitForExistence(timeout: 15))
+        XCTAssertFalse(taskRow(named: "Must stay unsaved for missing target", app: app).exists)
+        host.terminate()
+        _ = try send("tsk://complete?id=" + id)
+        XCTAssertTrue(title.waitForExistence(timeout: 15))
+        replaceTaskText(title, with: "Saved before repeated completion", app: app)
+        host.terminate()
+        _ = try send(try completionURL(id: id, callback: "tsk-unregistered-fixture://done"))
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.alerts.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "saved locally")).firstMatch.exists)
+        app.alerts.buttons["OK"].tap()
+        app.terminate()
+        app.launch()
+        selectDoneTasks(app)
+        XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 15))
+        XCTAssertTrue(taskRow(named: "Saved before repeated completion", app: app).exists)
+    }
+
+    func testCompleteOccurrenceURLPersistsAndMissingDeletedTargetsReturnErrors() throws {
+        let parent = UUID().uuidString, child = UUID().uuidString, deleted = UUID().uuidString
+        let records: [(id: String, attributes: [String: String])] = [
+            (parent, ["status": "recurring", "description": "URL series", "mask": "-", "recur": "weekly"]),
+            (child, ["status": "pending", "description": "URL occurrence", "parent": parent, "imask": "0", "due": "1793952000", "scheduled": "1793867400", "start": "1793800000"]),
+            (deleted, ["status": "deleted", "description": "Deleted URL target"])
+        ]
+        let encodedRecords: [[String: Any]] = records.map { record in
+            ["id": record.id, "attributes": record.attributes.map { ["key": $0.key, "value": $0.value] }]
+        }
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: encodedRecords), as: UTF8.self)
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try completionURL(id: child))
+        defer { host.terminate() }
+        let task = try XCTUnwrap(try callback(host)["task"] as? [String: Any])
+        XCTAssertEqual(task["uuid"] as? String, child)
+        XCTAssertEqual(task["status"] as? String, "completed")
+        XCTAssertEqual(task["scheduled"] as? String, "2026-11-05T08:30:00Z")
+        XCTAssertEqual(task["deadline"] as? String, "2026-11-06T08:00:00Z")
+        host.terminate()
+        _ = try send("tsk://complete?id=" + child)
+        XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 15))
+        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "URL occurrence")
+        XCTAssertFalse(app.buttons["complete-task"].exists)
+        capture("Completed occurrence opens preserved read-only information", app)
+        for (id, code) in [(UUID().uuidString, "task_not_found"), (deleted, "task_deleted"), ("1", "invalid_input")] {
+            host.terminate()
+            _ = try send(try completionURL(id: id))
+            let failure = try callback(host)
+            XCTAssertEqual(failure["savedLocally"] as? Bool, false)
+            XCTAssertEqual((failure["error"] as? [String: Any])?["code"] as? String, code)
+        }
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
+        app.launch()
+        selectDoneTasks(app)
+        XCTAssertTrue(app.buttons["task-" + child].waitForExistence(timeout: 15))
+    }
+
+    private func completionURL(id: String, callback: String = "tsk-action-fixture://done?token=a%2Bb&token=second") throws -> String {
+        var url = URLComponents(string: "tsk://complete")!
+        url.queryItems = [URLQueryItem(name: "id", value: id), URLQueryItem(name: "x-success", value: callback), URLQueryItem(name: "x-error", value: callback)]
+        return try XCTUnwrap(url.url?.absoluteString)
+    }
+
     private func send(_ url: String) throws -> XCUIApplication {
         let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
         host.launchEnvironment["TSK_ACTION_FIXTURE_URL"] = url

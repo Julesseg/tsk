@@ -10,7 +10,7 @@ import TskNative
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let app = try await TaskChampionSession.open(directory: directory)
-    let original = try await app.create(TaskDraft(description: "Native automation", attributes: ["scheduled": "1792051200", "due": "1792137600", "opaque": "retain", "start": "1792040000", "café": "composed", "cafe\u{301}": "decomposed"]))
+    let original = try await app.create(TaskDraft(description: "Native automation", attributes: ["scheduled": "1792051200", "due": "1792137600", "opaque": "retain", "project": "Travel", "tag_trip": "", "priority": "H", "wait": "1792000000", "start": "1792040000", "café": "composed", "cafe\u{301}": "decomposed"]))
     let entity = IntentTaskEntity(original)
     let planned = try await RescheduleTaskIntent(task: entity, role: .plannedDay, date: Date(timeIntervalSince1970: 1792224000), directory: directory).perform()
     #expect(planned.value?.id == original.id)
@@ -19,8 +19,18 @@ import TskNative
     #expect(plannedRecord.attributes["scheduled"] == "1792224000")
     #expect(plannedRecord.attributes["due"] == "1792137600")
     _ = try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(timeIntervalSince1970: 1792314000), directory: directory).perform()
+    _ = try await reopened.update(id: original.id, changes: ["description": "Current saved automation"])
     let completed = try await CompleteTaskIntent(task: entity, directory: directory).perform()
     #expect(completed.value?.id == original.id)
+    #expect(completed.value?.description == "Current saved automation")
+    #expect(completed.value?.project == "Travel")
+    #expect(completed.value?.tags == ["trip"])
+    #expect(completed.value?.priority == "H")
+    #expect(completed.value?.scheduled == Date(timeIntervalSince1970: 1792224000))
+    #expect(completed.value?.deadline == Date(timeIntervalSince1970: 1792314000))
+    #expect(completed.value?.waitingUntil == Date(timeIntervalSince1970: 1792000000))
+    #expect(completed.value?.status == "completed")
+    #expect(completed.value?.openTaskURL.absoluteString == "tsk://open-task?id=" + original.id.uuidString)
     let record = try await reopened.task(id: original.id)
     #expect(record.attributes["scheduled"] == "1792224000")
     #expect(record.attributes["due"] == "1792314000")
@@ -29,8 +39,14 @@ import TskNative
     #expect(record.attributes["opaque"] == "retain")
     #expect(record.attributes["café"] == "composed")
     #expect(record.attributes["cafe\u{301}"] == "decomposed")
+    let later = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 2000000000) })
+    #expect(try await later.complete(id: original.id) == record)
     _ = try await CompleteTaskIntent(task: entity, directory: directory).perform()
     #expect(try await reopened.task(id: original.id) == record)
+    let deleted = try await TaskChampionReplica(directory: directory).create(id: UUID(), attributes: ["description": "Deleted after entity selection", "status": "deleted"])
+    let stale = IntentTaskEntity(TaskRecord(id: deleted.id, attributes: ["description": "Previously pending", "status": "pending"]))
+    await #expect(throws: TaskManagementError.taskDeleted(deleted.id)) { try await CompleteTaskIntent(task: stale, directory: directory).perform() }
+    #expect(try await reopened.task(id: deleted.id) == deleted)
 }
 #endif
 
@@ -131,5 +147,10 @@ import TskNative
     #expect(try await app.task(id: child.id).status == "completed")
     #expect(try await app.task(id: child.id).attributes["opaque"] == "child")
     #expect(try await app.task(id: parent.id).attributes["mask"] == "+")
+    let before = try await app.tasks()
+    let later = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 2000100000) })
+    _ = try await later.complete(id: child.id)
+    _ = try await CompleteTaskIntent(task: entity, directory: directory).perform()
+    #expect(try await app.tasks() == before)
 }
 #endif
