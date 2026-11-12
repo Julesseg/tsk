@@ -13,7 +13,7 @@ func runTaskAutomationFixture() async throws {
         _ = try await CompleteTaskIntent(task: entity).perform()
     } else {
         guard let rawDate = environment["TSK_TEST_INTENT_DATE"], let timestamp = Double(rawDate), ["planned", "deadline"].contains(action) else { throw CocoaError(.coderInvalidValue) }
-        _ = try await RescheduleTaskIntent(task: entity, role: action == "planned" ? .plannedDay : .deadline, date: Date(timeIntervalSince1970: timestamp)).perform()
+        _ = try await ModifyTaskIntent(task: entity, scheduled: action == "planned" ? Date(timeIntervalSince1970: timestamp) : nil, deadline: action == "deadline" ? Date(timeIntervalSince1970: timestamp) : nil).perform()
     }
 }
 #endif

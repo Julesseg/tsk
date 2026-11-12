@@ -2,6 +2,7 @@ import Foundation
 
 public enum TaskActionURL: Equatable, Sendable {
     case add(AddTaskInput)
+    case modify(UUID, ModifyTaskInput)
     case openTask(UUID)
 
     public init(url: URL) throws {
@@ -10,6 +11,7 @@ public enum TaskActionURL: Equatable, Sendable {
         let allowed: Set<String>
         switch components.host {
         case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
+        case "modify": allowed = ["id", "description", "project", "tags", "tag-operation", "priority", "scheduled", "deadline", "waiting-until", "clear-project", "clear-priority", "clear-scheduled", "clear-deadline", "clear-waiting-until", "x-success", "x-error"]
         case "open-task": allowed = ["id"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
@@ -22,8 +24,16 @@ public enum TaskActionURL: Equatable, Sendable {
             values[item.name, default: []].append(value)
         }
         if components.host == "open-task" {
-            guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open Task requires a full UUID.") }
-            self = .openTask(id)
+            self = .openTask(try Self.taskID(values["id"]?.first))
+        } else if components.host == "modify" {
+            _ = try TaskActionCallbacks(url: url)
+            let id = try Self.taskID(values["id"]?.first)
+            guard let operation = TaskTagOperation(rawValue: values["tag-operation"]?.first ?? "add") else { throw TaskActionError.invalidInput("Tag operation must be add, remove, replace, or clear.") }
+            let input = ModifyTaskInput(description: values["description"]?.first, project: values["project"]?.first, tags: values["tags"], tagOperation: operation, priority: values["priority"]?.first,
+                                        scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first), waitingUntil: try Self.date(values["waiting-until"]?.first),
+                                        clearProject: try Self.clear(values["clear-project"]?.first), clearPriority: try Self.clear(values["clear-priority"]?.first), clearScheduled: try Self.clear(values["clear-scheduled"]?.first), clearDeadline: try Self.clear(values["clear-deadline"]?.first), clearWaitingUntil: try Self.clear(values["clear-waiting-until"]?.first))
+            _ = try input.validatedChanges(for: TaskRecord(id: id, attributes: [:]))
+            self = .modify(id, input)
         } else {
             _ = try TaskActionCallbacks(url: url)
             let input = AddTaskInput(description: values["description"]?.first ?? "", project: values["project"]?.first, tags: values["tags"] ?? [], priority: values["priority"]?.first,
@@ -31,6 +41,17 @@ public enum TaskActionURL: Equatable, Sendable {
             _ = try input.validatedDraft()
             self = .add(input)
         }
+    }
+
+    private static func taskID(_ raw: String?) throws -> UUID {
+        guard let raw, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("This action requires one full task UUID.") }
+        return id
+    }
+
+    private static func clear(_ raw: String?) throws -> Bool {
+        guard let raw else { return false }
+        guard ["true", "false"].contains(raw) else { throw TaskActionError.invalidInput("Clear controls must be true or false.") }
+        return raw == "true"
     }
 
     static func components(_ url: URL) throws -> URLComponents {
