@@ -109,6 +109,10 @@ private actor CaptureReplica: TaskReplica {
 @MainActor @Test func taskURLPreparationRetainsInvalidCaptureAndSavesItsCorrectedFields() async throws {
     let manager = TaskManager(replica: CaptureReplica())
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    let openPanel = UUID()
+    store.presentedTaskPanels.insert(openPanel)
+    #expect(!(await store.prepareForTaskActionNavigation()))
+    store.presentedTaskPanels.remove(openPanel)
     await store.beginCapture(reduceMotion: true)
     let editing = try #require(store.rowEditing)
     await editing.setExpanded(true, reduceMotion: true)
@@ -126,4 +130,23 @@ private actor CaptureReplica: TaskReplica {
     let saved = try #require(try await manager.tasks().first)
     #expect(saved.description == "Capture before URL")
     #expect(saved.tags == ["trip"])
+}
+
+@MainActor @Test func nestedLinkedTaskDraftAndPanelGateRemainVisibleToRootURLNavigation() async throws {
+    let manager = TaskManager(replica: CaptureReplica())
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    let nested = store.linkedTaskStore().linkedTaskStore()
+    let panel = UUID()
+    nested.presentedTaskPanels.insert(panel)
+    #expect(await store.prepareForTaskActionNavigation() == false)
+    var validated = false
+    nested.taskActionDraftCommit = (panel, {
+        validated = true
+        return false
+    })
+    #expect(await store.prepareForTaskActionNavigation() == false)
+    #expect(validated)
+    nested.presentedTaskPanels.remove(panel)
+    nested.taskActionDraftCommit = nil
+    #expect(await store.prepareForTaskActionNavigation())
 }

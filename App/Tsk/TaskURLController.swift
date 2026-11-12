@@ -6,7 +6,9 @@ import UIKit
 
 @MainActor @Observable
 final class TaskURLController {
+    var findResults: TaskFindResults?
     var taskToOpen: TaskRecord?
+    var deletedTaskID: UUID?
     var message: String?
     private var requests: [URL] = []
     private var isExecuting = false
@@ -28,22 +30,41 @@ final class TaskURLController {
             do {
                 callbacks = try TaskActionCallbacks(url: url)
                 let action = try TaskActionURL(url: url)
+                if case .delete(let id) = action {
+                    _ = try await store.manager.task(id: id)
+                }
                 guard await store.prepareForTaskActionNavigation() else {
                     throw TaskActionError.navigationFailed(store.error ?? "Finish the current editing panel before opening a task URL.")
                 }
                 let task: TaskRecord
                 switch action {
+                case .find(let input):
+                    let tasks = try await store.manager.findTasks(input)
+                    if let callback = try callbacks?.successURL(for: tasks) {
+                        await deliver(callback, saved: nil)
+                    } else {
+                        await store.reload()
+                        findResults = TaskFindResults(tasks: tasks)
+                    }
+                    continue
                 case .add(let input):
                     task = try await store.manager.addTask(input)
                     saved = task
-                case .openTask(let id): task = try await store.manager.task(id: id)
+                case .delete(let id):
+                    task = try await store.manager.delete(id: id)
+                    saved = task
+                    deletedTaskID = task.id
+                case .openTask(let id): task = try await store.manager.openTask(id: id)
                 }
-                let callback = try callbacks?.successURL(for: task)
                 await store.reload()
+                let callback = try callbacks?.successURL(for: task)
                 if let callback {
                     await deliver(callback, saved: saved)
                 } else if case .openTask = action {
                     taskToOpen = task
+                } else if case .delete = action {
+                    taskToOpen = nil
+                    message = "Deletion saved locally: \(task.description) (\(task.id.uuidString))."
                 }
             } catch {
                 let code = TaskActionFailureCode(error: error, savedLocally: saved != nil).rawValue
@@ -79,7 +100,7 @@ final class TaskURLController {
         let accepted = await UIApplication.shared.open(url)
         if accepted { message = nil }
         else if let saved {
-            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone. Opening Add again creates another task."
+            message = "Task saved locally (\(saved.id.uuidString)), but the callback could not be delivered. The task was not undone or retried."
         } else { message = "The callback could not be delivered. " + (message ?? "") }
     }
 }
