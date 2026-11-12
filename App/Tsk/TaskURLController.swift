@@ -6,7 +6,7 @@ import UIKit
 
 @MainActor @Observable
 final class TaskURLController {
-    var taskToOpen: TaskRecord?
+    @ObservationIgnored var navigate: (@MainActor (TaskNavigationDestination) async throws -> Void)?
     var message: String?
     private var requests: [URL] = []
     private var isExecuting = false
@@ -17,7 +17,7 @@ final class TaskURLController {
     }
 
     func executePending(in store: TaskStore) async {
-        guard !isExecuting else { return }
+        guard !isExecuting, store.workspaceViewsLoaded, navigate != nil else { return }
         isExecuting = true
         defer { isExecuting = false }
         while !requests.isEmpty {
@@ -31,19 +31,19 @@ final class TaskURLController {
                 guard await store.prepareForTaskActionNavigation() else {
                     throw TaskActionError.navigationFailed(store.error ?? "Finish the current editing panel before opening a task URL.")
                 }
-                let task: TaskRecord
                 switch action {
                 case .add(let input):
-                    task = try await store.manager.addTask(input)
+                    let task = try await store.manager.addTask(input)
                     saved = task
-                case .openTask(let id): task = try await store.manager.task(id: id)
-                }
-                let callback = try callbacks?.successURL(for: task)
-                await store.reload()
-                if let callback {
-                    await deliver(callback, saved: saved)
-                } else if case .openTask = action {
-                    taskToOpen = task
+                    let callback = try callbacks?.successURL(for: task)
+                    await store.reload()
+                    if let callback { await deliver(callback, saved: saved) }
+                case .openTask, .openView:
+                    let destination = try await resolveNavigation(action, in: store)
+                    let callback = try callbacks?.navigationURL(for: destination)
+                    guard let navigate else { throw TaskActionError.navigationFailed("The task workspace is unavailable.") }
+                    try await navigate(destination)
+                    if let callback { await deliver(callback, saved: nil) }
                 }
             } catch {
                 let code = TaskActionFailureCode(error: error, savedLocally: saved != nil).rawValue
@@ -56,6 +56,24 @@ final class TaskURLController {
                     message = (saved != nil ? "Task saved locally. " : "") + "The error callback could not be encoded: " + error.localizedDescription
                 }
             }
+        }
+    }
+
+    func openForeground(_ action: TaskActionURL, in store: TaskStore) async throws {
+        guard !isExecuting, let navigate else { throw TaskActionError.navigationFailed("Another task action is running. Try again.") }
+        isExecuting = true
+        defer { isExecuting = false }
+        guard await store.prepareForTaskActionNavigation() else {
+            throw TaskActionError.navigationFailed(store.error ?? "Finish the current task draft before navigating.")
+        }
+        try await navigate(resolveNavigation(action, in: store))
+    }
+
+    private func resolveNavigation(_ action: TaskActionURL, in store: TaskStore) async throws -> TaskNavigationDestination {
+        switch action {
+        case .openTask(let id): try await store.manager.navigationDestination(taskID: id)
+        case .openView(let view): try await store.manager.navigationDestination(view: view)
+        case .add: throw TaskActionError.invalidInput("Add Task is a background data action.")
         }
     }
 

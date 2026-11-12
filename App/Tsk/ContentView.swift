@@ -41,6 +41,7 @@ struct ContentView: View {
     @State private var linkedTaskIDs: Set<UUID> = []
     @State private var sidebarError: String?
     @State private var projectPath = NavigationPath()
+    @State private var taskActionReturnPaths: (tasks: [UUID], projects: NavigationPath, selected: UUID?)?
     @State private var isRequestingCapture = false
 
     init(store: TaskStore) {
@@ -122,7 +123,7 @@ struct ContentView: View {
         Group {
             if !store.workspaceViewsLoaded && sidebarError == nil {
                 ProgressView("Loading views")
-            } else if store.customView != nil && store.customView?.id == nil {
+            } else if store.navigationReturn != nil || (store.customView != nil && store.customView?.id == nil) {
                 workspaceContent
             } else {
                 TabView(selection: workspaceTabSelection) {
@@ -154,7 +155,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
-            if store.customView != nil && store.customView?.id == nil { captureButton.padding() }
+            if store.navigationReturn != nil || (store.customView != nil && store.customView?.id == nil) { captureButton.padding() }
         }
     }
 
@@ -206,6 +207,7 @@ struct ContentView: View {
             }
         }
         .onChange(of: projectPath) { _, value in
+            guard isProjectWorkspace else { return }
             if value.isEmpty { store.projectSelection = .all }
             if value.count < 2 { selectedTaskID = nil }
         }
@@ -262,9 +264,16 @@ struct ContentView: View {
 
     private var taskLifecycle: some View {
         editorSheets
-        .task(id: TaskListSelection(query: store.query, project: store.projectSelection, customView: store.customView)) {
-            selectedTaskID = nil
-            path = []
+        .task(id: TaskListSelection(external: store.navigationReturn != nil, query: store.query, project: store.projectSelection, customView: store.customView)) {
+            if store.navigationReturn == nil, let previous = taskActionReturnPaths {
+                path = previous.tasks
+                projectPath = previous.projects
+                selectedTaskID = previous.selected
+                taskActionReturnPaths = nil
+            } else {
+                selectedTaskID = nil
+                path = []
+            }
             await store.reload()
         }
         .task(id: scenePhase == .active ? store.filterRefreshGeneration : nil) {
@@ -287,13 +296,19 @@ struct ContentView: View {
 
     private var participantLifecycle: some View {
         taskLifecycle
-        .task(id: store.workspaceViewsLoaded ? automation.taskToOpen?.id : nil) {
-            guard store.workspaceViewsLoaded, let task = automation.taskToOpen else { return }
-            await store.reload()
-            guard !Task.isCancelled else { return }
-            linkedTaskIDs.insert(task.id)
-            showInformation(task)
-            automation.taskToOpen = nil
+        .task(id: store.workspaceViewsLoaded) {
+            guard store.workspaceViewsLoaded else { return }
+            automation.navigate = { destination in
+                if store.navigationReturn == nil {
+                    taskActionReturnPaths = (path, projectPath, selectedTaskID)
+                }
+                resetNavigation()
+                try await store.openNavigation(destination)
+            }
+            ForegroundTaskNavigation.shared.connect { action in
+                try await automation.openForeground(action, in: store)
+            }
+            await automation.executePending(in: store)
         }
         .task(id: scenePhase) {
             if scenePhase == .active { await continuousReminders.observeStatus() }
@@ -308,7 +323,6 @@ struct ContentView: View {
             if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
-        .onChange(of: store.selectedWorkspaceView) { _, _ in resetNavigation() }
         .onChange(of: path) { _, newPath in selectedTaskID = newPath.last }
     }
 
@@ -356,10 +370,10 @@ struct ContentView: View {
 
     private func taskList(title: String? = nil) -> some View {
         TaskListView(store: store, calendar: calendar, edit: { showInformation($0) })
-            .navigationTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+            .navigationTitle(title ?? store.navigationTitle ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                workspaceTitle(title ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+                workspaceTitle(title ?? store.navigationTitle ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
                 settingsToolbar
             }
             .safeAreaInset(edge: .bottom) {
@@ -380,6 +394,14 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private func workspaceTitle(_ title: String) -> some ToolbarContent {
+        if store.navigationReturn != nil {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Back", systemImage: "chevron.backward") {
+                    Task { _ = await store.returnFromNavigation() }
+                }
+                .accessibilityIdentifier("back-from-task-action")
+            }
+        }
         ToolbarItem(placement: .title) {
             WorkspaceTitleView(title: title, isSyncing: synchronization.isSyncing)
                 .font(.headline)
@@ -532,6 +554,7 @@ struct ContentView: View {
 }
 
 private struct TaskListSelection: Equatable {
+    let external: Bool
     let query: TaskQuery
     let project: TaskProjectSelection
     let customView: CustomViewSelection?

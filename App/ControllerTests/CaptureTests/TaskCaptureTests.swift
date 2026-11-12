@@ -112,6 +112,9 @@ private actor CaptureReplica: TaskReplica {
     await store.beginCapture(reduceMotion: true)
     let editing = try #require(store.rowEditing)
     await editing.setExpanded(true, reduceMotion: true)
+    #expect(!(await store.prepareForTaskActionNavigation()))
+    #expect(store.rowEditing === editing)
+    #expect(editing.error != nil)
     editing.draft.taskDraft.description = "Capture before URL"
     editing.parameter = .tags
     editing.draft.tagInput = "bad tag"
@@ -126,4 +129,73 @@ private actor CaptureReplica: TaskReplica {
     let saved = try #require(try await manager.tasks().first)
     #expect(saved.description == "Capture before URL")
     #expect(saved.tags == ["trip"])
+}
+
+@MainActor @Test func navigationSavesValidDraftAndRestoresOriginalWorkspaceWithoutChangingFavorites() async throws {
+    let replica = CaptureReplica()
+    let manager = TaskManager(replica: replica)
+    let original = try await manager.create(TaskDraft(description: "Original"))
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.today)
+    let favorites = store.workspaceViews
+    await store.beginCapture(reduceMotion: true)
+    let editing = try #require(store.rowEditing)
+    await editing.setExpanded(true, reduceMotion: true)
+    editing.draft.taskDraft.description = "Saved before navigation"
+    #expect(await store.prepareForTaskActionNavigation())
+    try await store.openNavigation(manager.navigationDestination(taskID: original.id))
+    #expect(store.rowEditing?.draft.original.id == original.id)
+    #expect(store.rowEditing?.isExpanded == true)
+    #expect(store.selectedWorkspaceView == .unfinished)
+    #expect(store.workspaceViews == favorites)
+    #expect(await store.returnFromNavigation())
+    #expect(store.selectedWorkspaceView == .today)
+    #expect(store.rowEditing == nil)
+    #expect(try await manager.tasks().count == 2)
+}
+
+@MainActor @Test func navigationFailureRetainsDraftPickerAndNestedGateUntilSuccessfulSave() async throws {
+    let replica = CaptureReplica()
+    let manager = TaskManager(replica: replica)
+    let root = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    let nested = root.linkedTaskStore()
+    await nested.beginCapture(reduceMotion: true)
+    let row = try #require(nested.rowEditing)
+    await row.setExpanded(true, reduceMotion: true)
+    row.draft.taskDraft.description = "Retained nested draft"
+    row.parameter = .tags
+    row.draft.tagInput = "two words"
+    let panel = UUID()
+    nested.presentedTaskPanels.insert(panel)
+    nested.taskActionDraftCommit = (panel, { await nested.saveRowForTaskActionNavigation() })
+    #expect(!(await root.prepareForTaskActionNavigation()))
+    #expect(nested.rowEditing === row)
+    #expect(row.parameter == .tags)
+    #expect(row.error != nil)
+    row.draft.tagInput = "valid"
+    await replica.setFailure(true)
+    #expect(!(await root.prepareForTaskActionNavigation()))
+    #expect(nested.rowEditing === row)
+    #expect(row.parameter == .tags)
+    #expect(row.error?.contains("Capture storage unavailable") == true)
+    #expect(root.navigationReturn == nil)
+    await replica.setFailure(false)
+    #expect(await root.prepareForTaskActionNavigation())
+    #expect(nested.rowEditing == nil)
+    #expect(try await manager.tasks().map(\.tags) == [["valid"]])
+}
+
+@MainActor @Test func completedOccurrenceExpandsReadOnlyAndClosesWithoutMutation() async throws {
+    let replica = CaptureReplica()
+    let id = UUID()
+    _ = try await replica.create(id: id, attributes: ["description": "Completed occurrence", "status": "completed", "parent": UUID().uuidString, "imask": "0", "due": "2000000000"])
+    let manager = TaskManager(replica: replica)
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    try await store.openNavigation(manager.navigationDestination(taskID: id))
+    let row = try #require(store.rowEditing)
+    #expect(row.draft.original.canEdit == false)
+    #expect(row.isExpanded)
+    #expect(await store.returnFromNavigation())
+    #expect(try await manager.task(id: id).description == "Completed occurrence")
+    #expect(store.rowEditing == nil)
 }

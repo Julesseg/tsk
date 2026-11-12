@@ -60,6 +60,21 @@ public struct TaskActionCallbacks: Sendable {
         try (success ?? error).map { try Self.url($0, payload: Success(task: TaskActionResult(task))) }
     }
 
+    public func navigationURL(for destination: TaskNavigationDestination) throws -> URL? {
+        try (success ?? error).map { try Self.url($0, payload: NavigationSuccess(
+            view: destination.view.url, title: destination.title,
+            task: destination.task.map(TaskActionResult.init))) }
+    }
+
+    private struct NavigationSuccess: Encodable {
+        let success = true
+        let navigated = true
+        let savedLocally = false
+        let view: URL
+        let title: String
+        let task: TaskActionResult?
+    }
+
     public func errorURL(code: String, message: String, savedTaskID: UUID? = nil) throws -> URL? {
         guard let base = error ?? success else { return nil }
         let failure = Failure(savedLocally: savedTaskID != nil, uuid: savedTaskID?.uuidString, error: FailureDetail(code: code, message: message))

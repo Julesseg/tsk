@@ -33,9 +33,14 @@ class SelectionTests(unittest.TestCase):
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 30)
+        self.assertEqual(len(nightly), 33)
         self.assertEqual(len(diagnostic), 27)
         self.assertFalse(nightly & diagnostic)
+        self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
+            "TskUITests/TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity",
+            "TskUITests/TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites",
+            "TskUITests/TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination",
+        })
         self.assertEqual(nightly | diagnostic, selection.test_methods())
         self.assertLess(selection.selected_methods(selection.selection("smoke", "iPhone")), nightly)
         self.assertIn("TskUITests/TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask", nightly)
@@ -89,7 +94,7 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (19, 11))
+        self.assertEqual((len(workspace), len(rows)), (22, 11))
         for partition, filters in groups.items():
             self.assertEqual(selection.requires_native_keyboard(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
