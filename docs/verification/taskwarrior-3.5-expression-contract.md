@@ -127,9 +127,8 @@ boundary. No tolerance, rounded value, query or assertion is removed.
 argv crosses Python
 JSON stdin to avoid Darwin Foundation’s Unicode normalization.
 
-`TypedFilterUITests.testComputedArithmeticViewErrorsEditsReopenAndCompletion`
-uses the real shared factory on iPhone/iPad: invalid expression draft, computed
-Medium-priority result, priority change removing membership, persistent reopen,
-expression edit restoring membership, and completion. Local generic compilation
-and canonical UI execution are separate gates; no local simulator capture or
-physical keyboard acceptance is claimed by these source tests.
+Arithmetic/urgency variants run in Core and pinned Taskwarrior Native conformance
+coverage. Their duplicate UI create/edit/reopen/completion journey is retired;
+`CustomViewsUITests.testRawViewValidationSaveEditReopenResultsActionsAndDeletion`
+retains the representative saved-filter authoring and result-update UI. This does
+not provide dedicated arithmetic-error UI or physical keyboard acceptance.

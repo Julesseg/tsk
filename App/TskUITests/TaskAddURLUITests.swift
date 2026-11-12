@@ -3,35 +3,6 @@ import XCTest
 @MainActor final class TaskAddURLUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testSystemAddURLAppearsInCurrentListWithoutOpeningAnEditorAndPersistsAfterRelaunch() throws {
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launch()
-        selectAllTasks(app)
-        defer { app.terminate() }
-        let host = try send("tsk://add?description=URL%20train&project=Travel&tags=trip&priority=H&scheduled=2026-11-05T10%3A30%3A00%2B02%3A00&deadline=2026-11-06T08%3A00%3A00Z&waiting-until=2026-11-04T09%3A00%3A00Z")
-        defer { host.terminate() }
-        let row = taskRow(named: "URL train", app: app)
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
-        XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
-        XCTAssertTrue(app.buttons["New task"].exists)
-        XCTAssertFalse(app.textFields["task-description"].exists)
-        XCTAssertFalse(app.buttons["task-url-back"].exists)
-        capture("URL-created task appears as a normal row in the current list", app)
-        row.tap()
-        let description = app.textFields["task-description"]
-        XCTAssertTrue(description.waitForExistence(timeout: 10))
-        XCTAssertEqual(description.value as? String, "URL train")
-        XCTAssertTrue(app.buttons["row-scheduled"].exists)
-        XCTAssertTrue(app.buttons["row-deadline"].exists)
-        XCTAssertTrue(app.buttons["row-waiting-date"].exists)
-        capture("URL-created task uses the ordinary row editor when tapped", app)
-        app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "URL train", app: app).waitForExistence(timeout: 15))
-    }
-
     func testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput() throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -50,6 +21,11 @@ import XCTest
         XCTAssertEqual(task["openTaskURL"] as? String, "tsk://open-task?id=" + id)
         capture("Actual caller receives structured success callback", host)
         host.terminate()
+        app.activate()
+        XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
+        XCTAssertFalse(app.textFields["task-description"].exists)
+        XCTAssertFalse(app.buttons["task-url-back"].exists)
         _ = try send(try actionURL(description: "Rejected URL task", extra: [URLQueryItem(name: "scheduled", value: "2026-11-05")]))
         let failure = try callback(host)
         XCTAssertEqual(failure["savedLocally"] as? Bool, false)

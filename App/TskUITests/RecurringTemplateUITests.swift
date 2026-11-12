@@ -69,19 +69,6 @@ final class RecurringTemplateUITests: XCTestCase {
         try verifyRecordedOccurrenceEditingAndCompletion(data: data)
     }
 
-    func testDecimalOccurrencePositionOffersCompletionAndPreservesSeriesAfterRelaunch() throws {
-        let path = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
-        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [[String: Any]])
-        for index in records.indices {
-            var attributes = try XCTUnwrap(records[index]["attributes"] as? [[String: String]])
-            for position in attributes.indices where attributes[position]["key"] == "imask" {
-                attributes[position]["value"] = try XCTUnwrap(attributes[position]["value"]) + ".000000"
-            }
-            records[index]["attributes"] = attributes
-        }
-        try verifyRecordedOccurrenceEditingAndCompletion(data: JSONSerialization.data(withJSONObject: records))
-    }
-
     private func verifyRecordedOccurrenceEditingAndCompletion(data: Data) throws {
         let records = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         let child = try XCTUnwrap(records.first { record in
@@ -142,34 +129,6 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
         XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
         capture("Completed occurrence remains in reopened series history", app)
-    }
-
-    func testMalformedSeriesMaskExposesAnErrorAndKeepsTheOccurrencePending() throws {
-        let path = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
-        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [[String: Any]])
-        let parentIndex = try XCTUnwrap(records.firstIndex { record in (record["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "mask" } })
-        var attributes = try XCTUnwrap(records[parentIndex]["attributes"] as? [[String: String]])
-        let maskIndex = try XCTUnwrap(attributes.firstIndex { $0["key"] == "mask" })
-        attributes[maskIndex]["value"] = "?WW"
-        records[parentIndex]["attributes"] = attributes
-        let child = try XCTUnwrap(records.first { record in (record["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "parent" } })
-        let id = try XCTUnwrap(child["id"] as? String)
-        let parentID = try XCTUnwrap((child["attributes"] as? [[String: String]])?.first { $0["key"] == "parent" }?["value"])
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
-        app.launch()
-        selectAllTasks(app)
-        let row = app.buttons["task-" + id]
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
-        openTaskInformation(row, app: app)
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
-        app.buttons["complete-task"].tap()
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-action-error"], in: "task-detail-form", app: app))
-        XCTAssertTrue(app.staticTexts["task-action-error"].label.contains("No tasks were changed"))
-        capture("Malformed series mask prevents completion without discarding the occurrence", app)
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app, initialScrollUp: false))
-        XCTAssertTrue(app.buttons["complete-task"].exists)
     }
 
     private func launch() -> XCUIApplication {

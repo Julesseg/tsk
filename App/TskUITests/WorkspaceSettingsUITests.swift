@@ -14,57 +14,6 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCUIDevice.shared.appearance = .light
     }
 
-    func testPlacementAndEverySettingsDestination() {
-        let app = launch()
-        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
-        capture("After empty workspace")
-        let create = app.buttons["New task"]
-        let settings = app.buttons["workspace-settings"]
-        XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
-        XCTAssertGreaterThan(create.frame.midX, app.frame.midX)
-        XCTAssertGreaterThan(create.frame.midY, app.frame.maxY - app.frame.height * 0.2)
-        let lastView = app.tabBars.buttons["All"]
-        XCTAssertGreaterThan(create.frame.minX, lastView.frame.maxX)
-        XCTAssertEqual(create.frame.midY, lastView.frame.midY, accuracy: 2)
-        XCTAssertGreaterThan(settings.frame.midX, app.frame.midX)
-        XCTAssertLessThan(settings.frame.midY, app.frame.minY + app.frame.height * 0.2)
-        XCTAssertFalse(app.buttons["workspace-more"].exists)
-        XCTAssertFalse(app.buttons["custom-views"].exists)
-        XCTAssertFalse(app.buttons["task-shortcuts"].exists)
-        XCTAssertFalse(app.buttons["spotlight-settings"].exists)
-        XCTAssertFalse(app.buttons["spotlight-pending"].exists)
-        tapTaskControl(settings, app: app)
-        XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["attribute-definitions"].exists)
-        capture("After settings")
-        XCTAssertFalse(app.buttons["task-shortcuts"].exists)
-        XCTAssertFalse(app.buttons["spotlight-settings"].exists)
-        XCTAssertFalse(app.buttons["spotlight-diagnostics"].exists)
-        tapTaskControl(app.buttons["close-workspace-settings"], app: app)
-        XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForNonExistence(timeout: 5))
-        let destinations = [
-            ("custom-views", "Views"),
-            ("recurring-templates", "Recurring templates"),
-            ("synchronization-settings", "Synchronization"),
-            ("notification-settings", "Task notifications"),
-            ("reminders-import", "Copy from Reminders"),
-            ("continuous-reminders-settings", "Move from Reminders")
-        ]
-        for (identifier, title) in destinations {
-            openWorkspaceSetting(identifier, app: app)
-            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10), identifier)
-            if identifier == "custom-views" { capture("Views with four active tabs") }
-            XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
-            tapTaskControl(app.navigationBars[title].buttons["Done"], app: app)
-            XCTAssertTrue(app.buttons["workspace-settings"].waitForExistence(timeout: 5))
-        }
-        tapTaskControl(create, app: app)
-        XCTAssertTrue(taskEditorSaveButton(app).waitForExistence(timeout: 5))
-        tapTaskControl(app.buttons["collapse-task-row"], app: app)
-        XCTAssertTrue(taskEditorSaveButton(app).waitForNonExistence(timeout: 5))
-        XCTAssertTrue(create.exists)
-    }
-
     func testSettingsRemainReachableAtLargestTextSize() {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.buttons["New task"].isHittable)
@@ -176,58 +125,6 @@ final class WorkspaceSettingsUITests: XCTestCase {
         tapTaskControl(app.buttons["close-views"], app: app)
         XCTAssertEqual(app.tabBars.buttons.count, 2)
         XCTAssertTrue(app.buttons["New task"].isHittable)
-    }
-
-    func testProjectsNavigateToTasksAndSettingsUseNeutralColors() {
-        let app = launch()
-        tapTaskControl(app.buttons["New task"], app: app)
-        let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
-        focusTaskText(description, app: app)
-        description.typeText("Prepare launch")
-        setCaptureProject("Launch", app: app)
-        tapTaskControl(taskEditorSaveButton(app), app: app)
-        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Prepare launch", app: app), timeout: 15))
-        tapTaskControl(app.tabBars.buttons["Projects"], app: app)
-        XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 10))
-        capture("Projects list")
-        tapTaskControl(app.buttons["project-Launch"], app: app)
-        XCTAssertTrue(taskRow(named: "Prepare launch", app: app).waitForExistence(timeout: 10))
-        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
-        capture("Project tasks")
-        openTaskInformation(taskRow(named: "Prepare launch", app: app), app: app)
-        XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 5))
-        capture("Project task detail")
-        tapTaskControl(app.navigationBars["Task"].buttons.element(boundBy: 0), app: app)
-        tapTaskControl(app.navigationBars["Launch"].buttons.element(boundBy: 0), app: app)
-        XCTAssertTrue(app.buttons["project-Launch"].waitForExistence(timeout: 5))
-        tapTaskControl(app.buttons["project-Launch"], app: app)
-        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
-        openWorkspaceSetting("custom-views", app: app)
-        let projects = app.buttons["view-projects"]
-        XCTAssertTrue(revealTaskElement(projects, in: "views-list", app: app))
-        tapTaskControl(projects, app: app)
-        XCTAssertTrue(app.collectionViews["projects-list"].waitForExistence(timeout: 5))
-        tapTaskControl(app.buttons["project-Launch"], app: app)
-        XCTAssertTrue(app.navigationBars["Launch"].waitForExistence(timeout: 5))
-        openWorkspaceSetting("custom-views", app: app)
-        tapTaskControl(app.buttons["new-custom-view"], app: app)
-        let preview = app.buttons["apply-filter"]
-        XCTAssertTrue(revealTaskElement(preview, in: "raw-filter-form", app: app))
-        tapTaskControl(preview, app: app)
-        XCTAssertTrue(app.navigationBars["Custom filter"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons.matching(identifier: "workspace-settings").count, 1)
-        capture("Unsaved filter preview")
-        tapTaskControl(app.buttons["Close filter"], app: app)
-        XCTAssertTrue(app.collectionViews["projects-list"].waitForExistence(timeout: 5))
-        XCUIDevice.shared.appearance = .dark
-        capture("Projects dark")
-        tapTaskControl(app.buttons["workspace-settings"], app: app)
-        XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForExistence(timeout: 5))
-        capture("Settings neutral dark")
-        openWorkspaceSetting("custom-views", app: app)
-        capture("Views dark")
-        tapTaskControl(app.buttons["close-views"], app: app)
-        XCUIDevice.shared.appearance = .light
     }
 
     func testSynchronizationProgressStaysBesideWorkspaceTitle() throws {

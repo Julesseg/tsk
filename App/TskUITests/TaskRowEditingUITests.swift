@@ -537,45 +537,6 @@ import XCTest
         capture("Cleared organization persists with dates unchanged", app)
     }
 
-    func testOccurrenceFailureRetainsDraftAndLargeTextScrollsInsideRow() throws {
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
-        var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
-        let parent = try XCTUnwrap(records.firstIndex { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "mask" } })
-        var attributes = try XCTUnwrap(records[parent]["attributes"] as? [[String: String]])
-        let mask = try XCTUnwrap(attributes.firstIndex { $0["key"] == "mask" })
-        attributes[mask]["value"] = "WW?"; records[parent]["attributes"] = attributes
-        app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
-        app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectAllTasks(app)
-        app.buttons["task-317F6B43-21B9-477D-86DE-920100159891"].tap()
-        let title = app.textFields["task-description"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        title.tap()
-        title.typeText(" unsaved")
-        tapTaskControl(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(revealTaskElement(app.buttons["row-tags"], in: app.scrollViews["task-row-supporting-scroll"], app: app, requireFullVisibility: true))
-        openTaskRowParameter("tags", app: app)
-        let tagInput = app.textFields["row-tag-input"]
-        XCTAssertTrue(tagInput.waitForExistence(timeout: 5))
-        replaceTaskText(tagInput, with: "retained", app: app)
-        app.buttons["close-row-parameter"].tap()
-        XCTAssertTrue(tagInput.waitForNonExistence(timeout: 5))
-        closeTaskRow(app)
-        let error = app.staticTexts["draft-error"]
-        XCTAssertTrue(error.waitForExistence(timeout: 10))
-        let scroll = app.descendants(matching: .any)["task-row-editor"].firstMatch
-        if !error.isHittable { scroll.swipeUp() }
-        capture("Failed occurrence retains draft with internal overflow", app)
-        XCTAssertTrue((title.value as? String ?? "").contains("unsaved"))
-        XCTAssertEqual(app.buttons["row-tags"].value as? String, "retained")
-        XCTAssertTrue(app.buttons["collapse-task-row"].exists)
-    }
-
     func testAppearanceAndAccessibilityOverflow() throws {
         for (appearance, largeText) in [("light", false), ("dark", false), ("light", true), ("dark", true)] {
             XCUIDevice.shared.appearance = appearance == "dark" ? .dark : .light

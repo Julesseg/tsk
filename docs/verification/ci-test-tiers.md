@@ -1,103 +1,75 @@
 # CI test tiers
 
-PRs and pushes to `main` run all Core and Native test targets plus iPhone
-smoke coverage. `App · XCUITest (macOS)` remains the required iPhone rollup;
-its legacy name refers to the Mac runner, not a macOS app. Native iPad support,
-its UI tests and CI jobs are retired under [ADR 0007](../adr/0007-iphone-only.md).
-Nightly runs use full iPhone coverage. The manual form defaults to smoke.
+PRs and pushes to `main` run all Core, Native, Apple-framework and controller
+tests plus three iPhone smoke journeys. `App · XCUITest (macOS)` remains the
+required iPhone rollup; its name refers to the Mac runner. Native iPad support
+and coverage are retired under [ADR 0007](../adr/0007-iphone-only.md).
+The manual form defaults to smoke.
 
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
-| Smoke | 12 methods | PR, main push, explicit dispatch |
-| Full | 85 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 12 methods | `diagnostic_only=true` |
-| Keyboard | 12 methods | Explicit dispatch |
-| Text | 4 methods | Explicit dispatch |
+| Smoke | 3 methods | PR, main push, explicit dispatch |
+| Full | 30 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
+| Keyboard | 2 methods | Explicit dispatch |
+| Text | 3 methods | Explicit dispatch |
 | Regression | 5 methods | Explicit dispatch |
-| Menu | 6 methods | Explicit dispatch |
+| Menu | 5 methods | Explicit dispatch |
 
-Smoke covers capture, validation, cancellation, durable row editing/completion,
-view ordering/capacity and real-server sync on iPhone. It also covers long-press selection with continuous
-vertical dragging, held-touch stability during refresh, atomic completion, Upcoming
-duplicates, failure retention, view changes and editor validation. Scheduled/Deadline selection controls
-stage both dates and completion until Apply, discard every pending change with the toolbar X,
-keep unchanged controls neutral and tint modified controls. The count becomes an enabled
-Apply button only for actual changes. Changed collapsed values include a neutral Reset icon;
-Reset is enabled only for modified fields. The glass date controls expand in place;
-Apply commits mixed-value edits atomically and reconciles Upcoming membership. The compact
-calendar/time picker keeps Reset, Remove, Today and Tomorrow in a bottom action row without
-an outer scroll view, using filled controls on one glass surface. Its checkmark and an
-outside list tap collapse it while retaining pending values. Outside taps do not change
-selection. Selection activates after a quarter-second hold; ordinary swipes remain unselected.
-The animation-enabled selection regression samples presentation frames across direct calendar
-input, quick actions and Reset, requiring the bottom actions to remain within one point.
-Controls fade in and out symmetrically, while tint fades are isolated from picker layout.
-Selection calendars reuse native controls during selection and detach them when closed.
-Repeated opening and closing requires one close button and no hidden native picker after dismissal.
-The picker morph and safe-area layout share a 0.22-second smooth animation; collapsing a focused
-row also dismisses its keyboard before selection controls appear.
-Hardware keyboard, installed Share/widgets/Spotlight,
-permissions, notification delivery and other system integrations retain their
-full-suite assertions. Green smoke does not certify them. Full iPhone coverage is required before accepting workflow changes, system integrations or
-behavior outside smoke. Moving frequency does not establish acceptance.
+`full` means the reviewed nightly selection, not every UI test in the target.
+[scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
+methods for every suite. Each of the 57 retained methods has exactly one primary
+cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
+combine both. An unregistered, duplicated or missing method fails routing, so a
+new test cannot silently expand PR or nightly coverage. Inline actor attributes
+are included in source discovery.
 
-Custom-attribute editors/definitions and their dedicated cases are retired. The
-built-in arithmetic saved-view test remains in Keyboard/Text. Share coverage now
-checks automatic plain-description capture without an editor or extra fields.
+Smoke covers inline capture/cancellation/save/relaunch, row validation/native
+pickers/outside-save/durable completion, and actual hold/drag selection with
+held-touch refresh stability, scrolling recovery and a staged dates/completion
+Apply. The gesture also runs without native list accessibility identifiers.
+Smoke needs no synchronization server, independent peer or native HID transport.
 
-Regression coverage retains installed Share, durable/organization row editing,
-view reordering and the repeated native menu journey on iPhone. It is a focused
-diagnostic loop with the original input, assertions and deadlines; it does not
-replace smoke or full acceptance. It needs neither native keyboard transport
-nor a synchronization server or peer.
+Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
+handoff; row notes, tag validation and dependency navigation; saved views/native
+reordering; occurrence success/failure; series preview/cancel/commit; manual and
+automatic-failure sync; real EventKit Calendar and Reminders; destructive move
+source-change/interruption safety; installed Share/widgets/Spotlight; actual
+closed-app and received-sync notification delivery; native HID command/focus
+routing; external add/callback URLs and draft-safe navigation. Full coverage is
+required for workflow/system changes and behavior outside smoke. It does not
+certify on-demand scenarios. Run the relevant focused/on-demand suite when a
+change touches those contracts. Moving frequency does not establish acceptance.
 
-The native menu regression opens and dismisses New project twenty times in one
-process after the original High selection/reselection sequence. Each cycle
-requires the actual field to appear and disappear within the original five-second
-acknowledgements, without changing the selected project or replaying a touch.
-The final cycle opens the menu from a focused title and requires native keyboard
-dismissal, covering the native menu activation focus handoff.
-After the twenty cycles, it also opens Project from a focused note, checks the
-same keyboard prerequisite and native action, retains the draft text, and returns
-to title/note editing. An independent title/Notes focus regression reaches the same native opener and
-keyboard-before-option assertion immediately on a fresh fixture, then verifies
-actual field/Done behavior and returned text editing. It does not replace the
-repeated case. Menu coverage retains both product methods and selects actual
-native HID compatibility on iPhone: the standalone native input baseline,
-the annotation presentation/editor scope, and a cross-family workspace/row-editor
-journey. The latter starts without focused input, captures and saves with actual
-commands, checks plain typing and selected-row editing/completion/view commands,
-then verifies capture/save after returning from Settings and durable results.
-It also enters bulk selection with native Command-Shift-S, sends Escape to collapse a pending Scheduled picker,
-and uses the toolbar X to discard the selection. Return invokes Done to commit a pending Deadline change,
-checking unchanged Scheduled and selection exit.
-The menu worker requires the native keyboard fixture but neither the synchronization server nor peer.
-Transport ownership and complete case-specific phase acknowledgements must match
-the native UI outcomes; a fallback action or transport ACK alone is insufficient.
-Diagnostic menu rollups remain distinct from required smoke/full checks. The
-completed minimal-root/host/first-claim controls and temporary receipt sink have
-been removed; their historical outcomes are recorded separately.
+On-demand coverage retains genuine lower-priority UI contracts: appearance and
+large text, exact row geometry and animation drift, native Project-menu stress,
+focus and retained-open scroll, Calendar display settings, notification Settings
+revocation, detail activity/annotation controls, recurring authoring/copy, stale
+Spotlight results and undeliverable callbacks. These do not run automatically at
+night or on PRs. Their original assertions and deadlines remain. See the
+[consolidation record](test-suite-consolidation.md) for the deletion rationale,
+baseline and accepted gaps.
 
-Menu coverage also retains an independent real-product retained-open Project-menu case.
-It seeds 80 actual project values through the existing persistent fixture, opens
-once, drags only within the freshly admitted native collection, and establishes
-a distant fully visible settled neighborhood. Two matching fresh samples over at
-least 300 ms distinguish settling from later movement. Ten seconds follow with no
-input or accessibility reads while normal product polling stays active. A fresh
-endpoint must retain two consecutive interior anchor rows and their viewport
-within 2 points, plus the draft selection. Edge-clipped/virtualized rows are not
-compared as an exact visible set. Missing anchors require fresh neighborhood/video
-corroboration to classify a reset; an AX-only gap remains incomplete. Selection/reselection then uses newly admitted geometry and the
-original 20s admission/5s acknowledgement bars; a reopened menu may legitimately
-need native scrolling again. A reset stops the case without replaying input.
-This interval tests the newly reported retention contract, not a timeout change
-in existing methods. Full coverage retains all 85 iPhone methods without skips,
-partitioned 44 workspace / 41 task-row methods. The retired iPad-only class and
-its seven-phase transport case are removed; the iPhone workspace/editor journey
-still requires all thirteen phases, alongside annotation and native-control coverage.
-Historical reports before ADR 0007 include retired iPad runs and do not establish
-current iPhone acceptance. Focused diagnostics do not replace clean-head full
-coverage or physical-device verification.
+The Menu suite retains three native Project-menu journeys plus product annotation
+and workspace/editor HID cases. Its stress case still opens and dismisses New
+project twenty times with five-second acknowledgements, including title/note
+keyboard handoff. Its scroll-retention case still uses 80 real project values,
+a settled distant neighborhood, ten untouched seconds and two-point endpoint
+geometry. The animation case still requires one-point presentation-frame
+stability. These contracts moved out of scheduled coverage without relaxed bars.
+
+The nightly HID workspace/editor journey retains all thirteen input phases and
+native outcomes, including selection Escape/Return behavior and capture after
+returning from Settings. The annotation case runs on demand. The standalone
+UIKit keyboard-control UI test is retired; protocol/ownership host regressions
+remain. The Menu, Keyboard, Text and Diagnostic suites need native HID but no UI
+sync server or peer. Regression retains Share, row editing, native menu stress
+and view ordering without HID/server/peer setup.
+
+Green smoke does not certify extensions, permissions, system delivery or native
+HID. Historical reports before ADR 0007 include retired iPad cases and do not
+establish current iPhone acceptance. Neither simulator UI nor direct intent
+`perform()` tests prove external Shortcuts/Siri or physical-device invocation.
 
 ## Build once, execute selected coverage
 
@@ -145,7 +117,8 @@ these optional traces.
 One Mac producer builds the simulator bridge, controller tests and signed arm64
 UI products. It validates intent metadata and App Group entitlements before any
 simulator is created. The selected coverage determines whether it also builds
-the real synchronization server and independent peer. Rust caches already exist;
+the real synchronization server and independent peer for UI workers; ordinary
+builds also produce them for the unchanged Native tests. Rust caches already exist;
 Core/Native Linux Swift builds have separate toolchain-specific caches.
 
 A compressed artifact preserves executable permissions and bundle symlinks.
@@ -160,7 +133,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 44 methods | 41 methods |
+| iPhone | 19 methods | 11 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers
@@ -236,7 +209,7 @@ Use the helper after publishing a frozen branch:
 
 ```sh
 python3 scripts/dispatch-ui-tests.py --ref <branch> --suite full \
-  --reason 'Measure complete iPhone coverage after retiring native iPad support'
+  --reason 'Verify the reviewed nightly selection at this source revision'
 ```
 
 It reuses queued/running manual work only for matching source, branch and suite.

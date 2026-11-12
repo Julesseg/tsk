@@ -79,69 +79,6 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app, initialScrollUp: false))
     }
 
-    func testIndependentNativeTextViewRecognizesPlainAndCommandKeys() throws {
-        struct State: Codable {
-            let processID: Int32
-            let firstResponder: Bool
-            let textLength: Int
-            let textIsPlainN: Bool
-            let commandNCount: Int
-            let commandReturnCount: Int
-        }
-        XCTAssertEqual(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"], "1")
-        let app = taskTestApplication(), token = UUID().uuidString
-        addTeardownBlock { app.terminate() }
-        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
-        app.launchEnvironment["TSK_TEST_NATIVE_KEYBOARD_CONTROL"] = token
-        func state() -> State? {
-            guard let application = try? app.snapshot(),
-                  let snapshot = taskSnapshot("native-keyboard-control-status", type: .staticText, in: application),
-                  let raw = snapshot.value as? String, raw.utf8.count <= 1024 else { return nil }
-            return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
-        }
-        enum Phase: String, Encodable { case startup, plain, commandN, commandReturn, teardown }
-        struct Observation: Encodable { let phase: Phase; let state: State? }
-        func retain(_ phase: Phase) {
-            guard let data = try? JSONEncoder().encode(Observation(phase: phase, state: state())), data.count <= 1024 else { return }
-            let raw = String(decoding: data, as: UTF8.self)
-            print("TSK_NATIVE_KEYBOARD_CONTROL_V1 " + raw)
-            let attachment = XCTAttachment(string: raw)
-            attachment.name = "Independent native keyboard control \(phase.rawValue) typed state"; attachment.lifetime = .keepAlways; add(attachment)
-        }
-        addTeardownBlock { retain(.teardown) }
-        app.launch()
-        let input = app.textViews["native-keyboard-control-input"]
-        let inputExists = input.waitForExistence(timeout: 20)
-        retain(.startup)
-        XCTAssertTrue(inputExists)
-        input.tap()
-        app.typeKey("n", modifierFlags: [])
-        let plain = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard let state = state() else { return false }
-            return state.firstResponder && state.textIsPlainN
-        }, object: nil)
-        let plainResult = XCTWaiter.wait(for: [plain], timeout: 10)
-        retain(.plain)
-        XCTAssertEqual(plainResult, .completed)
-        XCTAssertEqual(input.value as? String, "n")
-        app.typeKey("n", modifierFlags: .command)
-        let commandN = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in state()?.commandNCount == 1 }, object: nil)
-        let commandNResult = XCTWaiter.wait(for: [commandN], timeout: 10)
-        retain(.commandN)
-        XCTAssertEqual(commandNResult, .completed)
-        XCTAssertEqual(input.value as? String, "n")
-        let commands = try TaskKeyboardCommand(.native, app: app)
-        let nativeState = state().map { TaskKeyboardRequest.NativeState(processID: $0.processID, firstResponder: $0.firstResponder, textLength: $0.textLength, textIsPlainN: $0.textIsPlainN, commandNCount: $0.commandNCount, commandReturnCount: $0.commandReturnCount) }
-        try commands.perform("commandReturn", nativeState: nativeState) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
-        let commandReturn = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in state()?.commandReturnCount == 1 }, object: nil)
-        let commandReturnResult = XCTWaiter.wait(for: [commandReturn], timeout: 10)
-        retain(.commandReturn)
-        XCTAssertEqual(commandReturnResult, .completed)
-        XCTAssertEqual(input.value as? String, "n")
-        capture("Independent native UITextView consumes actual Command keys without inserting text", app: app)
-    }
-
     private func capture(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

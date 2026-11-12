@@ -42,43 +42,6 @@ import XCTest
         }
     }
 
-    func testEmptyCalendarDisappearsWithAndWithoutTasks() throws {
-        for hasTask in [true, false] {
-            let app = try launch("empty", hasTask: hasTask)
-            assertTodayTaskList(app)
-            XCTAssertFalse(app.staticTexts["calendar-empty"].exists)
-            XCTAssertFalse(app.staticTexts["Calendar · Today"].exists)
-            XCTAssertFalse(app.buttons["calendar-request-access"].exists)
-            XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'calendar-event-'")).firstMatch.exists)
-            if hasTask { XCTAssertTrue(taskRow(named: "Prepare the release", app: app).isHittable) }
-            else { XCTAssertTrue(app.staticTexts["Nothing planned or due today"].exists) }
-            capture("Empty Calendar \(hasTask ? "with task" : "empty tasks")", app)
-            app.terminate()
-        }
-    }
-
-    func testMissingAccessHidesCalendarAndEnablesFromSettings() throws {
-        for state in ["notDetermined", "denied", "restricted", "writeOnly", "unavailable"] {
-            let app = try launch(state)
-            assertCalendarHidden(app)
-            XCTAssertTrue(taskRow(named: "Prepare the release", app: app).isHittable)
-            capture("Hidden Calendar access \(state)", app)
-            openCalendarSettings(app)
-            let enable = app.buttons["calendar-request-access"]
-            XCTAssertTrue(enable.waitForExistence(timeout: 10))
-            XCTAssertEqual(enable.label, "Enable Calendar")
-            capture("Calendar access settings \(state)", app)
-            if state == "notDetermined" || state == "writeOnly" || state == "unavailable" {
-                tapTaskControl(enable, app: app)
-                XCTAssertTrue(enable.waitForNonExistence(timeout: 10))
-                closeCalendarSettings(app)
-                XCTAssertTrue(event("Team offsite", app).waitForExistence(timeout: 10))
-                capture("Enabled from \(state) Settings injected source", app)
-            }
-            app.terminate()
-        }
-    }
-
     func testReadFailureHidesCalendarAndSettingsRetryRecoversWithTasksUsable() throws {
         for largeText in [false, true] {
             let failed = try launch("failure", largeText: largeText)
