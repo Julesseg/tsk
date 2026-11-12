@@ -1,6 +1,6 @@
 import XCTest
 
-@MainActor final class TaskAddURLUITests: XCTestCase {
+@MainActor final class TaskActionURLUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput() throws {
@@ -147,6 +147,98 @@ import XCTest
         XCTAssertTrue(app.buttons["task-" + id].waitForExistence(timeout: 15))
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "task-", "Oversized callback")).count, 1)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "task-", "Undeliverable callback")).count, 1)
+    }
+
+    func testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send("tsk://add?description=Find%20TRAIN&project=Travel&tags=rail&tags=trip&priority=H&scheduled=2026-11-05T08:30:00Z&deadline=2026-11-06T08:30:00Z&waiting-until=2026-11-04T08:30:00Z")
+        defer { host.terminate() }
+        XCTAssertTrue(taskRow(named: "Find TRAIN", app: app).waitForExistence(timeout: 20))
+        host.terminate()
+        _ = try send("tsk://add?description=Find%20child&project=Travel.Rail&tags=rail&tags=trip&priority=H")
+        XCTAssertTrue(taskRow(named: "Find child", app: app).waitForExistence(timeout: 15))
+        host.terminate()
+        _ = try send("tsk://find?description=train&project=Travel&tags=rail&tags=trip&priority=H&scheduled-from=2026-11-05T08:30:00Z&scheduled-through=2026-11-05T08:30:00Z&deadline-from=2026-11-06T08:30:00Z&waiting-until-through=2026-11-04T08:30:00Z")
+        XCTAssertTrue(app.collectionViews["find-results-list"].waitForExistence(timeout: 15))
+        let matches = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "find-task-"))
+        XCTAssertEqual(matches.count, 1)
+        XCTAssertTrue(matches.firstMatch.label.contains("Find TRAIN"))
+        capture("Find URL combined filters show only the exact matching saved task", app)
+        matches.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Find TRAIN")
+        app.navigationBars.buttons["Find Tasks"].tap()
+        app.buttons["close-find-results"].tap()
+        XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
+        host.terminate()
+        _ = try send("tsk://find?description=No%20such%20task")
+        let emptyTitle = app.staticTexts.matching(identifier: "find-results-empty").matching(NSPredicate(format: "label == %@", "No matching tasks")).firstMatch
+        XCTAssertTrue(emptyTitle.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["No saved tasks match the supplied filters."].exists)
+        capture("Find URL successful empty state", app)
+        app.buttons["close-find-results"].tap()
+        XCTAssertTrue(app.tabBars.buttons["All"].isSelected)
+        XCTAssertTrue(taskRow(named: "Find child", app: app).exists)
+        app.terminate()
+        app.launch()
+        selectAllTasks(app)
+        XCTAssertFalse(app.buttons["close-find-results"].exists)
+        XCTAssertTrue(taskRow(named: "Find TRAIN", app: app).waitForExistence(timeout: 15))
+        app.buttons["workspace-settings"].tap()
+        XCTAssertTrue(app.buttons["close-workspace-settings"].waitForExistence(timeout: 10))
+        host.terminate()
+        _ = try send("tsk://find")
+        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
+        app.alerts.buttons["OK"].tap()
+        XCTAssertTrue(app.buttons["close-workspace-settings"].exists)
+        app.buttons["close-workspace-settings"].tap()
+    }
+
+    func testSystemFindCallbackReturnsRichPagesEmptyListsAndExplicitOversizeFailure() throws {
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
+        app.launch()
+        selectAllTasks(app)
+        defer { app.terminate() }
+        let host = try send(try actionURL(description: "Find callback A", extra: [URLQueryItem(name: "project", value: "Travel"), URLQueryItem(name: "tags", value: "rail")]))
+        defer { host.terminate() }
+        let created = try callback(host)
+        let first = try XCTUnwrap(created["task"] as? [String: Any])
+        let firstID = try XCTUnwrap(first["uuid"] as? String)
+        host.terminate()
+        _ = try send(try actionURL(description: "Find callback B", extra: [URLQueryItem(name: "project", value: String(repeating: "é", count: 2000))]))
+        _ = try callback(host)
+        func findURL(_ query: [URLQueryItem]) throws -> String {
+            var url = URLComponents(string: "tsk://find")!
+            url.queryItems = query + [URLQueryItem(name: "x-success", value: "tsk-action-fixture://done?token=a%2Bb&token=second")]
+            return try XCTUnwrap(url.url?.absoluteString)
+        }
+        host.terminate()
+        _ = try send(try findURL([URLQueryItem(name: "description", value: "Find callback"), URLQueryItem(name: "sort", value: "description-asc"), URLQueryItem(name: "limit", value: "1")]))
+        let page = try callback(host)
+        let tasks = try XCTUnwrap(page["tasks"] as? [[String: Any]])
+        XCTAssertEqual(page["success"] as? Bool, true)
+        XCTAssertNil(page["savedLocally"])
+        XCTAssertEqual(tasks.count, 1)
+        XCTAssertEqual(tasks.first?["uuid"] as? String, firstID)
+        XCTAssertEqual(tasks.first?["tags"] as? [String], ["rail"])
+        XCTAssertTrue(tasks.first?["scheduled"] is NSNull)
+        capture("Actual Find callback returns a rich UUID-bearing task page", host)
+        host.terminate()
+        _ = try send(try findURL([URLQueryItem(name: "offset", value: "2")]))
+        let empty = try callback(host)
+        XCTAssertEqual((empty["tasks"] as? [[String: Any]])?.count, 0)
+        host.terminate()
+        _ = try send(try findURL([]))
+        let oversized = try callback(host)
+        XCTAssertEqual(oversized["success"] as? Bool, false)
+        XCTAssertEqual((oversized["error"] as? [String: Any])?["code"] as? String, "result_too_large")
+        XCTAssertNil(oversized["tasks"])
+        capture("Find callback explicitly rejects an oversized result without truncation", host)
     }
 
     private func send(_ url: String) throws -> XCUIApplication {
