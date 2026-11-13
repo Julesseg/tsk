@@ -40,6 +40,6 @@ The [App Store listing](https://apps.apple.com/us/app/sorted-calendar-notes-task
 
 ## Migration investigation
 
-Preserve a complete source backup and inventory before any transfer. Verify Tuna capture and the installed Sorted import/export and backup options. Test a representative transfer and recovery path, including notes, projects, tags, recurring series, waiting tasks, and undated tasks. Then prepare a count-checked migration preview using the accepted date rule and identify unsupported fields or recurrence rules before moving the working set. No tasks have been migrated during this interview.
+Preserve a complete source backup and inventory before any transfer. The user requested a single import command without a mandatory sample/check sequence. Validation and retry tracking run automatically, while destination saving and recovery remain explicit verification limits. No tasks have been migrated during this interview.
 
-The [migration tool](sorted-migration.md) prepares a private source archive, preview and isolated Reminders staging helper. Its bridge records projects/tags and waiting/dependency constraints in notes and requires manual Sorted recurrence setup. These limits must be checked before treating the transfer as complete; it is not an automatic full-fidelity or reverse migration.
+The [migration tool](sorted-migration.md) prepares a private source archive and one-command direct URL importer. Projects map to lists and tags pass through. Notes, repeat rules and unsupported fields are preserved in an actionable sidecar report. Reminders are not required. This route does not provide a durable-save acknowledgement or an automatic reverse migration.

@@ -107,33 +107,33 @@ def plan(rows, zone_name, source_hash):
     validate(rows)
     zone = ZoneInfo(zone_name)
     templates = {row["uuid"]: row for row in rows if row["status"] == "recurring"}
-    reminders = []
+    tasks = []
     for row in rows:
         if row["status"] not in ACTIVE:
             continue
         date, date_field = task_date(row)
-        reminders.append({
+        tasks.append({
             "uuid": row["uuid"], "title": row["description"],
             "date": date, "date_field": date_field,
             "local_date": timestamp(date).astimezone(zone).isoformat() if date else None,
             "notes": notes(row, templates), "project": row.get("project"),
+            "annotations": row.get("annotations", []),
             "tags": row.get("tags", []),
             "priority": {"H": 1, "M": 5, "L": 9}.get(row.get("priority"), 0),
             "source_url": "tsk-sorted-migration://task/" + row["uuid"],
         })
-    reminders.sort(key=lambda row: row["uuid"])
+    tasks.sort(key=lambda row: row["uuid"])
     series = []
     for identifier, template in sorted(templates.items()):
         occurrences = [row["uuid"] for row in rows if row["status"] in ACTIVE and row.get("parent") == identifier]
         series.append({"source": template, "unfinished_occurrences": sorted(occurrences)})
     return {
-        "version": 1, "source_sha256": source_hash, "timezone": zone_name,
-        "list_name": "tsk → Sorted · " + source_hash[:12],
-        "counts": {"source": len(rows), "reminders": len(reminders),
+        "version": 2, "source_sha256": source_hash, "timezone": zone_name,
+        "counts": {"source": len(rows), "tasks": len(tasks),
                    "manual_series": len(series),
                    "archived": sum(row["status"] in {"completed", "deleted"} for row in rows)},
         "source_statuses": dict(Counter(row["status"] for row in rows)),
-        "reminders": reminders, "manual_series": series,
+        "tasks": tasks, "manual_series": series,
     }
 
 
@@ -142,23 +142,22 @@ def report(manifest):
     lines = ["# Sorted migration preview", "",
              f"Source SHA-256: `{manifest['source_sha256']}`", "",
              f"Time zone: {manifest['timezone']}", "",
-             f"Reminders staging list: {manifest['list_name']}", "",
              f"- {counts['source']} source records preserved in source.json.",
-             f"- {counts['reminders']} unfinished tasks ready for one-time staging.",
+             f"- {counts['tasks']} unfinished tasks ready for direct import.",
              f"- {counts['manual_series']} recurring series require manual setup in Sorted.",
              f"- {counts['archived']} completed/deleted records retained only in the archive.", "",
              "## Transfer boundaries", "",
              "Date = the earlier of Scheduled and Deadline, or the sole date. Undated tasks stay undated. "
              "Dates retain their time in the selected time zone, including midnight.", "",
-             "Annotations become Reminders notes. Project, tags, original dates, waiting constraints, "
-             "dependencies and source identity are recorded in notes; the entire original record stays in source.json. "
-             "Projects and tags are not automatically recreated as Sorted lists/tags by this bridge. "
-             "Waiting and dependency constraints are not enforced in the destination. "
-             "No repeat rules or alarms are created in Reminders.", "",
-             "Sorted's downstream retention of notes, dates and priority must be checked using the sample. "
-             "Do not assume that a staged reminder is already a verified Sorted task.", "",
+             "Tasks go directly to Sorted using its Add URL, with project mapped to list and tags passed through. "
+             "The documented URL has no notes, priority, waiting/dependency or repeat-rule inputs. "
+             "Those fields remain in source.json, with actionable exceptions in manual-work.md. "
+             "Dates use minute precision because that is what Sorted's documented URL accepts.", "",
+             "A successful URL dispatch means macOS accepted the request; it is not an acknowledgement of "
+             "durable saving inside Sorted. The local receipt records requests sent and protects retries, "
+             "but cannot detect tasks independently removed from Sorted.", "",
              "## Recurring series", "",
-             "All unfinished generated occurrences are staged as individual tasks. For each series, "
+             "All unfinished generated occurrences are sent as individual tasks. For each series, "
              "configure repetition on the appropriate imported occurrence in Sorted and verify its next dates. "
              "Keep other outstanding occurrences as single tasks. Do not import the template as another "
              "ordinary task. If there is no unfinished occurrence, create and check the next occurrence manually. "
@@ -168,9 +167,39 @@ def report(manifest):
         lines.extend([f"- {row['description']!r}: `{row['recur']}`; template `{row['uuid']}`; "
                       f"unfinished occurrences: {', '.join(series['unfinished_occurrences']) or 'none'}."])
     lines.extend(["", "## Tasks", ""])
-    for row in manifest["reminders"]:
+    for row in manifest["tasks"]:
         lines.append(f"- `{row['uuid']}` {row['title']!r} — "
                      f"{row['local_date'] or 'undated'}; project {row['project']!r}.")
+    return "\n".join(lines) + "\n"
+
+
+def manual_work(manifest, rows):
+    annotated = [row for row in rows if row["status"] in ACTIVE and row.get("annotations")]
+    fields = [row for row in rows if row["status"] in ACTIVE and any(row.get(key) for key in ("priority", "wait", "depends"))]
+    lines = ["# Fields Sorted's Add URL cannot transfer", "",
+             "The full original data is preserved in source.json. Tasks, lists, tags and dates are sent automatically.", "",
+             f"## Notes to copy ({len(annotated)} tasks)", ""]
+    for row in annotated:
+        lines.extend([f"### {row['description']}", f"Source: {row['uuid']}", ""])
+        for annotation in row["annotations"]:
+            lines.extend([annotation["description"], ""])
+    lines.extend([f"## Repeat rules to set ({len(manifest['manual_series'])} series)", "",
+                  "Set the rule on the appropriate imported occurrence; keep other outstanding occurrences as single tasks. "
+                  "Original rule fields and occurrence IDs are in manual-series.json.", ""])
+    for series in manifest["manual_series"]:
+        row = series["source"]
+        lines.extend([f"- {row['description']!r}: {row['recur']}; until {row.get('until', 'no end')}; "
+                      f"occurrences {', '.join(series['unfinished_occurrences']) or 'none; create the next task manually'}."])
+    lines.extend(["", f"## Other source fields ({len(fields)} tasks)", ""])
+    for row in fields:
+        values = {key: row[key] for key in ("priority", "wait", "depends") if row.get(key)}
+        lines.append(f"- {row['description']!r}: {json.dumps(values, ensure_ascii=False)}")
+    ambiguous_tags = [row for row in rows if row["status"] in ACTIVE and any("," in tag for tag in row.get("tags", []))]
+    if ambiguous_tags:
+        lines.extend(["", "## Tags containing commas", "",
+                      "These tasks omit automatic tags because Sorted uses a comma-separated tag parameter:", ""])
+        for row in ambiguous_tags:
+            lines.append(f"- {row['description']!r}: {row['tags']!r}")
     return "\n".join(lines) + "\n"
 
 
@@ -183,6 +212,7 @@ def prepare(raw, output, zone_name):
         for name, content in (("manifest.json", manifest), ("manual-series.json", manifest["manual_series"])):
             (output / name).write_text(json.dumps(content, ensure_ascii=False, indent=2) + "\n")
         (output / "review.md").write_text(report(manifest))
+        (output / "manual-work.md").write_text(manual_work(manifest, rows))
         for asset in ASSETS.iterdir():
             if asset.is_file():
                 shutil.copyfile(asset, output / asset.name)
@@ -195,7 +225,7 @@ def prepare(raw, output, zone_name):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Prepare a private, non-destructive Taskwarrior → Reminders → Sorted migration bundle.")
+    parser = argparse.ArgumentParser(description="Prepare a private, one-command Taskwarrior → Sorted migration bundle.")
     parser.add_argument("--input", type=Path, help="Full Taskwarrior JSON export; omit to export the local database without recurrence generation or garbage collection")
     parser.add_argument("--output", type=Path, required=True, help="New private output directory, outside the checkout")
     parser.add_argument("--timezone", required=True, help="IANA time zone, e.g. Europe/Paris")
@@ -219,9 +249,9 @@ def main():
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Migration preparation failed: {error}\n")
     print(json.dumps({"bundle": str(output), **manifest["counts"]}, indent=2))
-    print("Preview: review.md. On the Mac, run ./run-mac.sh validate, then ./run-mac.sh sample.")
+    print("On the Mac, run ./run-mac.sh to send the tasks directly to Sorted.")
     if manifest["manual_series"]:
-        print("Recurring series need manual setup; see review.md and manual-series.json.")
+        print("Notes and repeat-rule exceptions are in manual-work.md.")
 
 
 if __name__ == "__main__":

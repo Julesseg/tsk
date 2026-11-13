@@ -183,7 +183,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Verify migration conversion and offline EventKit helper
+      - name: Verify direct migration importer
         run: python3 scripts/test-sorted-migration.py
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Check out pinned real TaskChampion sync server
