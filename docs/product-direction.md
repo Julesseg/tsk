@@ -2,6 +2,8 @@
 
 This brief records the product choices accepted during the design interviews. It describes intended behavior; implementation and runtime verification are tracked separately.
 
+A [planner-oriented revision](planner-evaluation.md) is being evaluated. That interview records the latest workflow preferences and the open decision about retaining Taskwarrior, adopting another backend, or using an existing app.
+
 The [PRD](prd.md) expands this direction into user stories, implementation decisions, testing decisions, and explicit exclusions.
 
 ## Purpose and audience

@@ -11,6 +11,12 @@ _Avoid_: Reminder as a synonym for a Taskwarrior task
 **Task view**:
 A presentation of a selected set of tasks for a particular task-management purpose.
 
+**Day page**:
+A task view centered on one calendar day, showing its scheduled work in a user-chosen order alongside calendar events. Task times are optional.
+
+**Carryover**:
+Unfinished work scheduled for an earlier day that remains visible on Today until completed or explicitly rescheduled. Visibility does not require changing its Scheduled date.
+
 **Predefined view**:
 A task view supplied by tsk, such as Today, Upcoming, or a view by project.
 
