@@ -26,6 +26,8 @@ NIGHTLY = (
     'SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
     'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
+    'TaskActionURLUITests/testModifySystemURLSavesAllFieldsTagModesClearsAndAtomicRejections',
+    'TaskActionURLUITests/testModifyURLSettlesActiveEditingRevealsTimedResultAndPreservesInvalidDraft',
     'TaskActionURLUITests/testSystemFindCallbackReturnsRichPagesEmptyListsAndExplicitOversizeFailure',
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',

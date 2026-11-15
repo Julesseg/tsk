@@ -6,19 +6,19 @@ import TskCore
 import TskNative
 
 @available(macOS 13, iOS 16, *)
-@Test func completeAndRescheduleIntentsUsePersistentIdentityAndIndependentDateRoles() async throws {
+@Test func completeAndModifyIntentsUsePersistentIdentityAndIndependentDateRoles() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let app = try await TaskChampionSession.open(directory: directory)
     let original = try await app.create(TaskDraft(description: "Native automation", attributes: ["scheduled": "1792051200", "due": "1792137600", "opaque": "retain", "start": "1792040000", "café": "composed", "cafe\u{301}": "decomposed"]))
     let entity = IntentTaskEntity(original)
-    let planned = try await RescheduleTaskIntent(task: entity, role: .plannedDay, date: Date(timeIntervalSince1970: 1792224000), directory: directory).perform()
+    let planned = try await ModifyTaskIntent(task: entity, scheduled: Date(timeIntervalSince1970: 1792224000), directory: directory).perform()
     #expect(planned.value?.id == original.id)
     let reopened = try await TaskChampionSession.open(directory: directory)
     let plannedRecord = try await reopened.task(id: original.id)
     #expect(plannedRecord.attributes["scheduled"] == "1792224000")
     #expect(plannedRecord.attributes["due"] == "1792137600")
-    _ = try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(timeIntervalSince1970: 1792314000), directory: directory).perform()
+    _ = try await ModifyTaskIntent(task: entity, deadline: Date(timeIntervalSince1970: 1792314000), directory: directory).perform()
     let completed = try await CompleteTaskIntent(task: entity, directory: directory).perform()
     #expect(completed.value?.id == original.id)
     let record = try await reopened.task(id: original.id)
@@ -43,7 +43,7 @@ import TskNative
     let recurring = try await replica.create(id: UUID(), attributes: ["description": "Existing recurring template", "status": "recurring", "recur": "weekly", "opaque": "retain"])
     let entity = IntentTaskEntity(recurring)
     await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await CompleteTaskIntent(task: entity, directory: directory).perform() }
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(), directory: directory).perform() }
+    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await ModifyTaskIntent(task: entity, deadline: Date(), directory: directory).perform() }
     let missingID = UUID()
     let missing = IntentTaskEntity(TaskRecord(id: missingID, attributes: ["description": "Missing", "status": "pending"]))
     await #expect(throws: TaskManagementError.taskNotFound(missingID)) { try await CompleteTaskIntent(task: missing, directory: directory).perform() }
@@ -82,11 +82,11 @@ import TskNative
     let original = try await app.create(TaskDraft(description: "Intent during real network barrier", attributes: ["due": "1792137600", "opaque": "retain"]))
     try await SyncConfigurationStore(directory: directory).save(configuration)
     let entity = IntentTaskEntity(original)
-    _ = try await RescheduleTaskIntent(task: entity, role: .plannedDay, date: Date(timeIntervalSince1970: 1792224000), directory: directory).perform()
+    _ = try await ModifyTaskIntent(task: entity, scheduled: Date(timeIntervalSince1970: 1792224000), directory: directory).perform()
     try await automationWait { FileManager.default.fileExists(atPath: root.appendingPathComponent("blocked.json").path) }
     let safety = Task.detached { try await Task.sleep(for: .seconds(5)); try Data().write(to: gate) }
     defer { safety.cancel() }
-    _ = try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(timeIntervalSince1970: 1792314000), directory: directory).perform()
+    _ = try await ModifyTaskIntent(task: entity, deadline: Date(timeIntervalSince1970: 1792314000), directory: directory).perform()
     #expect(!FileManager.default.fileExists(atPath: gate.path), "Native rescheduling must acknowledge its local commit before releasing HTTP")
     _ = try await CompleteTaskIntent(task: entity, directory: directory).perform()
     #expect(!FileManager.default.fileExists(atPath: gate.path), "Native completion must acknowledge its local commit before releasing HTTP")
@@ -124,7 +124,7 @@ import TskNative
     let parent = try await replica.create(id: UUID(), attributes: ["status": "recurring", "mask": "-", "opaque": "parent"])
     let child = try await replica.create(id: UUID(), attributes: ["status": "pending", "description": "Intent occurrence", "due": "2000000000", "parent": parent.id.uuidString, "imask": "0", "opaque": "child"])
     let entity = IntentTaskEntity(child)
-    _ = try await RescheduleTaskIntent(task: entity, role: .deadline, date: Date(timeIntervalSince1970: 2000010000), directory: directory).perform()
+    _ = try await ModifyTaskIntent(task: entity, deadline: Date(timeIntervalSince1970: 2000010000), directory: directory).perform()
     _ = try await CompleteTaskIntent(task: entity, directory: directory).perform()
     let app = try await TaskChampionSession.open(directory: directory)
     #expect(try await app.task(id: child.id).attributes["due"] == "2000010000")

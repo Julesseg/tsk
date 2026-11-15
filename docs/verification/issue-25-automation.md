@@ -1,3 +1,5 @@
+Historical verification before #67. Modify Task now replaces the removed standalone Reschedule action; see [current task actions](../task-actions.md).
+
 # Complete and reschedule tasks through native automation
 
 Complete Task and Reschedule Task are App Intents with task entities identified by the saved TaskChampion UUID. Reschedule Task requires an explicit Planned day or Deadline and a new date. It changes `scheduled` or `due` independently. Both actions open the same required App Group session as Create Task and Find Tasks, load its persisted connection, and call the public Core TaskManager APIs. A missing group, missing task, unsupported recurring task, invalid date, or storage failure propagates as an error.

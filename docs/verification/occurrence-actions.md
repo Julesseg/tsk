@@ -2,7 +2,7 @@
 
 Pending generated occurrences have explicit **Edit occurrence** and **Complete occurrence** actions in task details, row actions, and Upcoming. The template remains a separate record and navigation destination. Completed occurrences stay in history and cannot be edited here. Creation and raw attribute edits cannot change parent/index/mask links.
 
-The common `TaskManager.update`, `complete`, rescheduling, annotation, dependency and typed-attribute actions use the same occurrence path. Native Complete/Reschedule App Intents therefore use it too. A shared filesystem semantic lease covers validation and the durable mutation across app participants. It never covers a network wait.
+The common `TaskManager.update`, `complete`, rescheduling, annotation, dependency and typed-attribute actions use the same occurrence path. Native Complete/Modify App Intents therefore use it too. A shared filesystem semantic lease covers validation and the durable mutation across app participants. It never covers a network wait.
 
 `TaskAtomicMutatingReplica.updateAtomically` requires full byte-exact expected snapshots and patches. Unsupported adapters fail; there is no sequential fallback. The native adapter wraps upstream SQLite storage, checks expected maps inside each serializable SQLite transaction, then calls upstream `Replica.commit_operations` once with the occurrence and parent operations. The final transaction also updates TaskChampion’s operation log and working set. SQLite rollback preserves all of these when a storage write fails. This uses TaskChampion’s dataset and synchronization protocol.
 

@@ -96,6 +96,9 @@ struct OccurrenceTests {
         let originalOperations = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
         try sqlite(directory, "CREATE TRIGGER fail_atomic BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'atomic rollback fixture'); END;")
         await #expect(throws: (any Error).self) { try await manager.complete(id: child.id) }
+        await #expect(throws: (any Error).self) {
+            try await manager.modifyTask(id: child.id, input: ModifyTaskInput(description: "Must roll back", project: "Travel", tags: ["trip"], priority: "H", scheduled: Date(timeIntervalSince1970: 2000000000), deadline: Date(timeIntervalSince1970: 2000010000), waitingUntil: Date(timeIntervalSince1970: 4000000000)))
+        }
         #expect(try await manager.tasks() == original)
         #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == originalOperations)
         try sqlite(directory, "DROP TRIGGER fail_atomic;")
