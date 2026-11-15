@@ -32,6 +32,8 @@ preserved. Review this PR with `git diff origin/main...HEAD`; there is no
 remaining unmerged prerequisite layer.
 #67 / PR #92 and #68 / PR #94 implementation/open-PR gates were already met;
 this branch does not modify their branches or take over their watches.
+PR #92 subsequently merged into main at `610df1c` and is included in the
+2026-11-16 rebase recorded below.
 Local backup refs preserve both pre-rebase histories. The current rebase
 supersedes the historical dependency state recorded below.
 
@@ -166,3 +168,35 @@ explicitly tied to its original source.
 Fresh exact-head smoke and full coverage are required after publication.
 The user now authorizes merge-method auto-merge subject to repository checks;
 no bypass or coverage reduction is authorized.
+
+## Modify integration rebase (2026-11-16)
+
+Rebased onto main `610df1c7f9686c38932322fd3acce8832d13c7f8`, which merges
+PR #92. The conflict resolution retains canonical Modify fields, validation,
+result presentation and draft gates alongside Delete. The shared UUID parser
+serves Open and Delete; Open still rejects deleted records. Main's retired
+Reschedule intent remains absent. App Shortcuts and artifact verification now
+cover Add, Find, Complete, Modify and Delete. Both Modify and both Delete URL
+journeys remain registered: 36 nightly methods (25 workspace / 11 row-editing),
+27 on demand and 3 smoke, with 63 retained methods overall. There is no coverage
+reduction, changed deadline or weakened assertion.
+
+The nested draft-gate implementation and host regression now come from main,
+so they no longer appear as additional #69 changes in the PR diff. Delete
+business logic, atomic recurrence bookkeeping, stored history and stale Find
+protection remain preserved. New exact-head smoke/full results are required;
+older runs and installed runtime evidence do not certify this rebase.
+
+Verification passes on the integrated source: 212 Core tests; Native host
+suites with 158 portable and 33 Apple methods inventoried (51 environment-gated
+skips); 76 Swift Testing and 6 XCTest controller tests; all 46 selection,
+routing and execution checks; signed generic arm64 simulator build-for-testing;
+and intent metadata/entitlement validation, including Modify, Delete and
+Reschedule retirement. No simulator was booted for this phase.
+
+Fresh independent Codex children reviewed the fixed diff `610df1c...1aab23c`.
+Standards found no actionable findings. Spec found one missing closing brace at
+the Modify/Delete UI-test boundary introduced by conflict resolution; it is
+fixed, and the complete build-for-testing plus metadata verification passes
+again. Spec reported no additional semantic findings. New-head CI remains the
+runtime gate; no old result is substituted for it.

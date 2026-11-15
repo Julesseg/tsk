@@ -340,6 +340,8 @@ import XCTest
         selectAllTasks(app)
         XCTAssertTrue(taskRow(named: "Draft saved before Modify", app: app).waitForExistence(timeout: 15))
         XCTAssertFalse(taskRow(named: "Must not save", app: app).exists)
+    }
+
     func testSystemDeleteCallbackReturnsDurableDeletedResultAndRejectsSubsequentOpen() throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
