@@ -103,3 +103,48 @@ The previous full run at `c6195ff` failed five existing notification, Spotlight
 and large-text/keyboard assertions; both Complete URL methods passed. That run
 is failed evidence, not acceptance for this source. Assertions are preserved;
 canonical acceptance awaits full CI at the rebased head.
+
+## Integration with merged Find
+
+Rebased onto main `910cf001383cbd0d84b6c8734d3c083305b5997b`, including merged
+Find PR #91. The shared URL test class is now `TaskActionURLUITests`; its Find and
+Complete cases remain registered. Current cadence is 34 nightly methods
+(23 workspace / 11 task-row), 27 on-demand and 3 smoke. Core's Complete identity,
+idempotence/history and atomic occurrence paths are retained. Find keeps its
+structured list callbacks and results presentation; the combined URL dispatcher
+handles both actions exhaustively.
+
+Post-integration checks: 206 host Core tests, both focused draft-navigation
+controller tests and all 17 selection/runner tests pass. The signed arm64 generic
+simulator test build passes. Bundle intent/entitlement verification passes with
+`ENABLE_DEBUG_DYLIB=NO`; the local Xcode 27.2 debug-dylib build skipped widget
+metadata extraction. Docker's daemon is unavailable, so fresh Linux Swift 6.0.3
+verification remains delegated to exact-head CI. No simulator was booted.
+
+Old-head `34db79d` required smoke failed when XCTest could not terminate the app.
+Its separate full run failed at held bulk-selection admission; that is distinct
+from the earlier five notification/Spotlight/large-text failures. Neither run is
+full acceptance for the integrated source. No assertions or coverage are relaxed,
+and no same-head infrastructure reruns have been consumed for this integration.
+The user now authorizes merge-method auto-merge through the active Core Linux and
+App XCUITest required checks; full iPhone evidence remains separately reported.
+
+## Integration with merged Modify
+
+Rebased onto main `610df1c7f9686c38932322fd3acce8832d13c7f8`, including Modify
+PR #92 alongside Find #91. The combined parser retains Modify's shared strict
+UUID helper, structured fields and clear semantics while adding Complete.
+No-callback Modify/Open/Complete reveal behavior and saved callback guarantees
+remain separate from Find's result-list presentation. Native verification now
+modifies the selected entity's saved data through `ModifyTaskIntent` before
+completion, proving fresh saved values, independent dates and unchanged repeated
+completion history. The retired standalone Reschedule action remains removed.
+
+Post-integration verification: 211 host Core tests, three Native completion/error/
+occurrence cases, and all 17 selection/runner checks pass. Signed arm64 iPhone
+simulator test products and App/Share/Widget metadata/entitlement admission pass
+with debug dylibs disabled. Current cadence is 36 nightly methods
+(25 workspace / 11 task-row), 27 on-demand and 3 smoke. All Find, Modify and
+Complete URL methods are retained. No simulator was booted. Auto-merge remains
+subject to required exact-head Core Linux and App XCUITest checks; separately
+requested full iPhone CI is not inferred from green required checks.
