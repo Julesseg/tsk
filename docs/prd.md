@@ -1,5 +1,7 @@
 # tsk product requirements document
 
+The accepted [daily planner redesign](planner-redesign.md) supersedes conflicting navigation, date placement, ordering, calendar display, completion-history, and notification requirements in this original PRD. Other capabilities remain the baseline. The redesign is not yet implemented.
+
 ## Problem Statement
 
 Taskwarrior users need a capable, modern iPhone app that lets them capture work, decide what to do next, and act quickly while continuing to use their existing Taskwarrior clients. A mobile client must preserve task information and Taskwarrior behavior, work without a connection, synchronize promptly through TaskChampion, and participate in native iOS workflows.
