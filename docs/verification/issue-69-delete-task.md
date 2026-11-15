@@ -24,13 +24,16 @@ Nested linked editors reuse the focused shared navigation gate from #67/#68.
 
 This branch originally started at unmerged #66 / PR #91, commit
 `e0ad2959435d60a77e68d101dfc63920e9712537`, by explicit user instruction.
-The PR targets main, so its diff includes inherited Find changes until #91
-merges. After rebasing onto main at `7c8a7be`, the prerequisite is reapplied as
-`8e21b39`. Review #69's own changes with `git diff 8e21b39...HEAD`.
+PR #91 merged into main at `910cf001383cbd0d84b6c8734d3c083305b5997b`
+on 2026-11-15. Rebasing onto that merge skipped the duplicate inherited Find
+commit `8e21b39` and replayed only #69's Delete changes. Main's canonical Find
+implementation, observed empty-state assertions and coverage registration are
+preserved. Review this PR with `git diff origin/main...HEAD`; there is no
+remaining unmerged prerequisite layer.
 #67 / PR #92 and #68 / PR #94 implementation/open-PR gates were already met;
 this branch does not modify their branches or take over their watches.
-Main was fetched before publication and refreshed by rebase on 2026-11-12.
-The prerequisite remains unmerged; its branch was not modified.
+Local backup refs preserve both pre-rebase histories. The current rebase
+supersedes the historical dependency state recorded below.
 
 ## Original verification at 27bbc10
 
@@ -100,7 +103,8 @@ records and re-resolves detail destinations; the extended installed-URL test
 passes. Its first run displayed the correct empty state but queried an AX
 container UIKit did not expose. Assertions now check the actual visible empty
 message and missing row, preserving deadlines; the inherited empty-state check
-uses that same user-visible assertion.
+used that same user-visible assertion.
+The 2026-11-15 rebase preserves main's newer identifier-and-label assertion.
 
 The screenshot report lives on this Mac at
 `/Users/julesseguin/.local/share/ui-reports/tsk/agent-issue-69/2026-11-11-delete-task.html`.
@@ -131,3 +135,34 @@ selection/routing/execution checks; signed arm64 simulator build-for-testing and
 intent artifact validation. No simulator was booted for this rebase. Native
 runtime acceptance and the remaining failure investigation require new CI at
 the rewritten head.
+
+## Merged-prerequisite rebase (2026-11-15)
+
+The duplicate Find implementation is absent from the PR diff after reconciling
+PR #91. Range comparison preserves every Delete business/storage/navigation
+change; only the superseded Find empty-state assertion and coverage ordering
+changed during resolution. The nightly selection remains 34 methods (23
+workspace / 11 row-editing), plus 27 on demand and 3 smoke. Assertions, coverage
+and deadlines were not weakened.
+
+At the previous head `dceef85`, required smoke run `43190425698` failed while
+terminating the app in `testOutsideSaveValidationPickersAndDurableCompletion`.
+Full run `43190855607` passed its workspace shard and failed its row-editing
+shard while terminating the app in
+`testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch`. Both are
+XCTest lifecycle failures in their logs, not evidence that the remaining UI
+acceptance passed. Those logs remain preserved locally; neither old result
+certifies the new source. Main also includes PR #99's bulk-date input admission
+fix. No additional old-head rerun was requested.
+
+Rebase host checks pass: 207 Core tests, both Native host targets (158 portable
+and 31 Apple methods inventoried, 51 environment-gated skips), 76 Swift Testing
+controller tests plus 6 XCTest controller tests, and all 46 selection/routing/execution checks. Signed arm64 generic
+simulator build-for-testing and intent metadata/entitlement validation also
+pass, with five shortcuts and one required Delete entity. No simulator was
+booted and no runtime verification was used for this rebase. Installed URL,
+direct-perform, real-peer and actual Shortcuts evidence above remains
+explicitly tied to its original source.
+Fresh exact-head smoke and full coverage are required after publication.
+The user now authorizes merge-method auto-merge subject to repository checks;
+no bypass or coverage reduction is authorized.
