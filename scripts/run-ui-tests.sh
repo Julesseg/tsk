@@ -119,7 +119,7 @@ xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphones
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
 share_status=0
-if [[ "$test_phases" == *share* || "${test_filters[*]}" == *TaskAddURLUITests* ]]; then
+if [[ "$test_phases" == *share* || "${test_filters[*]}" == *TaskActionURLUITests* ]]; then
     xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
 fi
 if [[ "$test_phases" == *share* ]]; then

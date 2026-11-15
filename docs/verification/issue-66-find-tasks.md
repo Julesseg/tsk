@@ -1,0 +1,206 @@
+# Find saved tasks with named filters
+
+Find Tasks returns a native list of rich task entities, suitable for explicit
+iteration into later task actions. It reads the same durable TaskChampion data
+as the app; it does not open a URL to perform a Shortcut. Each entity has the
+same full UUID, description, project, tags, priority, Scheduled, Deadline,
+Waiting until, status and Open Task URL properties as Add Task.
+
+## Filters and URLs
+
+Use `tsk://find` with these optional query arguments:
+
+| Argument | Meaning |
+| --- | --- |
+| `description` | Case-insensitive contained text, using the POSIX locale; literal text, never filter syntax |
+| `project` | Exact UTF-8 bytes, including case; child projects do not match. Empty selects no project |
+| `tags` (repeatable) | Every tag must match its exact UTF-8 bytes |
+| `status` | `unfinished` (default, pending), `completed`, or `all` (pending and completed only) |
+| `priority` | `H`, `M`, `L`, or empty for no priority |
+| `scheduled-from`, `scheduled-through` | Inclusive Scheduled timestamp bounds |
+| `deadline-from`, `deadline-through` | Inclusive Deadline timestamp bounds |
+| `waiting-until-from`, `waiting-until-through` | Inclusive Waiting until timestamp bounds |
+| `sort` | One of the choices below; defaults to `created-desc` |
+| `limit` | Positive integer; omitted returns every match |
+| `offset` | Nonnegative integer; defaults to zero |
+| `x-success`, `x-error` | Caller URLs using the Add Task callback rules |
+
+Every supplied filter must match. No arguments selects all unfinished tasks.
+Deleted records and recurring templates are excluded even for `all`.
+A bounded date must exist on the record; missing or invalid record dates do
+not match a supplied bound. `from <= date <= through`; either side may be
+omitted and equal bounds are valid. Reversed or invalid bounds fail.
+URL dates use ISO 8601 timestamps with explicit timezones, as in Add Task.
+Percent-encode query values, especially `+` in timezone offsets and callback
+URLs. Unknown arguments, duplicate non-tag arguments, unknown status/sort,
+invalid priorities, and invalid/overflowing pagination fail explicitly.
+Shortcuts exposes these same named inputs with native dates and enums.
+
+## Ordering and pages
+
+| Sort | Order |
+| --- | --- |
+| `created-desc` | Newest creation timestamp first (default) |
+| `created-asc` | Oldest creation timestamp first |
+| `description-asc` | Case-sensitive UTF-8 byte order |
+| `scheduled-asc` | Earliest Scheduled timestamp first |
+| `deadline-asc` | Earliest Deadline timestamp first |
+| `waiting-until-asc` | Earliest Waiting until timestamp first |
+| `priority-desc` | H, M, L, then absent/unrecognized priority |
+
+Dates sort numerically. Missing or invalid sort dates come last, including
+creation dates. Equal primary values use newest creation first, then full UUID
+ascending. Pages apply offset then limit after sorting. Offset beyond the
+matches succeeds with an empty list. There is no implicit result cap.
+Determinism applies to a fixed dataset; concurrent edits can move tasks between
+pages, so callers that need a fixed snapshot should consume one list.
+
+## Results and presentation
+
+Without callbacks, the app shows a temporary Find Tasks sheet, including an
+explicit empty state. Tasks open into their usual details. Dismissing returns
+to the existing workspace. No custom view is created and favorites are not
+changed. The list is a snapshot of that request, not a saved live query.
+Navigation first settles valid edits and retains invalid drafts using the
+existing Add Task navigation guard. Existing Settings and integration panels
+report a navigation error above the current panel; finish that panel and retry
+the URL, rather than replacing an open form with competing results.
+
+With a callback, the `result` query argument contains JSON:
+
+```json
+{"success":true,"tasks":[{"uuid":"full UUID","description":"Book train","project":"Travel","tags":["rail"],"priority":"H","scheduled":null,"deadline":null,"waitingUntil":null,"status":"pending","openTaskURL":"tsk://open-task?id=full-UUID"}]}
+```
+
+No matches returns `{"success":true,"tasks":[]}`. Read success does not claim
+`savedLocally`. tsk rejects an encoded callback above its own 8192-byte ceiling
+with `result_too_large`; it never truncates the list. This is an application
+limit, not a universal safe callback URL size. The caller or OS may reject a
+smaller URL. Use filters, limit and offset to request smaller pages. Delivery
+failure is displayed in tsk and does not automatically repeat the request.
+
+## Verification boundaries
+
+Core action tests cover combined filters, exact versus child projects, distinct
+Unicode byte identities, every-tag matching, statuses, inclusive/invalid ranges,
+numeric sorting and UUID ties, empty results, uncapped lists and pagination.
+Core URL tests cover decoding, validation and rich list JSON/oversize errors.
+The persistent Native test reopens actual storage with pending, completed,
+deleted and recurring records. Apple-framework tests execute the real intent,
+read rich entities and pass one directly to Complete Task.
+
+`TaskActionURLUITests` retains the Add URL journeys and adds actual installed
+caller-to-tsk URL delivery, visible matching/empty results, task navigation,
+workspace retention, callback pages, empty callbacks and oversized failure.
+These methods run in full iPhone coverage, not PR smoke. The artifact verifier
+checks all fourteen extracted Find inputs and six native date bounds.
+
+Local test/build results and the UI report are recorded in the PR. Direct
+`perform()` tests and extracted metadata do not prove discovery or invocation
+by the external Shortcuts app or Siri. Full iPhone CI, actual Shortcuts workflow
+execution, physical-device provisioning and suspended/background execution must
+be reported separately. Native iPad support is retired under ADR 0007; iPhone
+is canonical for this issue despite the older issue's iPad wording.
+
+## Local implementation evidence
+
+- Core: 189 tests pass, including five structured Find contract cases.
+- Native: 134 cases executed successfully; 50 existing environment-gated cases
+  skipped without the real sync server, pinned Taskwarrior or owned Spotlight
+  fixtures. The new persistent Find and real intent cases both execute and pass.
+- Controller package: 73 tests pass; the extended task URL panel/draft guard
+  regression also passes after the presentation fix.
+- UI selection: 16 selection tests pass, preserving eight smoke methods and
+  selecting all 83 full methods (46 workspace / 37 task-row).
+- CI execution: 11 tests pass; simulator-lease runner checks: three pass.
+- Signed generic arm64 simulator build-for-testing passes. Artifact admission
+  verifies fourteen Find inputs, native dates, native entity-list output and
+  existing App/Share/Widget entitlements and shortcuts.
+- Standards review: zero actionable findings. Spec review: no confirmed contract
+  defects; the open-panel concern was addressed with the existing navigation
+  guard and an installed URL regression.
+
+No local simulator was booted for this issue. Multiple bounded lease attempts
+were refused while another session owned the Mac's simulator. Populated/empty
+results, task-detail navigation, Settings refusal and real caller callbacks
+have checked-in XCUITest assertions and screenshot attachments, but were not
+executed locally. The UI-report builder declined to create an HTML report with
+zero captures; no visual report or screenshot evidence is claimed. Full iPhone
+CI and external Shortcuts discovery/invocation remain pending acceptance.
+
+
+## Rebase and first full iPhone findings
+
+After main added the per-calendar visibility test, the combined full selection
+is 83 methods (46 workspace, 37 task-row). Post-rebase local checks pass:
+Core 192, Controller 75, Native 134 executed with 50 environment-gated skips,
+and signed generic arm64 build-for-testing plus artifact admission.
+
+The first full run, 42933624960 at superseded commit `e0ad295`, completed all
+82 then-selected tests with two failures and no skips. The Find callback test
+passed, including actual installed delivery, a rich page, an empty list and
+explicit oversized-result failure. The visible Find journey passed populated
+results and task-detail navigation. It failed at the empty-state query because
+SwiftUI exposes `find-results-empty` on StaticText children, not an Other
+container. The original failure hierarchy and recording both show “No matching
+tasks” and its explanation. The test now queries that observed title role and
+also requires the explanation, retaining the original 15-second deadline.
+The later workspace-relaunch/Settings assertions need fresh execution.
+
+The other failure was the existing occurrence/large-text row test at
+`TaskRowEditingUITests.swift:562`, waiting for the tag input after its opener.
+No Find or URL request runs in that case, and the row code was unchanged by
+this PR. Its verdict remains a full-acceptance gap; its deadline and assertions
+are preserved. The rebased source requires a new exact-head full run; the
+failed superseded run is not accepted or hidden by the rebase.
+
+A 199,026-byte standalone UI report now contains the original CI populated
+capture, the empty-state frame extracted at 44.8 seconds of its XCTest recording,
+and both successful callback screenshots. It labels the old source and failed
+run explicitly. Local machine path:
+`/Users/julesseguin/.local/share/ui-reports/tsk/agent-issue-66/find-tasks.html`.
+External Shortcuts/Siri discovery and invocation remain unverified.
+
+## CI repair after the rebased run
+
+At `aed84c4`, smoke failed the bulk-selection row opener and the completion-circle
+geometry admission; both unchanged cases pass in the local original three-case
+run. Full row-editing again failed the occurrence/XXXL Tags step. The original
+three-case local invocation reproduces that same Tags failure, with the two
+smoke cases passing (one failure across three cases).
+
+The failure hierarchy shows `row-tags` at `(160.7, 467.3, 74.7, 55.3)` beneath a
+supporting scroll viewport with zero height. Its computed tap `(198, 495)` lands
+on the overlapping More task information control and attempts the intentionally
+invalid occurrence save. The test now clears retained title focus using the
+real Hide Keyboard button, requires that focus control to disappear, then
+reveals Tags fully inside the supporting scroll before the existing opener.
+The picker timeout, invalid fixture, failure message, unsaved title, retained
+tag and Save and close assertions are unchanged. No application handler,
+assertion, timeout or native menu/keyboard transport was weakened.
+
+The first two verification attempts used a dismissal helper that requires an
+onscreen software-keyboard rectangle. Captured geometry instead shows a visible
+focus-dismiss control with an offscreen software-keyboard frame. The final test
+uses the existing ordinary native-control helper to clear focus; shared helpers
+and their keyboard requirements remain unchanged.
+
+The corrected original occurrence case passes on local iPhone 17/iOS 27.0
+(39.140 seconds, zero failures). Signed generic simulator build, intent artifact
+admission and all 16 selection checks pass; full selection remains 83 methods.
+The simulator was reserved, shut down and released after each runtime phase.
+Local success is diagnostic evidence; fresh exact-head smoke/full CI remains
+the acceptance gate. No same-head infrastructure rerun has been used.
+
+## Rebase onto the explicit UI cadence
+
+Rebased onto main `7c8a7be` after bulk-selection Apply, the upstream large-text
+Tags repair and the reviewed UI-suite consolidation merged. The consolidation
+removed the duplicated occurrence/XXXL case, so this branch preserves that
+removal and retains its earlier diagnosis above as historical evidence.
+
+The two structured Find workflows are explicitly registered as nightly system
+journeys. Current coverage is three smoke methods, 32 nightly methods (21
+workspace / 11 task-row) and 27 on-demand methods: 59 retained methods, each
+with exactly one cadence. The older 83-case totals and runtime results above
+refer to superseded sources and do not establish current-head acceptance.

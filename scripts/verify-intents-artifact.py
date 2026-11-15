@@ -78,3 +78,13 @@ properties = {item['identifier'] for item in metadata['entities']['IntentTaskEnt
 if not {'uuid', 'description', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'status', 'openTaskURL'}.issubset(properties):
     raise SystemExit('The task entity must expose all rich result properties')
 print('Verified seven Add Task inputs, native dates, required Description, rich entity properties and tsk URL registration')
+
+find_parameters = {item['name']: item for item in metadata['actions']['FindTasksIntent']['parameters']}
+if set(find_parameters) != {'searchText', 'project', 'tags', 'status', 'priority', 'scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough', 'waitingUntilFrom', 'waitingUntilThrough', 'sort', 'limit', 'offset'}:
+    raise SystemExit('Find Tasks must expose exactly its named filters, sort and pagination inputs')
+for name in ('scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough', 'waitingUntilFrom', 'waitingUntilThrough'):
+    if find_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
+        raise SystemExit('Find Tasks bounds must be native dates: ' + name)
+if metadata['actions']['FindTasksIntent']['outputType'] != {'array': {'wrapper': {'capabilities': 3, 'memberValueType': {'entity': {'wrapper': {'typeName': 'IntentTaskEntity'}}}}}}:
+    raise SystemExit('Find Tasks must return a native list of task entities')
+print('Verified fourteen structured Find Tasks inputs, native date bounds and native entity list result')

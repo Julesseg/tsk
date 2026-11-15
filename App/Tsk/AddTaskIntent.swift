@@ -5,13 +5,6 @@ import TskCore
 import TskNative
 
 @available(iOS 16, macOS 13, *)
-public enum IntentTaskPriority: String, AppEnum {
-    case high = "H", medium = "M", low = "L"
-    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Task priority"
-    public static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [.high: "High", .medium: "Medium", .low: "Low"]
-}
-
-@available(iOS 16, macOS 13, *)
 public struct AddTaskIntent: AppIntent {
     public static let title: LocalizedStringResource = "Add Task"
     public static let description = IntentDescription("Add one task immediately to durable local storage, even offline. Success does not require server synchronization.")

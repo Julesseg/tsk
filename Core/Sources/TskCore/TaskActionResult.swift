@@ -60,6 +60,10 @@ public struct TaskActionCallbacks: Sendable {
         try (success ?? error).map { try Self.url($0, payload: Success(task: TaskActionResult(task))) }
     }
 
+    public func successURL(for tasks: [TaskRecord]) throws -> URL? {
+        try (success ?? error).map { try Self.url($0, payload: FindSuccess(tasks: tasks.map(TaskActionResult.init))) }
+    }
+
     public func errorURL(code: String, message: String, savedTaskID: UUID? = nil) throws -> URL? {
         guard let base = error ?? success else { return nil }
         let failure = Failure(savedLocally: savedTaskID != nil, uuid: savedTaskID?.uuidString, error: FailureDetail(code: code, message: message))
@@ -97,6 +101,11 @@ public struct TaskActionCallbacks: Sendable {
         components.percentEncodedQuery = [components.percentEncodedQuery, query].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "&")
         guard let url = components.url, url.absoluteString.utf8.count <= maximumURLBytes else { throw TaskActionError.resultTooLarge }
         return url
+    }
+
+    private struct FindSuccess: Encodable {
+        let success = true
+        let tasks: [TaskActionResult]
     }
 
     private struct Success: Encodable {

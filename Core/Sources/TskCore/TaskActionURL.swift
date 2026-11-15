@@ -2,6 +2,7 @@ import Foundation
 
 public enum TaskActionURL: Equatable, Sendable {
     case add(AddTaskInput)
+    case find(FindTasksInput)
     case openTask(UUID)
 
     public init(url: URL) throws {
@@ -10,6 +11,7 @@ public enum TaskActionURL: Equatable, Sendable {
         let allowed: Set<String>
         switch components.host {
         case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
+        case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "waiting-until-from", "waiting-until-through", "sort", "limit", "offset", "x-success", "x-error"]
         case "open-task": allowed = ["id"]
         default: throw TaskActionError.invalidInput("Unsupported tsk action.")
         }
@@ -24,6 +26,28 @@ public enum TaskActionURL: Equatable, Sendable {
         if components.host == "open-task" {
             guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open Task requires a full UUID.") }
             self = .openTask(id)
+        } else if components.host == "find" {
+            _ = try TaskActionCallbacks(url: url)
+            guard let status = FindTaskStatus(rawValue: values["status"]?.first ?? "unfinished"),
+                  let sort = FindTaskSort(rawValue: values["sort"]?.first ?? "created-desc") else {
+                throw TaskActionError.invalidInput("Unsupported Find status or sort choice.")
+            }
+            func integer(_ key: String) throws -> Int? {
+                guard let raw = values[key]?.first else { return nil }
+                guard !raw.isEmpty, raw.utf8.allSatisfy({ (48...57).contains($0) }), let value = Int(raw) else {
+                    throw TaskActionError.invalidInput("\(key) requires a nonnegative integer.")
+                }
+                return value
+            }
+            func range(_ key: String) throws -> TaskDateRange {
+                try TaskDateRange(from: Self.date(values[key + "-from"]?.first), through: Self.date(values[key + "-through"]?.first))
+            }
+            let input = try FindTasksInput(description: values["description"]?.first ?? "", project: values["project"]?.first,
+                                           tags: values["tags"] ?? [], status: status, priority: values["priority"]?.first,
+                                           scheduled: range("scheduled"), deadline: range("deadline"), waitingUntil: range("waiting-until"),
+                                           sort: sort, limit: integer("limit"), offset: integer("offset") ?? 0)
+            try input.validate()
+            self = .find(input)
         } else {
             _ = try TaskActionCallbacks(url: url)
             let input = AddTaskInput(description: values["description"]?.first ?? "", project: values["project"]?.first, tags: values["tags"] ?? [], priority: values["priority"]?.first,

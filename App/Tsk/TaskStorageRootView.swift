@@ -46,6 +46,9 @@ struct TaskStorageRootView: View {
             else if let error { ContentUnavailableView("Task storage unavailable", systemImage: "exclamationmark.triangle", description: Text(error)) }
             else { ProgressView("Opening task storage…") }
         }
+        .sheet(item: $automation.findResults) { results in
+            if let store { TaskFindResultsView(results: results, store: store).modifier(TaskActionMessage(controller: automation)) }
+        }
         .environment(automation)
     }
 

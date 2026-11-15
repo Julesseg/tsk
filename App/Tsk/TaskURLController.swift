@@ -6,6 +6,7 @@ import UIKit
 
 @MainActor @Observable
 final class TaskURLController {
+    var findResults: TaskFindResults?
     var taskToOpen: TaskRecord?
     var message: String?
     private var requests: [URL] = []
@@ -33,6 +34,15 @@ final class TaskURLController {
                 }
                 let task: TaskRecord
                 switch action {
+                case .find(let input):
+                    let tasks = try await store.manager.findTasks(input)
+                    if let callback = try callbacks?.successURL(for: tasks) {
+                        await deliver(callback, saved: nil)
+                    } else {
+                        await store.reload()
+                        findResults = TaskFindResults(tasks: tasks)
+                    }
+                    continue
                 case .add(let input):
                     task = try await store.manager.addTask(input)
                     saved = task
