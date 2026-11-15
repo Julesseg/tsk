@@ -11,6 +11,18 @@ _Avoid_: Reminder as a synonym for a Taskwarrior task
 **Task view**:
 A presentation of a selected set of tasks for a particular task-management purpose.
 
+**Day page**:
+A task view centered on one calendar day, showing its work, retained completion history, and calendar events. Tasks can be untimed or timed, with manual order within the day's date and time constraints.
+
+**Planner date**:
+The date supplied by Scheduled when present, otherwise by Deadline, that places a task in the planner before carryover is considered.
+
+**Carryover**:
+Unfinished work with an earlier planner date that appears on Today until completed or explicitly rescheduled. Its original date and time remain unchanged.
+
+**Inbox**:
+The task view of unfinished tasks with neither a Scheduled date nor a project. A Deadline alone does not exclude a task from Inbox.
+
 **Predefined view**:
 A task view supplied by tsk, such as Today, Upcoming, or a view by project.
 
@@ -27,7 +39,7 @@ An expression that selects tasks according to Taskwarrior's filtering language.
 A task created in tsk from an Apple reminder.
 
 **Scheduled**:
-The date and time at which the user intends to work on a task, distinct from its deadline and any waiting constraint. Midnight is a valid intended time.
+The date, with an optional time, on which the user intends to work on a task, distinct from its deadline and any waiting constraint. An explicit midnight time is distinct from a date without a time.
 _Avoid_: Planned day; Deadline as a synonym for Scheduled
 
 **Deadline**:
@@ -42,10 +54,10 @@ _Avoid_: Two-way synchronization
 Copying eligible reminders from selected Apple Reminders lists into tsk once, leaving the originals in Apple Reminders.
 
 **Today**:
-The predefined view of unfinished tasks scheduled for today or an earlier day, including times later today, or due today or overdue, alongside today's calendar events. Matching waiting or blocked tasks remain visible with their reason.
+The day page for the current day, including carryover, the day's work and retained completion history, and calendar events.
 
 **Upcoming**:
-The predefined view of future scheduled work and deadlines grouped by day, with Scheduled and Deadline distinguished.
+A view of future work organized by planner date.
 
 **Annotation**:
 A timestamped note attached to a task.

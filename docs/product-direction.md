@@ -2,6 +2,8 @@
 
 This brief records the product choices accepted during the design interviews. It describes intended behavior; implementation and runtime verification are tracked separately.
 
+The accepted [daily planner redesign](planner-redesign.md) retains Taskwarrior and supersedes conflicting navigation, date placement, ordering, calendar, completion-history, and notification details below. It records intended behavior, not implementation.
+
 The [PRD](prd.md) expands this direction into user stories, implementation decisions, testing decisions, and explicit exclusions.
 
 ## Purpose and audience

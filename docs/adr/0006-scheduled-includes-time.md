@@ -1,5 +1,7 @@
 # Scheduled includes time throughout tsk
 
+[ADR 0008](0008-preserve-planner-date-intent.md) and the [daily planner redesign](../planner-redesign.md) supersede the conflicting planner placement, date display, precision, and notification rules below. Scheduled still uses Taskwarrior's existing field and supports explicit times, including midnight; the new design also distinguishes an untimed date. Implementation of the redesign is pending.
+
 Scheduled expresses an intended work date and time throughout tsk, including task editors, date displays, Shortcuts, and URL actions. This supersedes [ADR 0003](0003-share-taskwarrior-planning-and-deadline-fields.md)'s day-only presentation while retaining Taskwarrior's `scheduled` attribute and the distinction from Deadline and Waiting until. Consistent time support lets users express when they intend to work without silently discarding time when editing; the label-only rename in [PR #61](https://github.com/Julesseg/tsk/pull/61) does not deliver this semantic change.
 
 Preserve existing timestamps and display their time, including midnight, without inferring replacement times or changing the storage format. Today still includes all unfinished work scheduled for today or earlier, including times later today; Upcoming remains grouped by local calendar day and ordered by actual timestamps. Waiting until remains a separate constraint.
