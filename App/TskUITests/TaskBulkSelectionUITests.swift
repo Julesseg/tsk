@@ -185,7 +185,7 @@ import XCTest
         XCTAssertEqual(scheduled.value as? String, "Modified")
         scheduled.tap()
         let pickerFrame = app.otherElements["selection-date-picker"].frame
-        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX - 6), dy: pickerFrame.midY))
+        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX / 2), dy: pickerFrame.midY))
         besidePicker.tap()
         XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2", "Empty space beside the picker also collapses it without changing selection")

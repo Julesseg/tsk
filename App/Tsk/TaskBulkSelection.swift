@@ -218,9 +218,12 @@ struct TaskSelectionBar: View {
     }
 
     private var completeButton: some View {
-        Button("Complete selected tasks", systemImage: "checkmark") { store.toggleSelectionCompletion() }
-            .labelStyle(.iconOnly)
-            .frame(width: 44, height: 44)
+        Button { store.toggleSelectionCompletion() } label: {
+            Label("Complete selected tasks", systemImage: "checkmark")
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+        }
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .glassEffect(.regular.tint(store.selectionChanges.complete ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Circle())
