@@ -164,6 +164,28 @@ are bounded and killed/reaped without blocking native keyboard request delivery.
 Ordinary test assertions still allow independent methods to finish. The first
 failure is annotated immediately, rather than waiting for the suite's last case.
 
+Every UI worker also wraps its unchanged command with
+`scripts/capture-ui-host-diagnostics.py`. Before that command starts, the wrapper
+starts a host unified-log reader for CoreSimulator, simdiskimaged, related launchd
+events and kernel memory-pressure events. It samples load, virtual memory,
+memory pressure, swap, disk space and relevant process IDs every 30 seconds,
+with initial/final snapshots and runner image/source identity in `capture.json`.
+Selected process/termination metadata and faulting frames from up to eight new
+simulator/test-process crash reports are retained; full process environments and
+raw crash reports are not uploaded. Inherited secret values and common credential
+forms are redacted before writing.
+
+The reader stops after 180 minutes without interrupting the worker. Event files
+rotate within 8 MiB and resource files within 1 MiB; each selected crash report is
+capped at 64 KiB. The wrapper stops/reaps only its own log reader and preserves
+the worker's exit status and signal delivery. Collection failures are best-effort
+diagnostic gaps, never test acceptance. `capture.json` records logger status,
+errors, duration caps and ordered retained files so missing logs remain visible.
+Existing diagnostic output is preserved instead of being overwritten. The normal
+`always()` result upload includes `.build/ui-host-diagnostics`, even when an
+interrupted xcresult cannot be finalized. This capture changes no test selection,
+native ownership or assertion deadline and does not dispatch or retry tests.
+
 ## Results and gates
 
 Each worker uploads its original xcresult bundles and runtime/transport receipts,
