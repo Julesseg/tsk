@@ -122,10 +122,17 @@ class HostDiagnosticsTests(unittest.TestCase):
         reports.mkdir()
         report = {'procName': 'CoreSimulatorService', 'pid': 42, 'termination': {'byProc': 'launchd', 'byPid': 1},
                   'environment': {'PASSWORD': 'do-not-retain'}, 'threadState': {'memory': 'do-not-retain'}}
-        (reports / 'CoreSimulatorService-fixture.ips').write_text(json.dumps({'header': True}) + '\n' + json.dumps(report))
-        (reports / 'Unrelated-app.ips').write_text(json.dumps({'procName': 'Unrelated-app'}))
+        recent = reports / 'CoreSimulatorService-fixture.ips'
+        recent.write_text(json.dumps({'header': True}) + '\n' + json.dumps(report))
+        old = reports / 'CoreSimulatorService-old.ips'
+        old.write_text(json.dumps(report))
+        unrelated = reports / 'Unrelated-app.ips'
+        unrelated.write_text(json.dumps({'procName': 'Unrelated-app'}))
+        for path, timestamp in ((recent, capture.started + 1), (old, capture.started - 1), (unrelated, capture.started + 1)):
+            os.utime(path, (timestamp, timestamp))
         capture.reports([reports])
         self.assertEqual(len(capture.metadata['processReports']), 1)
+        self.assertEqual(capture.metadata['processReports'][0]['file'], recent.name)
         retained = capture.metadata['processReports'][0]['details']
         self.assertEqual(retained['termination'], {'byProc': 'launchd', 'byPid': 1})
         self.assertNotIn('do-not-retain', json.dumps(retained))
