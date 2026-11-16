@@ -1,6 +1,6 @@
 # T3 Code orchestration
 
-This project's interactive sessions and issue dispatch use T3 Code. Existing
+This project's interactive sessions use T3 Code. Existing
 Paseo schedules and heartbeats remain there. Apply this document when running
 inside T3; sessions launched by Paseo retain their Paseo orchestration.
 

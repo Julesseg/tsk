@@ -166,27 +166,6 @@ Processing in TestFlight takes a few minutes after the run goes green; set
 attached to the run as an artifact (7-day retention). A misformatted tag (not
 `X.X.X`) fails the run early rather than uploading a bad version.
 
-## Enabling agent auto-dispatch (one-time)
-
-The auto-dispatch pipeline (`unblock-dispatch.yml` + `agent-implement.yml`)
-starts a T3 Code thread in an isolated worktree for each ready issue. The Mac
-needs a registered `tsk` project, a running T3 server, authenticated GitHub
-and provider credentials, and a self-hosted GitHub Actions runner under the
-same user account.
-
-Set the required repository Actions variable `T3_PROJECT_DIR`. Optional
-`T3_BASE`, `T3_CLI` and `T3_BASE_DIR` select the base ref, CLI executable and
-T3 home. Save the project's provider/model, reasoning and permission settings
-in T3; the launcher inherits them without inventing unsupported CLI flags.
-
-Install the shared `label-and-implement-with-pr`, `implement`, `ui-report` and
-`babysit-pr` skills under `~/.agents/skills`. In T3, the project adapter in
-[`docs/agents/t3-code.md`](agents/t3-code.md) supplies delegation and PR watch
-mechanics. Existing Paseo schedules and heartbeats remain in Paseo.
-
-See [`docs/agents/auto-dispatch.md`](agents/auto-dispatch.md) for readiness
-rules, duplicate protection, configuration and verification.
-
 ## CI details
 
 - **`ci.yml`** — `core-tests` runs `swift test` in a `swift:6.0.3` Linux
