@@ -30,6 +30,8 @@ NIGHTLY = (
     'TaskActionURLUITests/testCompleteURLReturnsRichSavedTaskRevealsItAndProtectsNestedDrafts',
     'TaskActionURLUITests/testModifySystemURLSavesAllFieldsTagModesClearsAndAtomicRejections',
     'TaskActionURLUITests/testModifyURLSettlesActiveEditingRevealsTimedResultAndPreservesInvalidDraft',
+    'TaskActionURLUITests/testSystemDeleteCallbackReturnsDurableDeletedResultAndRejectsSubsequentOpen',
+    'TaskActionURLUITests/testSystemDeletePreservesInvalidLinkedDraftThenConfirmsWithoutOpeningDeletedEditor',
     'TaskActionURLUITests/testSystemFindCallbackReturnsRichPagesEmptyListsAndExplicitOversizeFailure',
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',

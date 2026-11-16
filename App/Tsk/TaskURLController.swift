@@ -8,6 +8,7 @@ import UIKit
 final class TaskURLController {
     var findResults: TaskFindResults?
     var taskToOpen: TaskRecord?
+    var deletedTaskID: UUID?
     var message: String?
     private var requests: [URL] = []
     private var isExecuting = false
@@ -32,6 +33,9 @@ final class TaskURLController {
                 if case .complete(let id) = action {
                     _ = try await store.manager.task(id: id, includingDeleted: false)
                 }
+                if case .delete(let id) = action {
+                    _ = try await store.manager.task(id: id)
+                }
                 guard await store.prepareForTaskActionNavigation() else {
                     throw TaskActionError.navigationFailed(store.error ?? "Finish the current editing panel before opening a task URL.")
                 }
@@ -52,10 +56,14 @@ final class TaskURLController {
                 case .modify(let id, let input):
                     task = try await store.manager.modifyTask(id: id, input: input)
                     saved = task
-                case .openTask(let id): task = try await store.manager.task(id: id)
+                case .openTask(let id): task = try await store.manager.openTask(id: id)
                 case .complete(let id):
                     task = try await store.manager.complete(id: id)
                     saved = task
+                case .delete(let id):
+                    task = try await store.manager.delete(id: id)
+                    saved = task
+                    deletedTaskID = task.id
                 }
                 await store.reload()
                 let callback = try callbacks?.successURL(for: task)
@@ -64,6 +72,9 @@ final class TaskURLController {
                 } else {
                     switch action {
                     case .modify, .openTask, .complete: taskToOpen = task
+                    case .delete:
+                        taskToOpen = nil
+                        message = "Deletion saved locally: \(task.description) (\(task.id.uuidString))."
                     case .add, .find: break
                     }
                 }

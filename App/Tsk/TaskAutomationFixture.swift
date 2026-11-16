@@ -11,6 +11,8 @@ func runTaskAutomationFixture() async throws {
     let entity = IntentTaskEntity(try await manager.task(id: id))
     if action == "complete" {
         _ = try await CompleteTaskIntent(task: entity).perform()
+    } else if action == "delete" {
+        _ = try await DeleteTaskIntent(task: entity).perform()
     } else {
         guard let rawDate = environment["TSK_TEST_INTENT_DATE"], let timestamp = Double(rawDate), ["planned", "deadline"].contains(action) else { throw CocoaError(.coderInvalidValue) }
         _ = try await ModifyTaskIntent(task: entity, scheduled: action == "planned" ? Date(timeIntervalSince1970: timestamp) : nil, deadline: action == "deadline" ? Date(timeIntervalSince1970: timestamp) : nil).perform()

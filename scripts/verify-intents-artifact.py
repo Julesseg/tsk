@@ -53,12 +53,12 @@ if activation.get("NSExtensionActivationSupportsText") is not True or activation
     raise SystemExit("The embedded share extension does not activate for text and web URLs")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent'}.issubset(metadata['actions']):
-    raise SystemExit('The app metadata is missing its add/find/complete/modify actions')
+if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent'}.issubset(metadata['actions']):
+    raise SystemExit('The app metadata is missing its add/find/complete/modify/delete actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
-if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent'}.issubset(shortcuts):
+if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and four App Shortcuts')
+print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and five App Shortcuts')
 
 if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
     raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')
@@ -97,3 +97,10 @@ for name in ('scheduled', 'deadline', 'waitingUntil'):
     if modify_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
         raise SystemExit('Modify Task date inputs must be native dates: ' + name)
 print('Verified Modify Task inputs and removal of standalone Reschedule')
+
+parameters = metadata['actions']['DeleteTaskIntent']['parameters']
+if len(parameters) != 1 or parameters[0]['name'] != 'task' or parameters[0]['isOptional']:
+    raise SystemExit('Delete Task must require exactly one task entity')
+if metadata['actions']['DeleteTaskIntent']['outputType'] != metadata['actions']['CompleteTaskIntent']['outputType']:
+    raise SystemExit('Delete Task must return the shared rich task entity')
+print('Verified one required Delete Task entity and shared rich entity result')

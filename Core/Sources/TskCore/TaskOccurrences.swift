@@ -24,14 +24,14 @@ extension TaskManager {
         return saved
     }
 
-    func saveOccurrence(_ occurrence: TaskRecord, changes: TaskAttributePatch, completing: Bool = false) async throws -> TaskRecord {
+    func saveOccurrence(_ occurrence: TaskRecord, changes: TaskAttributePatch, completing: Bool = false, deleting: Bool = false) async throws -> TaskRecord {
         let records = try await replica.tasks()
         let (parent, index) = try occurrencePosition(occurrence, in: records)
         let rawMask = parent.attributes["mask"]!
         var mask = Array(rawMask.utf8)
         if occurrence.status == "completed", completing, mask[index] == 43 { return occurrence }
         guard let atomic = replica as? any TaskAtomicMutatingReplica else { throw TaskManagementError.storage("This storage adapter cannot save recurrence bookkeeping atomically.") }
-        mask[index] = try occurrenceMutationMask(occurrence, changes: changes, parent: parent, index: index, completing: completing)
+        mask[index] = try occurrenceMutationMask(occurrence, changes: changes, parent: parent, index: index, completing: completing, deleting: deleting)
         let parentChanges: TaskAttributePatch = String(decoding: mask, as: UTF8.self).matchesBytes(rawMask) ? [:] : ["mask": String(decoding: mask, as: UTF8.self), "modified": String(Int(now().timeIntervalSince1970))]
         let saved = try await atomic.updateAtomically([
             TaskAtomicUpdate(id: occurrence.id, expected: occurrence.attributes, changes: changes),
@@ -42,10 +42,14 @@ extension TaskManager {
         return result
     }
 
-    func occurrenceMutationMask(_ occurrence: TaskRecord, changes: TaskAttributePatch, parent: TaskRecord, index: Int, completing: Bool = false) throws -> UInt8 {
-        guard occurrence.status == "pending", [45, 87].contains(Array(parent.attributes["mask"]!.utf8)[index]) else {
+    func occurrenceMutationMask(_ occurrence: TaskRecord, changes: TaskAttributePatch, parent: TaskRecord, index: Int, completing: Bool = false, deleting: Bool = false) throws -> UInt8 {
+        let mask = Array(parent.attributes["mask"]!.utf8)[index]
+        let validPending = occurrence.status == "pending" && [45, 87].contains(mask)
+        let validCompletedDeletion = deleting && occurrence.status == "completed" && mask == 43
+        guard validPending || validCompletedDeletion else {
             throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.")
         }
+        if deleting { return 88 }
         if changes.keys.contains("due"), (changes["due"] ?? nil)?.isEmpty != false {
             throw TaskManagementError.storage("A generated occurrence must retain its due date. Change its deadline instead, or deselect it before removing deadlines. No tasks were changed.")
         }
