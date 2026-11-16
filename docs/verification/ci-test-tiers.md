@@ -116,6 +116,12 @@ Diagnostic snapshots remain best-effort if a process is killed before the next
 flush. Transport acknowledgements and UI outcome assertions are independent of
 these optional traces.
 
+The producer and every UI worker explicitly select Xcode 27.2. Simulator
+selection requires an available iPhone runtime matching the selected simulator
+SDK major/minor, so this toolchain runs iOS 27.2 rather than whichever runtime
+happens to be newest on the hosted image. Product and consumer identity checks
+remain mandatory.
+
 One Mac producer builds the simulator bridge, controller tests and signed arm64
 UI products. It validates intent metadata and App Group entitlements before any
 simulator is created. The selected coverage determines whether it also builds
