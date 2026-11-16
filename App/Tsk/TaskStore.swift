@@ -38,6 +38,51 @@ final class TaskStore {
         }
     }
 
+    struct NavigationLocation {
+        let workspace: WorkspaceView
+        let query: TaskQuery
+        let project: TaskProjectSelection
+        let custom: CustomViewSelection?
+    }
+    var navigationReturn: NavigationLocation?
+    var navigationTitle: String?
+
+    func openNavigation(_ destination: TaskNavigationDestination) async throws {
+        if navigationReturn == nil {
+            navigationReturn = NavigationLocation(workspace: selectedWorkspaceView, query: query, project: projectSelection, custom: customView)
+        }
+        endTaskSelection()
+        captureConfirmation = nil
+        selectWorkspaceView(destination.view.workspace)
+        if case .project(let name) = destination.view { projectSelection = .project(name) }
+        if let saved = destination.savedView { openView(saved) }
+        navigationTitle = destination.title
+        tasks = destination.snapshot.listTasks
+        allTasks = destination.snapshot.allTasks
+        availableProjects = destination.snapshot.projects
+        nextFilterEvaluation = destination.snapshot.nextEvaluation
+        error = nil
+        if let task = destination.task {
+            expandRow(task)
+            guard let row = rowEditing, row.draft.original.id == task.id else {
+                throw TaskActionError.navigationFailed("The task could not be expanded in its containing list.")
+            }
+            await row.setExpanded(true, reduceMotion: true)
+        }
+    }
+
+    func returnFromNavigation() async -> Bool {
+        guard await prepareForTaskActionNavigation(), let location = navigationReturn else { return false }
+        selectedWorkspaceView = location.workspace
+        query = location.query
+        projectSelection = location.project
+        customView = location.custom
+        navigationReturn = nil
+        navigationTitle = nil
+        await reload()
+        return true
+    }
+
     func prepareForTaskActionNavigation() async -> Bool {
         guard !isSaving else { error = "A task is still saving. Try the URL again after it finishes."; return false }
         let allowed = taskActionDraftCommit.map { Set([$0.id]) } ?? []
@@ -50,7 +95,12 @@ final class TaskStore {
     }
 
     func saveRowForTaskActionNavigation() async -> Bool {
-        guard !isSaving else { error = "A task is still saving. Try the URL again after it finishes."; return false }
+        guard !isSaving else { error = "A task is still saving. Try again after it finishes."; return false }
+        if let row = rowEditing, row.isCapture, row.draft.taskDraft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            row.error = TaskManagementError.emptyDescription.localizedDescription
+            error = row.error
+            return false
+        }
         if let row = rowEditing, !(await row.saveAndCollapse(in: self, reduceMotion: true, includingParameter: true)) {
             error = row.error ?? error ?? "The current task is still saving or its editing panel is open."
             return false
@@ -141,7 +191,7 @@ final class TaskStore {
     }
 
     func expandRow(_ task: TaskRecord, rowID: String? = nil) {
-        guard !isSelectionPressActive, !isSelectingTasks, rowEditing == nil, !isSaving, task.canEdit, visibleTasks.contains(where: { $0.id == task.id }) else { return }
+        guard !isSelectionPressActive, !isSelectingTasks, rowEditing == nil, !isSaving, task.canOpenInWorkspace, visibleTasks.contains(where: { $0.id == task.id }) else { return }
         let upcomingID = customView == nil && query == .upcoming ? upcomingDays.flatMap(\.entries).first { $0.task.id == task.id }?.rowIdentifier : nil
         guard customView != nil || query != .upcoming || upcomingID != nil else { return }
         rowEditing = TaskRowEditing(task: task, rowID: rowID ?? upcomingID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
@@ -156,7 +206,7 @@ final class TaskStore {
         } else {
             workspaceViews = try LocalWorkspaceViewStore(directory: directory).load(customIDs: savedViews.map(\.id))
         }
-        if !workspaceViewsLoaded || !workspaceViews.active.contains(selectedWorkspaceView) {
+        if navigationReturn == nil && (!workspaceViewsLoaded || !workspaceViews.active.contains(selectedWorkspaceView)) {
             selectWorkspaceView(workspaceViews.active[0])
         }
         workspaceViewsLoaded = true
@@ -171,6 +221,7 @@ final class TaskStore {
     }
 
     func selectWorkspaceView(_ view: WorkspaceView) {
+        navigationTitle = nil
         endTaskSelection()
         selectedWorkspaceView = view
         projectSelection = .all

@@ -1,4 +1,4 @@
-# Add Task automation
+# Task automation
 
 Add Task in Shortcuts and `tsk://add` save one task immediately to durable local storage, including offline. Success does not acknowledge server synchronization. Neither interface presents a confirmation editor. The Add Task adapter belongs to the app target, so Shortcuts runs it in the app process rather than the widget extension. Other actions are being rebuilt in separate issues.
 
@@ -27,7 +27,7 @@ Routes are deliberately unversioned. Future additions must preserve these meanin
 
 Shortcuts returns a Task entity with Full UUID, Description, Project, Tags, Priority, Scheduled, Deadline, Waiting until, Status and Open Task URL. Entity resolution uses the durable UUID. The Open Task URL is `tsk://open-task?id=<full UUID>`; working-set numbers and partial UUIDs are rejected.
 
-Without callbacks, Add Task refreshes the current workspace. The saved task appears as an ordinary row wherever it matches the current view and filters; no destination page or editor is opened. Explicit Open Task links use the existing task-link navigation with a route back. Existing valid task edits are saved before executing the URL; validation or save failure keeps the draft and reports the error. A URL received while another unsupported editing panel is open reports an error rather than discarding that panel.
+Without callbacks, Add Task refreshes the current workspace. The saved task appears as an ordinary row wherever it matches the current view and filters; no destination page or editor is opened. Explicit Open Task links resolve the current saved record, reveal All unfinished or Done, and expand one task in place with a Back route. Completed recurring occurrences expand read-only. Deleted and missing records report an error. Existing valid task edits are saved before executing the URL; validation or save failure keeps the draft and reports the error. A URL received while another unsupported editing panel is open reports an error rather than discarding that panel.
 
 ## Callbacks
 
@@ -51,7 +51,7 @@ A successful OS URL-open acknowledgement means the system accepted delivery; it 
 
 ## Modify Task
 
-Modify Task in Shortcuts and `tsk://modify?id=<full UUID>` change exactly one saved task. Select a Task entity in Shortcuts; URLs accept only its full UUID, never a numeric ID, partial UUID, filter or task list. For bulk workflows, use Find followed by explicit iteration. Modify replaces the old standalone Reschedule action; saved shortcuts using Reschedule may break. Delete and the remaining named navigation actions are tracked separately.
+Modify Task in Shortcuts and `tsk://modify?id=<full UUID>` change exactly one saved task. Select a Task entity in Shortcuts; URLs accept only its full UUID, never a numeric ID, partial UUID, filter or task list. For bulk workflows, use Find followed by explicit iteration. Modify replaces the old standalone Reschedule action; saved shortcuts using Reschedule may break. Delete is tracked separately.
 
 The seven fields use the same names and date formats as Add. All omitted values preserve existing data. Empty optional text or an empty Shortcuts tag list also preserves data, including with Replace selected. Blank Description preserves the saved description. Clear project, Clear priority, Clear Scheduled, Clear Deadline and Clear Waiting until remove those optional fields; URLs use `clear-project=true`, `clear-priority=true`, `clear-scheduled=true`, `clear-deadline=true`, and `clear-waiting-until=true`. Clear arguments accept only `true` or `false`. Supplying a nonempty value and its Clear control together is an error.
 
@@ -64,4 +64,24 @@ tsk://modify?id=12345678-1234-1234-1234-123456789ABC&tag-operation=clear&clear-p
 
 All fields validate and save together under the shared mutation lease. A failed validation or persistence operation leaves the saved task unchanged. Completed tasks remain editable; deleted and missing tasks report errors. Identity, completion state, unknown attributes, annotations and unrelated fields are preserved. Recurring templates remain guarded; generated occurrences use the existing atomic occurrence bookkeeping and cannot clear their required Deadline. No raw recurrence attributes are accepted.
 
-Modify uses the same durable offline acknowledgement, rich Task entity and JSON callbacks described above. Callback encoding/delivery failure after saving does not undo or replay the operation. Without callbacks it reveals the saved task through the existing linked-task navigation, even when its changed dates or project no longer match the current view. The existing draft gate saves valid edits before modifying and retains invalid drafts without applying the action.
+Modify uses the same durable offline acknowledgement, rich Task entity and JSON callbacks described above. Callback encoding/delivery failure after saving does not undo or replay the operation. Without callbacks it reveals the saved task in its normal containing list with a Back route, even when its changed dates or project no longer match the current view. The existing draft gate saves valid edits before modifying and retains invalid drafts without applying the action.
+
+## Open Task and Open View
+
+Shortcuts exposes **Open Task** with a required Task entity and **Open View** with a required native view picker. These foreground actions open tsk and await the workspace navigation result; an invalid draft, unavailable target or failed save throws instead of reporting successful navigation. Add, Find, Complete and Modify remain background data actions. Open actions do not wrap custom URLs.
+
+Open View selects an existing view, including views hidden from favorites. It never creates a custom view or changes favorite order or membership. Saved views use their durable UUID and current name/filter after renaming. Exact project names do not include child projects. Missing projects and saved views fail clearly.
+
+| Destination | URL |
+| --- | --- |
+| Today | `tsk://open-view?view=today` |
+| Upcoming | `tsk://open-view?view=upcoming` |
+| All unfinished | `tsk://open-view?view=unfinished` |
+| Done | `tsk://open-view?view=done` |
+| Projects | `tsk://open-view?view=projects` |
+| Exact project | `tsk://open-view?view=project&project=Work.Travel` |
+| Existing saved view | `tsk://open-view?view=saved&id=<full UUID>` |
+
+Names are case-sensitive. Percent-encode project names; saved display names are not accepted as identity. Unknown, duplicate, irrelevant or missing arguments fail. Both open routes accept the same optional `x-success` and `x-error` callback arguments as Add Task. Navigation callbacks are delivered after the workspace transition, with `success:true`, `navigated:true`, `savedLocally:false`, the canonical view URL and current title; Open Task also includes the current rich task result. `savedLocally:false` means the open action did not create a task. Existing valid edits may have been saved before opening. Errors use the common error payload and never silently discard current drafts.
+
+Back saves valid edits and restores the originating view and navigation path. Current invalid input or failed persistence retains the draft, picker and error. iPhone is the supported UI family under ADR-0007.
