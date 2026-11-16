@@ -70,7 +70,10 @@ struct TaskLinkedTaskList: View {
         }
         .task {
             await store.reload()
-            if let task = store.allTasks.first(where: { $0.id == taskID }) { store.expandRow(task) }
+            if let task = store.allTasks.first(where: { $0.id == taskID }) {
+                if task.canEdit { store.expandRow(task) }
+                else { destination = Destination(task: task, isLink: false) }
+            }
             await store.observeParticipantChanges(reconcileWorkspace: false)
         }
     }

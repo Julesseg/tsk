@@ -9,7 +9,7 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 3 methods | PR, main push, explicit dispatch |
-| Full | 34 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 36 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
 | Keyboard | 2 methods | Explicit dispatch |
 | Text | 3 methods | Explicit dispatch |
@@ -18,7 +18,7 @@ The manual form defaults to smoke.
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 61 retained methods has exactly one primary
+methods for every suite. Each of the 63 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -36,7 +36,7 @@ reordering; occurrence success/failure; series preview/cancel/commit; manual and
 automatic-failure sync; real EventKit Calendar and Reminders; destructive move
 source-change/interruption safety; installed Share/widgets/Spotlight; actual
 closed-app and received-sync notification delivery; native HID command/focus
-routing; external add/modify/callback URLs, structured Find results/callbacks and
+routing; external add/modify/complete/callback URLs, structured Find results/callbacks and
 draft-safe navigation. Modify retains two installed-URL journeys for atomic
 fields/tag modes/clears and linked navigation with valid and invalid drafts. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
@@ -135,7 +135,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 23 methods | 11 methods |
+| iPhone | 25 methods | 11 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 All native HID cases, installed system integrations and server/peer consumers

@@ -39,6 +39,7 @@ struct ContentView: View {
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
     @State private var linkedTaskIDs: Set<UUID> = []
+    @State private var linkedTaskPresentationID = UUID()
     @State private var sidebarError: String?
     @State private var projectPath = NavigationPath()
     @State private var isRequestingCapture = false
@@ -218,8 +219,9 @@ struct ContentView: View {
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
         if let task = store.allTasks.first(where: { $0.id == id }) {
-            if linkedTaskIDs.contains(id), task.canEdit {
+            if linkedTaskIDs.contains(id), task.canEdit || task.status == "completed" {
                 TaskLinkedTaskList(source: store, taskID: id)
+                    .id(linkedTaskPresentationID)
             } else {
                 TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
             }
@@ -291,6 +293,7 @@ struct ContentView: View {
             guard store.workspaceViewsLoaded, let task = automation.taskToOpen else { return }
             await store.reload()
             guard !Task.isCancelled else { return }
+            linkedTaskPresentationID = UUID()
             linkedTaskIDs.insert(task.id)
             showInformation(task)
             automation.taskToOpen = nil
