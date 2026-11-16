@@ -131,27 +131,9 @@ the Device panel alone leaves a simulator running. If none remain booted,
 quit Simulator. The Device panel assists inspection; canonical iPhone
 XCUITest remains the UI acceptance gate.
 
-### Fresh simulators missing from discovery
-
-If Xcode lists an available simulator but `device_list` omits it, check its
-usage history before reporting a missing runtime. Expo Device Hub 0.19.1
-filters out devices with neither `lastUsedAt` nor `lastBootedAt`; creating a
-simulator with `simctl create` alone leaves it hidden. Refreshing discovery
-does not add those timestamps, and `device_open` cannot resolve a hidden ID.
-
-Use the device hub's native **Create** flow when available. It creates and
-boots the simulator, making it eligible for discovery. Treat creation as a
-runtime operation: satisfy the simulator lease before its automatic boot and
-preserve other sessions' devices. Then refresh `device_list`, use the returned
-host/device IDs with `device_open`, and verify the requested runtime. Creation
-is successful for agent work only when native discovery and opening succeed.
-
-Discover the current tool capabilities rather than assuming a `device_create`
-tool exists. If native creation is unavailable to the agent, or another
-session holds the lease, report that specific limitation. An installed,
-available runtime is not an Xcode setup blocker. Keep the device hub dependency
-and simulator history files unchanged; use the supported creation flow rather
-than patching the filter or booting outside T3.
+For fresh simulators missing from T3 discovery, use the `simulator-lease`
+skill's native creation and discovery guidance before reporting missing
+runtime support.
 
 ## Provider hooks
 
