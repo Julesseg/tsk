@@ -33,8 +33,7 @@ class Redactor:
         for secret in self.secrets:
             text = text.replace(secret, '<REDACTED>')
         text = re.sub(r'(?i)(Bearer\s+)[^\s,;"\']+', r'\1<REDACTED>', text)
-        text = re.sub(r'(?i)((?:token|secret|password|passwd|authorization|credential)[\w-]*\s*[=:]\s*)[^\s,;"\']+', r'\1<REDACTED>', text)
-        text = re.sub(r'''(?i)((?:token|secret|password|passwd|authorization|credential)[\w-]*["']\s*:\s*["'])[^"']*''', r'\1<REDACTED>', text)
+        text = re.sub(r'''(?i)((?:token|secret|password|passwd|authorization|credential|api[_-]?key|private[_-]?key)[\w-]*["']?\s*[=:]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)''', r'\1<REDACTED>', text)
         return re.sub(r'(https?://)[^/\s:@]+:[^/\s@]+@', r'\1<REDACTED>@', text)
 
     def value(self, value):
@@ -94,7 +93,7 @@ class HostCapture:
         self.output = Path(output)
         self.environment = dict(os.environ if environment is None else environment)
         self.redact = Redactor(self.environment)
-        predicate = ('process == "CoreSimulatorService" OR process == "simdiskimaged" '
+        predicate = ('process == "CoreSimulatorService" OR process == "com.apple.CoreSimulator.CoreSimulatorService" OR process == "simdiskimaged" '
                      'OR subsystem BEGINSWITH "com.apple.CoreSimulator" '
                      f'OR (process == "launchd" AND (eventMessage CONTAINS "{device}" OR eventMessage CONTAINS "CoreSimulator")) '
                      'OR (process == "kernel" AND (eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "jetsam"))')

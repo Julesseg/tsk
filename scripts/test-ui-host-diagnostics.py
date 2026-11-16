@@ -35,6 +35,9 @@ class HostDiagnosticsTests(unittest.TestCase):
             self.assertNotIn(text, encoded)
         self.assertEqual(value['pid'], 42)
         self.assertGreaterEqual(encoded.count('<REDACTED>'), 5)
+        assignments = redact('"TSK_UI_SYNC_SECRET" = "generated-fixture-value"; password="quoted-value"; \'credential\': \'two words\'')
+        for text in ['generated-fixture-value', 'quoted-value', 'two words']:
+            self.assertNotIn(text, assignments)
 
     def test_rotating_records_remain_bounded_and_keep_latest_events_in_order(self):
         writer = diagnostics.BoundedRecords(self.output, maximum_bytes=100, maximum_files=3)
