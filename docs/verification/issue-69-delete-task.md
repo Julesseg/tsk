@@ -200,3 +200,43 @@ the Modify/Delete UI-test boundary introduced by conflict resolution; it is
 fixed, and the complete build-for-testing plus metadata verification passes
 again. Spec reported no additional semantic findings. New-head CI remains the
 runtime gate; no old result is substituted for it.
+
+## Complete integration rebase (2026-11-16)
+
+Rebased onto main `3d2bd74f7f713938048f230bece29d95060b0598`, which merges
+PR #94 after #91 and #92. All three automation predecessors are now on main;
+this branch carries only #69 changes and its verification history. Complete
+keeps its deleted/missing prevalidation and saved-result presentation. Delete
+keeps raw identity lookup for idempotent repetition, deletion confirmation and
+editor dismissal. Their singular UUID/callback parsing shares the existing
+parser without relaxing accepted inputs.
+
+Main now reports the precise `taskDeleted(id)` error when Complete is asked to
+change a deleted record. The initial Core and Native Delete suites each failed
+one old `unsupportedTaskKind` expectation. Their exact-error assertions now
+require `taskDeleted(id)`; the existing lifecycle case also verifies rejected
+Modify and unchanged deleted data after rejected actions. This adopts the
+canonical Complete contract while retaining Delete's history safeguards.
+
+Both Complete and Delete installed-URL journeys are retained. The inventory is
+38 nightly methods (27 workspace / 11 row-editing), 27 on demand, 3 smoke and
+65 retained methods overall. No selection timing, deadline or assertion was
+weakened to address old CI failures.
+
+At pre-rebase head `50d8b7a`, smoke attempt 1 failed on delayed XCTest app-death
+state delivery despite a simulator SIGTERM death within the termination wait.
+Its one targeted retry failed before the held-selection toolbar appeared;
+row editing and capture passed. The exact-head full row-editing artifact
+passed all 11 selected methods without skips, including both smoke-failing
+cases. The full manifest identifies that source, Xcode 27.0 and iOS 27.0 build
+24A434. A local unchanged iPhone baseline and three instrumented repetitions
+passed on newer Xcode; the CI-only selection failure was not reproduced or
+proven fixed. Original results, diagnostics, traces and the exhausted old-head
+retry counter remain under `.build/`. Active old-head full workspace evidence
+is retained; none of this substitutes for new-head acceptance.
+
+Integrated checks pass: 215 Core tests; Native host suites with 158 portable and
+33 Apple methods inventoried (51 environment-gated skips); 76 Swift Testing
+and 6 XCTest controller tests; all 46 selection/routing/execution checks;
+signed generic arm64 simulator build-for-testing and App/Share/Widget intent
+and entitlement validation. This rebase uses no simulator runtime.

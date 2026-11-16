@@ -28,7 +28,7 @@ import TskNative
     _ = try await DeleteTaskIntent(task: entity, directory: directory).perform()
     #expect(try await reopened.task(id: original.id) == deleted)
     #expect(try await reopened.findTasks(FindTasksInput(status: .all)).isEmpty)
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await CompleteTaskIntent(task: entity, directory: directory).perform() }
+    await #expect(throws: TaskManagementError.taskDeleted(original.id)) { try await CompleteTaskIntent(task: entity, directory: directory).perform() }
     let missing = IntentTaskEntity(TaskRecord(id: UUID(), attributes: [:]))
     await #expect(throws: TaskManagementError.taskNotFound(missing.id)) { try await DeleteTaskIntent(task: missing, directory: directory).perform() }
 }

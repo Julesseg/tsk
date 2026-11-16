@@ -20,8 +20,10 @@ import Testing
     #expect(try await later.findTasks(FindTasksInput(status: .all)) == [unrelated])
     #expect(try await replica.tasks().count == 2)
     await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await later.update(id: original.id, changes: ["description": "Rejected"]) }
-    await #expect(throws: TaskManagementError.unsupportedTaskKind) { try await later.complete(id: original.id) }
+    await #expect(throws: TaskManagementError.taskDeleted(original.id)) { try await later.complete(id: original.id) }
+    await #expect(throws: TaskActionError.invalidInput("This task was deleted and cannot be modified.")) { try await later.modifyTask(id: original.id, input: ModifyTaskInput(description: "Rejected")) }
     await #expect(throws: TaskManagementError.taskNotFound(original.id)) { try await later.openTask(id: original.id) }
+    #expect(try await later.task(id: original.id) == deleted)
     let missing = UUID()
     await #expect(throws: TaskManagementError.taskNotFound(missing)) { try await later.delete(id: missing) }
 }
