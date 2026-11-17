@@ -7,10 +7,7 @@ struct ContentView: View {
     private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
 
     enum WorkspaceSetting {
-        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport
-        #if DEBUG && targetEnvironment(simulator)
-        case spotlightDiagnostics
-        #endif
+        case customViews, recurring, synchronization, continuousReminders, remindersImport
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -19,13 +16,7 @@ struct ContentView: View {
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
-    @State private var spotlight: SpotlightController
-    #if DEBUG && targetEnvironment(simulator)
-    @State private var isShowingSpotlightDiagnostics = false
-    #endif
     @State private var calendar: TodayCalendarController
-    @State private var notifications: TaskNotificationController
-    @State private var isConfiguringNotifications = false
     @State private var continuousReminders: ContinuousReminderController
     @State private var isConfiguringContinuousReminders = false
     @State private var isConfiguringSync = false
@@ -47,11 +38,9 @@ struct ContentView: View {
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
-        _spotlight = State(initialValue: SpotlightController(store: store))
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
-        _notifications = State(initialValue: TaskNotificationController(store: store))
         _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
@@ -232,10 +221,6 @@ struct ContentView: View {
 
     private var integrationSheets: some View {
         navigationWorkspace
-        #if DEBUG && targetEnvironment(simulator)
-        .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
-        #endif
-        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications).modifier(TaskWorkspacePanel(store: store)) }
         .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
         .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
     }
@@ -289,7 +274,6 @@ struct ContentView: View {
             opportunities.start()
             await opportunities.foreground()
             await continuousReminders.scan()
-            await spotlight.reconcile()
         }
     }
 
@@ -325,19 +309,12 @@ struct ContentView: View {
         .task(id: scenePhase) {
             if scenePhase == .active { await store.observeParticipantChanges() }
         }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await notifications.observe() }
-        }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await spotlight.observe() }
-        }
         .onChange(of: automation.deletedTaskID) { _, id in
             if let id, selectedTaskID == id || linkedTaskIDs.contains(id) || editingTask?.id == id {
                 editingTask = nil
                 resetNavigation()
             }
         }
-        .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: path) { _, newPath in selectedTaskID = newPath.last }
     }
 
@@ -355,13 +332,12 @@ struct ContentView: View {
                     await continuousReminders.scan()
                     await store.reload()
                     await loadSavedViews()
-                    await spotlight.reconcile()
                 }
             } else if phase == .background { opportunities.background() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged(); Task { await notifications.refresh() } }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged(); await notifications.refresh() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
     }
 
     private var calendarWorkspace: some View {
@@ -460,14 +436,8 @@ struct ContentView: View {
         case .customViews: presentViews()
         case .recurring: isShowingRecurring = true
         case .synchronization: isConfiguringSync = true
-        case .notifications:
-            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "settings"])
-            isConfiguringNotifications = true
         case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
         case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
-        #if DEBUG && targetEnvironment(simulator)
-        case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
-        #endif
         }
     }
 

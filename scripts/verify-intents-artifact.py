@@ -14,6 +14,7 @@ def verify_group(bundle):
         raise SystemExit('Expected a thin 64-bit simulator Mach-O executable')
     position = 32
     groups = []
+    entitlements = {}
     for _ in range(struct.unpack_from('<I', binary, 16)[0]):
         command, size = struct.unpack_from('<II', binary, position)
         if command == 0x19:
@@ -24,6 +25,8 @@ def verify_group(bundle):
                     entitlements = plistlib.loads(binary[section[4]:section[4] + section[3]])
                     groups = entitlements.get('com.apple.security.application-groups', [])
         position += size
+    if 'com.apple.developer.usernotifications.time-sensitive' in entitlements:
+        raise SystemExit('The app must not retain the retired time-sensitive notification entitlement')
     if 'group.com.julesseguin.tsk' not in groups:
         raise SystemExit(f'{bundle.name} has no shared task App Group entitlement')
 

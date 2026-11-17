@@ -97,7 +97,6 @@ public actor TaskManager {
     var reminderMoveInProgress = false
     let reminderImportAdmission: any ReminderImportCoordinating
     var activeMutationScope: TaskMutationScope?
-    let notificationSynchronization: (any TaskSynchronizationReceiptStore)?
     let postCommitEffects: any TaskPostCommitEffect
     var mutationInProgress = false
     var mutationWaiters: [CheckedContinuation<Void, Never>] = []
@@ -105,12 +104,11 @@ public actor TaskManager {
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects(), notificationSynchronization: (any TaskSynchronizationReceiptStore)? = nil) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
         self.reminderImportConfiguration = reminderImportConfiguration
         self.reminderImportAdmission = reminderImportAdmission
-        self.notificationSynchronization = notificationSynchronization
         self.postCommitEffects = postCommitEffects
         self.changeTracking = changeTracking
         self.now = now

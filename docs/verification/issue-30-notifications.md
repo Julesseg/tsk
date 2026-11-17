@@ -1,3 +1,5 @@
+> Historical verification record. Notifications and Spotlight indexing were removed from product scope on 2026-11-17; this is not a current acceptance contract.
+
 # Task notifications (#30)
 
 Pending ordinary tasks and occurrences derive alerts from `scheduled` and `due`. Equal effective times use one combined request; distinct times remain separate. Recurring templates, completed tasks and deleted tasks do not produce alerts. Waiting and dependency state do not erase a real task date. Raw task attributes, UUIDs and unfamiliar fields are unchanged by preferences or reconciliation.

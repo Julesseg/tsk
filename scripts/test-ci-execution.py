@@ -157,7 +157,7 @@ class ExecutionTests(unittest.TestCase):
 
     def test_method_boundaries_retain_initial_failure_and_later_independent_results(self):
         with tempfile.TemporaryDirectory() as directory:
-            capture = boundaries.BoundaryCapture('owned', directory, ROOT / 'scripts')
+            capture = boundaries.BoundaryCapture('owned', directory)
             with contextlib.redirect_stdout(io.StringIO()):
                 capture.line(b"Test Case '-[TskUITests.TaskRowEditingUITests testEdit]' failed (5.000 seconds).")
                 capture.line(b"Test Case '-[TskUITests.TaskRowEditingUITests testOther]' passed (2.000 seconds).")

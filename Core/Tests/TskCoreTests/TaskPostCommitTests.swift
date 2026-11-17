@@ -6,7 +6,7 @@ private actor InspectingCommitEffect: TaskPostCommitEffect {
     var inspected = 0
     var releaseFirst: CheckedContinuation<Void, Never>?
     func apply(to manager: TaskManager, origin: TaskChangeOrigin) async {
-        _ = try? await manager.notificationPlan()
+        _ = try? await manager.tasks()
         inspected += 1
         if inspected == 1 { await withCheckedContinuation { releaseFirst = $0 } }
     }

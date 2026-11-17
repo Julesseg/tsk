@@ -1,3 +1,5 @@
+> Historical research. Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Retained synchronization behavior has its own current implementation and verification contract.
+
 # Notification and synchronization feasibility
 
 Research date: 2026-10-14. Taskwarrior source findings are pinned to `v3.5.0`;

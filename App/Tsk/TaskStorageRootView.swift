@@ -1,18 +1,14 @@
 import SwiftUI
 import TskNative
-import CoreSpotlight
 
 struct TaskStorageRootView: View {
     @State private var automation = TaskURLController()
     @State private var store: TaskStore?
     @State private var error: String?
-    @State private var spotlightRequest: SpotlightRequest?
-    @State private var spotlightFixtureCleaned = false
 
     var body: some View {
         Group {
-            if spotlightFixtureCleaned { Text("Owned Spotlight fixture index cleaned").accessibilityIdentifier("spotlight-fixture-cleaned") }
-            else if let store {
+            if let store {
                 ContentView(store: store)
             } else if let error {
                 ContentUnavailableView {
@@ -37,15 +33,7 @@ struct TaskStorageRootView: View {
         .onChange(of: store == nil) { _, missing in
             if !missing, let store { Task { await automation.executePending(in: store) } }
         }
-        .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && store?.rowEditing?.parameter == nil && spotlightRequest == nil))
-        .onContinueUserActivity(CSSearchableItemActionType) { activity in
-            spotlightRequest = SpotlightRequest(identifier: activity.userInfo?[CSSearchableItemActivityIdentifier] as? String ?? "")
-        }
-        .sheet(item: $spotlightRequest) { request in
-            if let store { SpotlightTaskDestination(store: store, identifier: request.identifier) }
-            else if let error { ContentUnavailableView("Task storage unavailable", systemImage: "exclamationmark.triangle", description: Text(error)) }
-            else { ProgressView("Opening task storage…") }
-        }
+        .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && store?.rowEditing?.parameter == nil))
         .sheet(item: $automation.findResults) { results in
             if let store { TaskFindResultsView(results: results, store: store).modifier(TaskActionMessage(controller: automation)) }
         }
@@ -68,12 +56,6 @@ struct TaskStorageRootView: View {
             try await installNavigationFixture()
             #endif
             let opened = try TaskStore()
-            #if DEBUG && targetEnvironment(simulator)
-            if ProcessInfo.processInfo.environment["TSK_TEST_SPOTLIGHT_CLEANUP"] == "1", ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", let token = ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"], UUID(uuidString: token) != nil {
-                try await CoreSpotlightTaskIndex(namespace: SpotlightTaskEffect.namespace(directory: opened.directory)).replace([])
-                spotlightFixtureCleaned = true
-            }
-            #endif
             store = opened
             error = nil
         } catch {

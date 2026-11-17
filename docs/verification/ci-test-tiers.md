@@ -9,15 +9,15 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 33 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
+| Full | 30 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 4 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 60 retained methods has exactly one primary
+methods for every suite. Each of the 55 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -30,8 +30,7 @@ Smoke needs no synchronization server or independent peer.
 Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
 handoff; row notes and tag validation; saved views/native
 reordering; occurrence success/failure; series metadata preview/cancel/save; manual sync; real EventKit Reminders; destructive move
-source-change/interruption safety; installed Spotlight; actual
-closed-app and received-sync notification delivery; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
+source-change/interruption safety; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
 adds fresh/completed/missing task identities, all view categories, stable saved-view
 renames/deletion, unchanged favorites, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
@@ -40,9 +39,8 @@ change touches those contracts. Moving frequency does not establish acceptance.
 
 On-demand coverage retains genuine lower-priority UI contracts: appearance and
 large text, exact row geometry and animation drift, native Project-menu stress,
-focus and retained-open scroll, Calendar display settings, notification Settings
-revocation, detail activity/annotation controls, recurring authoring/copy, stale
-Spotlight results and undeliverable callbacks. These do not run automatically at
+focus and retained-open scroll, Calendar display settings, detail activity/annotation
+controls, recurring authoring/copy and undeliverable callbacks. These do not run automatically at
 night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
 baseline and accepted gaps.
@@ -68,6 +66,12 @@ refresh/durable-completion and series-transition UI journeys. Bulk selection and
 series transitions remain in the product, with their Core/Native checks and
 other retained UI coverage. Their removed UI scenarios are no longer acceptance
 gates. The owned URL/callback host remains as TskActionFixture.
+Notifications and Spotlight indexing, including their dedicated UI/Core/Native
+tests, settings, services, fixtures and entitlement, were also removed explicitly.
+Task dates, ordinary task search, sync, Calendar/Reminders and seven Shortcuts remain.
+A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
+items; it requests no authorization and creates no new alerts or index records.
+Full now selects 22 workspace and eight row methods.
 These removals do not establish fixes for historical failed runs.
 
 The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
@@ -82,8 +86,7 @@ establish current iPhone acceptance. Neither simulator UI nor direct intent
 
 The Linux Native job runs `TskNativeTests` with a pinned Taskwarrior 3.5.0 client,
 the real synchronization server and the native probe. The Mac producer runs
-`TskNativeAppleTests`, including App Intents, EventKit,
-notification content and owned Spotlight indexing, using the same fixture
+`TskNativeAppleTests`, including App Intents and EventKit, using the same fixture
 versions. Apple tests have their own SwiftPM target so Linux compilation cannot
 silently stand in for their execution. Both jobs use
 `scripts/build-taskwarrior-fixture.sh` to verify the official release archive's

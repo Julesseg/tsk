@@ -1,3 +1,5 @@
+> Historical verification record. Notifications and Spotlight indexing were removed from product scope on 2026-11-17; this is not a current acceptance contract.
+
 # Notification content and Time Sensitive delivery
 
 Due alerts use the task title with an empty body. Planned alerts retain `Planned work`; combined alerts retain `Planned and due`. Immediate missed alerts use the same content as their scheduled counterparts, without the `(missed while away)` suffix.

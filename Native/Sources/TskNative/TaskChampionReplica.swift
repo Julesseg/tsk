@@ -39,12 +39,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         try request(command: "commitSnapshotAtomically", updates: updating, snapshot: records, creates: creating)
     }
 
-    public func synchronizationHistory() throws -> TaskSynchronizationHistory {
-        try protectReceiptDirectory()
-        return try request(command: "synchronizationHistory")
-    }
-
-    private nonisolated func protectReceiptDirectory() throws {
+    private nonisolated func protectSynchronizationDirectory() throws {
         #if os(iOS)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: directory.path)
@@ -53,12 +48,12 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
 
     public func synchronize(using configuration: SyncConfiguration) async throws {
         do {
-            try protectReceiptDirectory()
+            try protectSynchronizationDirectory()
             let generation = tsk_bridge_sync_generation(library, directory.standardizedFileURL.path)
             try Task.checkCancellation()
             try await withTaskCancellationHandler {
                 let operation = Task.detached { [self] in
-                    let _: Bool = try request(command: "synchronizeWithReceipt", configuration: configuration, syncGeneration: generation)
+                    let _: Bool = try request(command: "synchronize", configuration: configuration, syncGeneration: generation)
                 }
                 try await operation.value
             } onCancel: { [self] in
@@ -86,7 +81,7 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         let response = try decoder.decode(Response<T>.self, from: Data(String(cString: output).utf8))
         if let error = response.error {
             if error == "TSK_SYNC_INTERRUPTED" { throw SynchronizationError.interrupted }
-            if command == "synchronize" || command == "synchronizeWithReceipt" { throw SynchronizationError.failed(error) }
+            if command == "synchronize" { throw SynchronizationError.failed(error) }
             throw TaskManagementError.storage(error)
         }
         guard let value = response.value else { throw TaskManagementError.storage("TaskChampion returned no result.") }

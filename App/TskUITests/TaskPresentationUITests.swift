@@ -30,7 +30,6 @@ import XCTest
             XCTAssertTrue(row.label.contains("Deadline Today"))
             XCTAssertTrue(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
-            XCTAssertFalse(app.buttons["notification-attention"].exists)
             for hidden in ["Active", "Waiting", "Generated occurrence"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }

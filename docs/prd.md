@@ -1,6 +1,6 @@
 # tsk product requirements document
 
-The accepted [daily planner redesign](planner-redesign.md) supersedes conflicting navigation, date placement, ordering, calendar display, completion-history, and notification requirements in this original PRD. Other capabilities remain the baseline. The redesign is not yet implemented.
+The accepted [daily planner redesign](planner-redesign.md) supersedes conflicting navigation, date placement, ordering, calendar display, and completion-history requirements in this original PRD. Other capabilities remain the baseline. The redesign is not yet implemented.
 
 ## Problem Statement
 
@@ -12,7 +12,7 @@ This PRD records the agreed product contract without recording personal infrastr
 
 Build a first-class native iPhone Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
 
-The initial product includes Shortcuts/Siri, Spotlight, calendar events displayed only in Today, notifications derived from task dates, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
+The initial product includes Shortcuts/Siri, calendar events displayed only in Today, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
 
 The behavior below is the initial scope. It is not an assertion that interoperability or device behavior has already been verified, and it does not prescribe a delivery estimate.
 
@@ -81,7 +81,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 50. As a task owner, I want to receive generated occurrences through TaskChampion synchronization, so that I can manage them using the same views and actions as other tasks.
 51. As a task owner, I want to understand that new occurrences depend on a designated external generator, so that I do not expect the sync server or the initial iOS app to generate them.
 
-### Shortcuts, Siri, and Spotlight
+### Shortcuts and Siri
 
 52. As an iOS user, I want to create tasks through Shortcuts and Siri, so that capture can participate in native automation.
 53. As an iOS user, I want to find tasks through Shortcuts and Siri, so that automations can work with existing tasks.
@@ -90,7 +90,6 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 56. Removed from product scope on 2026-11-17: widgets.
 57. Removed from product scope on 2026-11-17: widgets.
 58. Removed from product scope on 2026-11-17: widgets.
-59. As an iOS user, I want to open a matching task from Spotlight, so that system search leads directly to the relevant task.
 60. Removed from product scope on 2026-11-17: incoming system sharing.
 61. Removed from product scope on 2026-11-17: incoming system sharing.
 62. Removed from product scope on 2026-11-17: incoming system sharing.
@@ -113,22 +112,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 76. As a task owner, I want to convert recurring reminders only when their complete rule has a verified supported mapping, so that the resulting Taskwarrior template preserves the supported recurrence semantics.
 77. As an iOS user, I want to leave unsupported or unverified recurring reminders untouched and receive a reason, so that import does not silently flatten or destroy their recurrence.
 
-### Notifications
+### Retired notifications and Spotlight
 
-78. As a task owner, I want to receive a notification at a task’s scheduled time, so that planned work becomes visible at the intended moment.
-79. As a task owner, I want to receive a distinct notification at a different deadline time, so that I can distinguish planned work from a due task.
-80. As a task owner, I want to receive one combined notification when scheduled and deadline alert times coincide, so that the same moment does not produce duplicate alerts.
-81. As a task owner, I want to use an enabled-by-default 09:00 notification fallback for midnight-valued dates in the current device time zone, so that dates without a chosen time can alert during the day.
-82. As a task owner, I want to change or disable the midnight notification fallback, so that notification timing matches my preferences.
-83. As a Taskwarrior user, I want to keep stored scheduled and deadline dates unchanged when changing notification preferences, so that alert presentation does not rewrite task semantics.
-84. As a task owner, I want to retain the specified time for dates that do not match the midnight convention, so that timed tasks are not silently shifted.
-85. As a task owner, I want to receive registered local notifications while the app is closed, so that delivery of an already scheduled alert does not depend on foreground use.
-86. As a task owner, I want to receive newly discovered missed alerts immediately after sync, so that a late-received task alert is not silently discarded.
-87. As a task owner, I want to suppress missed alerts when the same sync reveals the task’s completed or deleted final state, so that reconciliation does not notify me about work that is already finished or removed.
-88. As a task owner, I want to avoid receiving the same already delivered missed event again after every sync, so that newly discovered alerts remain distinct from repeated synchronization.
-89. As a task owner, I want to cancel pending alerts when completion or deletion is known locally, so that tasks I have finished or removed do not retain pending reminders.
-90. As a task owner, I want to reconcile pending alerts when dates change locally or arrive through sync, so that registered alerts reflect the latest known task state.
-91. As an iOS user, I want to keep notification preferences specific to each device, so that one device’s alert preferences do not unexpectedly alter another’s.
+Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Historical notification and indexing verification records do not define current acceptance.
 
 ### Native experience and permissions
 
@@ -136,7 +122,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard commands and widgets were subsequently removed from product scope on 2026-11-17.
 94. As an iOS user, I want to use native navigation, typography, gestures, accessibility, appearance, and Liquid Glass, so that tsk behaves as a first-class iOS app.
 95. As a task owner, I want to scan compact lists and reveal additional detail when needed, so that the interface balances density with clarity.
-96. As an iOS user, I want to retain ordinary task management when Calendar, Reminders, or notification permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
+96. As an iOS user, I want to retain ordinary task management when Calendar or Reminders permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
 97. As an iOS user, I want to receive clear permission and integration failure states, so that I can understand which requested capability is unavailable.
 
 ## Implementation Decisions
@@ -144,9 +130,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 ### Modules and interfaces
 
 - Core is the platform-independent module for task behavior. The SwiftUI app stays thin. iOS extensions and actions use the same Core behavior rather than implement competing task rules.
-- Introduce one primary public task-management interface in Core through which callers and behavior tests create, edit, complete, query, plan, and synchronize tasks. Keep field validation, view membership, filter evaluation, recurrence bookkeeping, import orchestration, and notification planning behind that interface.
-- Reuse the existing Core and XCUITest testing seams. Where platform execution actually varies, supply concrete adapters for persistent TaskChampion data, synchronization, EventKit, notification registration, clock/time zone, and system entry points. Keep adapter details internal where possible; do not create a public interface for each individual field or UI action.
-- Keep platform-independent decisions testable without EventKit or UserNotifications. Actual OS reads, writes, permission requests, scheduling, and extension execution belong in platform adapters; their results flow back through the Core interface.
+- Introduce one primary public task-management interface in Core through which callers and behavior tests create, edit, complete, query, plan, and synchronize tasks. Keep field validation, view membership, filter evaluation, recurrence bookkeeping, and import orchestration behind that interface.
+- Reuse the existing Core and XCUITest testing seams. Where platform execution actually varies, supply concrete adapters for persistent TaskChampion data, synchronization, EventKit, clock/time zone, and system entry points. Keep adapter details internal where possible; do not create a public interface for each individual field or UI action.
+- Keep platform-independent decisions testable without EventKit. Actual OS reads, writes, permission requests, scheduling, and extension execution belong in platform adapters; their results flow back through the Core interface.
 - Preserve task identity and unfamiliar attributes. Local custom-attribute editing and definition management are not supported. Do not round-trip tasks through a reduced schema that discards fields another client understands.
 - Pin the supported Taskwarrior and TaskChampion versions before claiming compatibility. Select and verify the Swift integration route separately; this PRD does not assert that an existing bridge or Taskwarrior library has already been proven to work on iOS.
 
@@ -158,7 +144,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Provide project views and actions directly from lists. Templates and ordinary occurrences remain distinct domain concepts.
 - Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in fields. Do not import desktop reports, contexts, or configuration.
 - TaskChampion’s storage interface is not a Taskwarrior filter evaluator. Implement or reuse compatible evaluation and verify its behavior against the pinned Taskwarrior version, including boolean expressions, modifiers, relative dates, virtual tags, dependencies, and built-in typed fields. Explicit errors must not become an excuse to silently replace the requested language with a smaller tag/project filter builder.
-- Saved custom views remain device-local. Notification preferences also remain device-specific.
+- Saved custom views remain device-local.
 
 ### Persistence and synchronization
 
@@ -189,15 +175,9 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Establish supported EventKit field and recurrence conversions with real interoperability checks. Similar frequency labels do not establish equivalence around selectors, completion-gated recurrence, time zones, daylight saving, month ends, or end conditions.
 - Continuous import can react to source changes and available execution opportunities. Do not promise instant background ingestion when iOS does not run the app.
 
-### Notifications and other iOS capabilities
+### iOS capabilities
 
-- Derive notifications from Scheduled and Deadline times. Do not require a separate opt-in reminder time on each task. Different times produce distinct scheduled/due alerts; coincident effective alert times produce one combined alert.
-- Start the midnight-time replacement enabled at 09:00 in the device’s current time zone. Allow choosing another time or disabling replacement. It affects notification timing only; stored task dates remain unchanged. Other timestamps retain their specified times.
-- Treat midnight as a convention, not recovered input precision: Taskwarrior does not retain whether midnight was explicit. Do not advertise reliable detection of a date entered without a time.
-- Reconcile the final local/synchronized task state before producing alerts. Cancel pending events for completed/deleted tasks. On sync, fire newly discovered missed events immediately unless the final state is completed or deleted. Do not fire an already delivered event again on every sync.
-- Reconcile registrations when task dates change. Register local notifications so existing schedules can fire while the app is closed. Remote completion cannot cancel a stale local alert until the relevant change reaches the device; do not imply automatic server-side cancellation.
 - Shortcuts and simple, unversioned URLs expose Add, Modify, Delete, Find, Complete, Open Task, and Open View with named inputs and shared behavior. Task-targeted actions use one entity or full UUID. Mutations execute immediately and acknowledge durable local storage; optional URL callbacks return structured results and never undo or retry a committed change on delivery failure. Existing saved shortcuts may break; Modify replaces standalone Reschedule. See [ADR 0005](adr/0005-structured-actions-for-urls-and-shortcuts.md) for the decision and implementation tickets.
-- Spotlight opens matching tasks.
 - Incoming system sharing is retired; a future implementation requires a new product contract.
 - Calendar integration reads events for Today and creates no calendar events or time blocks. Permission denial or revocation leaves ordinary task management usable.
 - Support iPhone capture and action, Native iPad support is out of scope under [ADR 0007](adr/0007-iphone-only.md). Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
@@ -215,9 +195,8 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Round-trip recurring templates through a real external Taskwarrior generator. Verify creation, occurrence return sync, occurrence completion bookkeeping, single-occurrence edits, effective-date series edits, preserved completed history, masks/relationships, and continued generation without duplicated or missing instances. Include date boundaries, relative dates, month ends, leap days, and daylight saving in the supported contract.
 - Test one-time import leaves sources unchanged and continuous import deletes only after durable destination save. Inject destination-save failure, deletion failure, and interruption between stores; verify source preservation and honest duplicate limitations rather than an exactly-once assertion. Verify completed and unselected source items are excluded, lists map to projects, and no per-item provenance or bookkeeping is retained.
 - Verify each supported recurring-reminder conversion against both actual EventKit data and the pinned external generator. Unsupported/unverified rules must remain untouched and be explained; verify source deletion scope for a supported recurring set before claiming safe continuous migration.
-- Verify notification planning through Core, including the 09:00 default, custom/disabled replacement, unchanged task dates, distinct/combined events, final-state completion/deletion suppression, immediate newly missed events, repeat prevention, and pending cancellation/rescheduling. Test actual delivery and registration reconciliation on iOS; do not assume the deprecated notification API’s capacity is the current limit.
 - Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings, import results, and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
-- Exercise Shortcuts/App Intents, Spotlight, Calendar/Reminders access, and local notification delivery using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
+- Exercise Shortcuts/App Intents and Calendar/Reminders access using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
 - Verify iPhone navigation, system appearance, and accessibility. Simulator/CI success alone does not prove background timing, or external-account behavior.
 - A documentation review or green scaffold CI does not fulfill these feature-level checks. Every delivered capability needs evidence at its stated seam, with unsupported cases and remaining verification limits reported explicitly.
 
@@ -226,7 +205,7 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - On-device occurrence generation in the initial release, including an enabled recurrence generator or automatic takeover from another generating client. Optional iOS generation is later and lower priority.
 - Guaranteed immediate background sync/import or exact background generation timing.
 - Desktop report, context, or configuration import.
-- Synchronization of saved custom views between devices or of device-specific notification preferences.
+- Synchronization of saved custom views between devices.
 - Creating or modifying calendar events, time blocking, or displaying calendar events as an Upcoming integration.
 - Export or two-way synchronization with Apple Reminders, updating source reminders after one-time import, and propagating later source changes into independently managed tasks.
 - Persistent per-item import provenance, processed IDs, source-derived task identity, or exactly-once import guarantees across separate stores and retries.
@@ -240,7 +219,6 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - The agreed source brief, glossary, ADRs, and primary-source research are in documentation PR #2: https://github.com/Julesseg/tsk/pull/2. Its Core and XCUITest checks passed for documentation/scaffold changes, not the capabilities specified here.
 - This is an umbrella product spec. Preserve the complete initial scope when it is decomposed into implementation milestones. Do not drop UI or system integrations because one execution environment cannot run them locally.
 - Repository policy places business behavior in Core and keeps the UI thin. Core tests are the fast loop; CI is the canonical app UI gate. Future implementation work must include its UI and be delivered through working-branch pull requests.
-- The exact Swift/TaskChampion binding, supported version pins, verified EventKit field mappings, safe series-edit bookkeeping, notification capacity/registration strategy, and device/account verification are implementation work. Do not present them as solved by this document. Avoid publishing an unverified list of supported recurrence conversions.
-- Native task attributes do not preserve input precision or original time-zone metadata. The midnight fallback is an explicitly accepted notification convention, not a change to Taskwarrior storage semantics.
+- The exact Swift/TaskChampion binding, supported version pins, verified EventKit field mappings, safe series-edit bookkeeping and device/account verification are implementation work. Do not present them as solved by this document. Avoid publishing an unverified list of supported recurrence conversions.
 - Neither TaskChampion property writes nor its sync server execute Taskwarrior’s recurrence validation, series propagation, mask updates, filter evaluation, or occurrence generation automatically.
 - No personal infrastructure setup is part of this PRD, and no implementation time or cost estimate is asserted.

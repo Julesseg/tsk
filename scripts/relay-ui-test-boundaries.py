@@ -17,16 +17,9 @@ import threading
 import time
 
 
-SPOTLIGHT_METHODS = {
-    'testReceivedEncryptedPeerCompletionReconcilesActualIndex',
-    'testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
-    'testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
-}
-CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
 METHOD = re.compile(r"^Test Case '-\[TskUITests\.(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \(([\d.]+) seconds\)\.)$")
 POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
 POST_GROUP_SIGNAL_DRAIN_SECONDS = 0.25
-SEARCH_SURFACE = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual system Search surface before first-run handling'$")
 
 
 def utc():
@@ -94,18 +87,10 @@ class DeviceMonitor:
 
 
 class BoundaryCapture:
-    def __init__(self, device, evidence, scripts):
+    def __init__(self, device, evidence):
         self.device = device
         self.evidence = pathlib.Path(evidence)
-        self.scripts = pathlib.Path(scripts)
-        self.children = []
         self.events = []
-        self.started = set()
-        self.active = {}
-        self.spotlight_current = None
-        self.spotlight_pids = {}
-        self.spotlight_pids_truncated = set()
-        self.search_contexts = set()
         self.first_failure = None
         try:
             self.evidence.mkdir(parents=True, exist_ok=True)
@@ -115,140 +100,22 @@ class BoundaryCapture:
     def record(self, event, **fields):
         self.events.append(dict(event=event, receivedUTC=utc(), **fields))
 
-    def spawn(self, arguments, kind, key, stop=None):
-        entry = dict(kind=kind, key=key, startedUTC=utc(), arguments=arguments, stop=stop)
-        try:
-            output = (self.evidence / ('boundary-' + key + '-helper.txt')).open('wb')
-            try:
-                process = subprocess.Popen(arguments, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
-            finally:
-                output.close()
-            entry.update(process=process, pid=process.pid)
-            self.children.append(entry)
-            return entry
-        except OSError as error:
-            self.record('helper-start-error', kind=kind, key=key, error=str(error))
-            return None
-
-    def stop(self, method, reason):
-        entry = self.active.pop(method, None)
-        if entry:
-            try:
-                pathlib.Path(entry['stop']).touch()
-            except OSError as error:
-                self.record('stop-file-error', method=method, error=str(error))
-            self.record(entry['kind'] + '-window-stop', method=method, reason=reason)
-
-    def search_context(self, method, boundary):
-        key = method + '-' + boundary
-        if key in self.search_contexts:
-            return
-        self.search_contexts.add(key)
-        pids = sorted(self.spotlight_pids.get(method, set()))
-        name = 'spotlight-' + key
-        arguments = [sys.executable, str(self.scripts / 'capture-simulator-search-context.py'), self.device,
-                     str(self.evidence / (name + '-context.json'))]
-        for pid in pids:
-            arguments += ['--observed-pid', pid]
-        self.record('spotlight-context-request', method=method, boundary=boundary, observedPIDs=pids)
-        self.spawn(arguments, 'context', name)
-
     def line(self, raw):
         line = raw.decode('utf-8', errors='replace').rstrip('\r')
         method = METHOD.fullmatch(line)
         if method:
             suite, name, state, outcome, seconds = method.groups()
             self.record('method-start' if state == 'started.' else 'method-end', method=suite + '/' + name, outcome=outcome, seconds=float(seconds) if seconds else None)
-            if suite in ('TaskNotificationUITests', 'MissedNotificationUITests'):
-                key = 'DEBUG-issue82-notifications-' + name
-                if state == 'started.':
-                    stop = self.evidence / (key + '.stop')
-                    stop.unlink(missing_ok=True)
-                    entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), '--notifications', self.device,
-                                        str(self.evidence / (key + '.log')), str(stop)], 'notification', key, str(stop))
-                    if entry:
-                        self.active[key] = entry
-                else:
-                    self.stop(key, 'test-end')
             if outcome == 'failed' and self.first_failure is None:
                 self.first_failure = utc()
                 self.record('first-test-failure', method=suite + '/' + name)
                 print('::error title=First UI failure::' + suite + '/' + name + ' failed; remaining independent cases may continue.', flush=True)
-        match = CASE.fullmatch(line)
-        if match:
-            suite, method, outcome = match.groups()
-            if suite == 'SpotlightUITests' and method in SPOTLIGHT_METHODS:
-                if outcome == 'started.':
-                    if method in self.started:
-                        self.record('duplicate-start', method=method)
-                    else:
-                        self.started.add(method)
-                        self.spotlight_current = method
-                        self.spotlight_pids[method] = set()
-                        self.search_context(method, 'method-start')
-                        stop = self.evidence / ('spotlight-' + method + '.stop')
-                        try:
-                            stop.unlink(missing_ok=True)
-                        except OSError as error:
-                            self.record('stop-file-error', method=method, error=str(error))
-                            return
-                        self.record('spotlight-window-start', method=method)
-                        entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), self.device,
-                                            str(self.evidence / ('spotlight-' + method + '.log')), str(stop)], 'spotlight', method, str(stop))
-                        if entry:
-                            self.active[method] = entry
-                else:
-                    self.record('test-end', method=method, outcome=outcome)
-                    if method in self.started:
-                        self.search_context(method, 'method-end')
-                    self.stop(method, 'test-end')
-                    if self.spotlight_current == method:
-                        self.spotlight_current = None
-        if self.spotlight_current is not None:
-            method = self.spotlight_current
-            pids = self.spotlight_pids[method]
-            for pid in re.findall(r'remote element in process (\d+)', line):
-                if len(pids) < 32:
-                    pids.add(pid)
-                elif pid not in pids and method not in self.spotlight_pids_truncated:
-                    self.spotlight_pids_truncated.add(method)
-                    self.record('spotlight-observed-pids-truncated', method=method, maximum=32)
-            if SEARCH_SURFACE.fullmatch(line):
-                self.search_context(method, 'search-before')
-            if ' : failed - Actual system Spotlight search field must be available' in line:
-                self.search_context(method, 'search-missing-field')
-        self.reap()
-
-    def reap(self):
-        for entry in self.children:
-            if 'returnCode' not in entry and entry['process'].poll() is not None:
-                entry.update(returnCode=entry['process'].returncode, finishedUTC=utc())
-
-    def finish(self, reason):
-        for method in list(self.active):
-            self.stop(method, reason)
-        deadline = time.monotonic() + 20
-        while any(entry['process'].poll() is None for entry in self.children) and time.monotonic() < deadline:
-            self.reap()
-            time.sleep(0.05)
-        for entry in self.children:
-            process = entry['process']
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=2)
-                entry['forcedCleanup'] = True
-        self.reap()
-        return [dict((key, value) for key, value in entry.items() if key != 'process') for entry in self.children]
 
 
-def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5, monitor_device=False):
+def run(command, device, evidence, cleanup_grace=5, monitor_device=False):
     if cleanup_grace != 5:
         raise ValueError('Owned cleanup grace must remain five seconds')
-    capture = BoundaryCapture(device, evidence, scripts)
+    capture = BoundaryCapture(device, evidence)
     process = None
     interrupted = None
     broken_output = False
@@ -298,7 +165,6 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
     for number in (signal.SIGINT, signal.SIGTERM):
         old_handlers[number] = signal.signal(number, interrupt)
     status = 1
-    reason = 'relay-error'
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
         capture.record('xcodebuild-start', pid=process.pid, command=command)
@@ -355,7 +221,6 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
                         selector.unregister(key.fileobj)
                         break
                     consume(chunk)
-                capture.reap()
             if pending and not discarding:
                 try:
                     capture.line(pending)
@@ -374,7 +239,6 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
         status = code if code >= 0 else 128 - code
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
-        reason = 'output-pipe' if broken_output else 'signal' if interrupted else 'eof'
         capture.record('xcodebuild-end', returnCode=code, status=status)
     except OSError as error:
         capture.record('relay-error', error=str(error))
@@ -390,7 +254,6 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
             except subprocess.TimeoutExpired:
                 signal_owned(signal.SIGKILL)
                 process.wait(timeout=5)
-        children = capture.finish(reason)
         for number, handler in old_handlers.items():
             signal.signal(number, handler)
         if interrupted is not None:
@@ -399,7 +262,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
             status = 74
         try:
             (pathlib.Path(evidence) / 'test-aligned-boundaries.json').write_text(json.dumps(dict(
-                device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events, children=children), indent=2) + '\n')
+                device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events), indent=2) + '\n')
         except OSError as error:
             print('Boundary metadata could not be written: ' + str(error), file=sys.stderr)
     return status

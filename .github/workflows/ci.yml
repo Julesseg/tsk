@@ -151,7 +151,6 @@ jobs:
               --taskwarrior .build/taskwarrior-install/bin/task \
               --probe "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
               --output .build/native-test-results
-          LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
       - uses: actions/upload-artifact@v4
         if: always()
         with:

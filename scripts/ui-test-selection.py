@@ -13,11 +13,9 @@ NIGHTLY = (
     'ContinuousReminderImportUITests/testInterruptionAndActualPermissionResetAfterCommitLeaveSourceAndTaskAvailable',
     'ContinuousReminderImportUITests/testRealContinuousMoveSourceChangesForegroundRescanAndDurableReopen',
     'CustomViewsUITests/testRawViewValidationSaveEditReopenResultsActionsAndDeletion',
-    'MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion',
     'ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks',
     'ReminderRecurrenceUITests/testActualCurrentWeeklyMoveRemovesOnlyVerifiedRemainderAfterDurableTemplateSave',
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
-    'SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
     'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
     'TaskActionURLUITests/testCompleteOccurrenceURLPersistsAndMissingDeletedTargetsReturnErrors',
@@ -35,7 +33,6 @@ NIGHTLY = (
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
-    'TaskNotificationUITests/testActualClosedAppDeliveryAndLocalMutationReconciliation',
     'TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope',
     'TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
@@ -53,13 +50,11 @@ ON_DEMAND = (
     'RecurringTemplateUITests/testRecurringTemplateValidationCreationInspectionAndPersistentReopen',
     'ReminderImportUITests/testDeniedRealRemindersPermissionKeepsOrdinaryTaskWorkspaceUsable',
     'ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory',
-    'SpotlightUITests/testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
     'SynchronizationUITests/testConnectionValidationPersistenceAndServerFailureRetainOfflineTask',
     'TaskActivityUITests/testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState',
     'TaskActionURLUITests/testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd',
     'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations',
     'TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary',
-    'TaskNotificationUITests/testActualPermissionRevocationStillAllowsDurableTaskCreation',
     'TaskPresentationUITests/testMatchedPopulatedTaskListsAcrossAppearanceAndAccessibilityText',
     'TaskRowEditingUITests/testAppearanceAndAccessibilityOverflow',
     'TaskRowEditingUITests/testLongTitleNearBottomKeepsKeyboardAndScrollingUsable',
@@ -185,7 +180,6 @@ def requires_sync_peer(filters):
 def requires_sync_server(filters):
     return bool(selected_methods(filters) & {
         "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-        "TskUITests/MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion",
     })
 
 

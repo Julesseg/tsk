@@ -16,7 +16,7 @@ Each unfinished task has at most one actionable planner placement:
 - Otherwise, Deadline supplies the fallback day and time. Give these tasks a warning treatment, such as an exclamation mark or red tint.
 - With neither date, the task has no planner placement.
 
-Deadline remains independent, appears in task detail, and can trigger its own notification. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
+Deadline remains independent and appears in task detail. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
 
 Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting tasks that qualify remain visible with their reason.
 
@@ -84,17 +84,15 @@ All-day events occupy a compact area below the toolbar and above the task list. 
 
 Completed tasks stay checked and dimmed, preserving order on the planner page they occupied when completed. A Monday task carried into Wednesday and completed there stays on Wednesday. A Friday task completed early stays on Friday. This is history of the occupied planner page, not grouping strictly by the actual completion date. Completing a task does not rewrite Scheduled.
 
-## Notifications
+## Retired notifications
 
-An explicit Scheduled time generates a notification; an untimed Scheduled date does not generate an individual Scheduled alert. Deadline notifications remain independent. Keep existing handling of coincident alerts so they do not create duplicate notifications.
-
-Retain an optional daily notification setting: one Today summary at a chosen time, only when unfinished work exists. Carryover alone does not create a new timed task alert. Actual delivery and background behavior require device verification during implementation.
+Notifications were removed from product scope on 2026-11-17. Planner date placement and stored task dates remain independent of alerts.
 
 ## Acceptance examples
 
 | Situation | Expected result |
 | --- | --- |
-| Scheduled next Monday, Deadline last Friday | One planner entry on Monday; Deadline stays in detail and retains its notification behavior |
+| Scheduled next Monday, Deadline last Friday | One planner entry on Monday; Deadline stays in detail |
 | Only Deadline Friday at 14:00; calendar scheduling to Monday | Scheduled becomes Monday at 14:00; Deadline stays Friday at 14:00 |
 | Drag across a timed task, then an untimed task, and drop | Save the untimed task's day without a time |
 | Drag across an overdue task last | Copy its original overdue Scheduled value; the dragged task can become carried-over |
@@ -107,4 +105,4 @@ Retain an optional daily notification setting: one Today summary at a chosen tim
 
 The product rules are settled; no planner implementation is included in this design work. Engineering still needs to choose the precision metadata format, persistence and synchronization of manual order, and storage for completion-page history. Those choices must preserve these rules and external Taskwarrior interoperability. They are not selected implicitly by this brief.
 
-This brief supersedes conflicting navigation, planner placement, ordering, calendar display, completion-history, and notification rules in the [original product direction](product-direction.md) and [PRD](prd.md). [ADR 0008](adr/0008-preserve-planner-date-intent.md) records the change from the date semantics in ADR 0006. Other existing capabilities remain the baseline.
+This brief supersedes conflicting navigation, planner placement, ordering, calendar display, completion-history rules in the [original product direction](product-direction.md) and [PRD](prd.md). [ADR 0008](adr/0008-preserve-planner-date-intent.md) records the change from the date semantics in ADR 0006. Other existing capabilities remain the baseline.
