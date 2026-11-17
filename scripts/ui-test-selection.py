@@ -6,7 +6,6 @@ import re
 PHONE_SMOKE = (
     'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
-    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
 )
 
 NIGHTLY = (
@@ -18,8 +17,6 @@ NIGHTLY = (
     'ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks',
     'ReminderRecurrenceUITests/testActualCurrentWeeklyMoveRemovesOnlyVerifiedRemainderAfterDurableTemplateSave',
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
-    'SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate',
-    'ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor',
     'SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
     'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
@@ -34,7 +31,6 @@ NIGHTLY = (
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
     'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch',
-    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
     'TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
@@ -81,9 +77,7 @@ ON_DEMAND = (
 
 DIAGNOSTIC = ON_DEMAND
 TEXT = (
-    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
 )
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
@@ -92,7 +86,6 @@ MENU = (
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
 )
 REGRESSION = (
-    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
@@ -178,12 +171,12 @@ def selection(suite, family, partition="all"):
     return ["-only-testing:" + test for test in sorted(chosen)]
 
 
-def phases(filters):
+def requires_action_fixture(filters):
     selected = selected_methods(filters)
     if not selected:
         raise ValueError("Selection contains no UI tests")
-    share = {test for test in selected if matches(test, "TskUITests/ShareCaptureUITests")}
-    return [phase for phase, enabled in (("share", share), ("main", selected - share)) if enabled]
+    return any(test.split("/")[1] in {"TaskActionURLUITests", "TaskNavigationUITests"}
+               for test in selected)
 
 
 def requires_sync_peer(filters):
@@ -204,18 +197,18 @@ def main():
     select.add_argument("suite", choices=("smoke", "full", "diagnostic", "text", "regression", "menu"))
     select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
-    phase = commands.add_parser("phases")
-    phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
     peer.add_argument("filters", nargs=argparse.REMAINDER)
     server = commands.add_parser("sync-server")
     server.add_argument("filters", nargs=argparse.REMAINDER)
+    fixture = commands.add_parser("action-fixture")
+    fixture.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
             output = selection(args.suite, args.family, args.partition)
-        elif args.command == "phases":
-            output = phases(args.filters)
+        elif args.command == "action-fixture":
+            output = ["yes" if requires_action_fixture(args.filters) else "no"]
         elif args.command == "sync-server":
             output = ["yes" if requires_sync_server(args.filters) else "no"]
         else:

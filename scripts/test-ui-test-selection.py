@@ -12,27 +12,24 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("ui_selection", ROOT / "scripts/ui-test-selection.py")
 selection = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(selection)
-SHARE = "-only-testing:TskUITests/ShareCaptureUITests"
 PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelaunch"
 
 
 class SelectionTests(unittest.TestCase):
-    def test_smoke_is_the_three_reviewed_product_journeys(self):
+    def test_smoke_is_the_two_reviewed_product_journeys(self):
         filters = selection.selection("smoke", "iPhone")
         self.assertEqual(selection.selected_methods(filters), {
             "TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelaunch",
             "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-            "TskUITests/TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably",
         })
         self.assertTrue(all(item.count("/") == 2 for item in filters))
-        self.assertEqual(selection.phases(filters), ["main"])
         self.assertFalse(selection.requires_sync_server(filters))
         self.assertFalse(selection.requires_sync_peer(filters))
 
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 37)
+        self.assertEqual(len(nightly), 34)
         self.assertEqual(len(diagnostic), 27)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
@@ -95,11 +92,11 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (26, 11))
+        self.assertEqual((len(workspace), len(rows)), (25, 9))
         for partition, filters in groups.items():
             self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
-        for cls in ("ShareCaptureUITests", "SpotlightUITests",
+        for cls in ("SpotlightUITests",
                     "TaskNotificationUITests", "MissedNotificationUITests", "ReminderImportUITests"):
             self.assertTrue(any("/" + cls + "/" in case for case in workspace), cls)
         self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
@@ -116,14 +113,12 @@ class SelectionTests(unittest.TestCase):
             "TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
         })
         text = selection.selection("text", "iPhone")
-        self.assertEqual(len(selection.selected_methods(text)), 3)
-        self.assertEqual(selection.phases(text), ["share", "main"])
+        self.assertEqual(len(selection.selected_methods(text)), 1)
         self.assertFalse(selection.requires_sync_server(text))
         for suite in ("text", "menu", "diagnostic"):
             self.assertFalse(selection.requires_sync_server(selection.selection(suite, "iPhone")))
         regression = selection.selection("regression", "iPhone")
-        self.assertEqual(len(selection.selected_methods(regression)), 5)
-        self.assertEqual(selection.phases(regression), ["share", "main"])
+        self.assertEqual(len(selection.selected_methods(regression)), 4)
         self.assertFalse(selection.requires_sync_server(regression))
         self.assertFalse(selection.requires_sync_peer(regression))
 
@@ -134,16 +129,15 @@ class SelectionTests(unittest.TestCase):
         for filters in (["-only-testing:TskUITests/MissingTests"], [PHONE, "-only-testing:TskUITests/MissingTests"],
                         [PHONE, "-skip-testing:TskUITests/MissingTests"]):
             with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
-                selection.phases(filters)
+                selection.requires_action_fixture(filters)
 
 
-    def test_filters_control_share_phases_and_real_sync_requirements(self):
-        self.assertEqual(selection.phases([]), ["share", "main"])
-        self.assertEqual(selection.phases([SHARE]), ["share"])
-        self.assertEqual(selection.phases([PHONE]), ["main"])
-        self.assertEqual(selection.phases(["-only-testing:TskUITests", "-skip-testing:TskUITests/ShareCaptureUITests"]), ["main"])
-        with self.assertRaises(ValueError):
-            selection.phases([SHARE, "-skip-testing:TskUITests/ShareCaptureUITests"])
+    def test_filters_control_sync_and_action_fixture_requirements(self):
+        self.assertFalse(selection.requires_action_fixture([PHONE]))
+        with self.assertRaisesRegex(ValueError, "contains no UI tests"):
+            selection.requires_action_fixture([PHONE, PHONE.replace("-only-testing:", "-skip-testing:")])
+        for cls in ("TaskActionURLUITests", "TaskNavigationUITests"):
+            self.assertTrue(selection.requires_action_fixture(["-only-testing:TskUITests/" + cls]))
         full = selection.selection("full", "iPhone")
         self.assertTrue(selection.requires_sync_peer(full))
         self.assertFalse(selection.requires_sync_peer(full + ["-skip-testing:TskUITests/SynchronizationUITests"]))
@@ -157,7 +151,7 @@ class SelectionTests(unittest.TestCase):
 
 
 class RunnerTests(unittest.TestCase):
-    def run_runner(self, filters=(), share_status=0, main_status=0, prebuilt=False, owned_ci=False):
+    def run_runner(self, filters=(), main_status=0, prebuilt=False, owned_ci=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             test_home = root / "home"
@@ -174,8 +168,6 @@ with open(os.environ['UI_TEST_COMMAND_LOG'], 'a') as output:
     output.write(json.dumps({'name': name, 'args': args}) + '\\n')
 if name == 'xcrun' and args[:4] == ['simctl', 'list', 'devices', 'booted']:
     print(json.dumps({'devices': {}}))
-if name == 'xcodebuild' and 'test-without-building' in args and '-only-testing:TskUITests/ShareCaptureUITests' in args:
-    sys.exit(int(os.environ['UI_TEST_SHARE_STATUS']))
 if name == 'xcodebuild' and 'test-without-building' in args:
     sys.exit(int(os.environ['UI_TEST_MAIN_STATUS']))
 """)
@@ -183,7 +175,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             for name in ("xcrun", "xcodebuild", "osascript", "codesign"):
                 (root / name).symlink_to(tool)
             environment = {key: value for key, value in os.environ.items() if not key.startswith(("TSK_", "TEST_RUNNER_"))}
-            environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_SHARE_STATUS=str(share_status), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
+            environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
             if owned_ci:
                 environment.update(CI="true", TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR="1", TSK_EVENTKIT_EVIDENCE_DIR=str(root / "evidence"))
             result = subprocess.run([
@@ -194,34 +186,31 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             return result, calls
 
-    def test_smoke_builds_once_without_share_launch_or_fixture_install(self):
+    def test_smoke_builds_once_without_action_fixture_install(self):
         result, calls = self.run_runner([PHONE])
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
         self.assertEqual(len(builds), 2)
         self.assertIn("build-for-testing", builds[0])
         self.assertIn("test-without-building", builds[1])
-        self.assertNotIn(SHARE, builds[1])
-        self.assertFalse(any("TskShareFixture.app" in argument for call in calls for argument in call["args"]))
+        self.assertFalse(any("TskActionFixture.app" in argument for call in calls for argument in call["args"]))
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_share_only_runs_once_and_has_no_empty_main_phase(self):
-        result, calls = self.run_runner([SHARE])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
-        self.assertEqual(len(executions), 1)
-        self.assertIn(SHARE, executions[0])
-
-    def test_full_preserves_both_phases_and_share_failure(self):
-        result, calls = self.run_runner(share_status=65)
+    def test_full_executes_once_and_preserves_failure_and_cleanup(self):
+        result, calls = self.run_runner(main_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
-        self.assertEqual(len(executions), 2)
-        self.assertIn(SHARE, executions[0])
-        self.assertIn("-skip-testing:TskUITests/ShareCaptureUITests", executions[1])
+        self.assertEqual(len(executions), 1)
+        self.assertTrue(any("TskActionFixture.app" in argument for call in calls for argument in call["args"]))
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_smoke_main_failure_is_not_hidden_by_omitted_share_phase(self):
+    def test_url_navigation_installs_its_action_callback_host(self):
+        result, calls = self.run_runner(["-only-testing:TskUITests/TaskNavigationUITests"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installs = [call["args"] for call in calls if call["name"] == "xcrun" and call["args"][:2] == ["simctl", "install"]]
+        self.assertTrue(any(call[-1].endswith("TskActionFixture.app") for call in installs))
+
+    def test_smoke_main_failure_is_preserved(self):
         result, calls = self.run_runner([PHONE], main_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))

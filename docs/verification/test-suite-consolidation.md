@@ -1,3 +1,9 @@
+Current user scope update (2026-11-17): incoming Share, keyboard commands and
+widgets are removed. The combined Calendar, automatic-sync recovery, held-selection
+and series-transition UI journeys are retired. Current source selection is
+34 nightly (25 workspace/9 row), 27 on demand, 2 smoke, 1 Text, 4 Regression
+and 4 Menu methods. Earlier counts below are historical evidence.
+
 > Subsequent scope update (2026-11-17): hardware keyboard commands, widgets,
 > their UI methods and HID tooling are removed. The combined real-Calendar UI
 > journey and automatic-sync failure UI journey are also retired by user decision;

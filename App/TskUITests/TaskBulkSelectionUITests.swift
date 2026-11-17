@@ -16,94 +16,6 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably() throws {
-        let app = try launch(probe: true, nativeIdentifiers: false)
-        let list = app.collectionViews.firstMatch
-        XCTAssertEqual(list.identifier, "task-list")
-        let initial = app.buttons["task-" + first].frame
-        let last = app.buttons["task-" + third].frame
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: initial.midY))
-        let end = start.withOffset(CGVector(dx: 0, dy: last.midY - initial.midY))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.7, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
-        XCTAssertFalse(app.buttons["task-selection-apply"].exists)
-        XCTAssertFalse(app.textFields["task-description"].exists, "A swipe without a hold must not select or open the editor")
-        start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2)
-        let count = app.buttons["task-selection-apply"]
-        let selectionAppeared = count.waitForExistence(timeout: 10)
-        if !selectionAppeared {
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Missing held selection after short swipe"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-        }
-        XCTAssertTrue(selectionAppeared)
-        let data = try XCTUnwrap((count.value as? String)?.data(using: .utf8))
-        let proof = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
-        attachment.name = "Held selection runtime proof"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        XCTAssertEqual(count.label, "3 selected")
-        XCTAssertEqual(proof["selectedWhileTouchDown"] as? Bool, true)
-        XCTAssertEqual(proof["maximumSelectedWhileTouchDown"] as? Int, 3)
-        XCTAssertEqual(proof["scrollingDisabled"] as? Bool, true)
-        XCTAssertEqual(proof["offsetsStable"] as? Bool, true)
-        XCTAssertEqual(proof["rowsStable"] as? Bool, true)
-        XCTAssertEqual(proof["refreshWhileTouchDown"] as? Bool, true)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(proof["activationDuration"] as? Double), 0.25)
-        XCTAssertLessThanOrEqual(try XCTUnwrap(proof["activationDistance"] as? Double), 10, "Selection activates during the stationary hold, before vertical dragging")
-        let width = try XCTUnwrap(proof["columnWidth"] as? Double)
-        XCTAssertEqual(width, list.frame.width, accuracy: 2)
-        if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertLessThan(width, app.frame.width * 0.75) }
-        XCTAssertTrue(taskRow(named: "Arrived while selecting", app: app).waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["task-" + first].frame.minX, initial.minX, accuracy: 1, "Rows stay horizontally fixed during selection")
-        let circles = app.buttons.matching(identifier: "complete-task-row-" + second)
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "2 selected")
-        func sweepBack() {
-            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: app.buttons["task-" + third].frame.midY))
-            let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + first].frame.midY - app.buttons["task-" + third].frame.midY))
-            start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
-        }
-        sweepBack()
-        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Deselecting every touched row exits selection mode")
-        XCTAssertFalse(app.buttons["task-selection-apply"].exists)
-        XCTAssertFalse(app.buttons["complete-task-selection"].exists)
-        sweepBack()
-        XCTAssertEqual(count.label, "3 selected", "A new gesture starting on an unselected row adds every touched row")
-        XCTAssertEqual(circles.firstMatch.value as? String, "Selected")
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "2 selected")
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "3 selected")
-        let offset = app.buttons["task-" + first].frame.minY
-        list.swipeUp()
-        let firstRow = app.buttons["task-" + first]
-        XCTAssertTrue(!firstRow.exists || abs(firstRow.frame.minY - offset) > 1, "Scrolling resumes after release")
-        app.buttons["selection-scheduled"].tap()
-        app.buttons["selection-date-today"].tap()
-        app.buttons["close-selection-date"].tap()
-        app.buttons["selection-deadline"].tap()
-        app.buttons["selection-date-tomorrow"].tap()
-        app.buttons["close-selection-date"].tap()
-        app.buttons["complete-task-selection"].tap()
-        XCTAssertEqual(app.buttons["complete-task-selection"].value as? String, "Modified")
-        XCTAssertTrue(count.exists, "Completion remains pending until Apply")
-        captureBulkDateEvidence("Both dates and completion staged for one Apply commit", app: app)
-        app.buttons["task-selection-apply"].tap()
-        XCTAssertTrue(count.waitForNonExistence(timeout: 15))
-        app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectDoneTasks(app)
-        for name in ["First selection task", "Second selection task", "Third selection task"] {
-            XCTAssertTrue(taskRow(named: name, app: app).waitForExistence(timeout: 10))
-        }
-        taskRow(named: "First selection task", app: app).tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792144800))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792238400))
-    }
-
     func testSelectionResolvesValidEditorAndRetainsInvalidDraft() throws {
         let app = try launch(crowded: true)
         let thirdRow = app.buttons["task-" + third]
@@ -397,19 +309,14 @@ import XCTest
         XCTAssertTrue(app.buttons["close-selection-date"].isHittable, file: file, line: line)
     }
 
-    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true, motionProbe: Bool = false) throws -> XCUIApplication {
+    private func launch(invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
-        if probe {
-            app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1"
-            app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0"
-        }
         if motionProbe { app.launchEnvironment["TSK_TEST_SELECTION_MOTION"] = "1" }
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
-        if !nativeIdentifiers { app.launchEnvironment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] = "0" }
         if crowded {
             app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1"
             app.launchEnvironment["TSK_UI_DIAGNOSTICS"] = "1"
@@ -427,7 +334,7 @@ import XCTest
         add(first, attributes)
         add(second, ["description": "Second selection task", "status": "pending"])
         add(third, ["description": "Third selection task", "status": "pending"])
-        if probe || crowded {
+        if crowded {
             for index in 4...40 {
                 add(String(format: "A0000000-0000-0000-0000-%012d", index), ["description": "Later selection task \(index)", "status": "pending"])
             }

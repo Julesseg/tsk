@@ -11,11 +11,11 @@ build and publish an installable. To rebuild an open PR manually, use
 
 The release pipeline builds a signed `.ipa` per PR and publishes it to
 `https://<owner>.github.io/<repo>/` (URL derived automatically — nothing to
-configure). It needs an Apple Developer **paid** membership, two matching
-Ad Hoc profiles, five required repository secrets, and GitHub Pages enabled.
+configure). It needs an Apple Developer **paid** membership, one App Group-capable
+Ad Hoc profile, four required repository secrets, and GitHub Pages enabled.
 The workflow skips signing when its certificate, password, main-app profile,
-or team secret is missing. Once those are configured, missing or invalid
-Share profiles fail validation rather than producing an installable build.
+or team secret is missing. Invalid app profiles fail validation rather than
+producing an installable build.
 
 ### Step 1 — Apple Developer console
 
@@ -26,36 +26,34 @@ under **Certificates, Identifiers & Profiles**.
    **UDID** (connect the device to a Mac: Finder → select the device → click
    the model/serial line until the UDID shows). Ad-hoc builds install **only**
    on devices baked into the profile.
-2. **Register or update both explicit App IDs** — *Identifiers → + →
-   App IDs → App*. Use these exact bundle IDs:
+2. **Register or update the explicit App ID** — *Identifiers → + →
+   App IDs → App*. Use this exact bundle ID:
 
    | Target | Explicit bundle ID |
    | --- | --- |
    | Main app | `com.julesseguin.tsk` |
-   | Share extension | `com.julesseguin.tsk.share` |
 
    Register the App Group `group.com.julesseguin.tsk` if needed. Enable
-   **App Groups** on **each** App ID, choose Configure, assign that same group,
-   and save. The group must be authorized by both profiles. Apple explains
+   **App Groups** on the App ID, choose Configure, assign that same group,
+   and save. The group must be authorized by the app profile. Apple explains
    [registering an App Group](https://developer.apple.com/help/account/identifiers/register-an-app-group)
    and [assigning it to an App ID](https://developer.apple.com/help/account/identifiers/enable-app-capabilities).
-3. **Use the existing Apple Distribution certificate** for both profiles.
+3. **Use the existing Apple Distribution certificate** for the app profile.
    If signing is already configured, retain its certificate and private key.
    For a new setup, create an Apple Distribution certificate using a CSR from
    Keychain Access, then import the downloaded `.cer` beside its private key.
 4. **Export that certificate as `.p12` if not already configured** — Keychain
    Access → My Certificates → *Apple Distribution: …* → Export. The existing
    `APPLE_CERTIFICATE_P12` and `APPLE_CERTIFICATE_PASSWORD` secrets can be reused.
-5. **Generate two Ad Hoc provisioning profiles** — *Profiles → + → Ad Hoc*.
-   Regenerate the existing main-app profile after enabling its App Group, and
-   create profiles for the Share ID. Choose the **same existing
-   distribution certificate and the same registered device set** for both;
-   download each `.mobileprovision`. Changes to an App ID require its
-   profiles to be regenerated. See Apple's [capability update rules](https://developer.apple.com/help/account/identifiers/enable-app-capabilities)
+5. **Generate an Ad Hoc provisioning profile** — *Profiles → + → Ad Hoc*.
+   Regenerate the main-app profile after enabling its App Group. Choose the
+   existing distribution certificate and registered device set, then download
+   the `.mobileprovision`. Changes to an App ID require its profile to be
+   regenerated. See Apple's [capability update rules](https://developer.apple.com/help/account/identifiers/enable-app-capabilities)
    and [Ad Hoc profile workflow](https://developer.apple.com/help/account/provisioning-profiles/create-an-ad-hoc-provisioning-profile).
 
-> Adding a device later? Register its UDID, regenerate **both profiles**
-> with the same device set, and replace both profile secrets below.
+> Adding a device later? Register its UDID, regenerate the app profile,
+> and replace its profile secret below.
 > TestFlight uses a separate pipeline and does not require registered UDIDs.
 
 ### Step 2 — GitHub repository secrets
@@ -70,13 +68,12 @@ in the repository.
 | `APPLE_CERTIFICATE_P12` | base64 of the `.p12` from step 1.4 | `base64 -i cert.p12 \| pbcopy` |
 | `APPLE_CERTIFICATE_PASSWORD` | the `.p12` export password | — |
 | `APPLE_PROVISIONING_PROFILE` | main-app Ad Hoc profile for `com.julesseguin.tsk` | `base64 -i TskApp-AdHoc.mobileprovision \| pbcopy` |
-| `APPLE_SHARE_PROVISIONING_PROFILE` | Share Ad Hoc profile for `com.julesseguin.tsk.share` | `base64 -i TskShare-AdHoc.mobileprovision \| pbcopy` |
 | `APPLE_TEAM_ID` | your 10-character Team ID | developer.apple.com → Membership |
 | `NTFY_TOPIC` | *(optional)* ntfy.sh topic for build-ready pushes | pick any unguessable string; subscribe in the ntfy app |
 
-The installer validates both explicit IDs, App Group, team, Ad Hoc type,
-expiry, matching device sets, and a common distribution certificate before
-installing profiles. Their names/UUIDs and the signing identity are read at
+The installer validates the explicit app ID, App Group, team, Ad Hoc type,
+expiry, devices and distribution certificate before installing the profile.
+Its name/UUID and the signing identity are read at
 runtime; no additional certificate or profile-name secret is needed.
 
 ### Step 3 — GitHub Pages
@@ -114,8 +111,7 @@ version tag `vX.X.X` (or from *Actions → Release (App Store) → Run workflow*
 Signing is driven by an **App Store Connect API key** with **automatic
 signing**: `xcodebuild` creates/downloads the App Store provisioning profile at
 build time, so — unlike the ad-hoc pipeline — there are **no `.mobileprovision`
-secrets** to manage. The main app and Share App Store profiles are
-resolved through automatic signing; their App IDs still need the App Group
+secrets** to manage. The app profile is resolved through automatic signing; its App ID still needs the App Group
 configuration above. This path requires its own App Store Connect app record
 and API key. It reuses the same Apple Distribution
 certificate (`APPLE_CERTIFICATE_P12` / `_PASSWORD`) and `APPLE_TEAM_ID` you

@@ -10,9 +10,7 @@ name: Release (App Store)
 # Automatic signing here is driven by the API key, not by stored provisioning
 # profiles: xcodebuild creates/downloads the App Store profile(s) at build time
 # (-allowProvisioningUpdates), so — unlike release.yml — there are no
-# `.mobileprovision` secrets to manage. If you add app extensions later
-# (Share) their App Store profiles are resolved the same way,
-# with no workflow change.
+# `.mobileprovision` secrets to manage.
 #
 # One-time setup (App Store Connect API key + secrets + an app record) is
 # documented in the root README, section "Enabling App Store / TestFlight

@@ -38,7 +38,7 @@ Attempt synchronization after changes, when the app opens, and when connectivity
 
 ## iOS integration
 
-Shortcuts and Siri, capture from the share sheet, Spotlight search, notifications, Calendar, and Apple Reminders import are all important parts of the initial product scope.
+Shortcuts and Siri, Spotlight search, notifications, Calendar, and Apple Reminders import are all important parts of the initial product scope.
 
 Apple Reminders integration is import-only: a one-time or continuous import of incomplete reminders from selected lists. Users choose which lists to import. Each selected Reminders list becomes the Taskwarrior project for its imported tasks. Completed reminders are excluded. There is no additional priority or importance criterion.
 
@@ -56,7 +56,7 @@ Shortcuts and the URL scheme will expose Add Task, Modify Task, Delete Task, Fin
 
 Spotlight opens matching tasks in tsk.
 
-Sharing text or a URL into tsk immediately creates a plain task whose complete description is the shared content. There is no extension editor, annotation, project, tag, priority, or date selection. File attachment storage is deferred initially.
+Incoming system sharing was removed from product scope on 2026-11-17. A future sharing design will be specified separately.
 
 Notifications are based on Scheduled or Deadline times. A separate opt-in reminder time per task is not the agreed behavior. Different Scheduled and Deadline times each produce a notification, distinguished as scheduled versus due; coincident times produce one combined notification. Completion or deletion cancels pending notifications once known locally.
 

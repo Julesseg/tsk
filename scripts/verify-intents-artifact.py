@@ -29,19 +29,8 @@ def verify_group(bundle):
 
 
 verify_group(app)
-for extension in (app / "PlugIns").glob("*.appex"):
-    info = plistlib.loads((extension / "Info.plist").read_bytes())
-    if info.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension":
-        raise SystemExit("The app must not embed a retired widget extension")
-share = app / "PlugIns" / "TskShare.appex"
-verify_group(share)
-share_info = plistlib.loads((share / "Info.plist").read_bytes())
-extension = share_info["NSExtension"]
-if share_info["CFBundleIdentifier"] != "com.julesseguin.tsk.share" or extension["NSExtensionPointIdentifier"] != "com.apple.share-services":
-    raise SystemExit("The embedded share extension has incorrect identity or extension point")
-activation = extension["NSExtensionAttributes"]["NSExtensionActivationRule"]
-if activation.get("NSExtensionActivationSupportsText") is not True or activation.get("NSExtensionActivationSupportsWebURLWithMaxCount", 0) < 1:
-    raise SystemExit("The embedded share extension does not activate for text and web URLs")
+if any((app / "PlugIns").glob("*.appex")):
+    raise SystemExit("The app must not embed retired Share or widget extensions")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
 if 'TaskWidgetConfiguration' in metadata['actions'] or 'WidgetTaskViewEntity' in metadata['entities']:
@@ -51,7 +40,7 @@ if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskInt
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
 if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Share shared entitlements and seven App Shortcuts')
+print('Verified app App Group entitlements and seven App Shortcuts')
 
 if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
     raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')

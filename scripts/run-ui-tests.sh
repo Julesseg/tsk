@@ -39,10 +39,6 @@ cleanup() {
         if [[ -n "$container" && -d "$container/Documents" ]]; then
             find "$container/Documents" -maxdepth 1 \( -name 'participant-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
         fi
-        group=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk group.com.julesseguin.tsk 2>/dev/null || true)
-        if [[ -n "$group" && -d "$group/UITestDiagnostics" ]]; then
-            find "$group/UITestDiagnostics" -maxdepth 1 -name 'participant-fixture-share-*.json' -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
-        fi
         if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
             python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-ui-boundaries.py" "$TSK_EVENTKIT_EVIDENCE_DIR" || true
         fi
@@ -67,7 +63,6 @@ if [[ "$was_booted" == no ]]; then
 fi
 xcrun simctl bootstatus "$simulator_id" -b
 build_arguments=()
-share_arguments=()
 test_filters=()
 skip_build=false
 derived_data=""
@@ -80,7 +75,6 @@ while [[ $# -gt 0 ]]; do
         -derivedDataPath)
             derived_data=$2
             build_arguments+=("$1" "$2")
-            share_arguments+=("$1" "$2")
             shift 2 ;;
         -resultBundlePath)
             result_path=$2
@@ -91,15 +85,14 @@ while [[ $# -gt 0 ]]; do
             shift ;;
         *)
             build_arguments+=("$1")
-            share_arguments+=("$1")
             shift ;;
     esac
 done
 if [[ -z "$derived_data" || -z "$result_path" ]]; then
-    echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed share fixture.' >&2
+    echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed action fixture.' >&2
     exit 1
 fi
-test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
+action_fixture=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" action-fixture -- ${test_filters[@]+"${test_filters[@]}"})
 if [[ "$skip_build" == true ]]; then
     if [[ ! -d "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" ]]; then
         echo 'Prebuilt UI tests require existing signed simulator products.' >&2
@@ -111,26 +104,8 @@ fi
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
-share_status=0
-if [[ "$test_phases" == *share* || "${test_filters[*]}" == *TaskActionURLUITests* ]]; then
-    xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
-fi
-if [[ "$test_phases" == *share* ]]; then
-    share_command=(xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult")
-    if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-        python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/share" --owned-simulator --monitor-device -- "${share_command[@]}" || share_status=$?
-    else
-        "${share_command[@]}" || share_status=$?
-    fi
-fi
-printf 'Share-first UI status: %s\n' "$share_status"
-case "$share_status" in
-    0|65) ;;
-    130|143) exit "$share_status" ;;
-    *) exit "$share_status" ;;
-esac
-if [[ "$test_phases" == share ]]; then
-    exit "$share_status"
+if [[ "$action_fixture" == yes ]]; then
+    xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskActionFixture.app"
 fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
     mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
@@ -143,9 +118,9 @@ if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_R
 fi
 main_status=0
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 else
-    xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+    xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 fi
 stop_spotlight_capture
 printf 'Remaining UI status: %s\n' "$main_status"
@@ -154,7 +129,4 @@ case "$main_status" in
     130|143) exit "$main_status" ;;
     *) exit "$main_status" ;;
 esac
-if [[ "$share_status" -ne 0 ]]; then
-    exit "$share_status"
-fi
 exit "$main_status"

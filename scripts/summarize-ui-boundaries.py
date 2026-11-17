@@ -15,7 +15,7 @@ import uuid
 PREFIX = b'TSK_BOUNDARY_SUMMARY_V1 '
 UUID = r'[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}'
 PATTERNS = {
-    'participant': re.compile(rf'participant-fixture-(?:(?:share|missed-notifications)-)?({UUID})-([1-9][0-9]{{0,9}})\.json'),
+    'participant': re.compile(rf'participant-fixture-(?:missed-notifications-)?({UUID})-([1-9][0-9]{{0,9}})\.json'),
     'readback': re.compile(rf'reminders-fixture-authorization-({UUID})-([1-9][0-9]{{0,9}})\.json'),
 }
 LIMITS = {'files': 128, 'file': 1048576, 'input': 8388608, 'output': 131072, 'line': 2048, 'family': 32768, 'reserve': 4096}

@@ -350,7 +350,6 @@ jobs:
           name: ${{ inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', 'ui-test-results', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
             App/TestResults.xcresult
-            App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
             .build/ui-host-diagnostics
