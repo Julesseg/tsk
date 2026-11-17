@@ -261,21 +261,68 @@ import XCTest
         let list = app.collectionViews["task-list"]
         let row = app.buttons["task-" + first]
         let next = app.buttons["task-" + second]
+        let deadline = ProcessInfo.processInfo.systemUptime + 10
         var previous: [CGRect]?
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard !app.textFields["task-description"].exists, !app.otherElements["task-row-editor"].exists,
-                  row.exists, next.exists, row.isHittable, next.isHittable else { previous = nil; return false }
-            let frames = [list.frame, row.frame, next.frame]
-            let stable = previous == frames && frames.allSatisfy { !$0.isEmpty }
-            previous = frames
-            return stable
-        }, object: nil)
-        guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed else {
+        var admitted: [CGRect]?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            let started = ProcessInfo.processInfo.systemUptime
+            do {
+                let snapshot = try app.snapshot()
+                var nodes: [XCUIElementSnapshot] = []
+                func collect(_ node: XCUIElementSnapshot) {
+                    nodes.append(node)
+                    for child in node.children { collect(child) }
+                }
+                collect(snapshot)
+                guard !nodes.contains(where: { $0.identifier == "task-description" && $0.elementType == .textField || $0.identifier == "task-row-editor" && $0.elementType == .other }) else {
+                    previous = nil
+                    lastSample = "editor remains open"
+                    return false
+                }
+                let targets = [("task-list", XCUIElement.ElementType.collectionView), ("task-" + first, .button), ("task-" + second, .button)]
+                var frames: [CGRect] = []
+                for (identifier, type) in targets {
+                    let matches = nodes.filter { $0.identifier == identifier && $0.elementType == type }
+                    guard matches.count == 1, let frame = matches.first?.frame, !frame.isEmpty else {
+                        previous = nil
+                        lastSample = "missing or ambiguous geometry: \(identifier) count=\(matches.count)"
+                        return false
+                    }
+                    frames.append(frame)
+                }
+                lastSample = "frames=\(frames) snapshotSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                let hittable = row.isHittable && next.isHittable
+                lastSample += " hittable=\(hittable) totalSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
+                guard hittable, ProcessInfo.processInfo.systemUptime < deadline else {
+                    previous = nil
+                    return false
+                }
+                let stable = previous == frames
+                previous = frames
+                lastSample += " stable=\(stable)"
+                if stable { admitted = frames }
+                return stable
+            } catch {
+                previous = nil
+                lastSample = "snapshot failed: \(error)"
+                return false
+            }
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+        guard XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)) == .completed,
+              ProcessInfo.processInfo.systemUptime < deadline, let frames = admitted else {
+            let detail = XCTAttachment(string: lastSample)
+            detail.name = "Selection readiness admission"
+            detail.lifetime = .keepAlways
+            add(detail)
             XCTFail("Selection rows must settle before the native hold and sweep")
             return
         }
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: row.frame.midY))
-        let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + second].frame.midY - row.frame.midY))
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frames[0].minX + 60, dy: frames[1].midY))
+        let end = start.withOffset(CGVector(dx: 0, dy: frames[2].midY - frames[1].midY))
         start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
