@@ -11,7 +11,7 @@ name: Release (App Store)
 # profiles: xcodebuild creates/downloads the App Store profile(s) at build time
 # (-allowProvisioningUpdates), so — unlike release.yml — there are no
 # `.mobileprovision` secrets to manage. If you add app extensions later
-# (widgets, share, etc.) their App Store profiles are resolved the same way,
+# (Share) their App Store profiles are resolved the same way,
 # with no workflow change.
 #
 # One-time setup (App Store Connect API key + secrets + an app record) is

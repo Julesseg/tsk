@@ -29,19 +29,10 @@ def verify_group(bundle):
 
 
 verify_group(app)
-widget = app / 'PlugIns' / 'TskWidgets.appex'
-widget_info = plistlib.loads((widget / 'Info.plist').read_bytes())
-if widget_info['CFBundleIdentifier'] != 'com.julesseguin.tsk.widgets' or widget_info['NSExtension']['NSExtensionPointIdentifier'] != 'com.apple.widgetkit-extension':
-    raise SystemExit('The app must embed the real WidgetKit extension')
-verify_group(widget)
-widget_metadata = json.loads((widget / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
-if {'AddTaskIntent', 'ModifyTaskIntent'} & widget_metadata['actions'].keys():
-    raise SystemExit('Add and Modify must run in the app, not the widget extension')
-if not {'TaskWidgetConfiguration', 'CompleteTaskIntent'}.issubset(widget_metadata['actions']):
-    raise SystemExit('Widget metadata is missing native view configuration or common completion action')
-if 'WidgetTaskViewEntity' not in widget_metadata['entities']:
-    raise SystemExit('Widget metadata is missing its registered-view entity')
-
+for extension in (app / "PlugIns").glob("*.appex"):
+    info = plistlib.loads((extension / "Info.plist").read_bytes())
+    if info.get("NSExtension", {}).get("NSExtensionPointIdentifier") == "com.apple.widgetkit-extension":
+        raise SystemExit("The app must not embed a retired widget extension")
 share = app / "PlugIns" / "TskShare.appex"
 verify_group(share)
 share_info = plistlib.loads((share / "Info.plist").read_bytes())
@@ -53,12 +44,14 @@ if activation.get("NSExtensionActivationSupportsText") is not True or activation
     raise SystemExit("The embedded share extension does not activate for text and web URLs")
 
 metadata = json.loads((app / 'Metadata.appintents' / 'extract.actionsdata').read_bytes())
+if 'TaskWidgetConfiguration' in metadata['actions'] or 'WidgetTaskViewEntity' in metadata['entities']:
+    raise SystemExit('Retired widget metadata must not remain in the app')
 if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(metadata['actions']):
     raise SystemExit('The app metadata is missing its add/find/complete/modify/delete/open actions')
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
 if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified App + Share + Widget shared entitlements, embedded WidgetKit target/configuration/completion, and seven App Shortcuts')
+print('Verified App + Share shared entitlements and seven App Shortcuts')
 
 if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
     raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')

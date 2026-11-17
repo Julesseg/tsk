@@ -76,18 +76,6 @@ extension TaskStore {
         } catch { self.error = error.localizedDescription }
     }
 
-    var selectionKeyboardCommands: [TaskKeyboardCommand] {
-        [
-            TaskKeyboardCommand(id: "selection-done", input: "\r", modifiers: [], title: "Apply to \(selectedTaskIDs.count)", action: { Task { await self.commitTaskSelection() } }),
-            TaskKeyboardCommand(id: "selection-cancel", input: UIKeyCommand.inputEscape, modifiers: [], title: "Cancel", action: {
-                guard !self.isSaving, !self.isSelectionGestureActive else { return }
-                if self.selectionDateField != nil { self.selectionDateField = nil }
-                else { self.endTaskSelection() }
-            }),
-            TaskKeyboardCommand(id: "selection-complete", input: "\r", modifiers: [.command, .shift], title: "Complete Selected Tasks", action: self.toggleSelectionCompletion)
-        ]
-    }
-
     private func finishRowEditingForSelection() async -> Bool {
         rowEditing?.parameter = nil
         return await finishRowEditing(reduceMotion: UIAccessibility.isReduceMotionEnabled)

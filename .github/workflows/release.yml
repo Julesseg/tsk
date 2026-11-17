@@ -57,13 +57,12 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
           APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
-          APPLE_WIDGET_PROVISIONING_PROFILE: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -n "$APPLE_CERTIFICATE_P12" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] \
              && [ -n "$APPLE_PROVISIONING_PROFILE" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            if [ -z "$APPLE_SHARE_PROVISIONING_PROFILE" ] || [ -z "$APPLE_WIDGET_PROVISIONING_PROFILE" ]; then
-              echo '::error::Configured installables require both Share and Widget provisioning profiles.'
+            if [ -z "$APPLE_SHARE_PROVISIONING_PROFILE" ]; then
+              echo '::error::Configured installables require a Share provisioning profile.'
               exit 1
             fi
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -133,7 +132,6 @@ jobs:
         env:
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
           APPLE_SHARE_PROVISIONING_PROFILE: ${{ secrets.APPLE_SHARE_PROVISIONING_PROFILE }}
-          APPLE_WIDGET_PROVISIONING_PROFILE: ${{ secrets.APPLE_WIDGET_PROVISIONING_PROFILE }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: python3 scripts/install-provisioning-profiles.py
 
@@ -164,7 +162,6 @@ jobs:
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             TSK_APP_PROVISIONING_PROFILE="$TSK_APP_PROVISIONING_PROFILE" \
             TSK_SHARE_PROVISIONING_PROFILE="$TSK_SHARE_PROVISIONING_PROFILE" \
-            TSK_WIDGET_PROVISIONING_PROFILE="$TSK_WIDGET_PROVISIONING_PROFILE" \
             OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
 
       - name: Export .ipa

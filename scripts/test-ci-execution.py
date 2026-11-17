@@ -36,13 +36,11 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(full['families'], ['iPhone'])
         self.assertEqual(len(full['matrix']['include']), 2)
         for worker in full['matrix']['include']:
-            self.assertEqual(worker['native_keyboard'], worker['partition'] == 'workspace')
             self.assertEqual(worker['server'], worker['partition'] == 'workspace')
             self.assertEqual(worker['peer'], worker['partition'] == 'workspace')
         smoke = plan.plan('smoke')
         self.assertEqual(smoke['families'], ['iPhone'])
         self.assertEqual(len(smoke['matrix']['include']), 1)
-        self.assertFalse(any(worker['native_keyboard'] for worker in smoke['matrix']['include']))
         self.assertFalse(smoke['server'])
         self.assertFalse(smoke['peer'])
         self.assertEqual(plan.plan('diagnostic')['families'], ['iPhone'])

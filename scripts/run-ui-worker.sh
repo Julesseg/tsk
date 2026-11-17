@@ -10,15 +10,10 @@ printf 'UI suite: %s (%s, %s)\n%s\n' "$UI_SUITE" "$UI_FAMILY" "$UI_PARTITION" "$
 export TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR=1
 export TEST_RUNNER_TSK_UI_DIAGNOSTICS=0
 case "$UI_SUITE" in
-    diagnostic|keyboard|text|regression|menu) export TEST_RUNNER_TSK_UI_DIAGNOSTICS=1 ;;
+    diagnostic|text|regression|menu) export TEST_RUNNER_TSK_UI_DIAGNOSTICS=1 ;;
 esac
 export TSK_EVENTKIT_EVIDENCE_DIR="$PWD/../.build/eventkit-fixture"
-export TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT="$PWD/../.build/native-keyboard-hid"
 export TSK_TASKCHAMPION_LIBRARY="$PWD/../.build/ui-tools/libtsk_taskchampion.dylib"
-export TSK_NATIVE_KEYBOARD_HID=0
-if [[ $(python3 ../scripts/ui-test-selection.py native-keyboard -- "${coverage[@]}") == yes ]]; then
-    export TSK_NATIVE_KEYBOARD_HID=1
-fi
 command=(/bin/bash ../scripts/run-ui-tests.sh "$simulator_id" --skip-build
     -project "$APP_NAME.xcodeproj" -scheme "$APP_NAME" "${coverage[@]}"
     -resultBundlePath TestResults.xcresult -derivedDataPath ../.build/ui

@@ -22,13 +22,11 @@ SPOTLIGHT_METHODS = {
     'testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
     'testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
 }
-WIDGET_METHOD = 'testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError'
-CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests|WidgetUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
+CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
 METHOD = re.compile(r"^Test Case '-\[TskUITests\.(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \(([\d.]+) seconds\)\.)$")
 POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
 POST_GROUP_SIGNAL_DRAIN_SECONDS = 0.25
 SEARCH_SURFACE = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual system Search surface before first-run handling'$")
-PROVIDER = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual tsk provider cell in native widget gallery'$")
 
 
 def utc():
@@ -104,10 +102,6 @@ class BoundaryCapture:
         self.events = []
         self.started = set()
         self.active = {}
-        self.widget_active = False
-        self.widget_contexts = set()
-        self.remote_pids = set()
-        self.remote_pids_truncated = False
         self.spotlight_current = None
         self.spotlight_pids = {}
         self.spotlight_pids_truncated = set()
@@ -144,17 +138,6 @@ class BoundaryCapture:
             except OSError as error:
                 self.record('stop-file-error', method=method, error=str(error))
             self.record(entry['kind'] + '-window-stop', method=method, reason=reason)
-
-    def widget_context(self, name):
-        if name in self.widget_contexts:
-            return
-        self.widget_contexts.add(name)
-        arguments = [sys.executable, str(self.scripts / 'capture-simulator-search-context.py'), self.device,
-                     str(self.evidence / (name + '-context.json'))]
-        for pid in sorted(self.remote_pids):
-            arguments += ['--observed-pid', pid]
-        self.record('widget-context-request', name=name, observedPIDs=sorted(self.remote_pids))
-        self.spawn(arguments, 'context', name)
 
     def search_context(self, method, boundary):
         key = method + '-' + boundary
@@ -221,9 +204,6 @@ class BoundaryCapture:
                     self.stop(method, 'test-end')
                     if self.spotlight_current == method:
                         self.spotlight_current = None
-            elif suite == 'WidgetUITests' and method == WIDGET_METHOD:
-                self.widget_active = outcome == 'started.'
-                self.record('widget-test-boundary', outcome=outcome)
         if self.spotlight_current is not None:
             method = self.spotlight_current
             pids = self.spotlight_pids[method]
@@ -237,17 +217,6 @@ class BoundaryCapture:
                 self.search_context(method, 'search-before')
             if ' : failed - Actual system Spotlight search field must be available' in line:
                 self.search_context(method, 'search-missing-field')
-        if self.widget_active:
-            for pid in re.findall(r'remote element in process (\d+)', line):
-                if len(self.remote_pids) < 32:
-                    self.remote_pids.add(pid)
-                elif pid not in self.remote_pids and not self.remote_pids_truncated:
-                    self.remote_pids_truncated = True
-                    self.record('widget-observed-pids-truncated', maximum=32)
-            if PROVIDER.fullmatch(line):
-                self.widget_context('widget-before-provider')
-            if ' : failed - Missing native system control: Add Widget' in line:
-                self.widget_context('widget-missing-add')
         self.reap()
 
     def reap(self):
@@ -277,8 +246,8 @@ class BoundaryCapture:
 
 
 def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5, monitor_device=False):
-    if cleanup_grace not in (5, 120):
-        raise ValueError('Owned cleanup grace must be the default or fixed native HID allowance')
+    if cleanup_grace != 5:
+        raise ValueError('Owned cleanup grace must remain five seconds')
     capture = BoundaryCapture(device, evidence, scripts)
     process = None
     interrupted = None
@@ -332,7 +301,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
     reason = 'relay-error'
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-        capture.record('owned-native-hid-owner-start' if cleanup_grace == 120 else 'xcodebuild-start', pid=process.pid, command=command, **(dict(cleanupGraceSeconds=120) if cleanup_grace == 120 else {}))
+        capture.record('xcodebuild-start', pid=process.pid, command=command)
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             signalled = False
@@ -406,7 +375,7 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
         reason = 'output-pipe' if broken_output else 'signal' if interrupted else 'eof'
-        capture.record('owned-native-hid-owner-end' if cleanup_grace == 120 else 'xcodebuild-end', returnCode=code, status=status)
+        capture.record('xcodebuild-end', returnCode=code, status=status)
     except OSError as error:
         capture.record('relay-error', error=str(error))
         if process is not None and process.poll() is not None:
@@ -442,7 +411,6 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--owned-simulator', action='store_true')
     parser.add_argument('--monitor-device', action='store_true')
-    parser.add_argument('--owned-cleanup-grace-seconds', type=int, choices=[5, 120], default=5)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
     if os.environ.get('CI') != 'true' or os.environ.get('TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR') != '1' or not arguments.owned_simulator:
@@ -450,6 +418,4 @@ if __name__ == '__main__':
     command = arguments.command[1:] if arguments.command[:1] == ['--'] else arguments.command
     if not command:
         parser.error('Pass the original xcodebuild command after --')
-    if arguments.owned_cleanup_grace_seconds == 120 and (len(command) < 2 or pathlib.Path(command[1]).resolve() != pathlib.Path(__file__).with_name('with-native-keyboard-hid.py').resolve() or os.environ.get('TSK_NATIVE_KEYBOARD_HID') != '1'):
-        parser.error('Extended owned cleanup is only for the explicit native HID owner')
-    raise SystemExit(run(command, arguments.device, arguments.evidence, cleanup_grace=arguments.owned_cleanup_grace_seconds, monitor_device=arguments.monitor_device))
+    raise SystemExit(run(command, arguments.device, arguments.evidence, monitor_device=arguments.monitor_device))

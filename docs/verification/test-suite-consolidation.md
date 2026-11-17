@@ -1,3 +1,9 @@
+> Subsequent scope update (2026-11-17): hardware keyboard commands, widgets,
+> their UI methods and HID tooling are removed. The combined real-Calendar UI
+> journey and automatic-sync failure UI journey are also retired by user decision;
+> Calendar and automatic sync themselves remain. Current
+> selections are defined in `scripts/ui-test-selection.py` and `ci-test-tiers.md`.
+
 # Test suite consolidation
 
 ## November 2026 reduction

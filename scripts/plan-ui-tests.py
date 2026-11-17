@@ -17,7 +17,7 @@ def plan(suite):
     for family in families:
         for partition in partitions:
             filters = selection.selection(suite, family, partition)
-            workers.append(dict(family=family, partition=partition, native_keyboard=selection.requires_native_keyboard(filters), server=selection.requires_sync_server(filters), peer=selection.requires_sync_peer(filters)))
+            workers.append(dict(family=family, partition=partition, server=selection.requires_sync_server(filters), peer=selection.requires_sync_peer(filters)))
     return dict(matrix=dict(include=workers), families=families, partitions=partitions, suite=suite,
                 server=any(worker['server'] for worker in workers), peer=any(worker['peer'] for worker in workers))
 
@@ -29,7 +29,7 @@ def validate_source(expected, actual):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('suite', choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression', 'menu'])
+    parser.add_argument('suite', choices=['smoke', 'full', 'diagnostic', 'text', 'regression', 'menu'])
     args = parser.parse_args()
     validate_source(os.environ.get('EXPECTED_SOURCE_SHA'), os.environ.get('GITHUB_SHA'))
     result = plan(args.suite)

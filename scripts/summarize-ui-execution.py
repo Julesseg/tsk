@@ -17,7 +17,7 @@ def test_methods(nodes):
 
 def failure_timing(receipts):
     events = [event for receipt in receipts for event in receipt.get('events', [])]
-    starts = [event['receivedUTC'] for event in events if event['event'] in ('xcodebuild-start', 'owned-native-hid-owner-start')]
+    starts = [event['receivedUTC'] for event in events if event['event'] == 'xcodebuild-start']
     failures = [event for event in events if event['event'] == 'first-test-failure']
     finishes = [receipt['finishedUTC'] for receipt in receipts if receipt.get('finishedUTC')]
     if not failures or not starts or not finishes:

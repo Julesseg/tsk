@@ -4,13 +4,13 @@ Use an explicit suite and reason after pushing a frozen source branch:
 
 ```sh
 python3 scripts/dispatch-ui-tests.py --ref <branch> --suite diagnostic \
-  --reason 'Compare native transport failure at the frozen source'
+  --reason 'Verify the selected UI scenario at the frozen source'
 ```
 
-Diagnostic selects the existing 12-method iPhone subset and skips the Linux
-Core/Native jobs. `keyboard` and `text` select focused coverage on both families;
-`full` selects complete coverage with two partitions per family. The manual form
-default is smoke, not full. See [CI test tiers](ci-test-tiers.md).
+Diagnostic selects the existing 27 on-demand iPhone methods and skips the Linux
+Core/Native jobs. `text`, `regression` and `menu` select focused iPhone coverage;
+`full` selects the nightly coverage with workspace and row-editing partitions.
+The manual form defaults to smoke. See [CI test tiers](ci-test-tiers.md).
 
 The helper resolves the branch, checks matching source/branch/suite work before
 dispatch, and rejects a branch move during admission. It can reuse successful

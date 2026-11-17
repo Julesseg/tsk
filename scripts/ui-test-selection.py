@@ -1,5 +1,4 @@
 import argparse
-import importlib.util
 import pathlib
 import re
 
@@ -11,8 +10,6 @@ PHONE_SMOKE = (
 )
 
 NIGHTLY = (
-    'AutomaticSynchronizationUITests/testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch',
-    'CalendarTodayUITests/testRealCalendarTodayReadOnlyClippingStoreChangeForegroundAndRevocation',
     'ContinuousReminderImportUITests/testActualSourceEditIntoRecurringRuleIsPreservedAndAutomaticMovePauses',
     'ContinuousReminderImportUITests/testInterruptionAndActualPermissionResetAfterCommitLeaveSourceAndTaskAvailable',
     'ContinuousReminderImportUITests/testRealContinuousMoveSourceChangesForegroundRescanAndDurableReopen',
@@ -39,7 +36,6 @@ NIGHTLY = (
     'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch',
     'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
     'TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft',
-    'TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
@@ -50,7 +46,6 @@ NIGHTLY = (
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
     'TaskRowEditingUITests/testSupportingInformationEditsKeepTheExpandedDraftAndPersist',
     'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
-    'WidgetUITests/testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError',
     'WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch',
 )
 
@@ -85,10 +80,6 @@ ON_DEMAND = (
 )
 
 DIAGNOSTIC = ON_DEMAND
-KEYBOARD = (
-    "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
-    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-)
 TEXT = (
     "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
@@ -98,7 +89,7 @@ MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
     "TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
-    *KEYBOARD,
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
 )
 REGRESSION = (
     "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
@@ -108,7 +99,7 @@ REGRESSION = (
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
-              keyboard=KEYBOARD, text=TEXT, menu=MENU, regression=REGRESSION)
+              text=TEXT, menu=MENU, regression=REGRESSION)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
@@ -206,19 +197,11 @@ def requires_sync_server(filters):
     })
 
 
-def requires_native_keyboard(filters):
-    selected_methods(filters)
-    spec = importlib.util.spec_from_file_location("native_keyboard_owner", pathlib.Path(__file__).with_name("with-native-keyboard-hid.py"))
-    owner = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(owner)
-    return bool(owner.selected_cases(filters))
-
-
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu"))
+    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "text", "regression", "menu"))
     select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     phase = commands.add_parser("phases")
@@ -227,16 +210,12 @@ def main():
     peer.add_argument("filters", nargs=argparse.REMAINDER)
     server = commands.add_parser("sync-server")
     server.add_argument("filters", nargs=argparse.REMAINDER)
-    native = commands.add_parser("native-keyboard")
-    native.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
             output = selection(args.suite, args.family, args.partition)
         elif args.command == "phases":
             output = phases(args.filters)
-        elif args.command == "native-keyboard":
-            output = ["yes" if requires_native_keyboard(args.filters) else "no"]
         elif args.command == "sync-server":
             output = ["yes" if requires_sync_server(args.filters) else "no"]
         else:

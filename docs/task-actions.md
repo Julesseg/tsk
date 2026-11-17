@@ -1,6 +1,6 @@
 # Task automation
 
-Add Task in Shortcuts and `tsk://add` save one task immediately to durable local storage, including offline. Success does not acknowledge server synchronization. Neither interface presents a confirmation editor. The Add Task adapter belongs to the app target, so Shortcuts runs it in the app process rather than the widget extension. Other actions are being rebuilt in separate issues.
+Add Task in Shortcuts and `tsk://add` save one task immediately to durable local storage, including offline. Success does not acknowledge server synchronization. Neither interface presents a confirmation editor. The Add Task adapter belongs to the app target, so Shortcuts runs it in the app process with access to its app-owned navigation. Other actions are being rebuilt in separate issues.
 
 ## Inputs
 

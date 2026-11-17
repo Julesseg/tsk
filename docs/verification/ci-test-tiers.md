@@ -9,16 +9,15 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 3 methods | PR, main push, explicit dispatch |
-| Full | 41 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 37 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
-| Keyboard | 2 methods | Explicit dispatch |
 | Text | 3 methods | Explicit dispatch |
 | Regression | 5 methods | Explicit dispatch |
-| Menu | 5 methods | Explicit dispatch |
+| Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 68 retained methods has exactly one primary
+methods for every suite. Each of the 64 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -28,15 +27,13 @@ Smoke covers inline capture/cancellation/save/relaunch, row validation/native
 pickers/outside-save/durable completion, and actual hold/drag selection with
 held-touch refresh stability, scrolling recovery and a staged dates/completion
 Apply. The gesture also runs without native list accessibility identifiers.
-Smoke needs no synchronization server, independent peer or native HID transport.
+Smoke needs no synchronization server or independent peer.
 
 Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
 handoff; row notes, tag validation and dependency navigation; saved views/native
-reordering; occurrence success/failure; series preview/cancel/commit; manual and
-automatic-failure sync; real EventKit Calendar and Reminders; destructive move
-source-change/interruption safety; installed Share/widgets/Spotlight; actual
-closed-app and received-sync notification delivery; native HID command/focus
-routing; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
+reordering; occurrence success/failure; series preview/cancel/commit; manual sync; real EventKit Reminders; destructive move
+source-change/interruption safety; installed Share/Spotlight; actual
+closed-app and received-sync notification delivery; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
 adds fresh/completed/missing task identities, all view categories, stable saved-view
 renames/deletion, unchanged favorites, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
@@ -52,24 +49,29 @@ night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
 baseline and accepted gaps.
 
-The Menu suite retains three native Project-menu journeys plus product annotation
-and workspace/editor HID cases. Its stress case still opens and dismisses New
+The Menu suite retains three native Project-menu journeys plus touch-based annotation
+editing. Its stress case still opens and dismisses New
 project twenty times with five-second acknowledgements, including title/note
 keyboard handoff. Its scroll-retention case still uses 80 real project values,
 a settled distant neighborhood, ten untouched seconds and two-point endpoint
 geometry. The animation case still requires one-point presentation-frame
 stability. These contracts moved out of scheduled coverage without relaxed bars.
 
-The nightly HID workspace/editor journey retains all thirteen input phases and
-native outcomes, including selection Escape/Return behavior and capture after
-returning from Settings. The annotation case runs on demand. The standalone
-UIKit keyboard-control UI test is retired; protocol/ownership host regressions
-remain. The Menu, Keyboard, Text and Diagnostic suites need native HID but no UI
-sync server or peer. Regression retains Share, row editing, native menu stress
-and view ordering without HID/server/peer setup.
+Hardware keyboard commands, their dedicated UI suite and native HID tooling,
+and all widgets were removed by the user on 2026-11-17. The remaining annotation
+journey uses visible Save controls and native touch text selection. The user
+also retired the combined real-Calendar permission/revocation/Settings-handoff
+journey after checking that scenario on a physical device. Calendar remains in
+the product, with its controller, Native EventKit and on-demand display tests.
+The user also retired the automatic-sync failure/offline-save/relaunch UI
+scenario. Automatic sync remains supported and covered in Core/Native tests.
+These removals do not establish fixes for historical failed runs.
 
-Green smoke does not certify extensions, permissions, system delivery or native
-HID. Historical reports before ADR 0007 include retired iPad cases and do not
+The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
+Regression retains Share, row editing, native menu stress and view ordering
+without server/peer setup.
+
+Green smoke does not certify extensions, permissions, system delivery. Historical reports before ADR 0007 include retired iPad cases and do not
 establish current iPhone acceptance. Neither simulator UI nor direct intent
 `perform()` tests prove external Shortcuts/Siri or physical-device invocation.
 
@@ -107,8 +109,8 @@ suppressed-animation journeys do not certify transition timing or performance.
 Direct intent fixtures call the actual `perform()` implementation; their app
 readback does not certify external Shortcuts/Siri discovery or invocation.
 
-Ordinary smoke/full runs leave expensive participant and keyboard traces off.
-Focused diagnostic, keyboard, text, regression and menu selections explicitly
+Ordinary smoke/full runs leave expensive participant traces off.
+Focused diagnostic, text, regression and menu selections explicitly
 forward `TSK_UI_DIAGNOSTICS=1` to the app. An isolated replica alone does not
 enable them. Receipts coalesce by file on a utility queue, outside input dispatch;
 Share's explicit request-scoped fixture flushes before completing the extension.
@@ -141,11 +143,11 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 30 methods | 11 methods |
+| iPhone | 26 methods | 11 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
-All native HID cases, installed system integrations and server/peer consumers
-remain in workspace. The task worker requires neither native HID nor a server.
+Installed system integrations and server/peer consumers remain in workspace.
+The task worker requires no server.
 Share executes before the rest of its worker. Portable selection and ownership
 regressions run once on Linux; controller regressions run in the producer.
 
@@ -160,7 +162,7 @@ ownership, cleanup traps and `always()` deletion remain. During Share and main
 execution, an asynchronous monitor checks only the owned device. A positively
 observed `Shutdown` stops the owned process group and reports infrastructure
 exit 74. Missing/slow/invalid queries do not assert device loss. Monitor queries
-are bounded and killed/reaped without blocking native keyboard request delivery.
+are bounded and killed/reaped without blocking test execution.
 Ordinary test assertions still allow independent methods to finish. The first
 failure is annotated immediately, rather than waiting for the suite's last case.
 
@@ -208,9 +210,7 @@ with a 165-minute worker limit after moving builds out; focused diagnostics have
 allowance. These are ceilings, not performance targets. A polling deadline does
 not interrupt a blocking XCTest accessibility call.
 
-Native HID initialization, fixed case/phase sequences, nonce/PID/device/socket
-checks, request deadlines, UP cleanup and public XCTest acceptance remain
-unchanged. Keyboard dismissal still requires visible geometry and two stable
+On-screen keyboard dismissal still requires visible geometry and two stable
 samples within 20 seconds. It prefers keyboard frames from the same app snapshot. If that hierarchy omits
 the keyboard, the original query against the same owning application supplies
 the geometry; absence still fails rather than inventing a keyboard frame. Native Select All still

@@ -12,7 +12,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [smoke, full, keyboard, text, regression, menu]
+        options: [smoke, full, text, regression, menu]
         required: true
         default: smoke
       reason:
@@ -37,7 +37,7 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text","regression","menu"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["text","regression","menu"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
@@ -75,10 +75,6 @@ jobs:
           python3 scripts/test-ui-shard-checks.py
           python3 scripts/test-ci-execution.py
           python3 scripts/test-native-test-selection.py
-          python3 scripts/test-native-keyboard-hid-installer.py
-          python3 scripts/test-native-keyboard-hid-relay.py
-          python3 scripts/test-native-keyboard-hid-owner.py
-          python3 scripts/test-native-keyboard-boundary-cleanup.py
       - name: Classify changed paths
         id: route
         run: python3 scripts/ci-test-routing.py
@@ -323,9 +319,6 @@ jobs:
       - name: Verify source, toolchain, runtime and signed products
         if: needs.changes.outputs.run_tests == 'true'
         run: python3 scripts/ui-build-products.py unpack --archive .build/ui-products.tar.gz
-      - name: Install pinned native keyboard transport
-        if: needs.changes.outputs.run_tests == 'true' && matrix.native_keyboard
-        run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
       - name: Resolve an available ${{ matrix.family }} simulator
         if: needs.changes.outputs.run_tests == 'true'
         id: sim
@@ -368,7 +361,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
+    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

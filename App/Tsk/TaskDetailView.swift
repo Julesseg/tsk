@@ -70,7 +70,6 @@ struct TaskDetailView: View {
                 }
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("edit-task")
-                    .keyboardShortcut(edit == nil ? KeyboardShortcut("e", modifiers: .command) : nil)
             }
         }
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }

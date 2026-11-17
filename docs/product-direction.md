@@ -38,7 +38,7 @@ Attempt synchronization after changes, when the app opens, and when connectivity
 
 ## iOS integration
 
-Shortcuts and Siri, capture from the share sheet, widgets, Spotlight search, notifications, Calendar, and Apple Reminders import are all important parts of the initial product scope.
+Shortcuts and Siri, capture from the share sheet, Spotlight search, notifications, Calendar, and Apple Reminders import are all important parts of the initial product scope.
 
 Apple Reminders integration is import-only: a one-time or continuous import of incomplete reminders from selected lists. Users choose which lists to import. Each selected Reminders list becomes the Taskwarrior project for its imported tasks. Completed reminders are excluded. There is no additional priority or importance criterion.
 
@@ -54,7 +54,7 @@ Calendar integration only displays calendar events in Today. tsk does not create
 
 Shortcuts and the URL scheme will expose Add Task, Modify Task, Delete Task, Find Tasks, Complete Task, Open Task, and Open View using individual named inputs rather than Taskwarrior syntax. Simple URLs have no version component; task-targeted actions use full UUIDs, and mutations save immediately and acknowledge durable local storage. Existing saved shortcuts may break when the actions are rebuilt; Modify covers rescheduling without a legacy Reschedule action. See [the shared-action decision](adr/0005-structured-actions-for-urls-and-shortcuts.md) and its implementation tickets.
 
-Widgets show Today or a chosen task view and provide completion actions. Spotlight opens matching tasks in tsk.
+Spotlight opens matching tasks in tsk.
 
 Sharing text or a URL into tsk immediately creates a plain task whose complete description is the shared content. There is no extension editor, annotation, project, tag, priority, or date selection. File attachment storage is deferred initially.
 
@@ -66,7 +66,7 @@ After synchronization, immediately fire newly discovered missed alerts for unfin
 
 ## Devices
 
-tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands remain supported on iPhone. Native iPad and Mac experiences are future product decisions.
+tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands and widgets were removed from product scope on 2026-11-17. Native iPad and Mac experiences are future product decisions.
 
 ## Visual direction
 

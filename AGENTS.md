@@ -2,7 +2,7 @@
 
 A native iPhone Taskwarrior client. `Core/` owns task behavior; `Native/`
 connects TaskChampion and system services; `App/` contains thin SwiftUI app,
-Share and widget interfaces. Shared storage, encrypted sync and task workflows
+Share interface. Shared storage, encrypted sync and task workflows
 are implemented. Use canonical iPhone XCUITest for runtime verification;
 source, host tests and generic builds do not establish system delivery,
 physical input, account behavior or distribution provisioning.

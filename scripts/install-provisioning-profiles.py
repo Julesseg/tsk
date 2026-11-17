@@ -9,7 +9,6 @@ import subprocess
 TARGETS = (
     ('com.julesseguin.tsk', 'APPLE_PROVISIONING_PROFILE', 'TSK_APP_PROVISIONING_PROFILE'),
     ('com.julesseguin.tsk.share', 'APPLE_SHARE_PROVISIONING_PROFILE', 'TSK_SHARE_PROVISIONING_PROFILE'),
-    ('com.julesseguin.tsk.widgets', 'APPLE_WIDGET_PROVISIONING_PROFILE', 'TSK_WIDGET_PROVISIONING_PROFILE'),
 )
 
 

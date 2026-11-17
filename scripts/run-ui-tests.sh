@@ -37,7 +37,7 @@ cleanup() {
         fi
         container=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk data 2>/dev/null || true)
         if [[ -n "$container" && -d "$container/Documents" ]]; then
-            find "$container/Documents" -maxdepth 1 \( -name 'keyboard-fixture-*.json' -o -name 'participant-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'widgets-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
+            find "$container/Documents" -maxdepth 1 \( -name 'participant-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
         fi
         group=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk group.com.julesseguin.tsk 2>/dev/null || true)
         if [[ -n "$group" && -d "$group/UITestDiagnostics" ]]; then
@@ -100,13 +100,6 @@ if [[ -z "$derived_data" || -z "$result_path" ]]; then
     exit 1
 fi
 test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
-if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "${TSK_NATIVE_KEYBOARD_HID:-0}" != 1 ]]; then
-    native_keyboard=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" native-keyboard -- ${test_filters[@]+"${test_filters[@]}"})
-    if [[ "$native_keyboard" == yes ]]; then
-        echo 'Selected hardware-keyboard tests require the owned native transport.' >&2
-        exit 1
-    fi
-fi
 if [[ "$skip_build" == true ]]; then
     if [[ ! -d "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" ]]; then
         echo 'Prebuilt UI tests require existing signed simulator products.' >&2
@@ -149,20 +142,8 @@ if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_R
     spotlight_capture_pid=$!
 fi
 main_status=0
-if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 && ( "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no || -z "${TSK_EVENTKIT_EVIDENCE_DIR:-}" ) ]]; then
-    echo 'Native keyboard transport requires the CI-owned isolated simulator and evidence directory.' >&2
-    exit 1
-fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-    if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 ]]; then
-        python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device --owned-cleanup-grace-seconds 120 -- \
-            python3 "$(dirname "${BASH_SOURCE[0]}")/with-native-keyboard-hid.py" --udid "$simulator_id" \
-            --tool-root "${TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT:?Pass the pinned .build HID tools}" \
-            --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/native-keyboard-hid" -- \
-            xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
-    else
     python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
-    fi
 else
     xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
 fi

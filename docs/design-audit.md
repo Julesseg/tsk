@@ -1,3 +1,7 @@
+> Product scope update (2026-11-17): hardware keyboard commands and widgets are
+> retired. References to keyboard commands below describe historical proposals;
+> ordinary on-screen text entry, touch editing and accessibility remain supported.
+
 # App design audit
 
 Native iPad requirements below are historical and superseded by [ADR 0007](adr/0007-iphone-only.md).
@@ -210,8 +214,7 @@ Upcoming's repeated appearances share one selection and count as one task.
 
 Show a bottom action bar with selected count and access to Plan, Deadline,
 Project, Tags, Priority and Complete. Each action opens focused controls rather
-than expanding every selected row. Provide a Select command for keyboard and
-accessibility use.
+than expanding every selected row. Provide a Select accessibility action.
 
 Each operation changes only its chosen field, preserving others. Clearing is
 explicit. Tags offers Add and Remove, preserving other tags. Save the selected

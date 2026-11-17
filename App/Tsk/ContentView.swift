@@ -234,7 +234,6 @@ struct ContentView: View {
 
     private var integrationSheets: some View {
         navigationWorkspace
-        .taskKeyboardCommands(keyboardCommands)
         #if DEBUG && targetEnvironment(simulator)
         .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
         #endif
@@ -493,38 +492,6 @@ struct ContentView: View {
         .padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
     }
 
-    private var selectedTask: TaskRecord? { store.allTasks.first { $0.id == selectedTaskID } }
-    private var navigationRows: [TaskRecord] {
-        store.customView == nil && store.query == .upcoming ? store.upcomingDays.flatMap(\.entries).map(\.task) : store.visibleTasks
-    }
-
-    private var keyboardCommands: [TaskKeyboardCommand] {
-        guard !store.isSaving, !store.isSelectionGestureActive else { return TaskKeyboardCommand.suspended }
-        guard store.isSelectingTasks else { return workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended }
-        return (workspaceActions?.keyboardCommands.filter { $0.id != "complete" } ?? []) + store.selectionKeyboardCommands
-    }
-
-    private var workspaceActions: TaskWorkspaceActions? {
-        guard store.selectionDateField == nil, !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
-              !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
-        #if DEBUG && targetEnvironment(simulator)
-        guard !isShowingSpotlightDiagnostics else { return nil }
-        #endif
-        return TaskWorkspaceActions(
-            capture: capture,
-            edit: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
-            complete: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
-            move: moveSelection,
-            reveal: selectedTask.map { task in {
-                if isProjectWorkspace { projectPath.append(task.id) }
-                else { path = [task.id] }
-            } },
-            openView: openView,
-            refresh: { Task { await store.reload() } },
-            select: selectedTask.flatMap { task in task.canComplete ? { store.toggleSelection(task.id) } : nil }
-        )
-    }
-
     private func capture() {
         guard !isRequestingCapture else { return }
         isRequestingCapture = true
@@ -548,21 +515,10 @@ struct ContentView: View {
         }
     }
 
-    private func openView(_ query: TaskQuery) {
-        guard let view = WorkspaceView.defaults.first(where: { $0.query == query }) else { return }
-        guard store.workspaceViews.active.contains(view) else { presentViews(); return }
-        tabSelection.wrappedValue = view
-    }
-
     private func openProject(_ project: TaskProjectSelection) {
         guard isProjectWorkspace else { return }
         store.query = .unfinished
         store.projectSelection = project
-    }
-
-    private func moveSelection(_ movement: TaskSelectionMovement) {
-        selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {

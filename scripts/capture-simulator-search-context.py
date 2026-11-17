@@ -11,7 +11,7 @@ import time
 from xml.parsers.expat import ExpatError
 
 
-TERMS = ['spotlight', 'search', 'indexagent', 'springboard', 'widget']
+TERMS = ['spotlight', 'search', 'indexagent', 'springboard']
 
 
 def utc():

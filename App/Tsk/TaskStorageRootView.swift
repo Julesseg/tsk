@@ -66,7 +66,6 @@ struct TaskStorageRootView: View {
             try await installRecordedRecurrenceFixture()
             try await runTaskAutomationFixture()
             try await installNavigationFixture()
-            try await installWidgetFixture()
             #endif
             let opened = try TaskStore()
             #if DEBUG && targetEnvironment(simulator)

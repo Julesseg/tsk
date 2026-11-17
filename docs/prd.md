@@ -12,7 +12,7 @@ This PRD records the agreed product contract without recording personal infrastr
 
 Build a first-class native iPhone Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
 
-The initial product includes Shortcuts/Siri, widgets, Spotlight, text/URL sharing, calendar events displayed only in Today, notifications derived from task dates, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
+The initial product includes Shortcuts/Siri, Spotlight, text/URL sharing, calendar events displayed only in Today, notifications derived from task dates, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
 
 The behavior below is the initial scope. It is not an assertion that interoperability or device behavior has already been verified, and it does not prescribe a delivery estimate.
 
@@ -81,15 +81,15 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 50. As a task owner, I want to receive generated occurrences through TaskChampion synchronization, so that I can manage them using the same views and actions as other tasks.
 51. As a task owner, I want to understand that new occurrences depend on a designated external generator, so that I do not expect the sync server or the initial iOS app to generate them.
 
-### Shortcuts, Siri, widgets, Spotlight, and sharing
+### Shortcuts, Siri, Spotlight, and sharing
 
 52. As an iOS user, I want to create tasks through Shortcuts and Siri, so that capture can participate in native automation.
 53. As an iOS user, I want to find tasks through Shortcuts and Siri, so that automations can work with existing tasks.
 54. As an iOS user, I want to complete tasks through Shortcuts and Siri, so that I can act without navigating through the main app.
 55. As an iOS user, I want to modify named task fields, including rescheduling, through Shortcuts, so that native automation can update my tasks without command syntax.
-56. As an iOS user, I want to show Today in a widget, so that the day’s tasks are visible outside the app.
-57. As an iOS user, I want to show a chosen task view in a widget, so that the widget can reflect the work I want to monitor.
-58. As an iOS user, I want to complete tasks from a widget, so that a small task action takes minimal interaction.
+56. Removed from product scope on 2026-11-17: widgets.
+57. Removed from product scope on 2026-11-17: widgets.
+58. Removed from product scope on 2026-11-17: widgets.
 59. As an iOS user, I want to open a matching task from Spotlight, so that system search leads directly to the relevant task.
 60. As an iOS user, I want shared text to become a plain task description without a review form.
 61. As an iOS user, I want sharing text or a URL to create a plain task automatically with the full content as its description.
@@ -133,7 +133,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 ### Native experience and permissions
 
 92. As an iPhone user, I want to use a compact native capture-and-action workflow, so that daily task management fits the phone.
-93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard support remains part of the iPhone workflow.
+93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard commands and widgets were subsequently removed from product scope on 2026-11-17.
 94. As an iOS user, I want to use native navigation, typography, gestures, accessibility, appearance, and Liquid Glass, so that tsk behaves as a first-class iOS app.
 95. As a task owner, I want to scan compact lists and reveal additional detail when needed, so that the interface balances density with clarity.
 96. As an iOS user, I want to retain ordinary task management when Calendar, Reminders, or notification permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
@@ -197,10 +197,10 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 - Reconcile the final local/synchronized task state before producing alerts. Cancel pending events for completed/deleted tasks. On sync, fire newly discovered missed events immediately unless the final state is completed or deleted. Do not fire an already delivered event again on every sync.
 - Reconcile registrations when task dates change. Register local notifications so existing schedules can fire while the app is closed. Remote completion cannot cancel a stale local alert until the relevant change reaches the device; do not imply automatic server-side cancellation.
 - Shortcuts and simple, unversioned URLs expose Add, Modify, Delete, Find, Complete, Open Task, and Open View with named inputs and shared behavior. Task-targeted actions use one entity or full UUID. Mutations execute immediately and acknowledge durable local storage; optional URL callbacks return structured results and never undo or retry a committed change on delivery failure. Existing saved shortcuts may break; Modify replaces standalone Reschedule. See [ADR 0005](adr/0005-structured-actions-for-urls-and-shortcuts.md) for the decision and implementation tickets.
-- Widgets support Today or a chosen view and task completion. Spotlight opens matching tasks.
+- Spotlight opens matching tasks.
 - Sharing text or a URL immediately saves a plain task with the complete shared content as its description, without an extension editor or extra fields. File attachment storage is not initial scope.
 - Calendar integration reads events for Today and creates no calendar events or time blocks. Permission denial or revocation leaves ordinary task management usable.
-- Support iPhone capture and action, including external keyboard interaction. Native iPad support is out of scope under [ADR 0007](adr/0007-iphone-only.md). Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
+- Support iPhone capture and action, Native iPad support is out of scope under [ADR 0007](adr/0007-iphone-only.md). Use native iOS navigation, typography, gestures, accessibility, appearance, and Liquid Glass.
 
 ## Testing Decisions
 
@@ -217,8 +217,8 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Verify each supported recurring-reminder conversion against both actual EventKit data and the pinned external generator. Unsupported/unverified rules must remain untouched and be explained; verify source deletion scope for a supported recurring set before claiming safe continuous migration.
 - Verify notification planning through Core, including the 09:00 default, custom/disabled replacement, unchanged task dates, distinct/combined events, final-state completion/deletion suppression, immediate newly missed events, repeat prevention, and pending cancellation/rescheduling. Test actual delivery and registration reconciliation on iOS; do not assume the deprecated notification API’s capacity is the current limit.
 - Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings, import results, and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
-- Exercise Shortcuts/App Intents, share extension, widgets, Spotlight, Calendar/Reminders access, and local notification delivery using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
-- Verify iPhone navigation, physical keyboard interaction, system appearance, and accessibility. Simulator/CI success alone does not prove physical keyboard, background timing, or external-account behavior.
+- Exercise Shortcuts/App Intents, share extension, Spotlight, Calendar/Reminders access, and local notification delivery using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
+- Verify iPhone navigation, system appearance, and accessibility. Simulator/CI success alone does not prove background timing, or external-account behavior.
 - A documentation review or green scaffold CI does not fulfill these feature-level checks. Every delivered capability needs evidence at its stated seam, with unsupported cases and remaining verification limits reported explicitly.
 
 ## Out of Scope

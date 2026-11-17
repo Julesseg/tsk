@@ -11,15 +11,6 @@ public enum TaskParticipantDiagnostics {
         #endif
     }
 
-    public static func writeKeyboardReceipt(_ data: Data, token: String) {
-        #if DEBUG && targetEnvironment(simulator)
-        guard environmentToken == token else { return }
-        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("keyboard-fixture-\(token)-\(ProcessInfo.processInfo.processIdentifier).json")
-        TaskDiagnosticFileWriter.shared.submit(data, to: file)
-        #endif
-    }
-
     public static func flush() async {
         #if DEBUG && targetEnvironment(simulator)
         await TaskDiagnosticFileWriter.shared.flushPending()
