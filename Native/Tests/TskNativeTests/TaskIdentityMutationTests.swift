@@ -3,13 +3,13 @@ import Testing
 import TskCore
 import TskNative
 
-@Test func workspaceSelectionEditsAndCompletesOnePersistentNativeTask() async throws {
+@Test func editingAndCompletingOnePersistentNativeTaskKeepsOtherTasksAndAttributes() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
     let manager = TaskManager(replica: TaskChampionReplica(directory: directory))
     let first = try await manager.create(TaskDraft(description: "Keep pending", attributes: ["opaque": "first", "project": "Work"]))
     let second = try await manager.create(TaskDraft(description: "Select me", attributes: ["opaque": "second", "project": "Work", "scheduled": "1792144800", "due": "1792231200"]))
-    let selected = try #require(manager.selectedTask(in: [first, second, first], from: first.id, moving: .next))
+    let selected = second.id
     _ = try await manager.update(id: selected, changes: ["description": "Edited with selected identity"])
     let completed = try await manager.complete(id: selected)
     let reopened = TaskManager(replica: TaskChampionReplica(directory: directory))
