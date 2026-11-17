@@ -67,7 +67,8 @@ final class SeriesMetadataUITests: XCTestCase {
         app.buttons["preview-series-metadata"].tap()
         assertPreview(futureIDs, app: app)
         app.buttons["save-series-metadata"].tap()
-        XCTAssertTrue(app.buttons["edit-series-metadata"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.collectionViews["series-metadata-form"].waitForNonExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["edit-series-metadata"].exists)
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Revised series metadata")
         capture("Series metadata saved through the shared atomic path", app)
         app.terminate()
@@ -114,7 +115,7 @@ final class SeriesMetadataUITests: XCTestCase {
     }
 
     private func hideKeyboard(_ app: XCUIApplication) {
-        if app.buttons["dismiss-series-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-series-keyboard"], app: app) }
+        if app.buttons["dismiss-series-keyboard"].exists { tapTaskControl(app.buttons["dismiss-series-keyboard"], app: app) }
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

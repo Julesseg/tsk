@@ -185,7 +185,7 @@ import XCTest
         XCTAssertEqual(scheduled.value as? String, "Modified")
         scheduled.tap()
         let pickerFrame = app.otherElements["selection-date-picker"].frame
-        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX - 6), dy: pickerFrame.midY))
+        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX / 2), dy: pickerFrame.midY))
         besidePicker.tap()
         XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2", "Empty space beside the picker also collapses it without changing selection")
@@ -260,7 +260,7 @@ import XCTest
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792231200))
         XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
         closeTaskRow(app)
-        app.buttons["task-" + second].tap()
+        tapTaskControlAtCenter(app.buttons["task-" + second], app: app)
         XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(Calendar.current.startOfDay(for: tomorrow).timeIntervalSince1970))

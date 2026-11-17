@@ -131,6 +131,10 @@ the Device panel alone leaves a simulator running. If none remain booted,
 quit Simulator. The Device panel assists inspection; canonical iPhone
 XCUITest remains the UI acceptance gate.
 
+For fresh simulators missing from T3 discovery, use the `simulator-lease`
+skill's native creation and discovery guidance before reporting missing
+runtime support.
+
 ## Provider hooks
 
 Keep the provider adapters in `.codex`, `.claude` and `.pi`. Codex normalizes

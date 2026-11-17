@@ -405,24 +405,25 @@ extension XCTestCase {
                     selected = nil
                     let readStarted = ProcessInfo.processInfo.systemUptime
                     do {
-                        lastSample = "binding native controls"
-                        let matches = controls.allElementsBoundByAccessibilityElement
-                        lastSample = "nativeCandidates=\(matches.count) readSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted)"
-                        guard ProcessInfo.processInfo.systemUptime < deadline, matches.count == 1, let control = matches.first else { return false }
-                        let snapshot = try control.snapshot()
-                        lastSample = "snapshotSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted)"
-                        guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                        let hittable = control.isHittable
-                        lastSample += " hittable=\(hittable) readSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted)"
-                        guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
-                        let applicationFrame = app.frame
-                        let windows = applicationFrame.isEmpty ? app.windows.allElementsBoundByAccessibilityElement.map(\.frame) : []
-                        let geometry = TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: [applicationFrame])
-                            .visibleInApplication(applicationFrame, windowFrames: windows)
-                        lastSample = "readSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted) type=\(snapshot.elementType.rawValue) enabled=\(snapshot.isEnabled) hittable=\(hittable) geometry=\(String(describing: geometry))"
-                        guard ProcessInfo.processInfo.systemUptime < deadline, snapshot.label == "Select All",
-                              snapshot.elementType == .menuItem || snapshot.elementType == .button,
-                              snapshot.isEnabled, hittable, let geometry else { return false }
+                        let application = try app.snapshot()
+                        var pending: [any XCUIElementSnapshot] = [application]
+                        var matches: [any XCUIElementSnapshot] = []
+                        while let snapshot = pending.popLast() {
+                            if snapshot.label == "Select All", snapshot.elementType == .menuItem || snapshot.elementType == .button {
+                                matches.append(snapshot)
+                            }
+                            pending.append(contentsOf: snapshot.children)
+                        }
+                        lastSample = "nativeCandidates=\(matches.count) snapshotSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted)"
+                        guard ProcessInfo.processInfo.systemUptime < deadline, matches.count == 1, let snapshot = matches.first,
+                              snapshot.isEnabled else { return false }
+                        let applicationFrame = application.frame
+                        let windows = applicationFrame.isEmpty ? application.children.filter { $0.elementType == .window }.map(\.frame) : []
+                        guard let geometry = TaskNativeMenuOptionGeometry(frame: snapshot.frame, ancestorFrames: [applicationFrame])
+                            .visibleInApplication(applicationFrame, windowFrames: windows) else { return false }
+                        let hittable = controls.firstMatch.isHittable
+                        lastSample += " enabled=\(snapshot.isEnabled) hittable=\(hittable) readSeconds=\(ProcessInfo.processInfo.systemUptime - readStarted) geometry=\(geometry)"
+                        guard ProcessInfo.processInfo.systemUptime < deadline, hittable else { return false }
                         selected = geometry
                         return true
                     } catch {
