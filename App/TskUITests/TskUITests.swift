@@ -33,11 +33,6 @@ final class TskUITests: XCTestCase {
         taskEditorSaveButton(app).tap()
         XCTAssertTrue(taskRow(named: "Buy milk from the market", app: app).waitForExistence(timeout: 10))
         screenshot("Tasks saved", app: app)
-        app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "Buy milk from the market", app: app).waitForExistence(timeout: 10))
-        screenshot("Tasks after relaunch", app: app)
         openTaskInformation(taskRow(named: "Buy milk from the market", app: app), app: app)
         let savedDescription = app.staticTexts["task-detail-description"]
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 5))
@@ -45,7 +40,15 @@ final class TskUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["task-detail-status"].label.contains("Pending"))
         XCTAssertFalse(app.staticTexts["Identity"].exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
-        screenshot("Saved task information after relaunch", app: app)
+        screenshot("Saved task information", app: app)
+        app.terminate()
+        let saved = try storedTasks(app, checkpoint: "saved")
+        XCTAssertEqual(saved.count, 1, "Cancelled capture must not persist a task")
+        let attributes = try XCTUnwrap(saved.values.first)
+        XCTAssertEqual(attributes["description"], "Buy milk from the market")
+        XCTAssertEqual(attributes["status"], "pending")
+        app.launch()
+        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
     }
 
     private func screenshot(_ name: String, app: XCUIApplication) {

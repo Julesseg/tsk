@@ -94,9 +94,29 @@ execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowa
 if [[ "$action_fixture" == yes ]]; then
     xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskActionFixture.app"
 fi
+readback_args=()
+readback_plan=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" native-readback -- ${test_filters[@]+"${test_filters[@]}"})
+if [[ "$readback_plan" != '{}' ]]; then
+    if [[ "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no ]]; then
+        echo 'Native readback requires the wrapper-owned isolated test simulator.' >&2
+        exit 1
+    fi
+    probe=${TSK_NATIVE_PROBE_BINARY:-$(dirname "$derived_data")/ui-tools/tsk-native-probe}
+    library=${TSK_TASKCHAMPION_LIBRARY:-$(dirname "$derived_data")/ui-tools/libtsk_taskchampion.dylib}
+    if [[ ! -x "$probe" || ! -f "$library" ]]; then
+        echo 'Native readback requires the built host probe and native library.' >&2
+        exit 1
+    fi
+    export TSK_EVENTKIT_EVIDENCE_DIR=${TSK_EVENTKIT_EVIDENCE_DIR:-${result_path%.xcresult}-evidence}
+    mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
+    printf '%s\n' "$readback_plan" > "$TSK_EVENTKIT_EVIDENCE_DIR/native-readback-plan.json"
+    export TSK_UI_NATIVE_READBACK_TOKEN=$(python3 -c 'import uuid; print(uuid.uuid4())')
+    export TEST_RUNNER_TSK_UI_NATIVE_READBACK_TOKEN=$TSK_UI_NATIVE_READBACK_TOKEN
+    readback_args=(--native-probe "$probe" --native-library "$library" --native-readback-plan "$TSK_EVENTKIT_EVIDENCE_DIR/native-readback-plan.json")
+fi
 main_status=0
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
+    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device ${readback_args[@]+"${readback_args[@]}"} -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 else
     xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 fi

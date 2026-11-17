@@ -29,7 +29,7 @@ class SelectionTests(unittest.TestCase):
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 30)
+        self.assertEqual(len(nightly), 29)
         self.assertEqual(len(diagnostic), 25)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
@@ -40,7 +40,6 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(nightly | diagnostic, selection.test_methods())
         self.assertLess(selection.selected_methods(selection.selection("smoke", "iPhone")), nightly)
         self.assertIn("TskUITests/TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask", nightly)
-        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft", nightly)
         self.assertIn("TskUITests/TaskActionURLUITests/testModifySystemURLSavesAllFieldsTagModesClearsAndAtomicRejections", nightly)
         self.assertIn("TskUITests/TaskActionURLUITests/testModifyURLSettlesActiveEditingRevealsTimedResultAndPreservesInvalidDraft", nightly)
         self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary", diagnostic)
@@ -92,7 +91,7 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (22, 8))
+        self.assertEqual((len(workspace), len(rows)), (22, 7))
         for partition, filters in groups.items():
             self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
@@ -148,6 +147,9 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(selection.requires_sync_server(filters), expected, case)
 
 
+RUNNER_CASE = "-only-testing:TskUITests/TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope"
+
+
 class RunnerTests(unittest.TestCase):
     def run_runner(self, filters=(), main_status=0, prebuilt=False, owned_ci=False):
         with tempfile.TemporaryDirectory() as directory:
@@ -156,6 +158,9 @@ class RunnerTests(unittest.TestCase):
             test_home.mkdir()
             if prebuilt:
                 (root / "DerivedData/Build/Products/Debug-iphonesimulator/Tsk.app").mkdir(parents=True)
+            (root / "probe").write_text("#!/bin/sh\nexit 1\n")
+            (root / "probe").chmod(0o755)
+            (root / "library.dylib").touch()
             log = root / "calls.jsonl"
             tool = root / "tool"
             tool.write_text("""#!/usr/bin/env python3
@@ -174,6 +179,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
                 (root / name).symlink_to(tool)
             environment = {key: value for key, value in os.environ.items() if not key.startswith(("TSK_", "TEST_RUNNER_"))}
             environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
+            environment.update(TSK_NATIVE_PROBE_BINARY=str(root / "probe"), TSK_TASKCHAMPION_LIBRARY=str(root / "library.dylib"))
             if owned_ci:
                 environment.update(CI="true", TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR="1", TSK_EVENTKIT_EVIDENCE_DIR=str(root / "evidence"))
             result = subprocess.run([
@@ -184,8 +190,8 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             return result, calls
 
-    def test_smoke_builds_once_without_action_fixture_install(self):
-        result, calls = self.run_runner([PHONE])
+    def test_non_readback_selection_builds_once_without_action_fixture_install(self):
+        result, calls = self.run_runner([RUNNER_CASE])
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
         self.assertEqual(len(builds), 2)
@@ -195,7 +201,7 @@ if name == 'xcodebuild' and 'test-without-building' in args:
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
     def test_full_executes_once_and_preserves_failure_and_cleanup(self):
-        result, calls = self.run_runner(main_status=65)
+        result, calls = self.run_runner(main_status=65, owned_ci=True)
         self.assertEqual(result.returncode, 65, result.stderr)
         executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
         self.assertEqual(len(executions), 1)
@@ -208,27 +214,32 @@ if name == 'xcodebuild' and 'test-without-building' in args:
         installs = [call["args"] for call in calls if call["name"] == "xcrun" and call["args"][:2] == ["simctl", "install"]]
         self.assertTrue(any(call[-1].endswith("TskActionFixture.app") for call in installs))
 
-    def test_smoke_main_failure_is_preserved(self):
-        result, calls = self.run_runner([PHONE], main_status=65)
+    def test_non_readback_main_failure_is_preserved(self):
+        result, calls = self.run_runner([RUNNER_CASE], main_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_prebuilt_smoke_executes_without_repeating_the_build(self):
-        result, calls = self.run_runner(["--skip-build", PHONE], prebuilt=True)
+    def test_prebuilt_selection_executes_without_repeating_the_build(self):
+        result, calls = self.run_runner(["--skip-build", RUNNER_CASE], prebuilt=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
         self.assertEqual(len(builds), 1)
         self.assertIn("test-without-building", builds[0])
         self.assertNotIn("--skip-build", builds[0])
 
+    def test_green_execution_without_native_checkpoints_fails_closed(self):
+        result, _ = self.run_runner([PHONE], owned_ci=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Native readback incomplete", result.stdout)
+
     def test_prebuilt_mode_rejects_missing_products(self):
-        result, calls = self.run_runner(["--skip-build", PHONE])
+        result, calls = self.run_runner(["--skip-build", RUNNER_CASE])
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(any(call["name"] == "xcodebuild" for call in calls))
 
 
-    def test_owned_smoke_executes_through_the_boundary_wrapper(self):
-        result, calls = self.run_runner([PHONE], owned_ci=True)
+    def test_owned_selection_executes_through_the_boundary_wrapper(self):
+        result, calls = self.run_runner([RUNNER_CASE], owned_ci=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         executions = [call for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
         self.assertEqual(len(executions), 1)

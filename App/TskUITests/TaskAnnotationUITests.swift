@@ -59,18 +59,14 @@ final class TaskAnnotationUITests: XCTestCase {
         tapTaskControl(app.buttons["save-annotation"], app: app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
-        openTaskInformation(taskRow(named: "Task with supporting notes", app: app), app: app)
-        let first = app.staticTexts["annotation-text-annotation_1792144800"]
-        let second = app.staticTexts["annotation-text-annotation_1792144801"]
-        XCTAssertTrue(revealTaskElement(first, in: "task-detail-form", app: app))
-        XCTAssertEqual(first.label, "First supporting note\nAnother line revised")
-        XCTAssertTrue(revealTaskElement(second, in: "task-detail-form", app: app))
-        XCTAssertEqual(second.label, "Second independent note")
-        capture("Both annotations after durable reopen", app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app, initialScrollUp: false))
+        let saved = try storedTasks(app, checkpoint: "saved")
+        XCTAssertEqual(saved.count, 1)
+        let attributes = try XCTUnwrap(saved.values.first)
+        XCTAssertEqual(attributes["description"], "Task with supporting notes")
+        XCTAssertEqual(attributes["annotation_1792144800"], "First supporting note\nAnother line revised")
+        XCTAssertEqual(attributes["annotation_1792144801"], "Second independent note")
+        XCTAssertEqual(attributes.keys.filter { $0.hasPrefix("annotation_") }.count, 2)
+
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

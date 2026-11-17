@@ -11,6 +11,18 @@ import Glibc
 struct MutationProbe {
     static func main() async {
         let arguments = CommandLine.arguments
+        if arguments.count == 3, arguments[1] == "read-tasks" {
+            do {
+                let records = try await TaskChampionReplica(directory: URL(fileURLWithPath: arguments[2])).readExistingTasks()
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                print(String(decoding: try encoder.encode(records.sorted { $0.id.uuidString < $1.id.uuidString }), as: UTF8.self))
+            } catch {
+                FileHandle.standardError.write(Data("Native storage readback failed: \(error.localizedDescription)\n".utf8))
+                exit(EXIT_FAILURE)
+            }
+            return
+        }
         if arguments.count == 5, arguments[1] == "participant-change" {
             do {
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))

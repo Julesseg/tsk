@@ -71,17 +71,6 @@ final class SeriesMetadataUITests: XCTestCase {
         XCTAssertTrue(app.buttons["edit-series-metadata"].exists)
         XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Revised series metadata")
         capture("Series metadata saved through the shared atomic path", app)
-        app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        selectAllTasks(app)
-        for id in futureIDs {
-            let row = app.buttons["task-" + id]
-            XCTAssertTrue(row.waitForExistence(timeout: 15))
-            XCTAssertTrue(row.label.contains("Revised series metadata"))
-        }
-        openTemplate(parentID, app: app)
-        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Revised series metadata")
         XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "task-detail-form", app: app))
         app.buttons["view-series-occurrences"].tap()
         for id in futureIDs {
@@ -89,7 +78,24 @@ final class SeriesMetadataUITests: XCTestCase {
         }
         XCTAssertTrue(app.staticTexts["Completed history"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
-        capture("Reopened series retains unfinished occurrences and completed history", app)
+        capture("Series history retains unfinished occurrences and completed history", app)
+        app.terminate()
+        let saved = try storedTasks(app, checkpoint: "saved")
+        XCTAssertEqual(saved.count, records.count)
+        for id in [parentID] + futureIDs {
+            let attributes = try XCTUnwrap(saved[try XCTUnwrap(UUID(uuidString: id)).uuidString])
+            XCTAssertEqual(attributes["description"], "Revised series metadata")
+            XCTAssertEqual(attributes["project"], "Series.Work")
+            XCTAssertTrue(attributes.contains { $0.key.hasPrefix("annotation_") && $0.value == "Series metadata note" })
+        }
+        for record in records {
+            let entries = try XCTUnwrap(record["attributes"] as? [[String: String]])
+            if entries.contains(where: { $0["key"] == "status" && $0["value"] == "completed" }) {
+                let id = try XCTUnwrap(UUID(uuidString: try XCTUnwrap(record["id"] as? String)))
+                let attributes = try XCTUnwrap(saved[id.uuidString])
+                for entry in entries { XCTAssertEqual(attributes[try XCTUnwrap(entry["key"])], entry["value"], "Completed history must stay unchanged") }
+            }
+        }
     }
 
     private func openTemplate(_ id: String, app: XCUIApplication) {

@@ -57,6 +57,8 @@ async fn execute(request: Request) -> Result<Value, String> {
         return Ok(json!(true));
     }
     if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
+    let read_only = request.command == "readExistingTasks";
+    if read_only && !std::path::Path::new(&request.path).is_dir() { return Err("Existing task storage is missing".into()); }
     let synchronization = if request.command == "synchronize" { Some(SyncAccess::new(&request.path, request.sync_generation).await?) } else { None };
     let _local = if synchronization.is_none() { Some(LocalAccess::new(&request.path)?) } else { None };
     if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
@@ -88,14 +90,14 @@ async fn execute(request: Request) -> Result<Value, String> {
             _ => Err("Unsupported configuration command".into())
         };
     }
-    let storage = SqliteStorage::new(&request.path, AccessMode::ReadWrite, true).await.map_err(|e| e.to_string())?;
+    let storage = SqliteStorage::new(&request.path, if read_only { AccessMode::ReadOnly } else { AccessMode::ReadWrite }, !read_only).await.map_err(|e| e.to_string())?;
     if request.command == "updateAtomically" || request.command == "updateSnapshotAtomically" || request.command == "commitSnapshotAtomically" {
         if request.command != "updateAtomically" && request.snapshot.is_none() { return Err("Missing preview snapshot".into()); }
         return atomic::update(storage, request.updates.ok_or("Missing atomic updates")?, request.snapshot, request.creates.unwrap_or_default()).await;
     }
     let mut replica = Replica::new(storage);
     match request.command.as_str() {
-        "tasks" => {
+        "tasks" | "readExistingTasks" => {
             let tasks = replica.all_task_data().await.map_err(|e| e.to_string())?;
             Ok(json!(tasks.into_values().map(record).collect::<Vec<_>>()))
         }

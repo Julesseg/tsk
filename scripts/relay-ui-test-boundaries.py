@@ -16,6 +16,8 @@ import termios
 import threading
 import time
 
+from native_ui_readback import NativeReadback, REQUEST
+
 
 METHOD = re.compile(r"^Test Case '-\[TskUITests\.(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \(([\d.]+) seconds\)\.)$")
 POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
@@ -87,11 +89,12 @@ class DeviceMonitor:
 
 
 class BoundaryCapture:
-    def __init__(self, device, evidence):
+    def __init__(self, device, evidence, readback=None):
         self.device = device
         self.evidence = pathlib.Path(evidence)
         self.events = []
         self.first_failure = None
+        self.readback = readback
         try:
             self.evidence.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -102,6 +105,9 @@ class BoundaryCapture:
 
     def line(self, raw):
         line = raw.decode('utf-8', errors='replace').rstrip('\r')
+        request = REQUEST.fullmatch(line)
+        if request and self.readback is not None:
+            self.readback.respond(request[1])
         method = METHOD.fullmatch(line)
         if method:
             suite, name, state, outcome, seconds = method.groups()
@@ -112,10 +118,10 @@ class BoundaryCapture:
                 print('::error title=First UI failure::' + suite + '/' + name + ' failed; remaining independent cases may continue.', flush=True)
 
 
-def run(command, device, evidence, cleanup_grace=5, monitor_device=False):
+def run(command, device, evidence, cleanup_grace=5, monitor_device=False, readback=None):
     if cleanup_grace != 5:
         raise ValueError('Owned cleanup grace must remain five seconds')
-    capture = BoundaryCapture(device, evidence)
+    capture = BoundaryCapture(device, evidence, readback)
     process = None
     interrupted = None
     broken_output = False
@@ -260,6 +266,8 @@ def run(command, device, evidence, cleanup_grace=5, monitor_device=False):
             status = 141 if broken_output else 128 + interrupted
         if device_lost:
             status = 74
+        if readback is not None:
+            status = readback.finish(status)
         try:
             (pathlib.Path(evidence) / 'test-aligned-boundaries.json').write_text(json.dumps(dict(
                 device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events), indent=2) + '\n')
@@ -274,6 +282,9 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--owned-simulator', action='store_true')
     parser.add_argument('--monitor-device', action='store_true')
+    parser.add_argument('--native-probe')
+    parser.add_argument('--native-library')
+    parser.add_argument('--native-readback-plan')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
     if os.environ.get('CI') != 'true' or os.environ.get('TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR') != '1' or not arguments.owned_simulator:
@@ -281,4 +292,8 @@ if __name__ == '__main__':
     command = arguments.command[1:] if arguments.command[:1] == ['--'] else arguments.command
     if not command:
         parser.error('Pass the original xcodebuild command after --')
-    raise SystemExit(run(command, arguments.device, arguments.evidence, monitor_device=arguments.monitor_device))
+    readback = None
+    if arguments.native_readback_plan:
+        plan = json.loads(pathlib.Path(arguments.native_readback_plan).read_text())
+        readback = NativeReadback(arguments.device, arguments.native_probe, arguments.native_library, plan, pathlib.Path(arguments.evidence) / 'native-readback', os.environ['TSK_UI_NATIVE_READBACK_TOKEN'])
+    raise SystemExit(run(command, arguments.device, arguments.evidence, monitor_device=arguments.monitor_device, readback=readback))

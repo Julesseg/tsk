@@ -9,7 +9,7 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 30 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 29 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 4 methods | Explicit dispatch |
@@ -17,7 +17,7 @@ The manual form defaults to smoke.
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 55 retained methods has exactly one primary
+methods for every suite. Each of the 54 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -71,7 +71,7 @@ tests, settings, services, fixtures and entitlement, were also removed explicitl
 Task dates, ordinary task search, sync, Calendar/Reminders and seven Shortcuts remain.
 A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
 items; it requests no authorization and creates no new alerts or index records.
-Full now selects 22 workspace and eight row methods.
+Full now selects 22 workspace and seven row methods.
 These removals do not establish fixes for historical failed runs.
 
 The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
@@ -285,3 +285,24 @@ Dependency management and its dedicated navigation journey were retired by the
 user on 2026-11-17. Retained row notes, waiting dates, activity and external
 task-navigation assertions keep their existing deadlines. Imported Taskwarrior
 fields and read-only filter compatibility remain preserved.
+
+## Durable data readback
+
+Capture, bulk-date apply/cancel/failure, row editing/supporting information/organization,
+series metadata, Scheduled edits and annotation persistence use direct Native readback.
+The UI still performs the real edit, validation and save/Apply actions. After app
+termination, the runner opens that UUID-named fixture replica with TaskChampion's
+read-only, existing-storage mode and returns actual records to the XCTest assertions.
+It obtains the app's registered App Group path through simctl, preserves native
+admission locks, and never substitutes an in-app action or changes task data.
+
+Requests and responses bind the run session, nonce, replica, method and checkpoint.
+The selected methods declare required checkpoints; missing, duplicate, expired or
+failed queries cannot produce green coverage. Artifacts retain the Native responses
+and checkpoint summary. Use scripts/run-ui-tests.sh on its owned isolated simulator
+with the built host probe/library; a bare Xcode test run lacks this host readback.
+Every UI producer packages the host probe, including diagnostic-only suites;
+this does not add Native unit-test batches or a synchronization server to them.
+UI-specific presentation, validation, navigation, keyboard and system-delivery
+assertions remain. The editor-handoff bulk-selection method was explicitly retired
+by the user; bulk selection itself remains supported.

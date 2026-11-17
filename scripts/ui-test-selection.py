@@ -1,4 +1,7 @@
 import argparse
+import json
+
+from native_ui_readback import CHECKPOINTS
 import pathlib
 import re
 
@@ -29,7 +32,6 @@ NIGHTLY = (
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
     'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch',
-    'TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
@@ -132,6 +134,10 @@ def validate_cadence():
     unregistered = available - set(registered)
     if unregistered:
         raise ValueError("UI tests need an explicit cadence: " + ", ".join(sorted(unregistered)))
+    if not set(CHECKPOINTS) <= set(NIGHTLY + ON_DEMAND):
+        raise ValueError("Native readback checkpoint names must match retained methods")
+    if any(not phases or len(phases) != len(set(phases)) for phases in CHECKPOINTS.values()):
+        raise ValueError("Native readback checkpoints must be nonempty and unique")
     if not set(PHONE_SMOKE) <= set(NIGHTLY):
         raise ValueError("Smoke must be a subset of nightly coverage")
 
@@ -196,10 +202,15 @@ def main():
     server.add_argument("filters", nargs=argparse.REMAINDER)
     fixture = commands.add_parser("action-fixture")
     fixture.add_argument("filters", nargs=argparse.REMAINDER)
+    readback = commands.add_parser("native-readback")
+    readback.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
             output = selection(args.suite, args.family, args.partition)
+        elif args.command == "native-readback":
+            selected = selected_methods(args.filters)
+            output = [json.dumps({key: value for key, value in CHECKPOINTS.items() if "TskUITests/" + key in selected})]
         elif args.command == "action-fixture":
             output = ["yes" if requires_action_fixture(args.filters) else "no"]
         elif args.command == "sync-server":

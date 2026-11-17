@@ -199,7 +199,6 @@ jobs:
       - name: Build native runtime and selected synchronization tools
         env:
           NEED_SERVER: ${{ needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
-          NEED_PEER: ${{ needs.changes.outputs.peer == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
         run: |
           scripts/build-native.sh simulator
           scripts/build-native.sh host
@@ -209,10 +208,8 @@ jobs:
             cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
             cp .build/sync-server/target/release/taskchampion-sync-server .build/ui-tools/
           fi
-          if [[ "$NEED_PEER" == true ]]; then
-            swift build --package-path Native --product tsk-native-probe
-            cp "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" .build/ui-tools/
-          fi
+          swift build --package-path Native --product tsk-native-probe
+          cp "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" .build/ui-tools/
       - name: Run Apple-framework Native tests
         if: env.RUN_NATIVE_TESTS == 'true'
         timeout-minutes: 10

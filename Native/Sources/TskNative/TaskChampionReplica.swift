@@ -19,6 +19,10 @@ public actor TaskChampionReplica: TaskSynchronizingReplica, TaskMutationCoordina
         try request(command: "tasks")
     }
 
+    public func readExistingTasks() async throws -> [TaskRecord] {
+        try request(command: "readExistingTasks")
+    }
+
     public func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord {
         try request(command: "create", id: id, attributes: attributes)
     }
