@@ -3,8 +3,6 @@ import XCTest
 
 @MainActor final class TaskPresentationUITests: XCTestCase {
     private let ordinaryID = "A0000000-0000-0000-0000-000000000001"
-    private let blockerID = "A0000000-0000-0000-0000-000000000002"
-    private let secondBlockerID = "A0000000-0000-0000-0000-000000000003"
     private let title = "Prepare the release with the product team and review every outstanding accessibility finding"
 
     override func setUpWithError() throws {
@@ -33,7 +31,7 @@ import XCTest
             XCTAssertTrue(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
             XCTAssertFalse(app.buttons["notification-attention"].exists)
-            for hidden in ["Active", "Waiting", "Blocked by", "Generated occurrence"] {
+            for hidden in ["Active", "Waiting", "Generated occurrence"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }
             let circle = app.buttons["complete-task-row-" + ordinaryID]
@@ -41,11 +39,6 @@ import XCTest
             XCTAssertLessThanOrEqual(circle.frame.minX - list.frame.minX, 12)
             capture("Today " + mode, app)
             openTaskInformation(row, app: app)
-            let reason = app.collectionViews["task-detail-form"].staticTexts["task-blocked-reason-" + ordinaryID]
-            XCTAssertTrue(revealTaskElement(reason, in: "task-detail-form", app: app))
-            XCTAssertTrue(reason.label.contains("First prerequisite with a long explanation"))
-            XCTAssertTrue(reason.label.contains("Second prerequisite with another long explanation"))
-            capture("Full blocker reasons " + mode, app)
             app.terminate()
             app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
             app.launch()
@@ -124,9 +117,7 @@ import XCTest
                 ["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }]
             }
             records = [
-                record(ordinaryID, ["description": title, "status": "pending", "project": "Release", "scheduled": "1792231200", "due": "1792238400", "wait": "1792324800", "start": "1792141200", "dep_" + blockerID.lowercased(): "x", "dep_" + secondBlockerID.lowercased(): "x", "depends": blockerID.lowercased() + "," + secondBlockerID.lowercased(), "opaque": "preserve unrelated data"]),
-                record(blockerID, ["description": "First prerequisite with a long explanation", "status": "pending", "scheduled": "1792108800"]),
-                record(secondBlockerID, ["description": "Second prerequisite with another long explanation", "status": "pending", "scheduled": "1792108800"])
+                record(ordinaryID, ["description": title, "status": "pending", "project": "Release", "scheduled": "1792231200", "due": "1792238400", "wait": "1792324800", "start": "1792141200", "opaque": "preserve unrelated data"])
             ]
         }
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)

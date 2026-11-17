@@ -30,7 +30,8 @@ private final class TemporalFilterClock: @unchecked Sendable {
 
 @Test func virtualAvailabilityAndDatePredicatesPublishClockReevaluationBoundaries() async throws {
     let clock = TemporalFilterClock(Date(timeIntervalSince1970: 1000))
-    let manager = TaskManager(replica: TestReplica(), now: { clock.date })
+    let replica = TestReplica()
+    let manager = TaskManager(replica: replica, now: { clock.date })
     let waiting = try await manager.create(TaskDraft(description: "Waiting", attributes: ["wait": "1001", "scheduled": "1000"]))
     #expect(try await manager.tasks(filter: "+WAITING").map(\.id) == [waiting.id])
     #expect(try await manager.tasks(filter: "+READY").isEmpty)
@@ -40,7 +41,7 @@ private final class TemporalFilterClock: @unchecked Sendable {
     #expect(try await manager.tasks(filter: "+WAITING").isEmpty)
     #expect(try await manager.tasks(filter: "+READY").map(\.id) == [waiting.id])
     let prerequisite = try await manager.create(TaskDraft(description: "Prerequisite"))
-    _ = try await manager.addDependency(id: waiting.id, prerequisiteID: prerequisite.id)
+    _ = try await replica.update(id: waiting.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
     #expect(try await manager.tasks(filter: "+BLOCKED").map(\.id) == [waiting.id])
     #expect(try await manager.tasks(filter: "+BLOCKING").map(\.id) == [prerequisite.id])
     _ = try await manager.complete(id: prerequisite.id)

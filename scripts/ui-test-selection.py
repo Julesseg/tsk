@@ -37,7 +37,6 @@ NIGHTLY = (
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
     'TaskNotificationUITests/testActualClosedAppDeliveryAndLocalMutationReconciliation',
     'TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope',
-    'TaskRowEditingUITests/testDependencyLinksSaveSourceAndExpandTargetWithReturnRoute',
     'TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
     'TaskRowEditingUITests/testSupportingInformationEditsKeepTheExpandedDraftAndPersist',

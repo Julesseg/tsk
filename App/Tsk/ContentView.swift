@@ -68,9 +68,7 @@ struct ContentView: View {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
         }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }, reveal: { task in
-            closeRow { linkedTaskIDs.insert(task.id); showInformation(task) }
-        }))
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {

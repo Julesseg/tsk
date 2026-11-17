@@ -2,16 +2,11 @@ import SwiftUI
 import TskCore
 
 struct TaskLinkedTaskList: View {
-    private struct Destination {
-        let task: TaskRecord
-        let isLink: Bool
-    }
-
     let taskID: UUID
     private let source: TaskStore
     @State private var store: TaskStore
     @State private var calendar: TodayCalendarController
-    @State private var destination: Destination?
+    @State private var destination: TaskRecord?
     @State private var taskActionDraftID = UUID()
     @Environment(TaskURLController.self) private var automation
     @Environment(\.dismiss) private var dismiss
@@ -26,7 +21,7 @@ struct TaskLinkedTaskList: View {
 
     var body: some View {
         TaskListView(store: store, calendar: calendar, edit: { task in
-            finish { destination = Destination(task: task, isLink: false) }
+            finish { destination = task }
         })
         .navigationTitle("Linked task")
         .navigationBarBackButtonHidden(true)
@@ -38,8 +33,7 @@ struct TaskLinkedTaskList: View {
         }
         .environment(\.taskRowActions, TaskRowActions(
             close: { finish() },
-            information: { task in finish { destination = Destination(task: task, isLink: false) } },
-            reveal: { task in finish { destination = Destination(task: task, isLink: true) } }
+            information: { task in finish { destination = task } }
         ))
         .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
             guard let editing = store.rowEditing, editing.isExpanded,
@@ -61,18 +55,14 @@ struct TaskLinkedTaskList: View {
             set: { if !$0 { destination = nil } }
         )) {
             if let destination {
-                if destination.isLink, destination.task.canEdit {
-                    TaskLinkedTaskList(source: store, taskID: destination.task.id)
-                } else {
-                    TaskDetailView(store: store, task: destination.task)
-                }
+                TaskDetailView(store: store, task: destination)
             }
         }
         .task {
             await store.reload()
             if let task = store.allTasks.first(where: { $0.id == taskID }) {
                 if task.canEdit { store.expandRow(task) }
-                else { destination = Destination(task: task, isLink: false) }
+                else { destination = task }
             }
             await store.observeParticipantChanges(reconcileWorkspace: false)
         }

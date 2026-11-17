@@ -29,7 +29,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 7. As a task owner, I want to add and edit annotations, so that supporting notes remain attached to the task.
 8. As a task owner, I want to set a Scheduled date and time independently of a Deadline, so that planning work does not change when it must be finished.
 9. As a task owner, I want to set and change a waiting date, so that I can distinguish work that is not yet available.
-10. As a task owner, I want to manage dependencies between tasks, so that I can see what blocks work and what becomes available after completion.
+10. Dependency management was removed from scope on 2026-11-17. Imported fields remain preserved and readable by Taskwarrior filters.
 11. As a task owner, I want to start and stop work on a task, so that active work is represented consistently with Taskwarrior.
 12. As a task owner, I want to complete tasks from the task list, so that routine actions do not require opening every task.
 13. As a Taskwarrior user, I want unfamiliar task attributes preserved during ordinary edits without a custom-field editor.
@@ -41,7 +41,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 16. As a task owner, I want to see all tasks scheduled for today in Today, including times later today, so that I can review the whole day's intended work.
 17. As a task owner, I want to keep unfinished tasks scheduled for earlier days in Today until completion or rescheduling, so that unfinished commitments do not disappear overnight.
 18. As a task owner, I want to see tasks due today and overdue in Today, so that I can recognize approaching or missed deadlines.
-19. As a task owner, I want to see matching waiting or blocked tasks with their reason in Today, so that I can understand why a scheduled or due task is not actionable.
+19. As a task owner, I want to see matching waiting tasks with their reason in Today, so that I can understand why a scheduled or due task is not actionable.
 20. As a task owner, I want to see future scheduled work grouped by day and ordered by time in Upcoming, so that I can review the days ahead.
 21. As a task owner, I want to see future deadlines distinguished from Scheduled dates and times in Upcoming, so that I can plan work without confusing it with its deadline.
 22. As a task owner, I want to see a task at both its future Scheduled date and its different Deadline, so that both commitments are visible.
@@ -153,7 +153,7 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 ### Dates, task views, and filters
 
 - Scheduled uses Taskwarrior's `scheduled` attribute and supports date and time throughout editors and displays; Deadline uses `due`. Preserve existing timestamps, including midnight, without inferring replacement times. Starting work and Waiting until remain separate. See [ADR 0006](adr/0006-scheduled-includes-time.md) and [implementation ticket #64](https://github.com/Julesseg/tsk/issues/64).
-- Today contains unfinished tasks scheduled for today or an earlier day, including times later today, and tasks due today or overdue. An unfinished scheduled task remains until completed or rescheduled. Matching waiting or blocked tasks remain visible with their reason. Calendar events appear in Today only.
+- Today contains unfinished tasks scheduled for today or an earlier day, including times later today, and tasks due today or overdue. An unfinished scheduled task remains until completed or rescheduled. Matching waiting tasks remain visible with their reason. Calendar events appear in Today only.
 - Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by actual timestamps, and labels their roles. A task can appear on two dates when its Scheduled and Deadline dates differ.
 - Provide project views and actions directly from lists. Templates and ordinary occurrences remain distinct domain concepts.
 - Custom views accept Taskwarrior filter expressions entered in tsk. Use documented Taskwarrior defaults for built-in fields. Do not import desktop reports, contexts, or configuration.

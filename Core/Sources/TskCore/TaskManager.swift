@@ -54,9 +54,6 @@ public protocol TaskReplica: Sendable {
 public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
     case invalidTag(String)
     case invalidPriority(String)
-    case dependencySelfReference
-    case dependencyCycle
-    case dependencyReferenceNotFound(String)
     case emptyAnnotation
     case invalidAnnotationTimestamp
     case annotationNotFound(String)
@@ -71,9 +68,6 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .invalidTag(let tag): "The tag ‘\(tag)’ is invalid. Use a name without whitespace or a colon after its first character. Do not start with a digit or operator. Names made only of A–Z letters are reserved."
         case .invalidPriority(let priority): "Priority ‘\(priority)’ is unsupported. Choose H, M, L, or no priority."
-        case .dependencySelfReference: "A task cannot depend on itself."
-        case .dependencyCycle: "This dependency would create a cycle. Choose a different prerequisite."
-        case .dependencyReferenceNotFound(let reference): "The dependency ‘\(reference)’ is no longer linked to this task."
         case .emptyAnnotation: "Enter annotation text before saving."
         case .invalidAnnotationTimestamp: "A valid timestamp could not be assigned to this annotation."
         case .annotationNotFound: "This annotation is no longer available. Reopen the task and try again."
@@ -136,7 +130,7 @@ public actor TaskManager {
     public func availability(id: UUID) async throws -> TaskAvailability {
         let records = try await tasks()
         guard let record = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
-        return record.availability(at: now(), tasks: records)
+        return record.availability(at: now())
     }
 
     public func upcomingDays() async throws -> [UpcomingDay] {

@@ -108,7 +108,7 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
         let actual = Set(try await manager.tasks(filter: expression, schema: TypedFilterFixture.schema).map { $0.id.uuidString.lowercased() })
         #expect(actual == expected, "\(expression)")
     }
-    let saved = try await manager.addDependency(id: child.id, prerequisiteID: prerequisite.id)
+    let saved = try await replica.update(id: child.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
     _ = try await manager.complete(id: prerequisite.id)
     #expect(try await manager.tasks(filter: "+BLOCKED").allSatisfy { $0.id != saved.id })
     #expect(try await manager.tasks(filter: "+READY").contains { $0.id == saved.id })
@@ -123,7 +123,8 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
     let manager = TaskChampionSession.makeManager(directory: directory, now: { now }, calendar: calendar)
     let prerequisite = try await manager.create(TaskDraft(description: "Prerequisite"))
     let task = try await manager.create(TaskDraft(description: "Native deadline", attributes: ["due": String(Int(now.timeIntervalSince1970)), "foreign": "keep", "custom_e\u{301}": "decomposed", "custom_é": "composed"]))
-    _ = try await manager.addDependency(id: task.id, prerequisiteID: prerequisite.id)
+    let replica = TaskChampionReplica(directory: directory)
+    _ = try await replica.update(id: task.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
     let saved = try await manager.saveView(name: "Ready deadlines", expression: "due:today and +READY")
     let reopened = TaskChampionSession.makeManager(directory: directory, now: { now }, calendar: calendar)
     #expect(try await reopened.savedViews() == [saved])

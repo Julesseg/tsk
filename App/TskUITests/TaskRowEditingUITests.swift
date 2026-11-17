@@ -53,9 +53,6 @@ import XCTest
         XCTAssertTrue(revealTaskElement(savedNote, in: editor, app: app))
         XCTAssertEqual(savedNote.value as? String, "New supporting note")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
-        openTaskRowParameter("dependencies", app: app)
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-task-")).count, 1)
-        app.buttons["close-dependencies"].tap()
         capture("Supporting mutations and row title survive durable reopen", app)
     }
 
@@ -72,69 +69,8 @@ import XCTest
         app.buttons["task-A0000000-0000-0000-0000-000000000002"].tap()
         XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["row-note-input"].firstMatch.exists)
-        openTaskRowParameter("dependencies", app: app)
-        let candidates = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "dependency-candidate-"))
-        XCTAssertTrue(candidates.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(revealTaskElement(app.buttons["dependency-candidate-A0000000-0000-0000-0000-000000000003"], in: "dependency-selection-list", app: app))
-        XCTAssertTrue(candidates.allElementsBoundByIndex.last!.label.contains("Completed dependency"))
-        app.buttons["close-dependencies"].tap()
         XCTAssertFalse(app.staticTexts["No annotations"].exists)
-        XCTAssertFalse(app.staticTexts["No prerequisites"].exists)
         capture("Empty supporting sections reduce to reachable actions", app)
-    }
-
-    func testDependencyLinksSaveSourceAndExpandTargetWithReturnRoute() throws {
-        let app = try launch(supporting: true)
-        let title = expandTask(app)
-        let link = app.buttons["dependency-task-A0000000-0000-0000-0000-000000000002"]
-        replaceTaskText(title, with: " ", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        openTaskRowParameter("dependencies", app: app)
-        XCTAssertTrue(link.waitForExistence(timeout: 5))
-        link.tap()
-        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["back-from-linked-task"].exists)
-        replaceTaskText(title, with: "Source saved before following prerequisite", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        openTaskRowParameter("dependencies", app: app)
-        XCTAssertTrue(link.waitForExistence(timeout: 5))
-        link.tap()
-        let back = app.buttons["back-from-linked-task"]
-        XCTAssertTrue(back.waitForExistence(timeout: 10))
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        XCTAssertEqual(title.value as? String, "Review accessibility findings")
-        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "task-row-editor").count, 1)
-        capture("Dependency opens its containing list with the prerequisite expanded", app)
-        replaceTaskText(title, with: " ", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        back.tap()
-        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 5))
-        XCTAssertTrue(back.exists)
-        replaceTaskText(title, with: "Changed prerequisite", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        back.tap()
-        XCTAssertTrue(back.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(taskRow(named: "Source saved before following prerequisite", app: app).waitForExistence(timeout: 10))
-        app.buttons["task-" + taskID].tap()
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
-        openTaskRowParameter("dependencies", app: app)
-        XCTAssertTrue(link.waitForExistence(timeout: 5))
-        XCTAssertTrue(link.label.contains("Changed prerequisite"))
-        let candidate = app.buttons["dependency-candidate-A0000000-0000-0000-0000-000000000004"]
-        XCTAssertTrue(candidate.exists)
-        XCTAssertLessThan(link.frame.minY, candidate.frame.minY)
-        candidate.tap()
-        let added = app.buttons["dependency-task-A0000000-0000-0000-0000-000000000004"]
-        XCTAssertTrue(added.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["close-dependencies"].exists)
-        let remove = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "remove-dependency-")).firstMatch
-        XCTAssertTrue(remove.exists)
-        remove.tap()
-        XCTAssertTrue(link.waitForNonExistence(timeout: 10))
-        app.buttons["close-dependencies"].tap()
-        XCTAssertEqual(app.buttons["row-dependencies"].value as? String, "1 dependencies")
-        XCTAssertEqual(title.value as? String, "Source saved before following prerequisite")
-        capture("Return route and dependency removal preserve the source task", app)
     }
 
     func testMiddleRowOpensSpaceAroundItsFixedHeader() throws {
@@ -789,16 +725,10 @@ import XCTest
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])
             attributes += [
                 ["key": "annotation_1792144800", "value": "Review the accessibility findings\nKeep the release checklist nearby"],
-                ["key": "dep_a0000000-0000-0000-0000-000000000002", "value": "x"],
-                ["key": "depends", "value": "a0000000-0000-0000-0000-000000000002"],
                 ["key": "note", "value": "Focused work"],
                 ["key": "start", "value": "1792141200"]
             ]
             records[0]["attributes"] = attributes
-            records += [
-                ["id": "A0000000-0000-0000-0000-000000000003", "attributes": [["key": "description", "value": "Completed dependency"], ["key": "status", "value": "completed"]]],
-                ["id": "A0000000-0000-0000-0000-000000000004", "attributes": [["key": "description", "value": "Available prerequisite"], ["key": "status", "value": "pending"]]]
-            ]
         }
         if longTitle {
             var attributes = try XCTUnwrap(records[0]["attributes"] as? [[String: String]])

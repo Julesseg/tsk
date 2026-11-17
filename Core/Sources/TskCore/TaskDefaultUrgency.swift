@@ -7,7 +7,7 @@ enum TaskDefaultUrgency {
         value += task.attributes["start"] != nil ? 4 : 0
         value += task.attributes["scheduled"] != nil && epoch(task.attributes["scheduled"]) < context.now.timeIntervalSince1970 ? 5 : 0
         value += FilterVirtualTag.isWaiting(task, at: context.now) ? -3 : 0
-        value += task.availability(at: context.now, tasks: context.tasks).isBlocked ? -5 : 0
+        value += FilterVirtualTag.isBlocked(task, context: context) ? -5 : 0
         value += countFactor(task.attributes.keys.filter { $0.utf8.starts(with: "annotation_".utf8) }.count)
         value += countFactor(task.attributes.keys.filter { $0.utf8.starts(with: "tag_".utf8) }.count)
         if let due = task.attributes["due"] {
@@ -20,7 +20,7 @@ enum TaskDefaultUrgency {
         }
         let terminal = task.status == "completed" || task.status == "deleted"
         let blocking = !terminal && context.tasks.contains { source in
-            source.status != "completed" && source.status != "deleted" && source.dependencyReferences.contains(task.id.uuidString.lowercased())
+            source.status != "completed" && source.status != "deleted" && FilterVirtualTag.references(source).contains(task.id.uuidString.lowercased())
         }
         value += blocking ? 8 : 0
         if let entry = task.attributes["entry"] {

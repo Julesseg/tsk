@@ -108,7 +108,7 @@ Accepted layout: editable title first, then dedicated custom parameter
 components arranged horizontally. Each component displays a task parameter and
 opens its editing control when tapped: for example, a date picker or tags
 selector. Use these components for project, tags, priority and scheduling;
-annotations and dependencies remain available below.
+annotations remain available below.
 Start/Stop is secondary. Remove duplicated values and use one actionable error
 presentation. Completed tasks and recurring templates retain action restrictions.
 iPad and accessibility routes follow the in-list editing direction too.
@@ -120,7 +120,7 @@ it does not activate the dimmed row underneath.
 
 Keep the edited row anchored until editing finishes. Collapse first, then apply
 normal filtering/grouping so changes do not move the row while it is being
-edited. Existing links from Spotlight/dependencies reveal a list containing the
+edited. Existing links from Spotlight and external task URLs reveal a list containing the
 task and expand its row, with a route back to the previous list.
 
 Existing tasks expand without raising the keyboard; capture immediately focuses
@@ -183,7 +183,7 @@ many events, empty tasks, largest text and both device families.
 ### 5. Edit multiple tasks
 
 Accepted action set: planned day, deadline, project, tags, priority and completing
-selected tasks. Descriptions, dependencies and recurring-series changes remain
+selected tasks. Descriptions and recurring-series changes remain
 individual operations.
 
 Accepted selection gesture:
@@ -306,7 +306,7 @@ and recurrence-help cleanup are deferred proposals, not part of the agreed focus
 
 ## Constraints carried forward
 
-Planned day and deadline remain distinct (ADR-0003). Waiting or blocked tasks
+Planned day and deadline remain distinct (ADR-0003). Waiting tasks
 matching Today remain visible with a reason. Calendar remains display-only.
 Recurring template and occurrence actions remain distinct, with external
 generation (ADR-0002). Reminders copy/move behavior remains as recorded in

@@ -20,7 +20,7 @@ Provide predefined views inspired by Things 3, including Today, Upcoming, and vi
 
 Keep Scheduled separate from Deadline and Waiting until. Scheduled is the intended work date and time and uses Taskwarrior's `scheduled` attribute; Deadline uses `due`. Preserve existing Scheduled timestamps, including midnight, and support time selection and display throughout the app. See [the Scheduled decision](adr/0006-scheduled-includes-time.md), with implementation tracked in [#64](https://github.com/Julesseg/tsk/issues/64).
 
-Today includes unfinished tasks scheduled for any time today, unfinished tasks scheduled for earlier days, and tasks due today or overdue. A task scheduled for later today is already visible; unfinished scheduled tasks remain until completed or rescheduled. Waiting or blocked tasks that meet these criteria remain visible with their reason.
+Today includes unfinished tasks scheduled for any time today, unfinished tasks scheduled for earlier days, and tasks due today or overdue. A task scheduled for later today is already visible; unfinished scheduled tasks remain until completed or rescheduled. Waiting tasks that meet these criteria remain visible with their reason.
 
 Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by their actual timestamps, and clearly distinguishes Scheduled from Deadline. A task with different Scheduled and Deadline dates may appear on both dates.
 
@@ -28,7 +28,7 @@ Custom views accept Taskwarrior filter expressions entered in tsk. Use documente
 
 ## Task editing
 
-Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, and dependencies, plus starting and stopping work. Preserve unfamiliar task fields without exposing a custom-attribute editor.
+Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, plus starting and stopping work. Preserve unfamiliar task fields without exposing a custom-attribute editor.
 
 ## Offline use and synchronization
 

@@ -13,19 +13,31 @@ enum FilterVirtualTag: String, CaseIterable, Sendable {
         task.status == "pending" && (FilterDateExpression.storedDate(task.attributes["wait"]) ?? .distantPast) > now
     }
 
+    static func references(_ task: TaskRecord) -> Set<String> {
+        Set(task.attributes.keys.filter { $0.utf8.starts(with: "dep_".utf8) }.map { String($0.dropFirst(4)) })
+    }
+
+    static func isBlocked(_ task: TaskRecord, context: TaskFilterContext) -> Bool {
+        guard task.status != "completed", task.status != "deleted" else { return false }
+        let references = references(task)
+        return context.tasks.contains {
+            $0.status != "completed" && $0.status != "deleted" && references.contains($0.id.uuidString.lowercased())
+        }
+    }
+
     func includes(_ task: TaskRecord, context: TaskFilterContext) throws -> Bool {
-        let availability = task.availability(at: context.now, tasks: context.tasks)
+        let blocked = Self.isBlocked(task, context: context)
         let waiting = Self.isWaiting(task, at: context.now)
         let terminal = task.status == "completed" || task.status == "deleted"
         switch self {
-        case .blocked: return availability.isBlocked
-        case .unblocked: return !availability.isBlocked
+        case .blocked: return blocked
+        case .unblocked: return !blocked
         case .blocking:
             return !terminal && context.tasks.contains { source in
-                source.status != "completed" && source.status != "deleted" && source.dependencyReferences.contains(task.id.uuidString.lowercased())
+                source.status != "completed" && source.status != "deleted" && Self.references(source).contains(task.id.uuidString.lowercased())
             }
         case .ready:
-            return task.status == "pending" && !waiting && !availability.isBlocked &&
+            return task.status == "pending" && !waiting && !blocked &&
                 (task.attributes["scheduled"] == nil || (FilterDateExpression.storedDate(task.attributes["scheduled"]) ?? Date(timeIntervalSince1970: 0)) < context.now)
         case .active: return task.isActive
         case .scheduled: return task.attributes["scheduled"] != nil

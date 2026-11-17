@@ -73,15 +73,7 @@ struct MutationProbe {
             do { try await verifyUISynchronization(); return }
             catch { print("Real UI synchronization verification failed: \(error)"); exit(EXIT_FAILURE) }
         }
-        guard arguments.count == 8 else { fatalError("Expected replica, source, prerequisite, ready, release, output, coordination") }
-        do {
-            let replica = BarrierReplica(directory: URL(fileURLWithPath: arguments[1]), ready: URL(fileURLWithPath: arguments[4]), release: URL(fileURLWithPath: arguments[5]), coordinated: arguments[7] == "coordinated")
-            let manager = TaskManager(replica: replica)
-            let record = try await manager.addDependency(id: UUID(uuidString: arguments[2])!, prerequisiteID: UUID(uuidString: arguments[3])!)
-            try write(["saved": record.id.uuidString], to: arguments[6])
-        } catch {
-            try? write(["error": error.localizedDescription], to: arguments[6])
-        }
+        fatalError("Unknown native probe command")
     }
 
     #if canImport(CoreSpotlight)
@@ -120,43 +112,6 @@ struct MutationProbe {
     static func write(_ value: [String: String], to path: String) throws {
         try JSONSerialization.data(withJSONObject: value).write(to: URL(fileURLWithPath: path), options: .atomic)
     }
-}
-
-private actor BarrierReplica: TaskMutationCoordinatingReplica {
-    let native: TaskChampionReplica
-    let ready: URL
-    let release: URL
-    let coordinated: Bool
-    var didRead = false
-
-    init(directory: URL, ready: URL, release: URL, coordinated: Bool) {
-        native = TaskChampionReplica(directory: directory)
-        self.ready = ready
-        self.release = release
-        self.coordinated = coordinated
-    }
-
-    func acquireMutationLease() async throws -> any TaskMutationLease {
-        if coordinated { return try await native.acquireMutationLease() }
-        return UncoordinatedLease()
-    }
-
-    func tasks() async throws -> [TaskRecord] {
-        let records = try await native.tasks()
-        if !didRead {
-            didRead = true
-            try Data().write(to: ready)
-            while !FileManager.default.fileExists(atPath: release.path) { try await Task.sleep(nanoseconds: 10_000_000) }
-        }
-        return records
-    }
-
-    func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord { try await native.create(id: id, attributes: attributes) }
-    func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord { try await native.update(id: id, changes: changes) }
-}
-
-private struct UncoordinatedLease: TaskMutationLease {
-    func release() {}
 }
 
 private actor SavedViewBarrierStore: TaskViewDefinitionsStore {

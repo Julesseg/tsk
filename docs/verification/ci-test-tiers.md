@@ -9,7 +9,7 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 34 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 33 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 4 methods | Explicit dispatch |
@@ -17,7 +17,7 @@ The manual form defaults to smoke.
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 61 retained methods has exactly one primary
+methods for every suite. Each of the 60 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -28,7 +28,7 @@ pickers/outside-save/durable completion.
 Smoke needs no synchronization server or independent peer.
 
 Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
-handoff; row notes, tag validation and dependency navigation; saved views/native
+handoff; row notes and tag validation; saved views/native
 reordering; occurrence success/failure; series metadata preview/cancel/save; manual sync; real EventKit Reminders; destructive move
 source-change/interruption safety; installed Spotlight; actual
 closed-app and received-sync notification delivery; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
@@ -145,7 +145,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 25 methods | 9 methods |
+| iPhone | 25 methods | 8 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 Installed system integrations and server/peer consumers remain in workspace.
@@ -277,3 +277,8 @@ python3 scripts/plan-ui-tests.py full
 python3 scripts/ui-test-selection.py select full iPhone --partition row-editing
 python3 scripts/test-ui-test-selection.py
 ```
+
+Dependency management and its dedicated navigation journey were retired by the
+user on 2026-11-17. Retained row notes, waiting dates, activity and external
+task-navigation assertions keep their existing deadlines. Imported Taskwarrior
+fields and read-only filter compatibility remain preserved.

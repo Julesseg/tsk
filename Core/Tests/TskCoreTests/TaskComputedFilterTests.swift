@@ -11,7 +11,7 @@ import TskCore
     #expect(try await manager.tasks(filter: "urgency.above:3.9").map(\.id) == [medium.id])
     let prerequisite = try await manager.create(TaskDraft(description: "Outside selected project", attributes: ["project": "Other"]))
     let dependent = try await manager.create(TaskDraft(description: "Blocked", attributes: ["project": "Work"]))
-    _ = try await manager.addDependency(id: dependent.id, prerequisiteID: prerequisite.id)
+    _ = try await replica.update(id: dependent.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
     #expect(try await manager.tasks(filter: "project:Work and urgency.below:0").map(\.id) == [dependent.id])
     _ = try await manager.complete(id: prerequisite.id)
     #expect(try await manager.tasks(filter: "project:Work and urgency.below:0").isEmpty)

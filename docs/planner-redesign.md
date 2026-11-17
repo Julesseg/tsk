@@ -18,7 +18,7 @@ Each unfinished task has at most one actionable planner placement:
 
 Deadline remains independent, appears in task detail, and can trigger its own notification. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
 
-Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting or blocked tasks that qualify remain visible with their reason.
+Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting tasks that qualify remain visible with their reason.
 
 Scheduled supports a date without a time and a date with an explicit time, including 00:00. These are distinct intentions. For legacy or external timestamps without precision metadata, interpret midnight as untimed and other clock times as timed; preserve the underlying timestamp. Supporting explicit midnight prospectively requires additional task metadata alongside the existing Taskwarrior date field. See [ADR 0008](adr/0008-preserve-planner-date-intent.md).
 
