@@ -7,7 +7,7 @@ final class TaskScheduledUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     override func tearDownWithError() throws { XCUIApplication().terminate() }
 
-    func testNonMidnightScheduledEditsKeepOtherDatesAndPersist() throws {
+    func testNonMidnightScheduledEditsKeepOtherDatesAndPersist() async throws {
         let app = try launch()
         app.tabBars.buttons["Today"].tap()
         let todayRow = app.buttons["task-" + taskID]
@@ -52,7 +52,7 @@ final class TaskScheduledUITests: XCTestCase {
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "saved")
+        let saved = try await storedTasks(app, checkpoint: "saved")
         let attributes = try XCTUnwrap(saved[taskID])
         var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: 1792170900))
         components.day = 17

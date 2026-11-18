@@ -1,8 +1,9 @@
+import Darwin
 import XCTest
 
 @MainActor
 extension XCTestCase {
-    func storedTasks(_ app: XCUIApplication, checkpoint: String, function: String = #function) throws -> [String: [String: String]] {
+    func storedTasks(_ app: XCUIApplication, checkpoint: String, function: String = #function) async throws -> [String: [String: String]] {
         XCTAssertEqual(app.state, .notRunning, "Close the app before independent durable readback")
         let session = try XCTUnwrap(ProcessInfo.processInfo.environment["TSK_UI_NATIVE_READBACK_TOKEN"], "Use scripts/run-ui-tests.sh for Native readback")
         let replica = try XCTUnwrap(app.launchEnvironment["TSK_TEST_REPLICA_NAME"])
@@ -10,13 +11,12 @@ extension XCTestCase {
         let method = String(describing: type(of: self)) + "/" + function.replacingOccurrences(of: "()", with: "")
         let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("TskNativeReadback")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let request: [String: Any] = ["schema": 1, "nonce": nonce, "session": session, "replica": replica, "method": method, "checkpoint": checkpoint, "expiresAt": Date().timeIntervalSince1970 + 10]
+        let request: [String: Any] = ["schema": 1, "nonce": nonce, "session": session, "replica": replica, "method": method, "checkpoint": checkpoint]
         try JSONSerialization.data(withJSONObject: request).write(to: folder.appendingPathComponent(nonce + ".request.json"), options: .atomic)
         print("TSK_NATIVE_READBACK_REQUEST " + nonce)
         fflush(nil)
         let response = folder.appendingPathComponent(nonce + ".response.json")
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in FileManager.default.fileExists(atPath: response.path) }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed, "Native readback response missing")
+        try await StoredTaskResponse(response).wait()
         let value = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: response)) as? [String: Any])
         XCTAssertNil(value["error"], String(describing: value["error"]))
         XCTAssertEqual(value["nonce"] as? String, nonce)
@@ -35,5 +35,38 @@ extension XCTestCase {
             result[id.uuidString] = attributes
         }
         return result
+    }
+}
+
+@MainActor
+private final class StoredTaskResponse {
+    private let response: URL
+    private var source: DispatchSourceFileSystemObject?
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(_ response: URL) { self.response = response }
+
+    func wait() async throws {
+        let descriptor = open(response.deletingLastPathComponent().path, O_EVTONLY)
+        guard descriptor >= 0 else { throw CocoaError(.fileReadUnknown) }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: .main)
+        self.source = source
+        source.setCancelHandler { close(descriptor) }
+        source.setEventHandler { [weak self] in
+            Task { @MainActor in self?.received() }
+        }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            source.resume()
+            received()
+        }
+    }
+
+    private func received() {
+        guard FileManager.default.fileExists(atPath: response.path), let continuation else { return }
+        self.continuation = nil
+        source?.cancel()
+        source = nil
+        continuation.resume()
     }
 }

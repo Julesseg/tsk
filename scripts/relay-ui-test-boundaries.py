@@ -225,6 +225,7 @@ def run(command, device, evidence, cleanup_grace=5, monitor_device=False, readba
                     chunk = os.read(key.fileobj.fileno(), 65536)
                     if not chunk:
                         selector.unregister(key.fileobj)
+                        key.fileobj.close()
                         break
                     consume(chunk)
             if pending and not discarding:
@@ -246,7 +247,7 @@ def run(command, device, evidence, cleanup_grace=5, monitor_device=False, readba
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
         capture.record('xcodebuild-end', returnCode=code, status=status)
-    except OSError as error:
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
         capture.record('relay-error', error=str(error))
         if process is not None and process.poll() is not None:
             status = process.returncode if process.returncode >= 0 else 128 - process.returncode

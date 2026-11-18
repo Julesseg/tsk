@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import time
+import threading
+import signal
 import uuid
 
 
@@ -33,26 +34,47 @@ class NativeReadback:
         self.token = token
         self.errors = []
         self.containers = {}
-        self.deadline = float("inf")
+        self.worker = None
+        self.processes = set()
+        self.lock = threading.Lock()
+        self.closing = False
 
     def container(self, bundle, kind):
         key = (bundle, kind)
         if key in self.containers:
             return self.containers[key]
-        remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError('Native readback service deadline expired')
-        value = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', self.device, bundle, kind], text=True, timeout=min(2, remaining)).strip()
+        value = self.command(['xcrun', 'simctl', 'get_app_container', self.device, bundle, kind])
         path = Path(value)
         if not path.is_absolute() or not path.is_dir():
             raise ValueError('Platform container is missing')
         self.containers[key] = path
         return path
 
+    def command(self, arguments, environment=None):
+        with self.lock:
+            if self.closing:
+                raise RuntimeError('Native readback service is closing')
+            process = subprocess.Popen(arguments, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+            self.processes.add(process)
+        try:
+            stdout, stderr = process.communicate()
+            if process.returncode:
+                raise ValueError('Native readback command failed: ' + stderr.strip())
+            return stdout.strip()
+        finally:
+            with self.lock:
+                self.processes.discard(process)
+
     def respond(self, nonce):
+        if self.worker is not None and self.worker.is_alive():
+            self.errors.append('Native readback is already in progress')
+            return
+        self.worker = threading.Thread(target=self.read, args=(nonce,), daemon=True)
+        self.worker.start()
+
+    def read(self, nonce):
         nonce = str(uuid.UUID(nonce)).upper()
         output = None
-        self.deadline = time.monotonic() + 5
         response = dict(nonce=nonce, session=self.token)
         evidence = dict(nonce=nonce, device=self.device, source=os.environ.get('GITHUB_SHA'), probe_sha256=hashlib.sha256(Path(self.probe).read_bytes()).hexdigest(), library_sha256=hashlib.sha256(Path(self.library).read_bytes()).hexdigest() if Path(self.library).is_file() else None)
         try:
@@ -71,8 +93,8 @@ class NativeReadback:
             if key not in self.expected or key in self.completed:
                 raise ValueError('Unexpected or duplicate readback checkpoint')
             replica = str(uuid.UUID(request['replica'])).upper()
-            if replica != request['replica'] or not time.time() < request['expiresAt'] <= time.time() + 15:
-                raise ValueError('Invalid replica or expired readback request')
+            if replica != request['replica']:
+                raise ValueError('Invalid replica identity')
             fixtures = self.container('com.julesseguin.tsk', 'group.com.julesseguin.tsk') / 'UITests'
             directory = fixtures / replica / 'TaskChampion'
             if not directory.resolve().is_relative_to(fixtures.resolve()):
@@ -80,18 +102,12 @@ class NativeReadback:
             if not directory.is_dir() or directory.is_symlink():
                 raise ValueError('Existing fixture replica is missing')
             environment = dict(os.environ, TSK_TASKCHAMPION_LIBRARY=self.library)
-            remaining = min(self.deadline - time.monotonic(), request['expiresAt'] - time.time())
-            if remaining <= 0:
-                raise TimeoutError('Native readback service deadline expired')
-            result = subprocess.run([self.probe, 'read-tasks', str(directory)], env=environment, capture_output=True, text=True, timeout=remaining)
-            if result.returncode:
-                raise ValueError('Native existing-store query failed: ' + result.stderr.strip())
-            records = json.loads(result.stdout)
+            records = json.loads(self.command([self.probe, 'read-tasks', str(directory)], environment))
             if not isinstance(records, list) or len(records) > 1000:
                 raise ValueError('Invalid native records')
             identities = [str(uuid.UUID(record['id'])) for record in records]
-            if len(identities) != len(set(identities)) or time.time() >= request['expiresAt']:
-                raise ValueError('Duplicate identities or expired native result')
+            if len(identities) != len(set(identities)):
+                raise ValueError('Duplicate native identities')
             response.update(replica=replica, method=key[0], checkpoint=key[1], records=records)
             evidence.update(response)
             self.completed.add(key)
@@ -107,6 +123,23 @@ class NativeReadback:
         (self.evidence / (nonce + '.json')).write_text(json.dumps(evidence, indent=2) + '\n')
 
     def finish(self, status):
+        with self.lock:
+            self.closing = True
+            processes = list(self.processes)
+        for process in processes:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=5)
+        if self.worker is not None:
+            self.worker.join(timeout=5)
+            if self.worker.is_alive():
+                self.errors.append('Native readback worker did not finish during owned cleanup')
         missing = sorted(self.expected - self.completed)
         (self.evidence / 'summary.json').write_text(json.dumps(dict(expected=sorted(self.expected), completed=sorted(self.completed), missing=missing, errors=self.errors), indent=2) + '\n')
         if missing or self.errors:

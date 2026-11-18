@@ -4,7 +4,7 @@ import XCTest
 final class SeriesMetadataUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences() throws {
+    func testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences() async throws {
         let path = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TaskwarriorRecurringFixture", withExtension: "json"))
         var records = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [[String: Any]])
         let parentIndex = try XCTUnwrap(records.firstIndex { ($0["attributes"] as? [[String: String]] ?? []).contains { $0["key"] == "mask" } })
@@ -80,7 +80,7 @@ final class SeriesMetadataUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
         capture("Series history retains unfinished occurrences and completed history", app)
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "saved")
+        let saved = try await storedTasks(app, checkpoint: "saved")
         XCTAssertEqual(saved.count, records.count)
         for id in [parentID] + futureIDs {
             let attributes = try XCTUnwrap(saved[try XCTUnwrap(UUID(uuidString: id)).uuidString])

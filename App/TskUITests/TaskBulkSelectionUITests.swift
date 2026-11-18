@@ -16,7 +16,7 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch() throws {
+    func testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch() async throws {
         let app = try launch()
         selectPair(app)
         let scheduled = app.buttons["selection-scheduled"]
@@ -85,7 +85,7 @@ import XCTest
         XCTAssertTrue(app.buttons["workspace-settings"].exists)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        let cancelled = try storedTasks(app, checkpoint: "cancelled")
+        let cancelled = try await storedTasks(app, checkpoint: "cancelled")
         XCTAssertEqual(cancelled.count, 3)
         XCTAssertEqual(cancelled[first]?["scheduled"], "1792231200")
         XCTAssertEqual(cancelled[first]?["due"], "1792238400")
@@ -122,7 +122,7 @@ import XCTest
         app.buttons["task-selection-apply"].tap()
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 10))
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "applied")
+        let saved = try await storedTasks(app, checkpoint: "applied")
         XCTAssertEqual(saved.count, 3)
         XCTAssertEqual(saved[first]?["scheduled"], "1792231200")
         XCTAssertNil(saved[first]?["due"])
@@ -135,7 +135,7 @@ import XCTest
 
     }
 
-    func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() throws {
+    func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() async throws {
         let app = try launch(invalidOccurrence: true)
         selectPair(app)
         app.buttons["selection-scheduled"].tap()
@@ -159,7 +159,7 @@ import XCTest
         XCTAssertTrue(error.exists)
         app.buttons["cancel-task-selection"].tap()
         app.terminate()
-        let unchanged = try storedTasks(app, checkpoint: "failed-apply")
+        let unchanged = try await storedTasks(app, checkpoint: "failed-apply")
         XCTAssertEqual(unchanged[first]?["scheduled"], "1792231200")
         XCTAssertEqual(unchanged[first]?["due"], "1792238400")
         XCTAssertNil(unchanged[second]?["scheduled"])

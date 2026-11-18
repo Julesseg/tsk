@@ -4,7 +4,7 @@ import XCTest
 final class TskUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testCaptureReviewCancelSaveAndRelaunch() throws {
+    func testCaptureReviewCancelSaveAndRelaunch() async throws {
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launch()
@@ -42,7 +42,7 @@ final class TskUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         screenshot("Saved task information", app: app)
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "saved")
+        let saved = try await storedTasks(app, checkpoint: "saved")
         XCTAssertEqual(saved.count, 1, "Cancelled capture must not persist a task")
         let attributes = try XCTUnwrap(saved.values.first)
         XCTAssertEqual(attributes["description"], "Buy milk from the market")

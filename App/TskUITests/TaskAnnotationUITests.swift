@@ -5,7 +5,7 @@ import XCTest
 final class TaskAnnotationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testAddValidateEditAndReopenTimestampedAnnotations() throws {
+    func testAddValidateEditAndReopenTimestampedAnnotations() async throws {
 
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
@@ -59,7 +59,7 @@ final class TaskAnnotationUITests: XCTestCase {
         tapTaskControl(app.buttons["save-annotation"], app: app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "saved")
+        let saved = try await storedTasks(app, checkpoint: "saved")
         XCTAssertEqual(saved.count, 1)
         let attributes = try XCTUnwrap(saved.values.first)
         XCTAssertEqual(attributes["description"], "Task with supporting notes")

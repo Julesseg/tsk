@@ -31,20 +31,21 @@ actor NativeAdmissionSource: ReminderMoveSource {
     let gated: Bool
     var didHold = false
     var continuation: CheckedContinuation<Void, Never>?
+    var fetchArrival: CheckedContinuation<Void, Never>?
     init(failRemoval: Bool = false, gated: Bool = false) { self.failRemoval = failRemoval; self.gated = gated }
     func lists() -> [ReminderList] { [ReminderList(id: "work", title: "Work")] }
     func incompleteReminders(in listIDs: [String]) -> [ReminderSnapshot] { present ? [ReminderSnapshot(listID: "work", title: "One shared source")] : [] }
     func moveCandidates(in listIDs: [String]) async -> [ReminderMoveCandidate] {
         let snapshots = incompleteReminders(in: listIDs)
-        if gated && !didHold { didHold = true; await withCheckedContinuation { continuation = $0 } }
+        if gated && !didHold {
+            didHold = true
+            fetchArrival?.resume(); fetchArrival = nil
+            await withCheckedContinuation { continuation = $0 }
+        }
         return snapshots.map { ReminderMoveCandidate(snapshot: $0, removeSource: { try await self.remove() }) }
     }
-    func waitForFetch() async throws {
-        let deadline = Date().addingTimeInterval(10)
-        while !didHold {
-            guard Date() < deadline else { throw TaskManagementError.storage("Native reminder source did not reach its fetch") }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
+    func waitForFetch() async {
+        if !didHold { await withCheckedContinuation { fetchArrival = $0 } }
     }
     func releaseFetch() { continuation?.resume(); continuation = nil }
     func remove() throws {
@@ -157,7 +158,7 @@ private func reminderSQL(_ directory: URL, _ statement: String) throws {
     try await first.configureContinuousReminders(enabled: true, mappings: mappings)
     let source = NativeAdmissionSource(gated: true)
     let attempt = Task { try await first.runContinuousReminderImport(from: source) }
-    try await source.waitForFetch()
+    await source.waitForFetch()
     let canceled = Task { try await other.runContinuousReminderImport(from: source) }
     canceled.cancel()
     do { _ = try await canceled.value; Issue.record("Canceled queued scan must terminate") }

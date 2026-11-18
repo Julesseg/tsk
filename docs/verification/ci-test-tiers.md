@@ -27,8 +27,8 @@ Smoke covers inline capture/cancellation/save/relaunch, row validation/native
 pickers/outside-save/durable completion.
 Smoke needs no synchronization server or independent peer.
 
-Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
-handoff; row notes and tag validation; saved views/native
+Nightly keeps bulk reset/cancel/mixed dates and failed Apply;
+row notes and tag validation; saved views/native
 reordering; occurrence success/failure; series metadata preview/cancel/save; manual sync; real EventKit Reminders; destructive move
 source-change/interruption safety; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
 adds fresh/completed/missing task identities, all view categories, stable saved-view
@@ -73,6 +73,16 @@ A one-time upgrade cleanup removes this app’s pending/delivered alerts and ind
 items; it requests no authorization and creates no new alerts or index records.
 Full now selects 22 workspace and seven row methods.
 These removals do not establish fixes for historical failed runs.
+
+Saved-value assertions read the existing Native replica after the app closes.
+A worker resolves the runner's current platform container after launch and reads
+its session-bound request. A separate registered App Group lookup locates the
+existing replica. File-change notifications resume the test when actual records
+arrive. Container lookup, query execution and response delivery have no separate
+short deadlines. The relay remains responsive during these operations. The
+existing whole-test and CI job watchdogs stop hung runs; cleanup reaps unfinished
+owned reader processes. UI readiness waits and tests of explicit timing behavior
+retain their condition checks and bounds.
 
 The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
 Regression retains row editing, native menu stress and view ordering

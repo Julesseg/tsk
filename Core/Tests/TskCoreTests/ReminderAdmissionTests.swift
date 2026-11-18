@@ -10,7 +10,7 @@ import Testing
     try await first.configureContinuousReminders(enabled: true, mappings: [ReminderListMapping(listID: "work", project: "")])
     let source = AdmissionSource()
     let a = Task { try await first.runContinuousReminderImport(from: source) }
-    try await source.waitForFetch()
+    await source.waitForFetch()
     let b = Task { try await second.runContinuousReminderImport(from: source) }
     _ = try await second.create(TaskDraft(description: "Ordinary capture remains available"))
     #expect(try await second.tasks().map(\.description) == ["Ordinary capture remains available"])
@@ -25,19 +25,20 @@ actor AdmissionSource: ReminderMoveSource {
     var present = true
     var fetched = false
     var continuation: CheckedContinuation<Void, Never>?
+    var fetchArrival: CheckedContinuation<Void, Never>?
     func lists() -> [ReminderList] { [ReminderList(id: "work", title: "Work")] }
     func incompleteReminders(in listIDs: [String]) -> [ReminderSnapshot] { present ? [ReminderSnapshot(listID: "work", title: "Only one copy")] : [] }
     func moveCandidates(in listIDs: [String]) async -> [ReminderMoveCandidate] {
         let snapshot = incompleteReminders(in: listIDs)
-        if !fetched { fetched = true; await withCheckedContinuation { continuation = $0 } }
+        if !fetched {
+            fetched = true
+            fetchArrival?.resume(); fetchArrival = nil
+            await withCheckedContinuation { continuation = $0 }
+        }
         return snapshot.map { ReminderMoveCandidate(snapshot: $0, removeSource: { await self.remove() }) }
     }
-    func waitForFetch() async throws {
-        let deadline = Date().addingTimeInterval(10)
-        while !fetched {
-            guard Date() < deadline else { throw TaskManagementError.storage("Reminder source did not reach its fetch") }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
+    func waitForFetch() async {
+        if !fetched { await withCheckedContinuation { fetchArrival = $0 } }
     }
     func releaseFetch() { continuation?.resume(); continuation = nil }
     func remove() { present = false }
@@ -51,7 +52,7 @@ actor AdmissionSource: ReminderMoveSource {
     try await first.configureContinuousReminders(enabled: true, mappings: [ReminderListMapping(listID: "work", project: "")])
     let source = AdmissionSource()
     let a = Task { try await first.runContinuousReminderImport(from: source) }
-    try await source.waitForFetch()
+    await source.waitForFetch()
     let canceled = Task { try await second.runContinuousReminderImport(from: source) }
     canceled.cancel()
     do { _ = try await canceled.value; Issue.record("Canceled queued scan must not fetch or save") }

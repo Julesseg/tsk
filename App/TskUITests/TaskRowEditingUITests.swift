@@ -13,7 +13,7 @@ import XCTest
         XCUIDevice.shared.appearance = .light
     }
 
-    func testSupportingInformationEditsKeepTheExpandedDraftAndPersist() throws {
+    func testSupportingInformationEditsKeepTheExpandedDraftAndPersist() async throws {
         let app = try launch(supporting: true)
         let title = expandTask(app)
         let editor = app.scrollViews["task-row-supporting-scroll"]
@@ -43,7 +43,7 @@ import XCTest
         app.buttons["collapse-task-row"].tap()
         XCTAssertTrue(taskRow(named: "Unsaved supporting draft", app: app).waitForExistence(timeout: 10))
         app.terminate()
-        let saved = try storedTasks(app, checkpoint: "saved")
+        let saved = try await storedTasks(app, checkpoint: "saved")
         let attributes = try XCTUnwrap(saved[taskID])
         XCTAssertEqual(attributes["description"], "Unsaved supporting draft")
         XCTAssertEqual(attributes["annotation_1792144800"], "Edited supporting note")
@@ -95,7 +95,7 @@ import XCTest
         capture("Tighter list restored after middle row collapse", app)
     }
 
-    func testOutsideSaveValidationPickersAndDurableCompletion() throws {
+    func testOutsideSaveValidationPickersAndDurableCompletion() async throws {
         let app = try launch()
         let row = app.buttons["task-" + taskID]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
@@ -158,7 +158,7 @@ import XCTest
         XCTAssertFalse(app.textFields["task-description"].exists, "Outside tap must not expand a dimmed neighbour")
         capture("Saved and collapsed", app)
         app.terminate()
-        let edited = try storedTasks(app, checkpoint: "edited")
+        let edited = try await storedTasks(app, checkpoint: "edited")
         let attributes = try XCTUnwrap(edited[taskID])
         var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: 1792231200))
         components.day = 18
@@ -208,7 +208,7 @@ import XCTest
         XCTAssertTrue(taskRow(named: "Release revised", app: app).waitForExistence(timeout: 10))
         capture("Completed task after relaunch", app)
         app.terminate()
-        let completed = try storedTasks(app, checkpoint: "completed")
+        let completed = try await storedTasks(app, checkpoint: "completed")
         XCTAssertEqual(completed[taskID]?["status"], "completed")
         XCTAssertNotNil(completed[taskID]?["end"])
         XCTAssertEqual(completed[taskID]?["description"], "Release revised")
@@ -408,7 +408,7 @@ import XCTest
         XCTAssertLessThan(ProcessInfo.processInfo.systemUptime, dismissalDeadline, file: file, line: line)
     }
 
-    func testOrganizationSelectionClearingInvalidTagsAndReopening() throws {
+    func testOrganizationSelectionClearingInvalidTagsAndReopening() async throws {
         let app = try launch(organized: true)
         let title = expandTask(app)
         XCTAssertEqual(app.buttons["row-project"].value as? String, "Release")
@@ -446,7 +446,7 @@ import XCTest
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         app.terminate()
-        let tagged = try storedTasks(app, checkpoint: "tagged")
+        let tagged = try await storedTasks(app, checkpoint: "tagged")
         let taggedAttributes = try XCTUnwrap(tagged[taskID])
         XCTAssertEqual(Set(taggedAttributes.keys.filter { $0.hasPrefix("tag_") }), ["tag_accessibility", "tag_next"])
         app.launch()
@@ -472,7 +472,7 @@ import XCTest
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         app.terminate()
-        let cleared = try storedTasks(app, checkpoint: "cleared")
+        let cleared = try await storedTasks(app, checkpoint: "cleared")
         let attributes = try XCTUnwrap(cleared[taskID])
         XCTAssertNil(attributes["project"])
         XCTAssertNil(attributes["priority"])
