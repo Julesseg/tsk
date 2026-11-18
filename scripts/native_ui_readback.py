@@ -12,7 +12,6 @@ import uuid
 CHECKPOINTS = {
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask': ['failed-apply'],
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion': ['edited', 'completed'],
-    'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch': ['cancelled', 'applied'],
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences': ['saved'],
     'TaskScheduledUITests/testNonMidnightScheduledEditsKeepOtherDatesAndPersist': ['saved'],
     'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations': ['saved'],

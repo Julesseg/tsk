@@ -1,10 +1,10 @@
-> Current saved-data verification uses Native existing-store readback after the app closes. Editor-handoff selection coverage was retired by explicit user decision; retained UI actions and presentation/system assertions remain.
+> Current saved-data verification uses Native existing-store readback; the organization journey keeps the app foreground. Editor-handoff and bulk-date apply/cancel/relaunch coverage were retired by explicit user decision; retained UI actions and presentation/system assertions remain.
 
-Current user scope update (2026-11-17): keyboard commands, widgets, incoming
+Current user scope update (2026-11-18): keyboard commands, widgets, incoming
 Share, dependency management, notifications and Spotlight indexing are removed.
 The combined Calendar, automatic-sync recovery, held-selection and series-transition
 UI journeys are retired; their retained product features remain. Current source
-selection is 29 nightly (22 workspace/7 row), 25 on demand, 2 smoke, 1 Text,
+selection is 28 nightly (22 workspace/6 row), 25 on demand, 2 smoke, 1 Text,
 4 Regression and 4 Menu methods. Earlier contracts and counts below are historical
 evidence. See `ci-test-tiers.md` for current acceptance.
 
