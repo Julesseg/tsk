@@ -1,3 +1,5 @@
+> Historical verification record. Notifications and Spotlight indexing were removed from product scope on 2026-11-17; this is not a current acceptance contract.
+
 # Newly learned missed notifications (#31)
 
 After a successful encrypted synchronization, tsk considers original planned/due events from its immutable final snapshot, excludes already known or accepted constituents, and intersects the candidates with the latest durable tasks. A completed/deleted task, removed original date, or recurring template cannot create a missed alert. A later partial state can suppress an older candidate, but cannot introduce a new missed candidate. Current device preferences and calendar determine effective times; raw task dates, identity and byte-distinct attributes stay unchanged. Equal effective times combine only the remaining eligible constituents.

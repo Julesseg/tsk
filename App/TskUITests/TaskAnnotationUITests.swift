@@ -5,16 +5,12 @@ import XCTest
 final class TaskAnnotationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testAddValidateEditAndReopenTimestampedAnnotations() throws {
+    func testAddValidateEditAndReopenTimestampedAnnotations() async throws {
 
         defer { XCUIDevice.shared.orientation = .portrait }
         let app = taskTestApplication()
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
-        let commands = try TaskKeyboardCommand(.annotations, app: app)
-        func save(_ phase: String) throws {
-            try commands.perform(phase) { app.typeKey(XCUIKeyboardKey.return, modifierFlags: .command) }
-        }
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         app.buttons["New task"].tap()
@@ -49,34 +45,28 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
         editor.typeText("Second independent note")
-        try commands.perform("secondNoteCommandN") { app.typeKey("n", modifierFlags: .command) }
-        XCTAssertFalse(app.textFields["task-description"].exists)
-        XCTAssertTrue(editor.exists)
-        try save("secondNoteSave")
+        tapTaskControlAtCenter(app.buttons["dismiss-annotation-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-annotation"], app: app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         XCTAssertTrue(revealTaskElement(app.buttons["edit-annotation_1792144800"], in: "task-detail-form", app: app))
         app.buttons["edit-annotation_1792144800"].tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
-        try commands.perform("editSelectAll") { editor.typeKey("a", modifierFlags: .command) }
-        editor.typeText("First supporting note\nAnother line revised")
+        replaceTaskText(editor, with: "First supporting note\nAnother line revised", app: app)
         XCTAssertEqual(editor.value as? String, "First supporting note\nAnother line revised")
         capture("Edit annotation keeps its original timestamp", app: app)
-        try save("editedNoteSave")
+        tapTaskControlAtCenter(app.buttons["dismiss-annotation-keyboard"], app: app)
+        tapTaskControl(app.buttons["save-annotation"], app: app)
         XCTAssertTrue(editor.waitForNonExistence(timeout: 10))
         app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "Task with supporting notes", app: app).waitForExistence(timeout: 10))
-        openTaskInformation(taskRow(named: "Task with supporting notes", app: app), app: app)
-        let first = app.staticTexts["annotation-text-annotation_1792144800"]
-        let second = app.staticTexts["annotation-text-annotation_1792144801"]
-        XCTAssertTrue(revealTaskElement(first, in: "task-detail-form", app: app))
-        XCTAssertEqual(first.label, "First supporting note\nAnother line revised")
-        XCTAssertTrue(revealTaskElement(second, in: "task-detail-form", app: app))
-        XCTAssertEqual(second.label, "Second independent note")
-        capture("Both annotations after durable reopen", app: app)
-        XCTAssertTrue(revealTaskElement(app.staticTexts["task-detail-description"], in: "task-detail-form", app: app, initialScrollUp: false))
+        let saved = try await storedTasks(app, checkpoint: "saved")
+        XCTAssertEqual(saved.count, 1)
+        let attributes = try XCTUnwrap(saved.values.first)
+        XCTAssertEqual(attributes["description"], "Task with supporting notes")
+        XCTAssertEqual(attributes["annotation_1792144800"], "First supporting note\nAnother line revised")
+        XCTAssertEqual(attributes["annotation_1792144801"], "Second independent note")
+        XCTAssertEqual(attributes.keys.filter { $0.hasPrefix("annotation_") }.count, 2)
+
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

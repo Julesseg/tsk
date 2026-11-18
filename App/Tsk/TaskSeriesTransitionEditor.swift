@@ -94,7 +94,6 @@ struct TaskSeriesTransitionEditor: View {
                 }
             }
             .interactiveDismissDisabled(store.isSaving)
-            .taskKeyboardCommands(store.isSaving || isPreviewing ? TaskKeyboardCommand.suspended : TaskEditorActions(save: { if let preview { save(preview) } else { buildPreview() } }).keyboardCommands)
             .modifier(TaskWorkspacePanel(store: store))
         }
     }

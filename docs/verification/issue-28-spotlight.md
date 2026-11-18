@@ -1,3 +1,5 @@
+> Historical verification record. Notifications and Spotlight indexing were removed from product scope on 2026-11-17; this is not a current acceptance contract.
+
 # Spotlight tasks (#28)
 
 Spotlight indexes unfinished (`pending`) tasks by a namespaced, canonical task UUID. Waiting/blocked tasks remain eligible. Recurring templates, completed/deleted/unknown-status tasks and blank descriptions are excluded. The searchable projection contains the description, project and tags; opaque attributes and annotation contents are not copied into the system index. Core projection and routing preserve task UUIDs and raw task attributes.

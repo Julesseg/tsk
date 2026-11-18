@@ -47,7 +47,6 @@ struct TaskRowDismissal: View {
 struct TaskRowActions {
     var close: () -> Void = {}
     var information: (TaskRecord) -> Void = { _ in }
-    var reveal: (TaskRecord) -> Void = { _ in }
 }
 
 private struct TaskRowActionsKey: EnvironmentKey {

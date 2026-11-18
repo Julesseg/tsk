@@ -16,19 +16,12 @@ import termios
 import threading
 import time
 
+from native_ui_readback import NativeReadback, REQUEST
 
-SPOTLIGHT_METHODS = {
-    'testReceivedEncryptedPeerCompletionReconcilesActualIndex',
-    'testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
-    'testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
-}
-WIDGET_METHOD = 'testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError'
-CASE = re.compile(r"^Test Case '-\[TskUITests\.(SpotlightUITests|WidgetUITests) (\w+)\]' (started\.|(?:passed|failed) \([\d.,]+ seconds\)\.)$")
+
 METHOD = re.compile(r"^Test Case '-\[TskUITests\.(\w+) (\w+)\]' (started\.|(passed|failed|skipped) \(([\d.]+) seconds\)\.)$")
 POST_PARENT_EXIT_DRAIN_SECONDS = 0.25
 POST_GROUP_SIGNAL_DRAIN_SECONDS = 0.25
-SEARCH_SURFACE = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual system Search surface before first-run handling'$")
-PROVIDER = re.compile(r"^\s*t =\s*[\d.,]+s Added attachment named 'Actual tsk provider cell in native widget gallery'$")
 
 
 def utc():
@@ -96,23 +89,12 @@ class DeviceMonitor:
 
 
 class BoundaryCapture:
-    def __init__(self, device, evidence, scripts):
+    def __init__(self, device, evidence, readback=None):
         self.device = device
         self.evidence = pathlib.Path(evidence)
-        self.scripts = pathlib.Path(scripts)
-        self.children = []
         self.events = []
-        self.started = set()
-        self.active = {}
-        self.widget_active = False
-        self.widget_contexts = set()
-        self.remote_pids = set()
-        self.remote_pids_truncated = False
-        self.spotlight_current = None
-        self.spotlight_pids = {}
-        self.spotlight_pids_truncated = set()
-        self.search_contexts = set()
         self.first_failure = None
+        self.readback = readback
         try:
             self.evidence.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -121,165 +103,25 @@ class BoundaryCapture:
     def record(self, event, **fields):
         self.events.append(dict(event=event, receivedUTC=utc(), **fields))
 
-    def spawn(self, arguments, kind, key, stop=None):
-        entry = dict(kind=kind, key=key, startedUTC=utc(), arguments=arguments, stop=stop)
-        try:
-            output = (self.evidence / ('boundary-' + key + '-helper.txt')).open('wb')
-            try:
-                process = subprocess.Popen(arguments, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
-            finally:
-                output.close()
-            entry.update(process=process, pid=process.pid)
-            self.children.append(entry)
-            return entry
-        except OSError as error:
-            self.record('helper-start-error', kind=kind, key=key, error=str(error))
-            return None
-
-    def stop(self, method, reason):
-        entry = self.active.pop(method, None)
-        if entry:
-            try:
-                pathlib.Path(entry['stop']).touch()
-            except OSError as error:
-                self.record('stop-file-error', method=method, error=str(error))
-            self.record(entry['kind'] + '-window-stop', method=method, reason=reason)
-
-    def widget_context(self, name):
-        if name in self.widget_contexts:
-            return
-        self.widget_contexts.add(name)
-        arguments = [sys.executable, str(self.scripts / 'capture-simulator-search-context.py'), self.device,
-                     str(self.evidence / (name + '-context.json'))]
-        for pid in sorted(self.remote_pids):
-            arguments += ['--observed-pid', pid]
-        self.record('widget-context-request', name=name, observedPIDs=sorted(self.remote_pids))
-        self.spawn(arguments, 'context', name)
-
-    def search_context(self, method, boundary):
-        key = method + '-' + boundary
-        if key in self.search_contexts:
-            return
-        self.search_contexts.add(key)
-        pids = sorted(self.spotlight_pids.get(method, set()))
-        name = 'spotlight-' + key
-        arguments = [sys.executable, str(self.scripts / 'capture-simulator-search-context.py'), self.device,
-                     str(self.evidence / (name + '-context.json'))]
-        for pid in pids:
-            arguments += ['--observed-pid', pid]
-        self.record('spotlight-context-request', method=method, boundary=boundary, observedPIDs=pids)
-        self.spawn(arguments, 'context', name)
-
     def line(self, raw):
         line = raw.decode('utf-8', errors='replace').rstrip('\r')
+        request = REQUEST.fullmatch(line)
+        if request and self.readback is not None:
+            self.readback.respond(request[1])
         method = METHOD.fullmatch(line)
         if method:
             suite, name, state, outcome, seconds = method.groups()
             self.record('method-start' if state == 'started.' else 'method-end', method=suite + '/' + name, outcome=outcome, seconds=float(seconds) if seconds else None)
-            if suite in ('TaskNotificationUITests', 'MissedNotificationUITests'):
-                key = 'DEBUG-issue82-notifications-' + name
-                if state == 'started.':
-                    stop = self.evidence / (key + '.stop')
-                    stop.unlink(missing_ok=True)
-                    entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), '--notifications', self.device,
-                                        str(self.evidence / (key + '.log')), str(stop)], 'notification', key, str(stop))
-                    if entry:
-                        self.active[key] = entry
-                else:
-                    self.stop(key, 'test-end')
             if outcome == 'failed' and self.first_failure is None:
                 self.first_failure = utc()
                 self.record('first-test-failure', method=suite + '/' + name)
                 print('::error title=First UI failure::' + suite + '/' + name + ' failed; remaining independent cases may continue.', flush=True)
-        match = CASE.fullmatch(line)
-        if match:
-            suite, method, outcome = match.groups()
-            if suite == 'SpotlightUITests' and method in SPOTLIGHT_METHODS:
-                if outcome == 'started.':
-                    if method in self.started:
-                        self.record('duplicate-start', method=method)
-                    else:
-                        self.started.add(method)
-                        self.spotlight_current = method
-                        self.spotlight_pids[method] = set()
-                        self.search_context(method, 'method-start')
-                        stop = self.evidence / ('spotlight-' + method + '.stop')
-                        try:
-                            stop.unlink(missing_ok=True)
-                        except OSError as error:
-                            self.record('stop-file-error', method=method, error=str(error))
-                            return
-                        self.record('spotlight-window-start', method=method)
-                        entry = self.spawn([sys.executable, str(self.scripts / 'capture-simulator-spotlight-log.py'), self.device,
-                                            str(self.evidence / ('spotlight-' + method + '.log')), str(stop)], 'spotlight', method, str(stop))
-                        if entry:
-                            self.active[method] = entry
-                else:
-                    self.record('test-end', method=method, outcome=outcome)
-                    if method in self.started:
-                        self.search_context(method, 'method-end')
-                    self.stop(method, 'test-end')
-                    if self.spotlight_current == method:
-                        self.spotlight_current = None
-            elif suite == 'WidgetUITests' and method == WIDGET_METHOD:
-                self.widget_active = outcome == 'started.'
-                self.record('widget-test-boundary', outcome=outcome)
-        if self.spotlight_current is not None:
-            method = self.spotlight_current
-            pids = self.spotlight_pids[method]
-            for pid in re.findall(r'remote element in process (\d+)', line):
-                if len(pids) < 32:
-                    pids.add(pid)
-                elif pid not in pids and method not in self.spotlight_pids_truncated:
-                    self.spotlight_pids_truncated.add(method)
-                    self.record('spotlight-observed-pids-truncated', method=method, maximum=32)
-            if SEARCH_SURFACE.fullmatch(line):
-                self.search_context(method, 'search-before')
-            if ' : failed - Actual system Spotlight search field must be available' in line:
-                self.search_context(method, 'search-missing-field')
-        if self.widget_active:
-            for pid in re.findall(r'remote element in process (\d+)', line):
-                if len(self.remote_pids) < 32:
-                    self.remote_pids.add(pid)
-                elif pid not in self.remote_pids and not self.remote_pids_truncated:
-                    self.remote_pids_truncated = True
-                    self.record('widget-observed-pids-truncated', maximum=32)
-            if PROVIDER.fullmatch(line):
-                self.widget_context('widget-before-provider')
-            if ' : failed - Missing native system control: Add Widget' in line:
-                self.widget_context('widget-missing-add')
-        self.reap()
-
-    def reap(self):
-        for entry in self.children:
-            if 'returnCode' not in entry and entry['process'].poll() is not None:
-                entry.update(returnCode=entry['process'].returncode, finishedUTC=utc())
-
-    def finish(self, reason):
-        for method in list(self.active):
-            self.stop(method, reason)
-        deadline = time.monotonic() + 20
-        while any(entry['process'].poll() is None for entry in self.children) and time.monotonic() < deadline:
-            self.reap()
-            time.sleep(0.05)
-        for entry in self.children:
-            process = entry['process']
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=2)
-                entry['forcedCleanup'] = True
-        self.reap()
-        return [dict((key, value) for key, value in entry.items() if key != 'process') for entry in self.children]
 
 
-def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanup_grace=5, monitor_device=False):
-    if cleanup_grace not in (5, 120):
-        raise ValueError('Owned cleanup grace must be the default or fixed native HID allowance')
-    capture = BoundaryCapture(device, evidence, scripts)
+def run(command, device, evidence, cleanup_grace=5, monitor_device=False, readback=None):
+    if cleanup_grace != 5:
+        raise ValueError('Owned cleanup grace must remain five seconds')
+    capture = BoundaryCapture(device, evidence, readback)
     process = None
     interrupted = None
     broken_output = False
@@ -329,10 +171,9 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
     for number in (signal.SIGINT, signal.SIGTERM):
         old_handlers[number] = signal.signal(number, interrupt)
     status = 1
-    reason = 'relay-error'
     try:
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-        capture.record('owned-native-hid-owner-start' if cleanup_grace == 120 else 'xcodebuild-start', pid=process.pid, command=command, **(dict(cleanupGraceSeconds=120) if cleanup_grace == 120 else {}))
+        capture.record('xcodebuild-start', pid=process.pid, command=command)
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             signalled = False
@@ -384,9 +225,9 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
                     chunk = os.read(key.fileobj.fileno(), 65536)
                     if not chunk:
                         selector.unregister(key.fileobj)
+                        key.fileobj.close()
                         break
                     consume(chunk)
-                capture.reap()
             if pending and not discarding:
                 try:
                     capture.line(pending)
@@ -405,9 +246,8 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
         status = code if code >= 0 else 128 - code
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
-        reason = 'output-pipe' if broken_output else 'signal' if interrupted else 'eof'
-        capture.record('owned-native-hid-owner-end' if cleanup_grace == 120 else 'xcodebuild-end', returnCode=code, status=status)
-    except OSError as error:
+        capture.record('xcodebuild-end', returnCode=code, status=status)
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
         capture.record('relay-error', error=str(error))
         if process is not None and process.poll() is not None:
             status = process.returncode if process.returncode >= 0 else 128 - process.returncode
@@ -421,16 +261,17 @@ def run(command, device, evidence, scripts=pathlib.Path(__file__).parent, cleanu
             except subprocess.TimeoutExpired:
                 signal_owned(signal.SIGKILL)
                 process.wait(timeout=5)
-        children = capture.finish(reason)
         for number, handler in old_handlers.items():
             signal.signal(number, handler)
         if interrupted is not None:
             status = 141 if broken_output else 128 + interrupted
         if device_lost:
             status = 74
+        if readback is not None:
+            status = readback.finish(status)
         try:
             (pathlib.Path(evidence) / 'test-aligned-boundaries.json').write_text(json.dumps(dict(
-                device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events, children=children), indent=2) + '\n')
+                device=device, finishedUTC=utc(), status=status, interrupted=interrupted, events=capture.events), indent=2) + '\n')
         except OSError as error:
             print('Boundary metadata could not be written: ' + str(error), file=sys.stderr)
     return status
@@ -442,7 +283,9 @@ if __name__ == '__main__':
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--owned-simulator', action='store_true')
     parser.add_argument('--monitor-device', action='store_true')
-    parser.add_argument('--owned-cleanup-grace-seconds', type=int, choices=[5, 120], default=5)
+    parser.add_argument('--native-probe')
+    parser.add_argument('--native-library')
+    parser.add_argument('--native-readback-plan')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     arguments = parser.parse_args()
     if os.environ.get('CI') != 'true' or os.environ.get('TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR') != '1' or not arguments.owned_simulator:
@@ -450,6 +293,8 @@ if __name__ == '__main__':
     command = arguments.command[1:] if arguments.command[:1] == ['--'] else arguments.command
     if not command:
         parser.error('Pass the original xcodebuild command after --')
-    if arguments.owned_cleanup_grace_seconds == 120 and (len(command) < 2 or pathlib.Path(command[1]).resolve() != pathlib.Path(__file__).with_name('with-native-keyboard-hid.py').resolve() or os.environ.get('TSK_NATIVE_KEYBOARD_HID') != '1'):
-        parser.error('Extended owned cleanup is only for the explicit native HID owner')
-    raise SystemExit(run(command, arguments.device, arguments.evidence, cleanup_grace=arguments.owned_cleanup_grace_seconds, monitor_device=arguments.monitor_device))
+    readback = None
+    if arguments.native_readback_plan:
+        plan = json.loads(pathlib.Path(arguments.native_readback_plan).read_text())
+        readback = NativeReadback(arguments.device, arguments.native_probe, arguments.native_library, plan, pathlib.Path(arguments.evidence) / 'native-readback', os.environ['TSK_UI_NATIVE_READBACK_TOKEN'])
+    raise SystemExit(run(command, arguments.device, arguments.evidence, monitor_device=arguments.monitor_device, readback=readback))

@@ -3,13 +3,16 @@ import Testing
 import TskCore
 import TskNative
 
-@Test func workspaceSelectionEditsAndCompletesOnePersistentNativeTask() async throws {
+@Test func editingAndCompletingOnePersistentNativeTaskKeepsOtherTasksAndAttributes() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let manager = TaskManager(replica: TaskChampionReplica(directory: directory))
+    let replica = TaskChampionReplica(directory: directory)
+    let manager = TaskManager(replica: replica)
     let first = try await manager.create(TaskDraft(description: "Keep pending", attributes: ["opaque": "first", "project": "Work"]))
     let second = try await manager.create(TaskDraft(description: "Select me", attributes: ["opaque": "second", "project": "Work", "scheduled": "1792144800", "due": "1792231200"]))
-    let selected = try #require(manager.selectedTask(in: [first, second, first], from: first.id, moving: .next))
+    let importedReference = first.id.uuidString.lowercased()
+    _ = try await replica.update(id: second.id, changes: ["dep_\(importedReference)": "existing desktop link", "depends": importedReference])
+    let selected = second.id
     _ = try await manager.update(id: selected, changes: ["description": "Edited with selected identity"])
     let completed = try await manager.complete(id: selected)
     let reopened = TaskManager(replica: TaskChampionReplica(directory: directory))
@@ -18,6 +21,8 @@ import TskNative
     #expect(completed.attributes["opaque"] == "second")
     #expect(completed.attributes["scheduled"] == "1792144800")
     #expect(completed.attributes["due"] == "1792231200")
+    #expect(completed.attributes["dep_\(importedReference)"] == "existing desktop link")
+    #expect(completed.attributes["depends"] == importedReference)
     if let binary = ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] {
         let config = directory.appendingPathComponent("taskrc")
         try "data.location=\(directory.path)\nuda.opaque.type=string\nconfirmation=no\n".write(to: config, atomically: true, encoding: .utf8)
@@ -36,6 +41,7 @@ import TskNative
         #expect(record["status"] as? String == "completed")
         #expect(record["description"] as? String == "Edited with selected identity")
         #expect(record["opaque"] as? String == "second")
+        #expect(record["depends"] as? [String] == [importedReference])
         #expect(records.count == 2)
     }
 }

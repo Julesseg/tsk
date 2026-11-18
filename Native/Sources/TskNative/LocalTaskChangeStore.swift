@@ -1,9 +1,6 @@
 import CTaskChampion
 import Foundation
 import TskCore
-#if os(iOS) && canImport(WidgetKit)
-import WidgetKit
-#endif
 
 public actor LocalTaskChangeStore: TaskChangeTracking {
     private let directory: URL
@@ -29,9 +26,6 @@ public actor LocalTaskChangeStore: TaskChangeTracking {
             #endif
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         }.value
-        #if os(iOS) && canImport(WidgetKit)
-        if #available(iOS 14, macOS 11, *) { WidgetCenter.shared.reloadTimelines(ofKind: "tsk.tasks") }
-        #endif
     }
 
     static func read(_ directory: URL) throws -> TaskChangeVersion {

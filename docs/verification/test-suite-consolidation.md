@@ -1,3 +1,20 @@
+> Current saved-data verification uses Native existing-store readback; the organization journey keeps the app foreground. Editor-handoff and bulk-date apply/cancel/relaunch coverage were retired by explicit user decision; retained UI actions and presentation/system assertions remain.
+
+Current user scope update (2026-11-18): keyboard commands, widgets, incoming
+Share, dependency management, notifications, Spotlight indexing and Apple Reminders
+import are removed.
+The combined Calendar, automatic-sync recovery, held-selection and series-transition
+UI journeys are retired; their retained product features remain. Current source
+selection is 23 nightly (17 workspace/6 row), 23 on demand, 2 smoke, 1 Text,
+4 Regression and 4 Menu methods. Earlier contracts and counts below are historical
+evidence. See `ci-test-tiers.md` for current acceptance.
+
+> Subsequent scope update (2026-11-17): hardware keyboard commands, widgets,
+> their UI methods and HID tooling are removed. The combined real-Calendar UI
+> journey and automatic-sync failure UI journey are also retired by user decision;
+> Calendar and automatic sync themselves remain. Current
+> selections are defined in `scripts/ui-test-selection.py` and `ci-test-tiers.md`.
+
 # Test suite consolidation
 
 ## November 2026 reduction

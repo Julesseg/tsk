@@ -12,7 +12,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [smoke, full, keyboard, text, regression, menu]
+        options: [smoke, full, text, regression, menu, sync]
         required: true
         default: smoke
       reason:
@@ -29,6 +29,10 @@ on:
         type: boolean
         required: false
         default: false
+      sync_products_run:
+        description: Optional prior CI run ID with signed products for the focused sync test
+        type: string
+        required: false
 
 # The one project-specific value in this workflow. Must match the name of the
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
@@ -37,13 +41,16 @@ env:
   APP_NAME: Tsk
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["keyboard","text","regression","menu"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
+  group: ${{ github.event_name == 'workflow_dispatch' && contains(fromJSON('["text","regression","menu"]'), inputs.ui_suite) && format('ci-{0}-{1}', inputs.ui_suite, github.ref) || github.event_name == 'workflow_dispatch' && format('ci-dispatch-{0}-{1}', inputs.diagnostic_only && 'diagnostic' || inputs.ui_suite, github.ref) || github.event_name == 'schedule' && format('ci-scheduled-{0}', github.ref) || format('ci-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   changes:
     name: Test routing
     runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
     outputs:
       run_tests: ${{ steps.route.outputs.run_tests }}
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -52,6 +59,8 @@ jobs:
       suite: ${{ steps.plan.outputs.suite }}
       server: ${{ steps.plan.outputs.server }}
       peer: ${{ steps.plan.outputs.peer }}
+      replay_artifact: ${{ steps.replay.outputs.artifact }}
+      replay_source: ${{ steps.replay.outputs.source }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,6 +71,23 @@ jobs:
           UI_SUITE: ${{ inputs.diagnostic_only && 'diagnostic' || github.event_name == 'schedule' && 'full' || inputs.ui_suite || 'smoke' }}
           EXPECTED_SOURCE_SHA: ${{ inputs.expected_sha }}
         run: python3 scripts/plan-ui-tests.py "$UI_SUITE"
+      - name: Resolve original signed products for sync replay
+        id: replay
+        if: github.event_name == 'workflow_dispatch' && inputs.sync_products_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCTS_RUN: ${{ inputs.sync_products_run }}
+          UI_SUITE: ${{ steps.plan.outputs.suite }}
+        run: |
+          if [[ "$UI_SUITE" != sync || ! "$PRODUCTS_RUN" =~ ^[1-9][0-9]{0,19}$ ]]; then
+            echo 'A numeric products run ID requires the sync suite.' >&2
+            exit 1
+          fi
+          source=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTS_RUN" \
+            | jq -er 'select(.path == ".github/workflows/ci.yml" and .status == "completed") | .head_sha | select(test("^[a-f0-9]{40}$"))')
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTS_RUN/artifacts?name=ui-products" \
+            | jq -er '[.artifacts[] | select(.name == "ui-products" and (.expired | not))] | select(length == 1) | .[0].id')
+          printf 'source=%s\nartifact=%s\n' "$source" "$artifact" >> "$GITHUB_OUTPUT"
 
       - name: Verify test routing
         run: |
@@ -75,17 +101,13 @@ jobs:
           python3 scripts/test-ui-shard-checks.py
           python3 scripts/test-ci-execution.py
           python3 scripts/test-native-test-selection.py
-          python3 scripts/test-native-keyboard-hid-installer.py
-          python3 scripts/test-native-keyboard-hid-relay.py
-          python3 scripts/test-native-keyboard-hid-owner.py
-          python3 scripts/test-native-keyboard-boundary-cleanup.py
       - name: Classify changed paths
         id: route
         run: python3 scripts/ci-test-routing.py
 
   core-tests:
     needs: changes
-    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync')) }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -104,7 +126,7 @@ jobs:
 
   native-tests:
     needs: changes
-    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync')) }}
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -155,7 +177,6 @@ jobs:
               --taskwarrior .build/taskwarrior-install/bin/task \
               --probe "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" \
               --output .build/native-test-results
-          LIBDISPATCH_COOPERATIVE_POOL_STRICT=1 swift test --package-path Native --filter SpotlightQueryReaderTests
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -166,12 +187,12 @@ jobs:
 
   ui-build:
     needs: changes
-    if: needs.changes.outputs.run_tests == 'true'
+    if: needs.changes.outputs.run_tests == 'true' && needs.changes.outputs.replay_artifact == ''
     name: App · Shared UI products
     runs-on: xcode-27
     timeout-minutes: 35
     env:
-      RUN_NATIVE_TESTS: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
+      RUN_NATIVE_TESTS: ${{ github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync') }}
     outputs:
       artifact_id: ${{ steps.products.outputs.artifact-id }}
     steps:
@@ -204,7 +225,6 @@ jobs:
       - name: Build native runtime and selected synchronization tools
         env:
           NEED_SERVER: ${{ needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
-          NEED_PEER: ${{ needs.changes.outputs.peer == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
         run: |
           scripts/build-native.sh simulator
           scripts/build-native.sh host
@@ -214,10 +234,8 @@ jobs:
             cargo build --locked --release --manifest-path .build/sync-server/Cargo.toml --package taskchampion-sync-server --bin taskchampion-sync-server
             cp .build/sync-server/target/release/taskchampion-sync-server .build/ui-tools/
           fi
-          if [[ "$NEED_PEER" == true ]]; then
-            swift build --package-path Native --product tsk-native-probe
-            cp "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" .build/ui-tools/
-          fi
+          swift build --package-path Native --product tsk-native-probe
+          cp "$(swift build --package-path Native --show-bin-path)/tsk-native-probe" .build/ui-tools/
       - name: Run Apple-framework Native tests
         if: env.RUN_NATIVE_TESTS == 'true'
         timeout-minutes: 10
@@ -293,9 +311,12 @@ jobs:
 
   app-ui-test-shards:
     needs: [changes, ui-build]
-    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.run_tests == 'false' || needs.ui-build.result == 'success') }}
+    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.run_tests == 'false' || needs.ui-build.result == 'success' || needs.changes.outputs.replay_artifact != '') }}
     name: App · UI shard (${{ matrix.family }}, ${{ matrix.partition }})
     runs-on: ${{ needs.changes.outputs.run_tests == 'true' && 'xcode-27' || 'ubuntu-24.04' }}
+    permissions:
+      actions: read
+      contents: read
     timeout-minutes: ${{ needs.changes.outputs.suite == 'full' && 165 || needs.changes.outputs.suite == 'smoke' && 60 || 90 }}
     strategy:
       fail-fast: false
@@ -306,6 +327,8 @@ jobs:
         run: echo 'Documentation-only change; no Xcode runner, build or simulator required.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
         if: needs.changes.outputs.run_tests == 'true'
+        with:
+          fetch-depth: ${{ needs.changes.outputs.replay_artifact != '' && '0' || '1' }}
       - uses: maxim-lobanov/setup-xcode@v1
         if: needs.changes.outputs.run_tests == 'true'
         with:
@@ -315,17 +338,28 @@ jobs:
         with:
           python-version: "3.12"
       - uses: actions/download-artifact@v4
-        if: needs.changes.outputs.run_tests == 'true'
+        if: needs.changes.outputs.run_tests == 'true' && needs.changes.outputs.replay_artifact == ''
         with:
           artifact-ids: ${{ needs.ui-build.outputs.artifact_id }}
           path: .build
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: needs.changes.outputs.replay_artifact != ''
+        with:
+          artifact-ids: ${{ needs.changes.outputs.replay_artifact }}
+          run-id: ${{ inputs.sync_products_run }}
+          github-token: ${{ github.token }}
+          path: .build
+          merge-multiple: true
       - name: Verify source, toolchain, runtime and signed products
         if: needs.changes.outputs.run_tests == 'true'
-        run: python3 scripts/ui-build-products.py unpack --archive .build/ui-products.tar.gz
-      - name: Install pinned native keyboard transport
-        if: needs.changes.outputs.run_tests == 'true' && matrix.native_keyboard
-        run: python3 scripts/install-native-keyboard-hid.py --root "$PWD/.build/native-keyboard-hid"
+        env:
+          REPLAY_SOURCE: ${{ needs.changes.outputs.replay_source }}
+        run: |
+          replay=()
+          if [[ -n "$REPLAY_SOURCE" ]]; then replay=(--replay-source "$REPLAY_SOURCE"); fi
+          python3 scripts/ui-build-products.py unpack --archive .build/ui-products.tar.gz "${replay[@]}" > .build/ui-product-identity.json
+          cat .build/ui-product-identity.json
       - name: Resolve an available ${{ matrix.family }} simulator
         if: needs.changes.outputs.run_tests == 'true'
         id: sim
@@ -357,18 +391,19 @@ jobs:
           name: ${{ inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', 'ui-test-results', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
             App/TestResults.xcresult
-            App/TestResults-sharing.xcresult
             .build/ui-sync
             .build/eventkit-fixture
             .build/ui-host-diagnostics
             .build/ui-execution.json
+            .build/ui-product-identity.json
+            .build/ui-products.tar.json
           include-hidden-files: true
           if-no-files-found: ignore
 
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["keyboard","text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'keyboard' && 'Keyboard' || needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
+    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || needs.changes.outputs.suite == 'sync' && 'App · Manual sync diagnostics (iPhone)' || contains(fromJSON('["text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

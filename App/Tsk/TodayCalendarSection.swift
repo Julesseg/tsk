@@ -19,11 +19,6 @@ struct TodayCalendarSection: View {
         #if DEBUG && targetEnvironment(simulator)
         if calendar.fixtureVerified { Text("Actual Calendar source readback unchanged").font(.caption).accessibilityIdentifier("calendar-fixture-verified") }
         if let error = calendar.fixtureError { Text(error).foregroundStyle(.red).accessibilityIdentifier("calendar-fixture-error") }
-        if let token = ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_FIXTURE"], ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", calendar.snapshot?.authorization == .fullAccess {
-            Button("Add owned Calendar fixture event") {
-                Task { if let day = calendar.snapshot?.day { try? await EventKitCalendarFixture.addObservedEvent(token: token, day: day) } }
-            }.accessibilityIdentifier("calendar-fixture-add")
-        }
         #endif
     }
 }

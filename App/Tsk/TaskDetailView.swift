@@ -47,7 +47,6 @@ struct TaskDetailView: View {
                 if !task.canChangeActivity { Text("Start and stop are available for unfinished tasks with valid task state.").font(.footnote) }
             }
             TaskAvailabilityView(task: task, store: store, isDetail: true)
-            TaskDependenciesSection(store: store, task: task, onSave: { task = $0 }, select: { panel = .dependency })
             Section("Planning") { TaskPlanningSummary(task: task) }
             TaskAnnotationsSection(store: store, task: task, edit: { panel = .annotation($0) })
             if !task.canEdit, task.recurrenceInspection == nil {
@@ -70,7 +69,6 @@ struct TaskDetailView: View {
                 }
                     .disabled(store.isSaving)
                     .accessibilityIdentifier("edit-task")
-                    .keyboardShortcut(edit == nil ? KeyboardShortcut("e", modifiers: .command) : nil)
             }
         }
         .sheet(isPresented: $isEditing) { TaskEditorView(store: store, task: task, onSave: { task = $0 }) }
@@ -81,7 +79,6 @@ struct TaskDetailView: View {
                 if let retired = store.allTasks.first(where: { $0.id == task.id }) { task = retired }
             })
             case .series: TaskSeriesMetadataEditor(store: store, template: task, onSave: { task = $0 })
-            case .dependency: TaskDependencySelection(store: store, task: task, onSave: { task = $0 })
             case .annotation(let annotation): TaskAnnotationEditor(store: store, task: task, original: annotation, onSave: { task = $0 })
             }
         }
@@ -100,13 +97,12 @@ struct TaskDetailView: View {
 }
 
 private enum TaskDetailPanel: Identifiable {
-    case dependency, annotation(TaskAnnotation?), series, transition
+    case annotation(TaskAnnotation?), series, transition
 
     var id: String {
         switch self {
         case .transition: "transition"
         case .series: "series"
-        case .dependency: "dependency"
         case .annotation(let annotation): annotation?.reference.rawValue ?? "new-annotation"
         }
     }

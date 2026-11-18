@@ -157,11 +157,6 @@ final class TaskSelectionRecognizer: UILongPressGestureRecognizer, UIGestureReco
                 guard let self, token == self.generation, let store = self.store,
                       selectionGeneration == store.taskSelectionGeneration else { return }
                 if wasEditing {
-                    #if DEBUG
-                    if ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_EDITOR_DELAY"] == "1" {
-                        try? await Task.sleep(for: .seconds(3))
-                    }
-                    #endif
                     guard token == self.generation, !Task.isCancelled,
                           selectionGeneration == store.taskSelectionGeneration else { return }
                     let ready = await store.beginSelectionGesture()

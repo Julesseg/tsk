@@ -1,42 +1,36 @@
 # CI test tiers
 
 PRs and pushes to `main` run all Core, Native, Apple-framework and controller
-tests plus three iPhone smoke journeys. `App · XCUITest (macOS)` remains the
+tests plus two iPhone smoke journeys. `App · XCUITest (macOS)` remains the
 required iPhone rollup; its name refers to the Mac runner. Native iPad support
 and coverage are retired under [ADR 0007](../adr/0007-iphone-only.md).
 The manual form defaults to smoke.
 
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
-| Smoke | 3 methods | PR, main push, explicit dispatch |
-| Full | 41 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 27 on-demand methods | `diagnostic_only=true` |
-| Keyboard | 2 methods | Explicit dispatch |
-| Text | 3 methods | Explicit dispatch |
-| Regression | 5 methods | Explicit dispatch |
-| Menu | 5 methods | Explicit dispatch |
+| Smoke | 2 methods | PR, main push, explicit dispatch |
+| Full | 23 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 23 on-demand methods | `diagnostic_only=true` |
+| Text | 1 method | Explicit dispatch |
+| Regression | 4 methods | Explicit dispatch |
+| Menu | 4 methods | Explicit dispatch |
+| Sync | 1 manual synchronization method and independent peer | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 68 retained methods has exactly one primary
+methods for every suite. Each of the 46 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
 are included in source discovery.
 
 Smoke covers inline capture/cancellation/save/relaunch, row validation/native
-pickers/outside-save/durable completion, and actual hold/drag selection with
-held-touch refresh stability, scrolling recovery and a staged dates/completion
-Apply. The gesture also runs without native list accessibility identifiers.
-Smoke needs no synchronization server, independent peer or native HID transport.
+pickers/outside-save/durable completion.
+Smoke needs no synchronization server or independent peer.
 
-Nightly keeps bulk reset/cancel/mixed dates, failed Apply and valid/invalid editor
-handoff; row notes, tag validation and dependency navigation; saved views/native
-reordering; occurrence success/failure; series preview/cancel/commit; manual and
-automatic-failure sync; real EventKit Calendar and Reminders; destructive move
-source-change/interruption safety; installed Share/widgets/Spotlight; actual
-closed-app and received-sync notification delivery; native HID command/focus
-routing; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
+Nightly keeps bulk failed Apply;
+row notes and tag validation; saved views/native
+reordering; occurrence success/failure; series metadata preview/cancel/save; manual sync; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
 adds fresh/completed/missing task identities, all view categories, stable saved-view
 renames/deletion, unchanged favorites, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
@@ -45,31 +39,61 @@ change touches those contracts. Moving frequency does not establish acceptance.
 
 On-demand coverage retains genuine lower-priority UI contracts: appearance and
 large text, exact row geometry and animation drift, native Project-menu stress,
-focus and retained-open scroll, Calendar display settings, notification Settings
-revocation, detail activity/annotation controls, recurring authoring/copy, stale
-Spotlight results and undeliverable callbacks. These do not run automatically at
+focus and retained-open scroll, Calendar display settings, detail activity/annotation
+controls, recurring authoring/copy and undeliverable callbacks. These do not run automatically at
 night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
 baseline and accepted gaps.
 
-The Menu suite retains three native Project-menu journeys plus product annotation
-and workspace/editor HID cases. Its stress case still opens and dismisses New
+The Menu suite retains three native Project-menu journeys plus touch-based annotation
+editing. Its stress case still opens and dismisses New
 project twenty times with five-second acknowledgements, including title/note
 keyboard handoff. Its scroll-retention case still uses 80 real project values,
 a settled distant neighborhood, ten untouched seconds and two-point endpoint
 geometry. The animation case still requires one-point presentation-frame
 stability. These contracts moved out of scheduled coverage without relaxed bars.
 
-The nightly HID workspace/editor journey retains all thirteen input phases and
-native outcomes, including selection Escape/Return behavior and capture after
-returning from Settings. The annotation case runs on demand. The standalone
-UIKit keyboard-control UI test is retired; protocol/ownership host regressions
-remain. The Menu, Keyboard, Text and Diagnostic suites need native HID but no UI
-sync server or peer. Regression retains Share, row editing, native menu stress
-and view ordering without HID/server/peer setup.
+Hardware keyboard commands, their dedicated UI suite and native HID tooling,
+and all widgets were removed by the user on 2026-11-17. The remaining annotation
+journey uses visible Save controls and native touch text selection. The user
+also retired the combined real-Calendar permission/revocation/Settings-handoff
+journey after checking that scenario on a physical device. Calendar remains in
+the product, with its controller, Native EventKit and on-demand display tests.
+The user also retired the automatic-sync failure/offline-save/relaunch UI
+scenario. Automatic sync remains supported and covered in Core/Native tests.
+The user also removed incoming Share end to end and retired the held-selection
+refresh/durable-completion and series-transition UI journeys. Bulk selection and
+series transitions remain in the product, with their Core/Native checks and
+other retained UI coverage. Their removed UI scenarios are no longer acceptance
+gates. The owned URL/callback host remains as TskActionFixture.
+Notifications and Spotlight indexing, including their dedicated UI/Core/Native
+tests, settings, services, fixtures and entitlement, were also removed explicitly.
+Task dates, ordinary task search, sync, Calendar and seven Shortcuts remain.
+A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
+items; it requests no authorization and creates no new alerts or index records.
+Full now selects 17 workspace and six row methods.
+Apple Reminders import was removed on 2026-11-18: one-time copy, continuous
+move, recurring conversion, settings, permission requests, background import,
+Core/Native APIs and dedicated fixtures/tests are retired. Calendar and tasks
+already saved in tsk remain.
+These removals do not establish fixes for historical failed runs.
 
-Green smoke does not certify extensions, permissions, system delivery or native
-HID. Historical reports before ADR 0007 include retired iPad cases and do not
+Saved-value assertions read the existing Native replica. The organization journey
+keeps the app in the foreground; explicit relaunch scenarios retain their lifecycle steps.
+A worker resolves the runner's current platform container after launch and reads
+its session-bound request. A separate registered App Group lookup locates the
+existing replica. File-change notifications resume the test when actual records
+arrive. Container lookup, query execution and response delivery have no separate
+short deadlines. The relay remains responsive during these operations. The
+existing whole-test and CI job watchdogs stop hung runs; cleanup reaps unfinished
+owned reader processes. UI readiness waits and tests of explicit timing behavior
+retain their condition checks and bounds.
+
+The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
+Regression retains row editing, native menu stress and view ordering
+without server/peer setup.
+
+Green smoke does not certify permissions or system delivery. Historical reports before ADR 0007 include retired iPad cases and do not
 establish current iPhone acceptance. Neither simulator UI nor direct intent
 `perform()` tests prove external Shortcuts/Siri or physical-device invocation.
 
@@ -77,8 +101,7 @@ establish current iPhone acceptance. Neither simulator UI nor direct intent
 
 The Linux Native job runs `TskNativeTests` with a pinned Taskwarrior 3.5.0 client,
 the real synchronization server and the native probe. The Mac producer runs
-`TskNativeAppleTests`, including App Intents, EventKit, item providers,
-notification content and owned Spotlight indexing, using the same fixture
+`TskNativeAppleTests`, including App Intents and EventKit, using the same fixture
 versions. Apple tests have their own SwiftPM target so Linux compilation cannot
 silently stand in for their execution. Both jobs use
 `scripts/build-taskwarrior-fixture.sh` to verify the official release archive's
@@ -107,11 +130,10 @@ suppressed-animation journeys do not certify transition timing or performance.
 Direct intent fixtures call the actual `perform()` implementation; their app
 readback does not certify external Shortcuts/Siri discovery or invocation.
 
-Ordinary smoke/full runs leave expensive participant and keyboard traces off.
-Focused diagnostic, keyboard, text, regression and menu selections explicitly
+Ordinary smoke/full runs leave expensive participant traces off.
+Focused diagnostic, text, regression and menu selections explicitly
 forward `TSK_UI_DIAGNOSTICS=1` to the app. An isolated replica alone does not
-enable them. Receipts coalesce by file on a utility queue, outside input dispatch;
-Share's explicit request-scoped fixture flushes before completing the extension.
+enable them. Receipts coalesce by file on a utility queue, outside input dispatch.
 Diagnostic snapshots remain best-effort if a process is killed before the next
 flush. Transport acknowledgements and UI outcome assertions are independent of
 these optional traces.
@@ -141,13 +163,12 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 30 methods | 11 methods |
+| iPhone | 17 methods | 6 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
-All native HID cases, installed system integrations and server/peer consumers
-remain in workspace. The task worker requires neither native HID nor a server.
-Share executes before the rest of its worker. Portable selection and ownership
-regressions run once on Linux; controller regressions run in the producer.
+Installed system integrations and server/peer consumers remain in workspace.
+The task worker requires no server.
+Portable selection and ownership regressions run once on Linux; controller regressions run in the producer.
 
 Measure the complete iPhone-only workflow, including build, setup, queue and
 cleanup, before deciding whether full coverage belongs in PR checks. Removing
@@ -156,11 +177,11 @@ the previous device workers ran in parallel. PR coverage remains smoke until a
 measured result supports changing that policy.
 
 Every execution worker owns one disposable simulator. Existing isolated
-ownership, cleanup traps and `always()` deletion remain. During Share and main
+ownership, cleanup traps and `always()` deletion remain. During UI
 execution, an asynchronous monitor checks only the owned device. A positively
 observed `Shutdown` stops the owned process group and reports infrastructure
 exit 74. Missing/slow/invalid queries do not assert device loss. Monitor queries
-are bounded and killed/reaped without blocking native keyboard request delivery.
+are bounded and killed/reaped without blocking test execution.
 Ordinary test assertions still allow independent methods to finish. The first
 failure is annotated immediately, rather than waiting for the suite's last case.
 
@@ -208,9 +229,7 @@ with a 165-minute worker limit after moving builds out; focused diagnostics have
 allowance. These are ceilings, not performance targets. A polling deadline does
 not interrupt a blocking XCTest accessibility call.
 
-Native HID initialization, fixed case/phase sequences, nonce/PID/device/socket
-checks, request deadlines, UP cleanup and public XCTest acceptance remain
-unchanged. Keyboard dismissal still requires visible geometry and two stable
+On-screen keyboard dismissal still requires visible geometry and two stable
 samples within 20 seconds. It prefers keyboard frames from the same app snapshot. If that hierarchy omits
 the keyboard, the original query against the same owning application supplies
 the geometry; absence still fails rather than inventing a keyboard frame. Native Select All still
@@ -234,6 +253,19 @@ same 90-second run-ID convergence budget. Authorization errors, malformed respon
 and terminal test failures fail immediately; API retries never replay tests.
 
 ## Dispatch and retries
+
+The focused Sync lane runs the existing manual synchronization case with the
+real server and independent peer. It retains loopback TCP timestamps, flags and
+lengths, plus server timeout and access logs. It writes no packet payloads or
+packet capture files. Full runs also retain Actix's request-dispatch trace for
+the owned fixture. The hosted focused lane requires permission to observe its
+loopback port.
+
+To replay signed products from an earlier completed CI run, pass
+`--suite sync --sync-products-run <run-id>` to the dispatch helper. Replay
+requires matching App, Core and Native source trees, archive integrity and an
+exact toolchain and runtime match. The result records the original product
+identity and exercises only the selected sync method.
 
 Use the helper after publishing a frozen branch:
 
@@ -276,3 +308,35 @@ python3 scripts/plan-ui-tests.py full
 python3 scripts/ui-test-selection.py select full iPhone --partition row-editing
 python3 scripts/test-ui-test-selection.py
 ```
+
+Dependency management and its dedicated navigation journey were retired by the
+user on 2026-11-17. Retained row notes, waiting dates, activity and external
+task-navigation assertions keep their existing deadlines. Imported Taskwarrior
+fields and read-only filter compatibility remain preserved.
+
+## Durable data readback
+
+Capture, bulk-date failure, row editing/supporting information/organization,
+series metadata, Scheduled edits and annotation persistence use direct Native readback.
+The UI still performs the real edit, validation and save/Apply actions. The runner
+opens that UUID-named fixture replica with TaskChampion's
+read-only, existing-storage mode and returns actual records to the XCTest assertions.
+It obtains the app's registered App Group path through simctl, preserves native
+admission locks, and never substitutes an in-app action or changes task data.
+Readback does not require app termination: the organization scenario keeps the
+app in the foreground for both persisted-value checks. Scenarios that verify
+relaunch behavior retain their explicit lifecycle steps.
+
+Requests and responses bind the run session, nonce, replica, method and checkpoint.
+The selected methods declare required checkpoints; missing, duplicate, expired or
+failed queries cannot produce green coverage. Artifacts retain the Native responses
+and checkpoint summary. Use scripts/run-ui-tests.sh on its owned isolated simulator
+with the built host probe/library; a bare Xcode test run lacks this host readback.
+Every UI producer packages the host probe, including diagnostic-only suites;
+this does not add Native unit-test batches or a synchronization server to them.
+UI-specific presentation, validation, navigation, keyboard and system-delivery
+assertions remain. The editor-handoff bulk-selection method was explicitly retired
+by the user; bulk selection itself remains supported. The bulk-date apply/cancel/
+mixed-fields/relaunch UI journey was also retired by explicit user decision.
+Bulk-date product behavior, Core/Native checks, failed-Apply UI and on-demand
+picker-motion coverage remain.

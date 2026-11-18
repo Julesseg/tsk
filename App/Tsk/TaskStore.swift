@@ -286,7 +286,7 @@ final class TaskStore {
     }
 
     func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
-        task.availability(at: fixedDate ?? date, tasks: allTasks)
+        task.availability(at: fixedDate ?? date)
     }
 
     func reload() async {
@@ -327,16 +327,6 @@ final class TaskStore {
 
     func updateRow(_ draft: TaskRowDraft) async -> TaskRecord? {
         await perform { try await $0.updateRow(draft) }
-    }
-
-    func dependencyLinks(for task: TaskRecord) -> [TaskDependencyLink] { task.dependencyLinks(in: allTasks) }
-
-    func addDependency(id: UUID, prerequisiteID: UUID) async -> TaskRecord? {
-        await perform { try await $0.addDependency(id: id, prerequisiteID: prerequisiteID) }
-    }
-
-    func removeDependency(id: UUID, reference: String) async -> TaskRecord? {
-        await perform { try await $0.removeDependency(id: id, reference: reference) }
     }
 
     func addAnnotation(id: UUID, text: String) async -> TaskRecord? {

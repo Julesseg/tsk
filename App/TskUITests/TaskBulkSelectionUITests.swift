@@ -16,258 +16,7 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably() throws {
-        let app = try launch(probe: true, nativeIdentifiers: false)
-        let list = app.collectionViews.firstMatch
-        XCTAssertEqual(list.identifier, "task-list")
-        let initial = app.buttons["task-" + first].frame
-        let last = app.buttons["task-" + third].frame
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: initial.midY))
-        let end = start.withOffset(CGVector(dx: 0, dy: last.midY - initial.midY))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: list.frame.width * 0.7, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
-        XCTAssertFalse(app.buttons["task-selection-apply"].exists)
-        XCTAssertFalse(app.textFields["task-description"].exists, "A swipe without a hold must not select or open the editor")
-        start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 2)
-        let count = app.buttons["task-selection-apply"]
-        let selectionAppeared = count.waitForExistence(timeout: 10)
-        if !selectionAppeared {
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Missing held selection after short swipe"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-        }
-        XCTAssertTrue(selectionAppeared)
-        let data = try XCTUnwrap((count.value as? String)?.data(using: .utf8))
-        let proof = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
-        attachment.name = "Held selection runtime proof"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        XCTAssertEqual(count.label, "3 selected")
-        XCTAssertEqual(proof["selectedWhileTouchDown"] as? Bool, true)
-        XCTAssertEqual(proof["maximumSelectedWhileTouchDown"] as? Int, 3)
-        XCTAssertEqual(proof["scrollingDisabled"] as? Bool, true)
-        XCTAssertEqual(proof["offsetsStable"] as? Bool, true)
-        XCTAssertEqual(proof["rowsStable"] as? Bool, true)
-        XCTAssertEqual(proof["refreshWhileTouchDown"] as? Bool, true)
-        XCTAssertGreaterThanOrEqual(try XCTUnwrap(proof["activationDuration"] as? Double), 0.25)
-        XCTAssertLessThanOrEqual(try XCTUnwrap(proof["activationDistance"] as? Double), 10, "Selection activates during the stationary hold, before vertical dragging")
-        let width = try XCTUnwrap(proof["columnWidth"] as? Double)
-        XCTAssertEqual(width, list.frame.width, accuracy: 2)
-        if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertLessThan(width, app.frame.width * 0.75) }
-        XCTAssertTrue(taskRow(named: "Arrived while selecting", app: app).waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["task-" + first].frame.minX, initial.minX, accuracy: 1, "Rows stay horizontally fixed during selection")
-        let circles = app.buttons.matching(identifier: "complete-task-row-" + second)
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "2 selected")
-        func sweepBack() {
-            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: app.buttons["task-" + third].frame.midY))
-            let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + first].frame.midY - app.buttons["task-" + third].frame.midY))
-            start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
-        }
-        sweepBack()
-        XCTAssertTrue(count.waitForNonExistence(timeout: 5), "Deselecting every touched row exits selection mode")
-        XCTAssertFalse(app.buttons["task-selection-apply"].exists)
-        XCTAssertFalse(app.buttons["complete-task-selection"].exists)
-        sweepBack()
-        XCTAssertEqual(count.label, "3 selected", "A new gesture starting on an unselected row adds every touched row")
-        XCTAssertEqual(circles.firstMatch.value as? String, "Selected")
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "2 selected")
-        circles.firstMatch.tap()
-        XCTAssertEqual(count.label, "3 selected")
-        let offset = app.buttons["task-" + first].frame.minY
-        list.swipeUp()
-        let firstRow = app.buttons["task-" + first]
-        XCTAssertTrue(!firstRow.exists || abs(firstRow.frame.minY - offset) > 1, "Scrolling resumes after release")
-        app.buttons["selection-scheduled"].tap()
-        app.buttons["selection-date-today"].tap()
-        app.buttons["close-selection-date"].tap()
-        app.buttons["selection-deadline"].tap()
-        app.buttons["selection-date-tomorrow"].tap()
-        app.buttons["close-selection-date"].tap()
-        app.buttons["complete-task-selection"].tap()
-        XCTAssertEqual(app.buttons["complete-task-selection"].value as? String, "Modified")
-        XCTAssertTrue(count.exists, "Completion remains pending until Apply")
-        captureBulkDateEvidence("Both dates and completion staged for one Apply commit", app: app)
-        app.buttons["task-selection-apply"].tap()
-        XCTAssertTrue(count.waitForNonExistence(timeout: 15))
-        app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectDoneTasks(app)
-        for name in ["First selection task", "Second selection task", "Third selection task"] {
-            XCTAssertTrue(taskRow(named: name, app: app).waitForExistence(timeout: 10))
-        }
-        taskRow(named: "First selection task", app: app).tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792144800))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792238400))
-    }
-
-    func testSelectionResolvesValidEditorAndRetainsInvalidDraft() throws {
-        let app = try launch(crowded: true)
-        let thirdRow = app.buttons["task-" + third]
-        XCTAssertTrue(thirdRow.waitForExistence(timeout: 10))
-        let selectionDistance = thirdRow.frame.midY - app.buttons["task-" + first].frame.midY
-        app.buttons["task-" + first].tap()
-        let title = app.textFields["task-description"]
-        XCTAssertTrue(title.waitForExistence(timeout: 10))
-        replaceTaskText(title, with: " ", app: app)
-        app.buttons["dismiss-row-keyboard"].tap()
-        let list = app.collectionViews["task-list"]
-        func selectExpandedRow(continuingVertically: Bool = false) {
-            let circle = app.buttons["complete-task-row-" + first]
-            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 24, dy: circle.frame.midY))
-            start.press(forDuration: 0.8, thenDragTo: start.withOffset(CGVector(dx: 0, dy: continuingVertically ? selectionDistance : 0)), withVelocity: .slow, thenHoldForDuration: 1)
-        }
-        selectExpandedRow()
-        XCTAssertTrue(app.staticTexts["draft-error"].waitForExistence(timeout: 10))
-        XCTAssertTrue(title.exists)
-        XCTAssertFalse(app.buttons["task-selection-apply"].exists)
-        replaceTaskText(title, with: "Saved before selecting", app: app)
-        app.buttons["dismiss-row-keyboard"].tap()
-        selectExpandedRow(continuingVertically: true)
-        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "3 selected")
-        XCTAssertEqual(app.buttons["complete-task-row-" + third].value as? String, "Selected")
-        XCTAssertTrue(taskRow(named: "Saved before selecting", app: app).exists)
-        app.buttons["cancel-task-selection"].tap()
-        app.buttons["task-" + first].tap()
-        XCTAssertEqual(title.value as? String, "Saved before selecting")
-        let circle = app.buttons["complete-task-row-" + first]
-        let quickStart = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 24, dy: circle.frame.midY))
-        quickStart.press(forDuration: 0.8)
-        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "1 selected")
-        let row = app.buttons["task-" + first]
-        let beforeScroll = row.frame.minY
-        list.swipeUp()
-        XCTAssertTrue(!row.exists || abs(row.frame.minY - beforeScroll) > 1, "An editor save finishing after release must restore scrolling")
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "1 selected")
-        app.buttons["cancel-task-selection"].tap()
-    }
-
-    func testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch() throws {
-        let app = try launch()
-        selectPair(app)
-        let scheduled = app.buttons["selection-scheduled"]
-        let deadline = app.buttons["selection-deadline"]
-        let complete = app.buttons["complete-task-selection"]
-        XCTAssertFalse(app.buttons["workspace-settings"].exists)
-        XCTAssertTrue(app.buttons["cancel-task-selection"].exists)
-        XCTAssertEqual(scheduled.value as? String, "Unchanged")
-        XCTAssertEqual(deadline.value as? String, "Unchanged")
-        XCTAssertEqual(complete.value as? String, "Unchanged")
-        for button in [scheduled, deadline, complete] {
-            XCTAssertEqual(button.frame.width, button.frame.height, accuracy: 1)
-        }
-        XCTAssertEqual(scheduled.frame.maxX, deadline.frame.maxX, accuracy: 1)
-        XCTAssertLessThan(scheduled.frame.maxY, deadline.frame.minY)
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
-        XCTAssertFalse(app.buttons["task-selection-apply"].isEnabled)
-        XCTAssertFalse(app.buttons["reset-selection-scheduled"].exists)
-        captureBulkDateEvidence("Neutral glass controls and toolbar cancellation", app: app)
-        scheduled.tap()
-        XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
-        assertCompactPicker(app, field: "scheduled")
-        XCTAssertFalse(app.buttons["reset-selection-date"].isEnabled)
-        app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
-        XCTAssertTrue(app.buttons["reset-selection-date"].isEnabled)
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2")
-        XCTAssertTrue(app.buttons["task-selection-apply"].isEnabled)
-        captureBulkDateEvidence("Glass Scheduled control expanded into date and time", app: app)
-        let rowFrame = app.buttons["task-" + first].frame
-        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rowFrame.midX, dy: rowFrame.minY + 4))
-        outside.tap()
-        XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2", "An outside row tap closes the picker without changing selection")
-        XCTAssertEqual(scheduled.value as? String, "Modified")
-        scheduled.tap()
-        let pickerFrame = app.otherElements["selection-date-picker"].frame
-        let besidePicker = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: max(1, pickerFrame.minX / 2), dy: pickerFrame.midY))
-        besidePicker.tap()
-        XCTAssertTrue(app.otherElements["selection-date-picker"].waitForNonExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2", "Empty space beside the picker also collapses it without changing selection")
-        XCTAssertEqual(scheduled.value as? String, "Modified")
-        app.buttons["task-" + third].tap()
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 3", "Row selection resumes after the picker closes")
-        app.buttons["task-" + third].tap()
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "Apply to 2")
-        captureBulkDateEvidence("Collapsed pending value with neutral Reset", app: app)
-        let reset = app.buttons["reset-selection-scheduled"]
-        XCTAssertTrue(reset.isHittable)
-        XCTAssertLessThan(reset.frame.maxX, scheduled.frame.maxX)
-        reset.tap()
-        XCTAssertEqual(scheduled.value as? String, "Unchanged")
-        XCTAssertFalse(app.buttons["task-selection-apply"].isEnabled)
-        XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
-        scheduled.tap()
-        app.buttons["selection-date-today"].tap()
-        app.buttons["close-selection-date"].tap()
-        deadline.tap()
-        assertCompactPicker(app, field: "deadline")
-        app.buttons["selection-date-remove"].tap()
-        app.buttons["close-selection-date"].tap()
-        complete.tap()
-        XCTAssertEqual(complete.value as? String, "Modified")
-        captureBulkDateEvidence("Both dates and completion staged before X", app: app)
-        app.buttons["cancel-task-selection"].tap()
-        XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["workspace-settings"].exists)
-        app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectAllTasks(app)
-        app.buttons["task-" + first].tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792231200))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792238400))
-        closeTaskRow(app)
-        selectPair(app)
-        XCTAssertEqual(scheduled.value as? String, "Unchanged")
-        XCTAssertEqual(deadline.value as? String, "Unchanged")
-        XCTAssertEqual(complete.value as? String, "Unchanged")
-        scheduled.tap()
-        app.buttons["selection-date-tomorrow"].tap()
-        app.buttons["close-selection-date"].tap()
-        XCTAssertEqual(scheduled.value as? String, "Modified")
-        scheduled.tap()
-        XCTAssertEqual(app.buttons["selection-date-tomorrow"].value as? String, "Selected")
-        app.buttons["reset-selection-date"].tap()
-        app.buttons["close-selection-date"].tap()
-        XCTAssertEqual(scheduled.value as? String, "Unchanged")
-        XCTAssertFalse(app.buttons["task-selection-apply"].isEnabled)
-        scheduled.tap()
-        app.buttons["selection-date-tomorrow"].tap()
-        app.buttons["close-selection-date"].tap()
-        deadline.tap()
-        app.buttons["selection-date-remove"].tap()
-        app.buttons["close-selection-date"].tap()
-        complete.tap()
-        complete.tap()
-        XCTAssertEqual(complete.value as? String, "Unchanged", "Toggling completion back removes its tint")
-        captureBulkDateEvidence("Tinted dates remain pending until Apply", app: app)
-        app.buttons["task-selection-apply"].tap()
-        XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 10))
-        app.terminate()
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectAllTasks(app)
-        app.buttons["task-" + first].tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792231200))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
-        closeTaskRow(app)
-        tapTaskControlAtCenter(app.buttons["task-" + second], app: app)
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: 1792144800))!
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(Calendar.current.startOfDay(for: tomorrow).timeIntervalSince1970))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
-    }
-
-    func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() throws {
+    func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() async throws {
         let app = try launch(invalidOccurrence: true)
         selectPair(app)
         app.buttons["selection-scheduled"].tap()
@@ -291,17 +40,13 @@ import XCTest
         XCTAssertTrue(error.exists)
         app.buttons["cancel-task-selection"].tap()
         app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        app.tabBars.buttons["Upcoming"].tap()
-        XCTAssertEqual(upcomingRows(first, app: app).count, 2, "Failed Apply must preserve both original dates")
-        selectAllTasks(app)
-        XCTAssertTrue(app.buttons["task-" + first].exists)
-        app.buttons["task-" + second].tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, "Not set")
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, "Not set")
+        let unchanged = try await storedTasks(app, checkpoint: "failed-apply")
+        XCTAssertEqual(unchanged[first]?["scheduled"], "1792231200")
+        XCTAssertEqual(unchanged[first]?["due"], "1792238400")
+        XCTAssertNil(unchanged[second]?["scheduled"])
+        XCTAssertNil(unchanged[second]?["due"])
+        for id in [first, second, third] { XCTAssertEqual(unchanged[id]?["status"], "pending") }
+
     }
 
     func testSelectionPickerValueChangesKeepQuickActionsStationary() throws {
@@ -346,35 +91,73 @@ import XCTest
     }
 
     private func selectPair(_ app: XCUIApplication) {
-        let list = app.collectionViews["task-list"]
         let row = app.buttons["task-" + first]
         let next = app.buttons["task-" + second]
+        let deadline = ProcessInfo.processInfo.systemUptime + 10
         var previous: [CGRect]?
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard !app.textFields["task-description"].exists, !app.otherElements["task-row-editor"].exists,
-                  row.exists, next.exists, row.isHittable, next.isHittable else { previous = nil; return false }
-            let frames = [list.frame, row.frame, next.frame]
-            let stable = previous == frames && frames.allSatisfy { !$0.isEmpty }
-            previous = frames
-            return stable
-        }, object: nil)
-        guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed else {
+        var admitted: [CGRect]?
+        var lastSample = "not sampled"
+        func sample() -> Bool {
+            guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            let started = ProcessInfo.processInfo.systemUptime
+            do {
+                let snapshot = try app.snapshot()
+                var nodes: [XCUIElementSnapshot] = []
+                func collect(_ node: XCUIElementSnapshot) {
+                    nodes.append(node)
+                    for child in node.children { collect(child) }
+                }
+                collect(snapshot)
+                guard !nodes.contains(where: { $0.identifier == "task-description" && $0.elementType == .textField || $0.identifier == "task-row-editor" && $0.elementType == .other }) else {
+                    previous = nil
+                    lastSample = "editor remains open"
+                    return false
+                }
+                let targets = [("task-list", XCUIElement.ElementType.collectionView), ("task-" + first, .button), ("task-" + second, .button)]
+                var frames: [CGRect] = []
+                for (identifier, type) in targets {
+                    let matches = nodes.filter { $0.identifier == identifier && $0.elementType == type }
+                    guard matches.count == 1, let frame = matches.first?.frame, !frame.isEmpty else {
+                        previous = nil
+                        lastSample = "missing or ambiguous geometry: \(identifier) count=\(matches.count)"
+                        return false
+                    }
+                    frames.append(frame)
+                }
+                lastSample = "frames=\(frames) snapshotSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
+                guard ProcessInfo.processInfo.systemUptime < deadline else { return false }
+                let hittable = row.isHittable && next.isHittable
+                lastSample += " hittable=\(hittable) totalSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
+                guard hittable, ProcessInfo.processInfo.systemUptime < deadline else {
+                    previous = nil
+                    return false
+                }
+                let stable = previous == frames
+                previous = frames
+                lastSample += " stable=\(stable)"
+                if stable { admitted = frames }
+                return stable
+            } catch {
+                previous = nil
+                lastSample = "snapshot failed: \(error)"
+                return false
+            }
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in sample() }, object: nil)
+        guard XCTWaiter.wait(for: [ready], timeout: max(0, deadline - ProcessInfo.processInfo.systemUptime)) == .completed,
+              ProcessInfo.processInfo.systemUptime < deadline, let frames = admitted else {
+            let detail = XCTAttachment(string: lastSample)
+            detail.name = "Selection readiness admission"
+            detail.lifetime = .keepAlways
+            add(detail)
             XCTFail("Selection rows must settle before the native hold and sweep")
             return
         }
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: list.frame.minX + 60, dy: row.frame.midY))
-        let end = start.withOffset(CGVector(dx: 0, dy: app.buttons["task-" + second].frame.midY - row.frame.midY))
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frames[0].minX + 60, dy: frames[1].midY))
+        let end = start.withOffset(CGVector(dx: 0, dy: frames[2].midY - frames[1].midY))
         start.press(forDuration: 0.8, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
-    }
-
-    private func upcomingRows(_ id: String, app: XCUIApplication) -> XCUIElementQuery {
-        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@", "upcoming-", id))
-    }
-
-    private func formatted(_ seconds: TimeInterval) -> String {
-        Date(timeIntervalSince1970: seconds).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "en_US")))
     }
 
     private func captureBulkDateEvidence(_ name: String, app: XCUIApplication) {
@@ -384,36 +167,14 @@ import XCTest
         add(attachment)
     }
 
-    private func assertCompactPicker(_ app: XCUIApplication, field: String, file: StaticString = #filePath, line: UInt = #line) {
-        let actions = ["selection-date-today", "selection-date-tomorrow", "reset-selection-date", "selection-date-remove"].map { app.buttons[$0] }
-        for action in actions {
-            XCTAssertTrue(action.isHittable, "Every quick action is visible without scrolling", file: file, line: line)
-            XCTAssertEqual(action.frame.midY, actions[0].frame.midY, accuracy: 1, file: file, line: line)
-        }
-        let calendar = app.datePickers[field + "-picker"]
-        XCTAssertGreaterThanOrEqual(calendar.frame.minY, app.frame.minY, file: file, line: line)
-        XCTAssertGreaterThanOrEqual(actions[0].frame.minY, calendar.frame.maxY, "Quick actions sit below the calendar", file: file, line: line)
-        XCTAssertLessThanOrEqual(calendar.frame.maxY, app.frame.maxY, "The whole date/time picker fits on screen", file: file, line: line)
-        XCTAssertTrue(app.buttons["close-selection-date"].isHittable, file: file, line: line)
-    }
-
-    private func launch(probe: Bool = false, invalidOccurrence: Bool = false, crowded: Bool = false, animationsEnabled: Bool = false, nativeIdentifiers: Bool = true, motionProbe: Bool = false) throws -> XCUIApplication {
+    private func launch(invalidOccurrence: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
-        if probe {
-            app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1"
-            app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0"
-        }
         if motionProbe { app.launchEnvironment["TSK_TEST_SELECTION_MOTION"] = "1" }
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
-        if !nativeIdentifiers { app.launchEnvironment["TSK_TEST_SELECTION_NATIVE_IDENTIFIERS"] = "0" }
-        if crowded {
-            app.launchEnvironment["TSK_TEST_SELECTION_EDITOR_DELAY"] = "1"
-            app.launchEnvironment["TSK_UI_DIAGNOSTICS"] = "1"
-        }
         var records: [[String: Any]] = []
         func add(_ id: String, _ attributes: [String: String]) {
             records.append(["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }])
@@ -427,11 +188,6 @@ import XCTest
         add(first, attributes)
         add(second, ["description": "Second selection task", "status": "pending"])
         add(third, ["description": "Third selection task", "status": "pending"])
-        if probe || crowded {
-            for index in 4...40 {
-                add(String(format: "A0000000-0000-0000-0000-%012d", index), ["description": "Later selection task \(index)", "status": "pending"])
-            }
-        }
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))

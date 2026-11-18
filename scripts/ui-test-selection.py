@@ -1,5 +1,7 @@
 import argparse
-import importlib.util
+import json
+
+from native_ui_readback import CHECKPOINTS
 import pathlib
 import re
 
@@ -7,23 +9,11 @@ import re
 PHONE_SMOKE = (
     'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
-    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
 )
 
 NIGHTLY = (
-    'AutomaticSynchronizationUITests/testAutomaticFailureKeepsCaptureAvailableAndRetriesOnRelaunch',
-    'CalendarTodayUITests/testRealCalendarTodayReadOnlyClippingStoreChangeForegroundAndRevocation',
-    'ContinuousReminderImportUITests/testActualSourceEditIntoRecurringRuleIsPreservedAndAutomaticMovePauses',
-    'ContinuousReminderImportUITests/testInterruptionAndActualPermissionResetAfterCommitLeaveSourceAndTaskAvailable',
-    'ContinuousReminderImportUITests/testRealContinuousMoveSourceChangesForegroundRescanAndDurableReopen',
     'CustomViewsUITests/testRawViewValidationSaveEditReopenResultsActionsAndDeletion',
-    'MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion',
-    'ReminderImportUITests/testRealEventKitCopyAndRecurrenceFixturePreserveSourcesAndDurableTasks',
-    'ReminderRecurrenceUITests/testActualCurrentWeeklyMoveRemovesOnlyVerifiedRemainderAfterDurableTemplateSave',
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
-    'SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate',
-    'ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor',
-    'SpotlightUITests/testSystemSpotlightOpensExactTaskAndLocalCompletionRemovesIndexEntry',
     'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
     'TaskActionURLUITests/testCompleteOccurrenceURLPersistsAndMissingDeletedTargetsReturnErrors',
@@ -36,21 +26,14 @@ NIGHTLY = (
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
-    'TaskBulkSelectionUITests/testBulkDatesRequireApplyKeepMixedFieldsAndPersistAfterRelaunch',
-    'TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably',
-    'TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft',
-    'TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
-    'TaskNotificationUITests/testActualClosedAppDeliveryAndLocalMutationReconciliation',
     'TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope',
-    'TaskRowEditingUITests/testDependencyLinksSaveSourceAndExpandTargetWithReturnRoute',
     'TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
     'TaskRowEditingUITests/testSupportingInformationEditsKeepTheExpandedDraftAndPersist',
     'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
-    'WidgetUITests/testInstalledWidgetRendersTodayCompletesAndUsesSavedViewWithTruthfulDeletionError',
     'WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch',
 )
 
@@ -61,15 +44,11 @@ ON_DEMAND = (
     'CalendarPresentationUITests/testReadFailureHidesCalendarAndSettingsRetryRecoversWithTasksUsable',
     'RecurringTemplateUITests/testRecordedRealGeneratorOccurrenceEditsAndCompletesWithoutChangingItsTemplate',
     'RecurringTemplateUITests/testRecurringTemplateValidationCreationInspectionAndPersistentReopen',
-    'ReminderImportUITests/testDeniedRealRemindersPermissionKeepsOrdinaryTaskWorkspaceUsable',
-    'ReminderRecurrenceUITests/testActualCurrentWeeklyCopyCreatesDurableTemplateAndPreservesCompletedSourceHistory',
-    'SpotlightUITests/testStaleRealSystemResultReportsUnavailableAndNeverOpensAnotherTask',
     'SynchronizationUITests/testConnectionValidationPersistenceAndServerFailureRetainOfflineTask',
     'TaskActivityUITests/testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState',
     'TaskActionURLUITests/testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd',
     'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations',
     'TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary',
-    'TaskNotificationUITests/testActualPermissionRevocationStillAllowsDurableTaskCreation',
     'TaskPresentationUITests/testMatchedPopulatedTaskListsAcrossAppearanceAndAccessibilityText',
     'TaskRowEditingUITests/testAppearanceAndAccessibilityOverflow',
     'TaskRowEditingUITests/testLongTitleNearBottomKeepsKeyboardAndScrollingUsable',
@@ -85,30 +64,24 @@ ON_DEMAND = (
 )
 
 DIAGNOSTIC = ON_DEMAND
-KEYBOARD = (
-    "TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
-    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-)
+MANUAL_SYNC = 'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
 TEXT = (
-    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-    "SeriesTransitionUITests/testExplicitSuccessorPreviewCancelCommitAndRetiredHistoryRemainSeparate",
 )
 MENU = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
     "TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
-    *KEYBOARD,
+    "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
 )
 REGRESSION = (
-    "ShareCaptureUITests/testSharingTextAndLinksCreatesPlainTasksWithoutAnEditor",
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
-              keyboard=KEYBOARD, text=TEXT, menu=MENU, regression=REGRESSION)
+              text=TEXT, menu=MENU, regression=REGRESSION, sync=(MANUAL_SYNC,))
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
@@ -154,6 +127,10 @@ def validate_cadence():
     unregistered = available - set(registered)
     if unregistered:
         raise ValueError("UI tests need an explicit cadence: " + ", ".join(sorted(unregistered)))
+    if not set(CHECKPOINTS) <= set(NIGHTLY + ON_DEMAND):
+        raise ValueError("Native readback checkpoint names must match retained methods")
+    if any(not phases or len(phases) != len(set(phases)) for phases in CHECKPOINTS.values()):
+        raise ValueError("Native readback checkpoints must be nonempty and unique")
     if not set(PHONE_SMOKE) <= set(NIGHTLY):
         raise ValueError("Smoke must be a subset of nightly coverage")
 
@@ -187,56 +164,46 @@ def selection(suite, family, partition="all"):
     return ["-only-testing:" + test for test in sorted(chosen)]
 
 
-def phases(filters):
+def requires_action_fixture(filters):
     selected = selected_methods(filters)
     if not selected:
         raise ValueError("Selection contains no UI tests")
-    share = {test for test in selected if matches(test, "TskUITests/ShareCaptureUITests")}
-    return [phase for phase, enabled in (("share", share), ("main", selected - share)) if enabled]
+    return any(test.split("/")[1] in {"TaskActionURLUITests", "TaskNavigationUITests"}
+               for test in selected)
 
 
 def requires_sync_peer(filters):
-    return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
+    return "TskUITests/" + MANUAL_SYNC in selected_methods(filters)
 
 
 def requires_sync_server(filters):
-    return bool(selected_methods(filters) & {
-        "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-        "TskUITests/MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion",
-    })
-
-
-def requires_native_keyboard(filters):
-    selected_methods(filters)
-    spec = importlib.util.spec_from_file_location("native_keyboard_owner", pathlib.Path(__file__).with_name("with-native-keyboard-hid.py"))
-    owner = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(owner)
-    return bool(owner.selected_cases(filters))
+    return requires_sync_peer(filters)
 
 
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "keyboard", "text", "regression", "menu"))
+    select.add_argument("suite", choices=SUITES)
     select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
-    phase = commands.add_parser("phases")
-    phase.add_argument("filters", nargs=argparse.REMAINDER)
     peer = commands.add_parser("sync-peer")
     peer.add_argument("filters", nargs=argparse.REMAINDER)
     server = commands.add_parser("sync-server")
     server.add_argument("filters", nargs=argparse.REMAINDER)
-    native = commands.add_parser("native-keyboard")
-    native.add_argument("filters", nargs=argparse.REMAINDER)
+    fixture = commands.add_parser("action-fixture")
+    fixture.add_argument("filters", nargs=argparse.REMAINDER)
+    readback = commands.add_parser("native-readback")
+    readback.add_argument("filters", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if args.command == "select":
             output = selection(args.suite, args.family, args.partition)
-        elif args.command == "phases":
-            output = phases(args.filters)
-        elif args.command == "native-keyboard":
-            output = ["yes" if requires_native_keyboard(args.filters) else "no"]
+        elif args.command == "native-readback":
+            selected = selected_methods(args.filters)
+            output = [json.dumps({key: value for key, value in CHECKPOINTS.items() if "TskUITests/" + key in selected})]
+        elif args.command == "action-fixture":
+            output = ["yes" if requires_action_fixture(args.filters) else "no"]
         elif args.command == "sync-server":
             output = ["yes" if requires_sync_server(args.filters) else "no"]
         else:

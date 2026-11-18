@@ -7,10 +7,7 @@ struct ContentView: View {
     private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
 
     enum WorkspaceSetting {
-        case customViews, recurring, synchronization, notifications, continuousReminders, remindersImport
-        #if DEBUG && targetEnvironment(simulator)
-        case spotlightDiagnostics
-        #endif
+        case customViews, recurring, synchronization
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -19,20 +16,11 @@ struct ContentView: View {
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
-    @State private var spotlight: SpotlightController
-    #if DEBUG && targetEnvironment(simulator)
-    @State private var isShowingSpotlightDiagnostics = false
-    #endif
     @State private var calendar: TodayCalendarController
-    @State private var notifications: TaskNotificationController
-    @State private var isConfiguringNotifications = false
-    @State private var continuousReminders: ContinuousReminderController
-    @State private var isConfiguringContinuousReminders = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
     @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
-    @State private var isImportingReminders = false
     @State private var isShowingSettings = false
     @State private var pendingWorkspaceSetting: WorkspaceSetting?
     @State private var editingTask: TaskRecord?
@@ -47,12 +35,9 @@ struct ContentView: View {
 
     init(store: TaskStore) {
         _store = State(initialValue: store)
-        _spotlight = State(initialValue: SpotlightController(store: store))
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
-        _notifications = State(initialValue: TaskNotificationController(store: store))
-        _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
     var body: some View {
@@ -68,9 +53,7 @@ struct ContentView: View {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
         }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }, reveal: { task in
-            closeRow { linkedTaskIDs.insert(task.id); showInformation(task) }
-        }))
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {
@@ -232,19 +215,8 @@ struct ContentView: View {
         }
     }
 
-    private var integrationSheets: some View {
-        navigationWorkspace
-        .taskKeyboardCommands(keyboardCommands)
-        #if DEBUG && targetEnvironment(simulator)
-        .sheet(isPresented: $isShowingSpotlightDiagnostics) { SpotlightStatusView(controller: spotlight) }
-        #endif
-        .sheet(isPresented: $isConfiguringNotifications) { TaskNotificationSettingsView(controller: notifications).modifier(TaskWorkspacePanel(store: store)) }
-        .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
-        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
-    }
-
     private var editorSheets: some View {
-        integrationSheets
+        navigationWorkspace
         .sheet(isPresented: $isChoosingCustomView, onDismiss: {
             tabsBeforeEditingViews = nil
             Task { await loadSavedViews() }
@@ -291,8 +263,6 @@ struct ContentView: View {
             await loadSavedViews()
             opportunities.start()
             await opportunities.foreground()
-            await continuousReminders.scan()
-            await spotlight.reconcile()
         }
     }
 
@@ -323,16 +293,7 @@ struct ContentView: View {
             await automation.executePending(in: store)
         }
         .task(id: scenePhase) {
-            if scenePhase == .active { await continuousReminders.observeStatus() }
-        }
-        .task(id: scenePhase) {
             if scenePhase == .active { await store.observeParticipantChanges() }
-        }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await notifications.observe() }
-        }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await spotlight.observe() }
         }
         .onChange(of: automation.deletedTaskID) { _, id in
             if let id, selectedTaskID == id || linkedTaskIDs.contains(id) || editingTask?.id == id {
@@ -340,7 +301,6 @@ struct ContentView: View {
                 resetNavigation()
             }
         }
-        .onChange(of: store.allTasks) { _, _ in Task { await spotlight.reconcile(force: false) } }
         .onChange(of: path) { _, newPath in selectedTaskID = newPath.last }
     }
 
@@ -348,23 +308,18 @@ struct ContentView: View {
         participantLifecycle
         .onChange(of: scenePhase) { _, phase in
             TaskUIBoundaryDiagnostics.event("calendar.scene", details: ["phase": String(describing: phase)])
-            #if DEBUG && targetEnvironment(simulator)
-            continuousReminders.source.recordAccessDiagnostic("reminders.scene", details: ["phase": String(describing: phase)])
-            #endif
             if phase == .active {
                 Task {
                     await synchronization.loadConfiguration()
                     await opportunities.foreground()
-                    await continuousReminders.scan()
                     await store.reload()
                     await loadSavedViews()
-                    await spotlight.reconcile()
                 }
             } else if phase == .background { opportunities.background() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged(); Task { await notifications.refresh() } }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged(); await notifications.refresh() } }
+        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in calendar.sourceChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
     }
 
     private var calendarWorkspace: some View {
@@ -401,9 +356,6 @@ struct ContentView: View {
                             .font(.callout).padding(8)
                             .accessibilityIdentifier("capture-confirmation")
                             .accessibilityAddTraits(.updatesFrequently)
-                    }
-                    if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
-                        Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
                     if let error = store.error, !store.isSelectingTasks, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
@@ -463,14 +415,6 @@ struct ContentView: View {
         case .customViews: presentViews()
         case .recurring: isShowingRecurring = true
         case .synchronization: isConfiguringSync = true
-        case .notifications:
-            TaskParticipantDiagnostics.event("notifications.presentation.request", details: ["source": "settings"])
-            isConfiguringNotifications = true
-        case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
-        case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
-        #if DEBUG && targetEnvironment(simulator)
-        case .spotlightDiagnostics: isShowingSpotlightDiagnostics = true
-        #endif
         }
     }
 
@@ -479,50 +423,12 @@ struct ContentView: View {
         isChoosingCustomView = true
     }
 
-    private func requestIntegrationPresentation(_ destination: String, state: Binding<Bool>) {
-        TaskUIBoundaryDiagnostics.event("workspace.menu.action-entry", details: ["destination": destination, "presented": String(state.wrappedValue)])
-        state.wrappedValue = true
-        TaskUIBoundaryDiagnostics.event("workspace.menu.state-assigned", details: ["destination": destination, "presented": String(state.wrappedValue)])
-    }
-
     private func errorBanner(_ error: String, retry: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(error).font(.footnote)
             Button("Retry", action: retry)
         }
         .padding().frame(maxWidth: .infinity, alignment: .leading).background(.regularMaterial)
-    }
-
-    private var selectedTask: TaskRecord? { store.allTasks.first { $0.id == selectedTaskID } }
-    private var navigationRows: [TaskRecord] {
-        store.customView == nil && store.query == .upcoming ? store.upcomingDays.flatMap(\.entries).map(\.task) : store.visibleTasks
-    }
-
-    private var keyboardCommands: [TaskKeyboardCommand] {
-        guard !store.isSaving, !store.isSelectionGestureActive else { return TaskKeyboardCommand.suspended }
-        guard store.isSelectingTasks else { return workspaceActions?.keyboardCommands ?? TaskKeyboardCommand.suspended }
-        return (workspaceActions?.keyboardCommands.filter { $0.id != "complete" } ?? []) + store.selectionKeyboardCommands
-    }
-
-    private var workspaceActions: TaskWorkspaceActions? {
-        guard store.selectionDateField == nil, !(selectedTask?.canEdit == true && selectedTaskID.map(linkedTaskIDs.contains) == true),
-              !isShowingSettings, pendingWorkspaceSetting == nil, !isConfiguringNotifications, !isConfiguringSync, !isChoosingCustomView, !isShowingRecurring, !isImportingReminders, !isConfiguringContinuousReminders, editingTask == nil, store.rowEditing == nil, store.presentedTaskPanels.isEmpty, !store.isSaving else { return nil }
-        #if DEBUG && targetEnvironment(simulator)
-        guard !isShowingSpotlightDiagnostics else { return nil }
-        #endif
-        return TaskWorkspaceActions(
-            capture: capture,
-            edit: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canEdit ? { store.expandRow(task) } : nil },
-            complete: store.isSelectingTasks ? nil : selectedTask.flatMap { task in task.canComplete ? { Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) } } : nil },
-            move: moveSelection,
-            reveal: selectedTask.map { task in {
-                if isProjectWorkspace { projectPath.append(task.id) }
-                else { path = [task.id] }
-            } },
-            openView: openView,
-            refresh: { Task { await store.reload() } },
-            select: selectedTask.flatMap { task in task.canComplete ? { store.toggleSelection(task.id) } : nil }
-        )
     }
 
     private func capture() {
@@ -548,21 +454,10 @@ struct ContentView: View {
         }
     }
 
-    private func openView(_ query: TaskQuery) {
-        guard let view = WorkspaceView.defaults.first(where: { $0.query == query }) else { return }
-        guard store.workspaceViews.active.contains(view) else { presentViews(); return }
-        tabSelection.wrappedValue = view
-    }
-
     private func openProject(_ project: TaskProjectSelection) {
         guard isProjectWorkspace else { return }
         store.query = .unfinished
         store.projectSelection = project
-    }
-
-    private func moveSelection(_ movement: TaskSelectionMovement) {
-        selectedTaskID = store.manager.selectedTask(in: navigationRows, from: selectedTaskID, moving: movement)
-        if !path.isEmpty { path = selectedTaskID.map { [$0] } ?? [] }
     }
 
     private func loadSavedViews() async {

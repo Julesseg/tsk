@@ -6,7 +6,6 @@ use uuid::Uuid;
 mod admission;
 mod atomic;
 mod migration;
-mod receipt;
 use admission::{LocalAccess, SyncAccess, interrupt_sync, sync_generation};
 
 #[derive(Deserialize)]
@@ -58,7 +57,9 @@ async fn execute(request: Request) -> Result<Value, String> {
         return Ok(json!(true));
     }
     if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
-    let synchronization = if request.command == "synchronize" || request.command == "synchronizeWithReceipt" { Some(SyncAccess::new(&request.path, request.sync_generation).await?) } else { None };
+    let read_only = request.command == "readExistingTasks";
+    if read_only && !std::path::Path::new(&request.path).is_dir() { return Err("Existing task storage is missing".into()); }
+    let synchronization = if request.command == "synchronize" { Some(SyncAccess::new(&request.path, request.sync_generation).await?) } else { None };
     let _local = if synchronization.is_none() { Some(LocalAccess::new(&request.path)?) } else { None };
     if std::path::Path::new(&request.path).join(".tsk-migrated-to").exists() { return Err("This replica migrated to shared storage. Reopen through the common session.".into()); }
     if request.command.starts_with("configuration") {
@@ -89,19 +90,14 @@ async fn execute(request: Request) -> Result<Value, String> {
             _ => Err("Unsupported configuration command".into())
         };
     }
-    let storage = SqliteStorage::new(&request.path, AccessMode::ReadWrite, true).await.map_err(|e| e.to_string())?;
+    let storage = SqliteStorage::new(&request.path, if read_only { AccessMode::ReadOnly } else { AccessMode::ReadWrite }, !read_only).await.map_err(|e| e.to_string())?;
     if request.command == "updateAtomically" || request.command == "updateSnapshotAtomically" || request.command == "commitSnapshotAtomically" {
         if request.command != "updateAtomically" && request.snapshot.is_none() { return Err("Missing preview snapshot".into()); }
         return atomic::update(storage, request.updates.ok_or("Missing atomic updates")?, request.snapshot, request.creates.unwrap_or_default()).await;
     }
     let mut replica = Replica::new(storage);
-    if request.command == "synchronizationHistory" {
-        if let Some(history) = receipt::load(&request.path)? { return Ok(history); }
-        let tasks = replica.all_task_data().await.map_err(|error| error.to_string())?;
-        return receipt::initialize(&request.path, json!(tasks.into_values().map(record).collect::<Vec<_>>()));
-    }
     match request.command.as_str() {
-        "tasks" => {
+        "tasks" | "readExistingTasks" => {
             let tasks = replica.all_task_data().await.map_err(|e| e.to_string())?;
             Ok(json!(tasks.into_values().map(record).collect::<Vec<_>>()))
         }
@@ -140,16 +136,7 @@ async fn execute(request: Request) -> Result<Value, String> {
             replica.commit_operations(operations).await.map_err(|e| e.to_string())?;
             Ok(record(task))
         }
-        "synchronize" | "synchronizeWithReceipt" => {
-            let mut history = if request.command == "synchronizeWithReceipt" {
-                Some(match receipt::load(&request.path)? {
-                    Some(value) => value,
-                    None => {
-                        let tasks = replica.all_task_data().await.map_err(|error| error.to_string())?;
-                        receipt::initialize(&request.path, json!(tasks.into_values().map(record).collect::<Vec<_>>()))?
-                    }
-                })
-            } else { None };
+        "synchronize" => {
             let config = request.configuration.ok_or("Missing synchronization configuration")?;
             let mut server = ServerConfig::Remote {
                 url: config.server_url,
@@ -161,12 +148,6 @@ async fn execute(request: Request) -> Result<Value, String> {
                 biased;
                 result = access.interrupted() => { result?; return Err("TSK_SYNC_INTERRUPTED".to_owned()); },
                 result = replica.sync(&mut server, true) => { result.map_err(|e| format!("{e:#}"))?; }
-            }
-            if let Some(ref mut history) = history {
-                let tasks = replica.all_task_data().await.map_err(|error| error.to_string())?;
-                let completed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|error| error.to_string())?.as_secs_f64();
-                history["success"] = json!({"id": Uuid::new_v4(), "completedAt": completed, "tasks": tasks.into_values().map(record).collect::<Vec<_>>()});
-                receipt::save(&request.path, history).map_err(|error| format!("Synchronization finished, but its final receipt could not be saved: {error}"))?;
             }
             Ok(json!(true))
         }

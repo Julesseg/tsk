@@ -12,29 +12,25 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("ui_selection", ROOT / "scripts/ui-test-selection.py")
 selection = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(selection)
-SHARE = "-only-testing:TskUITests/ShareCaptureUITests"
 PHONE = "-only-testing:TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelaunch"
 
 
 class SelectionTests(unittest.TestCase):
-    def test_smoke_is_the_three_reviewed_product_journeys(self):
+    def test_smoke_is_the_two_reviewed_product_journeys(self):
         filters = selection.selection("smoke", "iPhone")
         self.assertEqual(selection.selected_methods(filters), {
             "TskUITests/TskUITests/testCaptureReviewCancelSaveAndRelaunch",
             "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
-            "TskUITests/TaskBulkSelectionUITests/testContinuousSelectionFreezesRowsBeforeReleaseAndCompletesDurably",
         })
         self.assertTrue(all(item.count("/") == 2 for item in filters))
-        self.assertEqual(selection.phases(filters), ["main"])
-        self.assertFalse(selection.requires_native_keyboard(filters))
         self.assertFalse(selection.requires_sync_server(filters))
         self.assertFalse(selection.requires_sync_peer(filters))
 
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 41)
-        self.assertEqual(len(diagnostic), 27)
+        self.assertEqual(len(nightly), 23)
+        self.assertEqual(len(diagnostic), 23)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
             "TskUITests/TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity",
@@ -44,7 +40,6 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(nightly | diagnostic, selection.test_methods())
         self.assertLess(selection.selected_methods(selection.selection("smoke", "iPhone")), nightly)
         self.assertIn("TskUITests/TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask", nightly)
-        self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionResolvesValidEditorAndRetainsInvalidDraft", nightly)
         self.assertIn("TskUITests/TaskActionURLUITests/testModifySystemURLSavesAllFieldsTagModesClearsAndAtomicRejections", nightly)
         self.assertIn("TskUITests/TaskActionURLUITests/testModifyURLSettlesActiveEditingRevealsTimedResultAndPreservesInvalidDraft", nightly)
         self.assertIn("TskUITests/TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary", diagnostic)
@@ -96,44 +91,32 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (30, 11))
+        self.assertEqual((len(workspace), len(rows)), (17, 6))
         for partition, filters in groups.items():
-            self.assertEqual(selection.requires_native_keyboard(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
-        for cls in ("ShareCaptureUITests", "WidgetUITests", "SpotlightUITests", "CalendarTodayUITests",
-                    "TaskNotificationUITests", "MissedNotificationUITests", "ReminderImportUITests"):
-            self.assertTrue(any("/" + cls + "/" in case for case in workspace), cls)
         self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(selection.selected_methods(result.stdout.splitlines()), rows)
 
-    def test_focused_suites_keep_product_input_and_original_menu_contracts(self):
-        keyboard = selection.selected_methods(selection.selection("keyboard", "iPhone"))
-        self.assertEqual(keyboard, {
-            "TskUITests/TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus",
-            "TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
-        })
+    def test_focused_suites_keep_touch_annotation_and_original_menu_contracts(self):
         menu = selection.selected_methods(selection.selection("menu", "iPhone"))
-        self.assertEqual(menu - keyboard, {
+        self.assertEqual(menu, {
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard",
             "TskUITests/TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen",
+            "TskUITests/TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
         })
         text = selection.selection("text", "iPhone")
-        self.assertEqual(len(selection.selected_methods(text)), 3)
-        self.assertEqual(selection.phases(text), ["share", "main"])
+        self.assertEqual(len(selection.selected_methods(text)), 1)
         self.assertFalse(selection.requires_sync_server(text))
-        for suite in ("keyboard", "text", "menu", "diagnostic"):
-            self.assertTrue(selection.requires_native_keyboard(selection.selection(suite, "iPhone")))
+        for suite in ("text", "menu", "diagnostic"):
             self.assertFalse(selection.requires_sync_server(selection.selection(suite, "iPhone")))
         regression = selection.selection("regression", "iPhone")
-        self.assertEqual(len(selection.selected_methods(regression)), 5)
-        self.assertEqual(selection.phases(regression), ["share", "main"])
+        self.assertEqual(len(selection.selected_methods(regression)), 4)
         self.assertFalse(selection.requires_sync_server(regression))
         self.assertFalse(selection.requires_sync_peer(regression))
-        self.assertFalse(selection.requires_native_keyboard(regression))
 
     def test_renamed_and_unknown_selectors_fail_instead_of_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):
@@ -142,35 +125,15 @@ class SelectionTests(unittest.TestCase):
         for filters in (["-only-testing:TskUITests/MissingTests"], [PHONE, "-only-testing:TskUITests/MissingTests"],
                         [PHONE, "-skip-testing:TskUITests/MissingTests"]):
             with self.subTest(filters=filters), self.assertRaisesRegex(ValueError, "Unknown UI test selector"):
-                selection.phases(filters)
+                selection.requires_action_fixture(filters)
 
-    def test_transport_selection_matches_owner_for_every_method_and_suite(self):
-        spec = importlib.util.spec_from_file_location("transport_owner", ROOT / "scripts/with-native-keyboard-hid.py")
-        owner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(owner)
-        for method in selection.test_methods():
-            filters = ["-only-testing:" + method]
-            self.assertEqual(selection.requires_native_keyboard(filters), bool(owner.selected_cases(filters)), method)
-        for suite in selection.SUITES:
-            filters = selection.selection(suite, "iPhone")
-            if selection.requires_native_keyboard(filters):
-                command = ["xcodebuild", "test-without-building", "-destination", "platform=iOS Simulator,id=owned",
-                           "-parallel-testing-enabled", "NO", "-collect-test-diagnostics", "never", "-resultBundlePath", "Results.xcresult",
-                           *filters, "-skip-testing:TskUITests/ShareCaptureUITests"]
-                owner.validate_command(command, "owned")
-        script = str(ROOT / "scripts/ui-test-selection.py")
-        for suite, expected in (("smoke", "no"), ("full", "yes")):
-            result = subprocess.run(["python3", script, "native-keyboard", "--", *selection.selection(suite, "iPhone")], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), expected)
 
-    def test_filters_control_share_phases_and_real_sync_requirements(self):
-        self.assertEqual(selection.phases([]), ["share", "main"])
-        self.assertEqual(selection.phases([SHARE]), ["share"])
-        self.assertEqual(selection.phases([PHONE]), ["main"])
-        self.assertEqual(selection.phases(["-only-testing:TskUITests", "-skip-testing:TskUITests/ShareCaptureUITests"]), ["main"])
-        with self.assertRaises(ValueError):
-            selection.phases([SHARE, "-skip-testing:TskUITests/ShareCaptureUITests"])
+    def test_filters_control_sync_and_action_fixture_requirements(self):
+        self.assertFalse(selection.requires_action_fixture([PHONE]))
+        with self.assertRaisesRegex(ValueError, "contains no UI tests"):
+            selection.requires_action_fixture([PHONE, PHONE.replace("-only-testing:", "-skip-testing:")])
+        for cls in ("TaskActionURLUITests", "TaskNavigationUITests"):
+            self.assertTrue(selection.requires_action_fixture(["-only-testing:TskUITests/" + cls]))
         full = selection.selection("full", "iPhone")
         self.assertTrue(selection.requires_sync_peer(full))
         self.assertFalse(selection.requires_sync_peer(full + ["-skip-testing:TskUITests/SynchronizationUITests"]))
@@ -178,19 +141,24 @@ class SelectionTests(unittest.TestCase):
             filters = ["-only-testing:TskUITests/" + case]
             expected = case in {
                 "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-                "MissedNotificationUITests/testRealEncryptedFinalStateDeliversNewMissedOnceAndCancelsReceivedCompletion",
             }
             self.assertEqual(selection.requires_sync_server(filters), expected, case)
 
 
+RUNNER_CASE = "-only-testing:TskUITests/TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope"
+
+
 class RunnerTests(unittest.TestCase):
-    def run_runner(self, filters=(), share_status=0, main_status=0, prebuilt=False, owned_ci=False):
+    def run_runner(self, filters=(), main_status=0, prebuilt=False, owned_ci=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             test_home = root / "home"
             test_home.mkdir()
             if prebuilt:
                 (root / "DerivedData/Build/Products/Debug-iphonesimulator/Tsk.app").mkdir(parents=True)
+            (root / "probe").write_text("#!/bin/sh\nexit 1\n")
+            (root / "probe").chmod(0o755)
+            (root / "library.dylib").touch()
             log = root / "calls.jsonl"
             tool = root / "tool"
             tool.write_text("""#!/usr/bin/env python3
@@ -201,8 +169,6 @@ with open(os.environ['UI_TEST_COMMAND_LOG'], 'a') as output:
     output.write(json.dumps({'name': name, 'args': args}) + '\\n')
 if name == 'xcrun' and args[:4] == ['simctl', 'list', 'devices', 'booted']:
     print(json.dumps({'devices': {}}))
-if name == 'xcodebuild' and 'test-without-building' in args and '-only-testing:TskUITests/ShareCaptureUITests' in args:
-    sys.exit(int(os.environ['UI_TEST_SHARE_STATUS']))
 if name == 'xcodebuild' and 'test-without-building' in args:
     sys.exit(int(os.environ['UI_TEST_MAIN_STATUS']))
 """)
@@ -210,7 +176,8 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             for name in ("xcrun", "xcodebuild", "osascript", "codesign"):
                 (root / name).symlink_to(tool)
             environment = {key: value for key, value in os.environ.items() if not key.startswith(("TSK_", "TEST_RUNNER_"))}
-            environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_SHARE_STATUS=str(share_status), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
+            environment.update(HOME=str(test_home), PATH=str(root) + os.pathsep + os.environ["PATH"], UI_TEST_COMMAND_LOG=str(log), UI_TEST_MAIN_STATUS=str(main_status), CI="false")
+            environment.update(TSK_NATIVE_PROBE_BINARY=str(root / "probe"), TSK_TASKCHAMPION_LIBRARY=str(root / "library.dylib"))
             if owned_ci:
                 environment.update(CI="true", TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR="1", TSK_EVENTKIT_EVIDENCE_DIR=str(root / "evidence"))
             result = subprocess.run([
@@ -221,60 +188,56 @@ if name == 'xcodebuild' and 'test-without-building' in args:
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             return result, calls
 
-    def test_smoke_builds_once_without_share_launch_or_fixture_install(self):
-        result, calls = self.run_runner([PHONE])
+    def test_non_readback_selection_builds_once_without_action_fixture_install(self):
+        result, calls = self.run_runner([RUNNER_CASE])
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
         self.assertEqual(len(builds), 2)
         self.assertIn("build-for-testing", builds[0])
         self.assertIn("test-without-building", builds[1])
-        self.assertNotIn(SHARE, builds[1])
-        self.assertFalse(any("TskShareFixture.app" in argument for call in calls for argument in call["args"]))
+        self.assertFalse(any("TskActionFixture.app" in argument for call in calls for argument in call["args"]))
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_share_only_runs_once_and_has_no_empty_main_phase(self):
-        result, calls = self.run_runner([SHARE])
-        self.assertEqual(result.returncode, 0, result.stderr)
+    def test_full_executes_once_and_preserves_failure_and_cleanup(self):
+        result, calls = self.run_runner(main_status=65, owned_ci=True)
+        self.assertEqual(result.returncode, 65, result.stderr)
         executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
         self.assertEqual(len(executions), 1)
-        self.assertIn(SHARE, executions[0])
-
-    def test_full_preserves_both_phases_and_share_failure(self):
-        result, calls = self.run_runner(share_status=65)
-        self.assertEqual(result.returncode, 65, result.stderr)
-        executions = [call["args"] for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
-        self.assertEqual(len(executions), 2)
-        self.assertIn(SHARE, executions[0])
-        self.assertIn("-skip-testing:TskUITests/ShareCaptureUITests", executions[1])
+        self.assertTrue(any("TskActionFixture.app" in argument for call in calls for argument in call["args"]))
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_smoke_main_failure_is_not_hidden_by_omitted_share_phase(self):
-        result, calls = self.run_runner([PHONE], main_status=65)
+    def test_url_navigation_installs_its_action_callback_host(self):
+        result, calls = self.run_runner(["-only-testing:TskUITests/TaskNavigationUITests"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installs = [call["args"] for call in calls if call["name"] == "xcrun" and call["args"][:2] == ["simctl", "install"]]
+        self.assertTrue(any(call[-1].endswith("TskActionFixture.app") for call in installs))
+
+    def test_non_readback_main_failure_is_preserved(self):
+        result, calls = self.run_runner([RUNNER_CASE], main_status=65)
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(any(call["args"] == ["simctl", "shutdown", "owned-test-device"] for call in calls))
 
-    def test_prebuilt_smoke_executes_without_repeating_the_build(self):
-        result, calls = self.run_runner(["--skip-build", PHONE], prebuilt=True)
+    def test_prebuilt_selection_executes_without_repeating_the_build(self):
+        result, calls = self.run_runner(["--skip-build", RUNNER_CASE], prebuilt=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         builds = [call["args"] for call in calls if call["name"] == "xcodebuild"]
         self.assertEqual(len(builds), 1)
         self.assertIn("test-without-building", builds[0])
         self.assertNotIn("--skip-build", builds[0])
 
+    def test_green_execution_without_native_checkpoints_fails_closed(self):
+        result, _ = self.run_runner([PHONE], owned_ci=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Native readback incomplete", result.stdout)
+
     def test_prebuilt_mode_rejects_missing_products(self):
-        result, calls = self.run_runner(["--skip-build", PHONE])
+        result, calls = self.run_runner(["--skip-build", RUNNER_CASE])
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(any(call["name"] == "xcodebuild" for call in calls))
 
-    def test_owned_native_selection_rejects_missing_transport_before_launching_tests(self):
-        filters = ["-only-testing:TskUITests/TaskKeyboardCompatibilityUITests/testWorkspaceAndEditorCommandsKeepOwnershipAcrossFocus"]
-        result, calls = self.run_runner(filters, owned_ci=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Selected hardware-keyboard tests require the owned native transport", result.stderr)
-        self.assertFalse(any(call["name"] == "xcodebuild" for call in calls))
 
-    def test_owned_smoke_executes_without_native_transport(self):
-        result, calls = self.run_runner([PHONE], owned_ci=True)
+    def test_owned_selection_executes_through_the_boundary_wrapper(self):
+        result, calls = self.run_runner([RUNNER_CASE], owned_ci=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         executions = [call for call in calls if call["name"] == "xcodebuild" and "test-without-building" in call["args"]]
         self.assertEqual(len(executions), 1)

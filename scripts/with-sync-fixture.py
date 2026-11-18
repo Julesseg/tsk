@@ -1,4 +1,5 @@
 import argparse
+import getpass
 import json
 import os
 import pathlib
@@ -15,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--server', required=True)
 parser.add_argument('--output', required=True)
 parser.add_argument('--verify-peer')
+parser.add_argument('--trace-loopback', action='store_true')
 parser.add_argument('command', nargs=argparse.REMAINDER)
 options = parser.parse_args()
 command = options.command[1:] if options.command[:1] == ['--'] else options.command
@@ -31,12 +33,11 @@ with socket.socket() as reservation:
     reservation.bind(('127.0.0.1', 0))
     port = reservation.getsockname()[1]
 client = str(uuid.uuid4())
-generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23, 31, 34, 131, 231]}
+generator_clients = {ticket: str(uuid.uuid4()) for ticket in [20, 21, 22, 23, 34, 131, 231]}
 secret = 'tsk-isolated-ui-' + str(uuid.uuid4())
 url = 'http://127.0.0.1:' + str(port)
 settings = {'TSK_UI_SYNC_SERVER_URL': url, 'TSK_UI_SYNC_CLIENT_ID': client, 'TSK_UI_SYNC_SECRET': secret,
-            'TSK_UI_SYNC_FIXTURE_TOKEN': str(uuid.uuid4()),
-            'TSK_UI_MISSED_CLIENT_ID': generator_clients[31]}
+            'TSK_UI_SYNC_FIXTURE_TOKEN': str(uuid.uuid4())}
 environment = dict(os.environ)
 for key, value in settings.items():
     environment[key] = value
@@ -49,8 +50,11 @@ server_environment = dict(os.environ)
 for name in ['LISTEN', 'DATA_DIR', 'CLIENT_ID', 'CREATE_CLIENTS', 'SNAPSHOT_VERSIONS', 'SNAPSHOT_DAYS']:
     server_environment.pop(name, None)
 server_environment['RUST_LOG'] = 'info'
+if options.verify_peer or options.trace_loopback:
+    server_environment['RUST_LOG'] += ',actix_http::h1::dispatcher=trace'
 server = None
 tests = None
+capture = None
 
 def interrupted(number, frame):
     raise KeyboardInterrupt()
@@ -59,6 +63,20 @@ signal.signal(signal.SIGTERM, interrupted)
 signal.signal(signal.SIGINT, interrupted)
 
 try:
+    if options.trace_loopback:
+        with (fixture / 'connection-timing.log').open('w') as timings, (fixture / 'connection-capture.log').open('w') as receipt:
+            capture = subprocess.Popen([
+                'sudo', '-n', '/usr/sbin/tcpdump', '-Z', getpass.getuser(), '-i', 'lo0',
+                '-nn', '-tt', '-l', '-s', '96', '-c', '4096',
+                'tcp', 'and', 'host', '127.0.0.1', 'and', 'port', str(port),
+            ], stdout=timings, stderr=receipt, start_new_session=True)
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and capture.poll() is None:
+            if 'listening on lo0' in (fixture / 'connection-capture.log').read_text():
+                break
+            time.sleep(0.05)
+        else:
+            raise RuntimeError('Loopback trace did not start; inspect connection-capture.log')
     with (fixture / 'server.log').open('w') as log:
         server_command = [str(binary), '--listen', '127.0.0.1:' + str(port), '--data-dir', str(fixture / 'data')]
         for identity in [client, *generator_clients.values()]:
@@ -103,3 +121,10 @@ finally:
                     process.kill()
                 process.wait()
     (fixture / 'stopped').touch()
+    if capture is not None and capture.poll() is None:
+        capture.send_signal(signal.SIGINT)
+        try:
+            capture.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            capture.terminate()
+            capture.wait(timeout=10)

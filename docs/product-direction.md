@@ -2,7 +2,7 @@
 
 This brief records the product choices accepted during the design interviews. It describes intended behavior; implementation and runtime verification are tracked separately.
 
-The accepted [daily planner redesign](planner-redesign.md) retains Taskwarrior and supersedes conflicting navigation, date placement, ordering, calendar, completion-history, and notification details below. It records intended behavior, not implementation.
+The accepted [daily planner redesign](planner-redesign.md) retains Taskwarrior and supersedes conflicting navigation, date placement, ordering, calendar, and completion-history details below. It records intended behavior, not implementation.
 
 The [PRD](prd.md) expands this direction into user stories, implementation decisions, testing decisions, and explicit exclusions.
 
@@ -20,7 +20,7 @@ Provide predefined views inspired by Things 3, including Today, Upcoming, and vi
 
 Keep Scheduled separate from Deadline and Waiting until. Scheduled is the intended work date and time and uses Taskwarrior's `scheduled` attribute; Deadline uses `due`. Preserve existing Scheduled timestamps, including midnight, and support time selection and display throughout the app. See [the Scheduled decision](adr/0006-scheduled-includes-time.md), with implementation tracked in [#64](https://github.com/Julesseg/tsk/issues/64).
 
-Today includes unfinished tasks scheduled for any time today, unfinished tasks scheduled for earlier days, and tasks due today or overdue. A task scheduled for later today is already visible; unfinished scheduled tasks remain until completed or rescheduled. Waiting or blocked tasks that meet these criteria remain visible with their reason.
+Today includes unfinished tasks scheduled for any time today, unfinished tasks scheduled for earlier days, and tasks due today or overdue. A task scheduled for later today is already visible; unfinished scheduled tasks remain until completed or rescheduled. Waiting tasks that meet these criteria remain visible with their reason.
 
 Upcoming groups future scheduled work and future deadlines by local calendar day, orders entries by their actual timestamps, and clearly distinguishes Scheduled from Deadline. A task with different Scheduled and Deadline dates may appear on both dates.
 
@@ -28,7 +28,7 @@ Custom views accept Taskwarrior filter expressions entered in tsk. Use documente
 
 ## Task editing
 
-Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, and dependencies, plus starting and stopping work. Preserve unfamiliar task fields without exposing a custom-attribute editor.
+Support editing description, project, tags, priority, annotations, Scheduled, Deadline, Waiting until, plus starting and stopping work. Preserve unfamiliar task fields without exposing a custom-attribute editor.
 
 ## Offline use and synchronization
 
@@ -38,35 +38,21 @@ Attempt synchronization after changes, when the app opens, and when connectivity
 
 ## iOS integration
 
-Shortcuts and Siri, capture from the share sheet, widgets, Spotlight search, notifications, Calendar, and Apple Reminders import are all important parts of the initial product scope.
-
-Apple Reminders integration is import-only: a one-time or continuous import of incomplete reminders from selected lists. Users choose which lists to import. Each selected Reminders list becomes the Taskwarrior project for its imported tasks. Completed reminders are excluded. There is no additional priority or importance criterion.
-
-One-time import is for switching apps: copy eligible reminders into tsk and leave the originals in Apple Reminders. Continuous import moves eligible reminders into tsk and removes the imported reminders from Apple Reminders. The two modes deliberately differ in source deletion.
-
-After import, manage the task independently in tsk. Export and two-way synchronization are outside the agreed scope. Do not retain provenance, processed reminder IDs, source-derived task identifiers, or import bookkeeping. Selected list configuration and its project mapping remain necessary for operating import.
-
-Save the task durably in local storage before deleting its source reminder. If source deletion fails, preserve the reminder; an interrupted move or later retry can create a duplicate. The user accepts this occasional duplication in exchange for retaining no bookkeeping. Continuous import runs on one designated device and stays disabled on others; task synchronization still reaches every client. See [the integration boundary decision](adr/0001-import-only-apple-reminders.md).
-
-Convert recurring Apple reminders into Taskwarrior templates only for verified supported recurrence rules. Skip unsupported or unverified rules, leave the source reminder untouched, and explain why. Do not silently flatten a recurring reminder or approximate its rule. In continuous mode, remove the source only after durably saving a valid replacement. Supported conversions require interoperability tests against the external generator; matching frequency labels alone does not establish compatibility. See [the mapping research](research/reminders-recurrence-mapping.md).
+Shortcuts, Siri and Calendar remain in scope. Apple Reminders import was removed by explicit user decision on 2026-11-18; existing saved tasks are retained. [ADR 0001](adr/0001-import-only-apple-reminders.md) records the retired design.
 
 Calendar integration only displays calendar events in Today. tsk does not create calendar events or time blocks.
 
 Shortcuts and the URL scheme will expose Add Task, Modify Task, Delete Task, Find Tasks, Complete Task, Open Task, and Open View using individual named inputs rather than Taskwarrior syntax. Simple URLs have no version component; task-targeted actions use full UUIDs, and mutations save immediately and acknowledge durable local storage. Existing saved shortcuts may break when the actions are rebuilt; Modify covers rescheduling without a legacy Reschedule action. See [the shared-action decision](adr/0005-structured-actions-for-urls-and-shortcuts.md) and its implementation tickets.
 
-Widgets show Today or a chosen task view and provide completion actions. Spotlight opens matching tasks in tsk.
 
-Sharing text or a URL into tsk immediately creates a plain task whose complete description is the shared content. There is no extension editor, annotation, project, tag, priority, or date selection. File attachment storage is deferred initially.
+Incoming system sharing was removed from product scope on 2026-11-17. A future sharing design will be specified separately.
 
-Notifications are based on Scheduled or Deadline times. A separate opt-in reminder time per task is not the agreed behavior. Different Scheduled and Deadline times each produce a notification, distinguished as scheduled versus due; coincident times produce one combined notification. Completion or deletion cancels pending notifications once known locally.
 
-Provide a settings option to use a configurable default notification time when a date has the default midnight time. Start enabled at 09:00 in the device's current time zone, with options to change the time or disable the replacement. Other timestamps retain their specified times. This changes notification timing, not the stored task date. Taskwarrior does not retain whether midnight was explicit, so the setting is a convention rather than reliable detection of time-free input. Notification preferences remain device-specific.
 
-After synchronization, immediately fire newly discovered missed alerts for unfinished tasks. Evaluate the final synchronized task state first: if the same sync reveals completion, do not fire its missed alert. Completion or deletion suppresses task alerts. An already delivered event is not newly discovered on every subsequent sync.
 
 ## Devices
 
-tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands remain supported on iPhone. Native iPad and Mac experiences are future product decisions.
+tsk supports iPhone only. Native iPad layouts and distribution targets are retired under [ADR 0007](adr/0007-iphone-only.md). External keyboard commands and widgets were removed from product scope on 2026-11-17. Native iPad and Mac experiences are future product decisions.
 
 ## Visual direction
 
@@ -88,6 +74,8 @@ Everyday task management works offline as described above; generation of new rec
 
 ## Deferred scope and verification
 
-Optional iOS recurrence generation and file attachment storage are deferred. A dedicated Mac experience is a later decision. Desktop configuration import, saved-view synchronization, calendar event creation, and export or two-way synchronization with Apple Reminders are outside the agreed scope.
+Optional iOS recurrence generation and file attachment storage are deferred. A dedicated Mac experience is a later decision. Desktop configuration import, saved-view synchronization, calendar event creation, and Apple Reminders integration are outside the agreed scope.
 
-Before implementation can claim interoperability, select and pin supported Taskwarrior and TaskChampion versions, verify the Swift integration route, and test filter behavior, template editing, occurrence completion bookkeeping, and supported Reminders conversions. Verify notification delivery, midnight-time replacement, sync reconciliation, and background behavior on iOS. Source-based feasibility research is not evidence that those capabilities already work.
+Before implementation can claim interoperability, select and pin supported Taskwarrior and TaskChampion versions, verify the Swift integration route, and test filter behavior, template editing, occurrence completion bookkeeping. Verify sync reconciliation and background behavior on iOS. Source-based feasibility research is not evidence that those capabilities already work.
+
+Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Task dates, ordinary task search, Shortcuts, Calendar remain.

@@ -102,6 +102,7 @@ class HostCapture:
             'memory': ['/usr/bin/vm_stat'],
             'pressure': ['/usr/bin/memory_pressure', '-Q'],
             'swap': ['/usr/sbin/sysctl', 'vm.swapusage'],
+            'hardwareKeyboardPreference': ['/usr/bin/defaults', 'read', 'com.apple.iphonesimulator', 'ConnectHardwareKeyboard'],
             'disk': ['/bin/df', '-k', str(self.output.resolve())],
             'processes': ['/bin/ps', '-axo', 'pid,ppid,pcpu,rss,comm'],
         }

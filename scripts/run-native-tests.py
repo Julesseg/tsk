@@ -69,10 +69,8 @@ def main():
     environment['TSK_TASKWARRIOR_BINARY'] = taskwarrior
     environment['TSK_NATIVE_PROBE_BINARY'] = str(Path(options.probe).resolve())
     for key in list(environment):
-        if key.startswith('TSK_SYNC_TEST_') or key == 'TSK_SPOTLIGHT_REAL_INDEX_TEST':
+        if key.startswith('TSK_SYNC_TEST_'):
             del environment[key]
-    if options.target == 'TskNativeAppleTests':
-        environment['TSK_SPOTLIGHT_REAL_INDEX_TEST'] = '1'
     output = Path(options.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     swift = ['swift', 'test', '--package-path', str(ROOT / 'Native')]

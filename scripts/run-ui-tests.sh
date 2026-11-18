@@ -10,15 +10,6 @@ if [[ -x "$lease_helper" ]]; then
 fi
 simulator_id=${1:?Pass the target simulator UDID followed by xcodebuild arguments}
 shift
-spotlight_capture_pid=""
-spotlight_stop_file=""
-stop_spotlight_capture() {
-    if [[ -n "$spotlight_capture_pid" ]]; then
-        touch "$spotlight_stop_file"
-        wait "$spotlight_capture_pid" || true
-        spotlight_capture_pid=""
-    fi
-}
 booted_file=$(mktemp)
 xcrun simctl list devices booted --json > "$booted_file"
 was_booted=$(python3 - "$booted_file" "$simulator_id" <<'PY'
@@ -29,19 +20,11 @@ print('yes' if any(device['udid'] == sys.argv[2] and device['state'] == 'Booted'
 PY
 )
 cleanup() {
-    stop_spotlight_capture
     if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" ]]; then
         mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
-        if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-            python3 "$(dirname "${BASH_SOURCE[0]}")/capture-simulator-search-context.py" "$simulator_id" "$TSK_EVENTKIT_EVIDENCE_DIR/search-owned-simulator-context.json" || true
-        fi
         container=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk data 2>/dev/null || true)
         if [[ -n "$container" && -d "$container/Documents" ]]; then
-            find "$container/Documents" -maxdepth 1 \( -name 'keyboard-fixture-*.json' -o -name 'participant-fixture-*.json' -o -name 'reminders-fixture-*.json' -o -name 'calendar-fixture-*.json' -o -name 'widgets-*.json' -o -name 'notifications-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
-        fi
-        group=$(xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk group.com.julesseguin.tsk 2>/dev/null || true)
-        if [[ -n "$group" && -d "$group/UITestDiagnostics" ]]; then
-            find "$group/UITestDiagnostics" -maxdepth 1 -name 'participant-fixture-share-*.json' -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
+            find "$container/Documents" -maxdepth 1 \( -name 'participant-fixture-*.json' -o -name 'calendar-fixture-*.json' \) -exec cp {} "$TSK_EVENTKIT_EVIDENCE_DIR/" \;
         fi
         if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
             python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-ui-boundaries.py" "$TSK_EVENTKIT_EVIDENCE_DIR" || true
@@ -67,7 +50,6 @@ if [[ "$was_booted" == no ]]; then
 fi
 xcrun simctl bootstatus "$simulator_id" -b
 build_arguments=()
-share_arguments=()
 test_filters=()
 skip_build=false
 derived_data=""
@@ -80,7 +62,6 @@ while [[ $# -gt 0 ]]; do
         -derivedDataPath)
             derived_data=$2
             build_arguments+=("$1" "$2")
-            share_arguments+=("$1" "$2")
             shift 2 ;;
         -resultBundlePath)
             result_path=$2
@@ -91,22 +72,14 @@ while [[ $# -gt 0 ]]; do
             shift ;;
         *)
             build_arguments+=("$1")
-            share_arguments+=("$1")
             shift ;;
     esac
 done
 if [[ -z "$derived_data" || -z "$result_path" ]]; then
-    echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed share fixture.' >&2
+    echo 'UI tests require explicit derivedDataPath and resultBundlePath for the installed action fixture.' >&2
     exit 1
 fi
-test_phases=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" phases -- ${test_filters[@]+"${test_filters[@]}"})
-if [[ "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "${TSK_NATIVE_KEYBOARD_HID:-0}" != 1 ]]; then
-    native_keyboard=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" native-keyboard -- ${test_filters[@]+"${test_filters[@]}"})
-    if [[ "$native_keyboard" == yes ]]; then
-        echo 'Selected hardware-keyboard tests require the owned native transport.' >&2
-        exit 1
-    fi
-fi
+action_fixture=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" action-fixture -- ${test_filters[@]+"${test_filters[@]}"})
 if [[ "$skip_build" == true ]]; then
     if [[ ! -d "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" ]]; then
         echo 'Prebuilt UI tests require existing signed simulator products.' >&2
@@ -118,62 +91,39 @@ fi
 xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app"
 xcrun simctl get_app_container "$simulator_id" com.julesseguin.tsk app > /dev/null
 execution_limits=(-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600)
-share_status=0
-if [[ "$test_phases" == *share* || "${test_filters[*]}" == *TaskActionURLUITests* ]]; then
-    xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskShareFixture.app"
+if [[ "$action_fixture" == yes ]]; then
+    xcrun simctl install "$simulator_id" "$derived_data/Build/Products/Debug-iphonesimulator/TskActionFixture.app"
 fi
-if [[ "$test_phases" == *share* ]]; then
-    share_command=(xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${share_arguments[@]}" -only-testing:TskUITests/ShareCaptureUITests -resultBundlePath "${result_path%.xcresult}-sharing.xcresult")
-    if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-        python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/share" --owned-simulator --monitor-device -- "${share_command[@]}" || share_status=$?
-    else
-        "${share_command[@]}" || share_status=$?
+readback_args=()
+readback_plan=$(python3 "$(dirname "${BASH_SOURCE[0]}")/ui-test-selection.py" native-readback -- ${test_filters[@]+"${test_filters[@]}"})
+if [[ "$readback_plan" != '{}' ]]; then
+    if [[ "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no ]]; then
+        echo 'Native readback requires the wrapper-owned isolated test simulator.' >&2
+        exit 1
     fi
-fi
-printf 'Share-first UI status: %s\n' "$share_status"
-case "$share_status" in
-    0|65) ;;
-    130|143) exit "$share_status" ;;
-    *) exit "$share_status" ;;
-esac
-if [[ "$test_phases" == share ]]; then
-    exit "$share_status"
-fi
-if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
+    probe=${TSK_NATIVE_PROBE_BINARY:-$(dirname "$derived_data")/ui-tools/tsk-native-probe}
+    library=${TSK_TASKCHAMPION_LIBRARY:-$(dirname "$derived_data")/ui-tools/libtsk_taskchampion.dylib}
+    if [[ ! -x "$probe" || ! -f "$library" ]]; then
+        echo 'Native readback requires the built host probe and native library.' >&2
+        exit 1
+    fi
+    export TSK_EVENTKIT_EVIDENCE_DIR=${TSK_EVENTKIT_EVIDENCE_DIR:-${result_path%.xcresult}-evidence}
     mkdir -p "$TSK_EVENTKIT_EVIDENCE_DIR"
-    spotlight_stop_file="$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-log-stop-$simulator_id"
-    python3 -c 'from pathlib import Path; import sys; Path(sys.argv[1]).unlink(missing_ok=True)' "$spotlight_stop_file"
-    codesign -dv --verbose=4 "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" > "$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-app-signature.txt" 2>&1 || true
-    codesign -d --entitlements - "$derived_data/Build/Products/Debug-iphonesimulator/Tsk.app" > "$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-app-entitlements.plist" 2> "$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-app-entitlements-stderr.txt" || true
-    python3 "$(dirname "${BASH_SOURCE[0]}")/capture-simulator-spotlight-log.py" "$simulator_id" "$TSK_EVENTKIT_EVIDENCE_DIR/spotlight-service.log" "$spotlight_stop_file" &
-    spotlight_capture_pid=$!
+    printf '%s\n' "$readback_plan" > "$TSK_EVENTKIT_EVIDENCE_DIR/native-readback-plan.json"
+    export TSK_UI_NATIVE_READBACK_TOKEN=$(python3 -c 'import uuid; print(uuid.uuid4())')
+    export TEST_RUNNER_TSK_UI_NATIVE_READBACK_TOKEN=$TSK_UI_NATIVE_READBACK_TOKEN
+    readback_args=(--native-probe "$probe" --native-library "$library" --native-readback-plan "$TSK_EVENTKIT_EVIDENCE_DIR/native-readback-plan.json")
 fi
 main_status=0
-if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 && ( "${CI:-false}" != true || "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" != 1 || "$was_booted" != no || -z "${TSK_EVENTKIT_EVIDENCE_DIR:-}" ) ]]; then
-    echo 'Native keyboard transport requires the CI-owned isolated simulator and evidence directory.' >&2
-    exit 1
-fi
 if [[ -n "${TSK_EVENTKIT_EVIDENCE_DIR:-}" && "${CI:-false}" == true && "${TEST_RUNNER_TSK_UI_ISOLATED_SIMULATOR:-0}" == 1 && "$was_booted" == no ]]; then
-    if [[ "${TSK_NATIVE_KEYBOARD_HID:-0}" == 1 ]]; then
-        python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device --owned-cleanup-grace-seconds 120 -- \
-            python3 "$(dirname "${BASH_SOURCE[0]}")/with-native-keyboard-hid.py" --udid "$simulator_id" \
-            --tool-root "${TSK_NATIVE_KEYBOARD_HID_TOOL_ROOT:?Pass the pinned .build HID tools}" \
-            --evidence "$TSK_EVENTKIT_EVIDENCE_DIR/native-keyboard-hid" -- \
-            xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
-    else
-    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
-    fi
+    python3 "$(dirname "${BASH_SOURCE[0]}")/relay-ui-test-boundaries.py" --device "$simulator_id" --evidence "$TSK_EVENTKIT_EVIDENCE_DIR" --owned-simulator --monitor-device ${readback_args[@]+"${readback_args[@]}"} -- xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 else
-    xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -skip-testing:TskUITests/ShareCaptureUITests -resultBundlePath "$result_path" || main_status=$?
+    xcodebuild test-without-building "${execution_limits[@]}" -collect-test-diagnostics never -destination "platform=iOS Simulator,id=$simulator_id" -parallel-testing-enabled NO "${build_arguments[@]}" -resultBundlePath "$result_path" || main_status=$?
 fi
-stop_spotlight_capture
 printf 'Remaining UI status: %s\n' "$main_status"
 case "$main_status" in
     0|65) ;;
     130|143) exit "$main_status" ;;
     *) exit "$main_status" ;;
 esac
-if [[ "$share_status" -ne 0 ]]; then
-    exit "$share_status"
-fi
 exit "$main_status"

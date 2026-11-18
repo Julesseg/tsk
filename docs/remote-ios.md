@@ -63,8 +63,8 @@ bash scripts/remote-ios.sh test --device <UDID> \
 
 The helper uses `scripts/run-ui-tests.sh`, including its simulator ownership
 and cleanup. Tests that boot a stopped simulator shut it down on success or
-failure and preserve pre-existing boots. Tests requiring sync servers or
-native keyboard fixtures need the existing CI setup; run those through CI.
+failure and preserve pre-existing boots. Tests requiring real sync servers and peers need the existing CI setup; run
+those through CI.
 Result bundles are copied to the local `.build/remote-ios/<run>/`, including
 after a test failure when the SSH connection is still available. A broken
 connection may require retrieving results from the printed Mac workspace.

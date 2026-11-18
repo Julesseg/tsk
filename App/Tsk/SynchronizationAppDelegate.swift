@@ -1,16 +1,18 @@
 @preconcurrency import BackgroundTasks
 import UIKit
-@preconcurrency import UserNotifications
 import TskCore
 import TskNative
 
 @MainActor
-final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
     static var schedulingError: String?
     static var refreshIdentifier: String { (Bundle.main.bundleIdentifier ?? "com.julesseguin.tsk") + ".refresh" }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        Task {
+            do { try await RetiredSystemContent.remove() }
+            catch { NSLog("Retired system content cleanup will retry: %@", error.localizedDescription) }
+        }
         let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshIdentifier, using: .main) { task in
             Task { @MainActor in
                 await Self.refresh(task)
@@ -18,10 +20,6 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserN
         }
         if !registered { Self.schedulingError = "iOS did not register background synchronization. Foreground synchronization remains available." }
         return true
-    }
-
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .list, .sound])
     }
 
     static func scheduleRefresh() {
@@ -48,19 +46,12 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserN
                 task.setTaskCompleted(success: false)
                 return
             }
-            let continuous: ContinuousReminderController
-            if let current = ContinuousReminderController.current, current.store.directory == directory { continuous = current }
-            else { continuous = ContinuousReminderController(store: TaskStore(manager: manager, directory: directory)) }
-            execution.continuousReminders = continuous
-            await continuous.scan()
-            guard !execution.expired else { task.setTaskCompleted(success: false); return }
-            let importSucceeded = continuous.error == nil && !continuous.isRunning && (continuous.status?.active != true || continuous.result?.stopped != true)
             if await manager.synchronizationStatus() == .localOnly {
-                task.setTaskCompleted(success: importSucceeded)
+                task.setTaskCompleted(success: true)
                 return
             }
             _ = try await manager.synchronize(trigger: .backgroundOpportunity)
-            task.setTaskCompleted(success: importSucceeded)
+            task.setTaskCompleted(success: true)
         } catch { task.setTaskCompleted(success: false) }
     }
 }
@@ -69,12 +60,9 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserN
 private final class BackgroundSynchronizationExecution {
     var manager: TaskManager?
     var expired = false
-    var continuousReminders: ContinuousReminderController?
 
     func expire() async {
         expired = true
-        continuousReminders?.cancel()
-        await continuousReminders?.store.manager.suspendSynchronization()
         await manager?.suspendSynchronization()
     }
 }

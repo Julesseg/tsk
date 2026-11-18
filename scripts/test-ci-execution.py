@@ -36,17 +36,20 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(full['families'], ['iPhone'])
         self.assertEqual(len(full['matrix']['include']), 2)
         for worker in full['matrix']['include']:
-            self.assertEqual(worker['native_keyboard'], worker['partition'] == 'workspace')
             self.assertEqual(worker['server'], worker['partition'] == 'workspace')
             self.assertEqual(worker['peer'], worker['partition'] == 'workspace')
         smoke = plan.plan('smoke')
         self.assertEqual(smoke['families'], ['iPhone'])
         self.assertEqual(len(smoke['matrix']['include']), 1)
-        self.assertFalse(any(worker['native_keyboard'] for worker in smoke['matrix']['include']))
         self.assertFalse(smoke['server'])
         self.assertFalse(smoke['peer'])
         self.assertEqual(plan.plan('diagnostic')['families'], ['iPhone'])
         self.assertFalse(plan.plan('text')['server'])
+        sync = plan.plan('sync')
+        self.assertEqual(sync['matrix']['include'], [dict(family='iPhone', partition='all', server=True, peer=True)])
+        self.assertEqual(plan.selection.selection('sync', 'iPhone'), [
+            '-only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
+        ])
         plan.validate_source('frozen', 'frozen')
         plan.validate_source(None, 'current')
         with self.assertRaisesRegex(ValueError, 'Branch moved'):
@@ -58,6 +61,31 @@ class ExecutionTests(unittest.TestCase):
         for key in identity:
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, key):
                 products.verify_identity(identity, dict(identity, **{key: 'different'}))
+
+    def test_replay_requires_an_ancestor_with_unchanged_product_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root, text=True, stderr=subprocess.PIPE).strip()
+            git('init', '-q')
+            git('config', 'user.name', 'CI replay tests')
+            git('config', 'user.email', 'ci@example.invalid')
+            (root / 'App').mkdir()
+            source_file = root / 'App/Test.swift'
+            source_file.write_text('original')
+            git('add', 'App')
+            git('commit', '-qm', 'original')
+            source = git('rev-parse', 'HEAD')
+            git('commit', '-qm', 'diagnostics', '--allow-empty')
+            diagnostics = git('rev-parse', 'HEAD')
+            self.assertEqual(products.replay_identity(dict(source=diagnostics), source, root),
+                             dict(source=source, tree=git('rev-parse', source + '^{tree}')))
+            with self.assertRaises(subprocess.CalledProcessError):
+                products.replay_identity(dict(source=source), diagnostics, root)
+            source_file.write_text('changed')
+            git('commit', '-qam', 'changed')
+            with self.assertRaises(subprocess.CalledProcessError):
+                products.replay_identity(dict(source=git('rev-parse', 'HEAD')), source, root)
 
     def test_product_transfer_preserves_executables_links_and_detects_corruption(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -159,7 +187,7 @@ class ExecutionTests(unittest.TestCase):
 
     def test_method_boundaries_retain_initial_failure_and_later_independent_results(self):
         with tempfile.TemporaryDirectory() as directory:
-            capture = boundaries.BoundaryCapture('owned', directory, ROOT / 'scripts')
+            capture = boundaries.BoundaryCapture('owned', directory)
             with contextlib.redirect_stdout(io.StringIO()):
                 capture.line(b"Test Case '-[TskUITests.TaskRowEditingUITests testEdit]' failed (5.000 seconds).")
                 capture.line(b"Test Case '-[TskUITests.TaskRowEditingUITests testOther]' passed (2.000 seconds).")

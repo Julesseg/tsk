@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # Taskwarrior filters and Apple Reminders import feasibility
 
 Research date: 2026-10-13. Scope: primary-source documentation review for the product interview. No implementation, build, device import, or compatibility test was performed. TaskChampion observations concern its current published Rust API; the repository dependency version was not checked in this review.

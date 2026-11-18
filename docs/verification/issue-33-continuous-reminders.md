@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # Continuous Reminders move
 
 The native compact More menu and iPad sidebar offer Move from Reminders automatically. Selected source lists map to projects through the same reusable controls as one-time copy. Enabling explicitly designates this device and starts a move; other installations default to disabled. The operating settings stay in device-local shared storage, outside task synchronization. The stored vendor device identifier is checked before automatic execution, so a configuration restored onto a different device cannot silently enable it there. If a device identifier, permission, list or configuration is unavailable, moving fails visibly and ordinary task management remains available.

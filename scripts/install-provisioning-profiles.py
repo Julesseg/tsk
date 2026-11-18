@@ -8,8 +8,6 @@ import subprocess
 
 TARGETS = (
     ('com.julesseguin.tsk', 'APPLE_PROVISIONING_PROFILE', 'TSK_APP_PROVISIONING_PROFILE'),
-    ('com.julesseguin.tsk.share', 'APPLE_SHARE_PROVISIONING_PROFILE', 'TSK_SHARE_PROVISIONING_PROFILE'),
-    ('com.julesseguin.tsk.widgets', 'APPLE_WIDGET_PROVISIONING_PROFILE', 'TSK_WIDGET_PROVISIONING_PROFILE'),
 )
 
 
@@ -34,7 +32,7 @@ def validate(profile, bundle, team, now):
 def main():
     missing = [secret for _, secret, _ in TARGETS if not os.environ.get(secret, '').strip(' \t\r\n\v\f')]
     if missing:
-        raise SystemExit('Missing provisioning profile secrets: ' + ', '.join(missing) + '. Create App, Share, and Widget Ad Hoc profiles with group.com.julesseguin.tsk enabled')
+        raise SystemExit('Missing provisioning profile secrets: ' + ', '.join(missing) + '. Create an App Ad Hoc profile with group.com.julesseguin.tsk enabled')
     payloads = {}
     for bundle, secret, _ in TARGETS:
         try:
@@ -60,10 +58,10 @@ def main():
         environment.append(setting + '=' + profile['Name'])
     devices = [set(p['ProvisionedDevices']) for p in profiles]
     if not all(group == devices[0] for group in devices):
-        raise SystemExit('App, Share, and Widget profiles must authorize the same Ad Hoc devices')
+        raise SystemExit('Provisioning profiles must authorize the same Ad Hoc devices')
     certificates = [set(p.get('DeveloperCertificates', [])) for p in profiles]
     if not set.intersection(*certificates):
-        raise SystemExit('App, Share, and Widget profiles must authorize a common distribution certificate')
+        raise SystemExit('Provisioning profiles must authorize a common distribution certificate')
     for (bundle, _, _), profile in zip(TARGETS, profiles):
         destination = installed / (profile['UUID'] + '.mobileprovision')
         destination.write_bytes((temporary / (bundle + '.mobileprovision')).read_bytes())
@@ -72,7 +70,7 @@ def main():
         file.write('\n'.join(environment) + '\n')
     export = {'method': 'ad-hoc', 'teamID': os.environ['APPLE_TEAM_ID'], 'signingStyle': 'manual', 'compileBitcode': False, 'provisioningProfiles': mappings}
     (temporary / 'ExportOptions.plist').write_bytes(plistlib.dumps(export))
-    print('Installed validated App, Share, and Widget profiles and target-specific export mapping')
+    print('Installed validated app profile and export mapping')
 
 
 if __name__ == '__main__':

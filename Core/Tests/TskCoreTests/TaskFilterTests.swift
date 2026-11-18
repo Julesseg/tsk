@@ -67,17 +67,19 @@ import Testing
 }
 
 @Test func customViewSnapshotKeepsPrerequisitesOutsideTheRawExpression() async throws {
-    let manager = TaskManager(replica: TestReplica())
+    let replica = TestReplica()
+    let manager = TaskManager(replica: replica)
     let prerequisite = try await manager.create(TaskDraft(description: "Prerequisite", attributes: ["project": "Other"]))
     let child = try await manager.create(TaskDraft(description: "Selected", attributes: ["project": "Work"]))
-    _ = try await manager.addDependency(id: child.id, prerequisiteID: prerequisite.id)
+    _ = try await replica.update(id: child.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
     let snapshot = try await manager.viewSnapshot(filter: "project.is:Work")
-    let selected = try #require(snapshot.tasks.first)
+    #expect(snapshot.allTasks.count == 2)
     #expect(snapshot.tasks.map(\.id) == [child.id])
-    #expect(!selected.availability(at: Date(), tasks: snapshot.allTasks).isAvailable)
+    #expect(try await manager.tasks(filter: "project.is:Work and +BLOCKED").map(\.id) == [child.id])
     _ = try await manager.complete(id: prerequisite.id)
     let refreshed = try await manager.viewSnapshot(filter: "project.is:Work")
-    #expect(try #require(refreshed.tasks.first).availability(at: Date(), tasks: refreshed.allTasks).isAvailable)
+    #expect(refreshed.tasks.map(\.id) == [child.id])
+    #expect(try await manager.tasks(filter: "project.is:Work and +READY").map(\.id) == [child.id])
 }
 
 @Test func ECMAScriptQueriesUseUTF8ByteLengthsIncludingEmbeddedNul() async throws {

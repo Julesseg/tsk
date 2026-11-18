@@ -10,7 +10,6 @@ struct TaskRowEditor: View {
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
     @State private var measuredActionsHeight: CGFloat = 44
-    @State private var linkedTask: TaskRecord?
     @FocusState private var focusedNote: UTF8String?
     @Environment(\.taskRowActions) private var rowActions
 
@@ -25,7 +24,7 @@ struct TaskRowEditor: View {
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("task-row-supporting-scroll")
             VStack(alignment: .leading, spacing: 8) {
-                if editing.supportingPanel == nil, let error = editing.error ?? store.error {
+                if let error = editing.error ?? store.error {
                     Text(error).font(.callout).foregroundStyle(.red)
                         .accessibilityIdentifier("draft-error")
                         .accessibilityAddTraits(.updatesFrequently)
@@ -58,18 +57,6 @@ struct TaskRowEditor: View {
         .buttonStyle(.borderless)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-row-editor")
-        .sheet(item: $editing.supportingPanel, onDismiss: {
-            store.error = nil
-            if let target = linkedTask { linkedTask = nil; rowActions.reveal(target) }
-        }) { panel in
-            switch panel {
-            case .dependency:
-                TaskDependencySelection(store: store, task: editing.draft.original, onSave: editing.absorb) { target in
-                    linkedTask = target
-                    editing.supportingPanel = nil
-                }
-            }
-        }
         .task(id: measuredContentHeight > 0) {
             guard measuredContentHeight > 0 else { return }
             await Task.yield()
@@ -120,19 +107,6 @@ private struct TaskRowEditorContent: View {
                             }
                         }
                         if !editing.isCapture {
-                        Button { open(.dependency) } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "arrow.triangle.branch")
-                                if !task.dependencyReferences.isEmpty { Text(task.dependencyReferences.count, format: .number) }
-                            }
-                            .font(.caption)
-                        }
-                        .buttonStyle(TaskRowParameterButtonStyle())
-                        .frame(minWidth: 44, minHeight: 44, alignment: .top)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel("Dependencies")
-                        .accessibilityValue("\(task.dependencyReferences.count) dependencies")
-                        .accessibilityIdentifier("row-dependencies")
                         TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
                         }
                     }.padding(.horizontal, 4)
@@ -153,14 +127,6 @@ private struct TaskRowEditorContent: View {
         }
         .padding(.bottom, 8)
         .disabled(editing.isSaving || store.isSaving)
-    }
-
-    private func open(_ panel: TaskRowEditing.SupportingPanel) {
-        titleFocused = false
-        focusedNote = nil
-        editing.error = nil
-        store.error = nil
-        editing.supportingPanel = panel
     }
 }
 

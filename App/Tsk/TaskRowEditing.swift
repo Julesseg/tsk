@@ -5,16 +5,6 @@ import TskCore
 
 @MainActor @Observable
 final class TaskRowEditing {
-    enum SupportingPanel: Identifiable {
-        case dependency
-
-        var id: String {
-            switch self {
-            case .dependency: "dependency"
-            }
-        }
-    }
-
     let isCapture: Bool
     let rowID: String
     let context: TaskCompletionFeedback.Context
@@ -23,7 +13,6 @@ final class TaskRowEditing {
     let referenceDate: Date
     var draft: TaskRowDraft
     var parameter: TaskRowParameter?
-    var supportingPanel: SupportingPanel?
     var savedTask: TaskRecord?
     var error: String?
     var isExpanded = false
@@ -98,7 +87,7 @@ final class TaskRowEditing {
     }
 
     func saveAndCollapse(in store: TaskStore, reduceMotion: Bool, includingParameter: Bool = false) async -> Bool {
-        guard !isSaving, !store.isSaving, supportingPanel == nil, isExpanded else { return false }
+        guard !isSaving, !store.isSaving, isExpanded else { return false }
         if parameter != nil && !includingParameter { parameter = nil; return false }
         if !isCapture && !draft.original.canEdit {
             parameter = nil

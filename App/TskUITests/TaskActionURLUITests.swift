@@ -554,7 +554,7 @@ import XCTest
     }
 
     private func send(_ url: String) throws -> XCUIApplication {
-        let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.sharefixture")
+        let host = XCUIApplication(bundleIdentifier: "com.julesseguin.tsk.actionfixture")
         host.launchEnvironment["TSK_ACTION_FIXTURE_URL"] = url
         host.launch()
         let open = host.buttons["action-fixture-open"]

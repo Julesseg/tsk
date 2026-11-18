@@ -108,7 +108,6 @@ struct TaskAnnotationEditor: View {
             }
             .interactiveDismissDisabled(store.isSaving)
             .onChange(of: UTF8String(text)) { _, _ in error = nil }
-            .taskKeyboardCommands(store.isSaving ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
             .modifier(TaskWorkspacePanel(store: store))
         }
     }

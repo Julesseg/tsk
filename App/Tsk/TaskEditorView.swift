@@ -92,7 +92,6 @@ struct TaskEditorView: View {
                 store.presentedTaskPanels.remove(taskActionDraftID)
                 if store.taskActionDraftCommit?.id == taskActionDraftID { store.taskActionDraftCommit = nil }
             }
-            .taskKeyboardCommands(store.isSaving || isChoosingPriority ? TaskKeyboardCommand.suspended : TaskEditorActions(save: save).keyboardCommands)
 
         }
         .modifier(TaskActionMessage(controller: automation))

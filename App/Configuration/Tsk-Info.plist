@@ -12,8 +12,6 @@
 	<true/>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Show today’s Calendar events alongside your tasks. tsk only reads Calendar and never creates, edits, or removes events.</string>
-	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Choose Reminders lists to copy incomplete reminders into tasks. One-time copy leaves your originals unchanged.</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>

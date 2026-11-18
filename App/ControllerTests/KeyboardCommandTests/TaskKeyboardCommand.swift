@@ -1,1 +1,0 @@
-../../TskUITests/TaskKeyboardCommand.swift

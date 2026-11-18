@@ -41,13 +41,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--repo', default='Julesseg/tsk')
     parser.add_argument('--ref', required=True)
-    parser.add_argument('--suite', required=True, choices=['smoke', 'full', 'diagnostic', 'keyboard', 'text', 'regression', 'menu'])
+    parser.add_argument('--suite', required=True, choices=['smoke', 'full', 'diagnostic', 'text', 'regression', 'menu', 'sync'])
+    parser.add_argument('--sync-products-run', type=int)
     parser.add_argument('--reason', required=True)
     parser.add_argument('--identity', type=Path)
     parser.add_argument('--force', action='store_true')
     args = parser.parse_args()
     if not args.reason.strip():
         parser.error('Explain why this coverage is needed')
+    if args.sync_products_run is not None and (args.suite != 'sync' or args.sync_products_run < 1):
+        parser.error('--sync-products-run requires a positive run ID and the sync suite')
     sha = api(f'repos/{args.repo}/commits/{args.ref}')['sha']
     runs = api(f'repos/{args.repo}/actions/workflows/ci.yml/runs?head_sha={sha}&event=workflow_dispatch&per_page=100')['workflow_runs']
     identity = json.loads(args.identity.read_text()) if args.identity else None
@@ -60,6 +63,8 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     if existing and not args.force:
+        if args.sync_products_run is not None:
+            parser.error('Sync coverage is already pending; inspect the active run before replaying products: ' + existing['html_url'])
         print(('Reusing verified completed coverage: ' if existing['status'] == 'completed' else 'Matching coverage is already pending; verify its result and identity: ') + existing['html_url'])
         return
     failed = [run for run in runs if run['head_branch'] == args.ref and run['display_title'].startswith('CI · ' + args.suite + ' · ') and run['conclusion'] == 'failure']
@@ -71,6 +76,8 @@ def main():
                '-f', 'ui_suite=' + ('smoke' if args.suite == 'diagnostic' else args.suite), '-f', 'reason=' + args.reason,
                '-f', 'expected_sha=' + sha,
                '-f', 'diagnostic_only=' + ('true' if args.suite == 'diagnostic' else 'false')]
+    if args.sync_products_run is not None:
+        command += ['-f', 'sync_products_run=' + str(args.sync_products_run)]
     subprocess.run(command, check=True)
     print(f'Requested {args.suite} at {sha}; verify the resulting run SHA before accepting it.')
 

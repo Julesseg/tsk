@@ -7,7 +7,7 @@ final class TaskScheduledUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
     override func tearDownWithError() throws { XCUIApplication().terminate() }
 
-    func testNonMidnightScheduledEditsKeepOtherDatesAndPersist() throws {
+    func testNonMidnightScheduledEditsKeepOtherDatesAndPersist() async throws {
         let app = try launch()
         app.tabBars.buttons["Today"].tap()
         let todayRow = app.buttons["task-" + taskID]
@@ -52,17 +52,16 @@ final class TaskScheduledUITests: XCTestCase {
         app.buttons["save-task"].tap()
         XCTAssertTrue(app.buttons["edit-task"].waitForExistence(timeout: 10))
         app.terminate()
-        app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-        selectAllTasks(app)
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        row.tap()
-        XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, scheduled(on: 17))
-        XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792177200))
-        XCTAssertEqual(app.buttons["row-waiting-date"].value as? String, formatted(1792184400))
-        app.terminate()
+        let saved = try await storedTasks(app, checkpoint: "saved")
+        let attributes = try XCTUnwrap(saved[taskID])
+        var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: 1792170900))
+        components.day = 17
+        XCTAssertEqual(attributes["scheduled"], String(Int(try XCTUnwrap(Calendar.current.date(from: components)).timeIntervalSince1970)))
+        XCTAssertEqual(attributes["due"], "1792177200")
+        XCTAssertEqual(attributes["wait"], "1792184400")
+        XCTAssertEqual(attributes["description"], "Review the release")
+        XCTAssertEqual(attributes["status"], "pending")
+
     }
 
     private func formatted(_ seconds: TimeInterval) -> String {

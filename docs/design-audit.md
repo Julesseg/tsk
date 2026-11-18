@@ -1,3 +1,9 @@
+> Scope update (2026-11-18): Apple Reminders import is removed; references to its copy/move screens below are historical. Calendar, synchronization and existing task data remain.
+
+> Product scope update (2026-11-17): hardware keyboard commands and widgets are
+> retired. References to keyboard commands below describe historical proposals;
+> ordinary on-screen text entry, touch editing and accessibility remain supported.
+
 # App design audit
 
 Native iPad requirements below are historical and superseded by [ADR 0007](adr/0007-iphone-only.md).
@@ -44,7 +50,7 @@ to reach. Broad replacement of navigation or visual styling is not yet justified
 | Task rows stack metadata independently | `App/Tsk/TaskListView.swift:67`, `App/Tsk/UpcomingTaskList.swift:16`, `App/Tsk/TaskAvailabilityView.swift:23` | Project, activity, dates, full blocker names and recurrence can consume multiple lines. Upcoming has a separate implementation and different context-menu actions. |
 | Detail privileges completeness over decisions | `App/Tsk/TaskDetailView.swift:19`, `App/SharedTaskForms/TaskOrganizationSection.swift:95` | Empty priority, activity and dependency rows precede planning. Screenshots show planning below the initial viewport, even on a large iPad. |
 | Raw information duplicates readable detail | `App/Tsk/TaskDetailView.swift:48`, `App/Tsk/TaskPlanningSummary.swift:25` | Every raw field and UUID is always rendered; start time is repeated. Errors have both a top banner and a bottom section. |
-| Capture opens the complete metadata form | `App/Tsk/TaskEditorView.swift:27`, `App/TskShare/ShareCaptureView.swift:89` | Simple capture carries project, priority, tags, three date controls and explanatory copy. |
+| Capture opens the complete metadata form | `App/Tsk/TaskEditorView.swift:27` | Simple capture carries project, priority, tags, three date controls and explanatory copy. |
 | Calendar consumes the start of Today | `App/Tsk/TaskListView.swift:15`, `App/Tsk/TodayCalendarSection.swift:10` | Permission/setup copy or every event precedes tasks. The largest-text capture makes that competition especially apparent. |
 | Choosing views is mixed with configuring tabs | `App/Tsk/TaskSettingsView.swift:10`, `App/Tsk/CustomViewsView.swift:67`, `App/Tsk/CustomViewsView.swift:104` | Views opens in persistent edit mode; inactive predefined views cannot simply be opened, while inactive custom views open their editor. |
 | Integration screens mix operation and diagnostics | `App/Tsk/SyncSettingsView.swift:25`, `App/Tsk/TaskNotificationSettingsView.swift:33`, `App/Tsk/ContinuousReminderSettingsView.swift:21` | Current state and the useful next action compete with credentials, counters and explanatory text. |
@@ -104,7 +110,7 @@ Accepted layout: editable title first, then dedicated custom parameter
 components arranged horizontally. Each component displays a task parameter and
 opens its editing control when tapped: for example, a date picker or tags
 selector. Use these components for project, tags, priority and scheduling;
-annotations and dependencies remain available below.
+annotations remain available below.
 Start/Stop is secondary. Remove duplicated values and use one actionable error
 presentation. Completed tasks and recurring templates retain action restrictions.
 iPad and accessibility routes follow the in-list editing direction too.
@@ -116,7 +122,7 @@ it does not activate the dimmed row underneath.
 
 Keep the edited row anchored until editing finishes. Collapse first, then apply
 normal filtering/grouping so changes do not move the row while it is being
-edited. Existing links from Spotlight/dependencies reveal a list containing the
+edited. Existing links from Spotlight and external task URLs reveal a list containing the
 task and expand its row, with a route back to the previous list.
 
 Existing tasks expand without raising the keyboard; capture immediately focuses
@@ -179,7 +185,7 @@ many events, empty tasks, largest text and both device families.
 ### 5. Edit multiple tasks
 
 Accepted action set: planned day, deadline, project, tags, priority and completing
-selected tasks. Descriptions, dependencies and recurring-series changes remain
+selected tasks. Descriptions and recurring-series changes remain
 individual operations.
 
 Accepted selection gesture:
@@ -210,8 +216,7 @@ Upcoming's repeated appearances share one selection and count as one task.
 
 Show a bottom action bar with selected count and access to Plan, Deadline,
 Project, Tags, Priority and Complete. Each action opens focused controls rather
-than expanding every selected row. Provide a Select command for keyboard and
-accessibility use.
+than expanding every selected row. Provide a Select accessibility action.
 
 Each operation changes only its chosen field, preserving others. Clearing is
 explicit. Tags offers Add and Remove, preserving other tags. Save the selected
@@ -303,7 +308,7 @@ and recurrence-help cleanup are deferred proposals, not part of the agreed focus
 
 ## Constraints carried forward
 
-Planned day and deadline remain distinct (ADR-0003). Waiting or blocked tasks
+Planned day and deadline remain distinct (ADR-0003). Waiting tasks
 matching Today remain visible with a reason. Calendar remains display-only.
 Recurring template and occurrence actions remain distinct, with external
 generation (ADR-0002). Reminders copy/move behavior remains as recorded in

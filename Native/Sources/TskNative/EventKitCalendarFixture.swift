@@ -49,8 +49,7 @@ import TskCore
         var evidence = try JSONSerialization.jsonObject(with: Data(contentsOf: file(token))) as? [String: Any] ?? [:]
         let after = summaries(store: store, calendar: calendar, day: day)
         guard let before = evidence["storedBeforeDisplay"] as? [[String: Any]] else { throw CocoaError(.fileReadCorruptFile) }
-        let originalAfter = after.filter { ($0["title"] as? String) != "Calendar fixture observed change" }
-        guard try encoded(before) == encoded(originalAfter) else { throw NSError(domain: "tsk.CalendarFixture", code: 2, userInfo: [NSLocalizedDescriptionKey: "Displaying Calendar changed owned source events."]) }
+        guard try encoded(before) == encoded(after) else { throw NSError(domain: "tsk.CalendarFixture", code: 2, userInfo: [NSLocalizedDescriptionKey: "Displaying Calendar changed owned source events."]) }
         let owned = displayed.filter { $0.calendarTitle == name(token) }
         guard owned.count >= 3, owned.contains(where: { $0.title == "Calendar fixture all day" && $0.isAllDay }),
               owned.contains(where: { $0.title == "Calendar fixture timed" }), owned.contains(where: { $0.title == "Calendar fixture spanning" }),
@@ -68,16 +67,6 @@ import TskCore
         evidence["displayed"] = owned.map { ["title": $0.title, "id": $0.eventID, "start": $0.start.timeIntervalSince1970, "end": $0.end.timeIntervalSince1970, "allDay": $0.isAllDay] as [String: Any] }
         evidence["readOnlyVerified"] = true
         try write(evidence, token: token)
-    }
-
-    public static func addObservedEvent(token: String, day: DateInterval) async throws {
-        try validate(token)
-        let store = EKEventStore()
-        try await requireAccess(store: store)
-        guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) && $0.source.sourceType == .local }) else { throw CocoaError(.fileNoSuchFile) }
-        let event = EKEvent(eventStore: store)
-        event.calendar = calendar; event.title = "Calendar fixture observed change"; event.startDate = day.start.addingTimeInterval(43200); event.endDate = day.start.addingTimeInterval(45000)
-        try store.save(event, span: .thisEvent, commit: true)
     }
 
     public static func clean(token: String) throws {

@@ -289,15 +289,6 @@ struct TaskListRow: View {
         }
         .modifier(TaskRowSpacing(editing: editing))
         .modifier(TaskSelectionRowFeedback(selected: selected))
-        .background {
-            if expanded {
-                Color.clear.taskKeyboardCommands(TaskEditorActions(save: rowActions.close).keyboardCommands + [
-                    TaskKeyboardCommand(id: "select", input: "s", modifiers: [.command, .shift], title: "Select Task", action: { store.toggleSelection(task.id) }),
-                    TaskKeyboardCommand(id: "collapse", input: "\u{1b}", modifiers: [], title: "Close Task Editor", action: rowActions.close)
-                ])
-                .allowsHitTesting(false)
-            }
-        }
         .onChange(of: expanded) { _, expanded in
             if !expanded { titleFocused = false }
             else if editing?.isCapture == true { titleFocused = true }
