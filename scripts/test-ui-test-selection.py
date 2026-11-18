@@ -27,12 +27,12 @@ class SelectionTests(unittest.TestCase):
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 22)
-        self.assertEqual(len(diagnostic), 23)
+        self.assertEqual(len(nightly), 21)
+        self.assertEqual(len(diagnostic), 25)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
             "TskUITests/TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity",
-            "TskUITests/TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites",
+            "TskUITests/TaskNavigationUITests/testInstalledOpenViewURLsReachPlannerInboxAndExactProjects",
             "TskUITests/TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination",
         })
         self.assertEqual(nightly | diagnostic, selection.test_methods())
@@ -82,14 +82,14 @@ class SelectionTests(unittest.TestCase):
                     "TskUITests/ActorTests/testPlain",
                 })
 
-    def test_shards_cover_nightly_once_and_keep_system_fixtures_in_workspace(self):
+    def test_shards_cover_nightly_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         groups = {name: selection.selection("full", "iPhone", name) for name in ("workspace", "row-editing")}
         workspace = selection.selected_methods(groups["workspace"])
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (16, 6))
+        self.assertEqual((len(workspace), len(rows)), (14, 7))
         self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -106,7 +106,7 @@ class SelectionTests(unittest.TestCase):
         text = selection.selection("text", "iPhone")
         self.assertEqual(len(selection.selected_methods(text)), 1)
         regression = selection.selection("regression", "iPhone")
-        self.assertEqual(len(selection.selected_methods(regression)), 4)
+        self.assertEqual(len(selection.selected_methods(regression)), 3)
 
     def test_renamed_and_unknown_selectors_fail_instead_of_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):

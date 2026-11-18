@@ -12,7 +12,6 @@ PHONE_SMOKE = (
 )
 
 NIGHTLY = (
-    'CustomViewsUITests/testRawViewValidationSaveEditReopenResultsActionsAndDeletion',
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
     'TaskActionURLUITests/testCompleteOccurrenceURLPersistsAndMissingDeletedTargetsReturnErrors',
@@ -25,21 +24,21 @@ NIGHTLY = (
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
+    'TaskBulkSelectionUITests/testScheduledSlotSelectsOnTouchDownAndSweepsWithoutMovingRows',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
-    'TaskNavigationUITests/testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites',
+    'TaskNavigationUITests/testInstalledOpenViewURLsReachPlannerInboxAndExactProjects',
     'TaskNavigationUITests/testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination',
     'TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope',
     'TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening',
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion',
     'TaskRowEditingUITests/testSupportingInformationEditsKeepTheExpandedDraftAndPersist',
     'TskUITests/testCaptureReviewCancelSaveAndRelaunch',
-    'WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch',
 )
 
 ON_DEMAND = (
     'CalendarPresentationUITests/testCalendarVisibilityTogglesFilterIndependentlyAndPersistAcrossLaunches',
-    'CalendarPresentationUITests/testOverviewHoursSaveAcrossLaunchAndKeepEventsOutsideTheRange',
-    'CalendarPresentationUITests/testPopulatedCalendarOnlyShowsTimeAndTitleAboveTasksAcrossAppearances',
+    'CalendarPresentationUITests/testDisplayedDayCalendarReadsEventsWithoutChangingTasks',
+    'CalendarPresentationUITests/testPopulatedCalendarMixesTimedEventsAndTasksAcrossAppearances',
     'CalendarPresentationUITests/testReadFailureHidesCalendarAndSettingsRetryRecoversWithTasksUsable',
     'RecurringTemplateUITests/testRecordedRealGeneratorOccurrenceEditsAndCompletesWithoutChangingItsTemplate',
     'RecurringTemplateUITests/testRecurringTemplateValidationCreationInspectionAndPersistentReopen',
@@ -56,7 +55,9 @@ ON_DEMAND = (
     'TaskRowEditingUITests/testNativeProjectMenuDismissesTitleAndNoteKeyboard',
     'TaskRowEditingUITests/testNativeProjectMenuRetainsScrolledPositionWhileOpen',
     'TaskRowEditingUITests/testSupportingInformationOverflowAndEmptyActionsAtAccessibilitySize',
-    'TaskRowEditingUITests/testUpcomingAnchorAndMembershipChangeAfterCollapse',
+    'TaskRowEditingUITests/testDayPageAnchorAndMembershipChangeAfterCollapse',
+    'TaskScheduledUITests/testCompletedPlannerRowsRetainPageOrderAndCheckedStateAfterRelaunch',
+    'TaskScheduledUITests/testNativeDraggingSavesLastCrossedIntentAndManualOrder',
     'TaskScheduledUITests/testNonMidnightScheduledEditsKeepOtherDatesAndPersist',
     'WorkspaceSettingsUITests/testSettingsRemainReachableAtLargestTextSize',
     'WorkspaceSettingsUITests/testSynchronizationProgressStaysBesideWorkspaceTitle',
@@ -76,7 +77,6 @@ REGRESSION = (
     "TaskRowEditingUITests/testNativeProjectMenuActionsSurviveRepeatedPopoverDismissal",
     "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
     "TaskRowEditingUITests/testOrganizationSelectionClearingInvalidTagsAndReopening",
-    "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
               text=TEXT, menu=MENU, regression=REGRESSION)

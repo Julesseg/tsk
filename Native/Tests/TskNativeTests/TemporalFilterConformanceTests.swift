@@ -125,17 +125,16 @@ func relativeDateAndVirtualTagQueriesAgreeWithPinnedTaskwarrior350() async throw
     let task = try await manager.create(TaskDraft(description: "Native deadline", attributes: ["due": String(Int(now.timeIntervalSince1970)), "foreign": "keep", "custom_e\u{301}": "decomposed", "custom_é": "composed"]))
     let replica = TaskChampionReplica(directory: directory)
     _ = try await replica.update(id: task.id, changes: ["dep_\(prerequisite.id.uuidString.lowercased())": "x"])
-    let saved = try await manager.saveView(name: "Ready deadlines", expression: "due:today and +READY")
+    let expression = "due:today and +READY"
     let reopened = TaskChampionSession.makeManager(directory: directory, now: { now }, calendar: calendar)
-    #expect(try await reopened.savedViews() == [saved])
-    let before = try await reopened.viewSnapshot(filter: saved.expression)
+    let before = try await reopened.viewSnapshot(filter: expression)
     #expect(before.tasks.isEmpty)
     #expect(before.allTasks.count == 2)
     _ = try await reopened.complete(id: prerequisite.id)
-    #expect(try await reopened.tasks(filter: saved.expression).map(\.id) == [task.id])
+    #expect(try await reopened.tasks(filter: expression).map(\.id) == [task.id])
     let nextDay = calendar.date(byAdding: .day, value: 1, to: now)!
     let tomorrow = TaskChampionSession.makeManager(directory: directory, now: { nextDay }, calendar: calendar)
-    #expect(try await tomorrow.tasks(filter: saved.expression).isEmpty)
+    #expect(try await tomorrow.tasks(filter: expression).isEmpty)
     #expect(try await tomorrow.tasks(filter: "+YESTERDAY and +READY").map(\.id) == [task.id])
     let attributes = try await tomorrow.task(id: task.id).attributes
     #expect(attributes["foreign"] == "keep")

@@ -1,19 +1,18 @@
 import Foundation
 
 public enum TaskNavigationView: Equatable, Sendable {
-    case today, upcoming, unfinished, done, projects, project(String), saved(UUID)
+    case today, inbox, unfinished, done, projects, project(String)
 
-    public static let predefined: [Self] = [.today, .upcoming, .unfinished, .done, .projects]
+    public static let predefined: [Self] = [.today, .inbox, .projects]
 
     public var title: String {
         switch self {
         case .today: "Today"
-        case .upcoming: "Upcoming"
+        case .inbox: "Inbox"
         case .unfinished: "All unfinished"
         case .done: "Done"
         case .projects: "Projects"
         case .project(let name): name
-        case .saved: "Saved view"
         }
     }
 
@@ -22,7 +21,6 @@ public enum TaskNavigationView: Equatable, Sendable {
         let items: [URLQueryItem]
         switch self {
         case .project(let name): items = [.init(name: "view", value: "project"), .init(name: "project", value: name)]
-        case .saved(let id): items = [.init(name: "view", value: "saved"), .init(name: "id", value: id.uuidString)]
         default: items = [.init(name: "view", value: id)]
         }
         components.queryItems = items
@@ -32,23 +30,27 @@ public enum TaskNavigationView: Equatable, Sendable {
     public var id: String {
         switch self {
         case .today: "today"
-        case .upcoming: "upcoming"
+        case .inbox: "inbox"
         case .unfinished: "unfinished"
         case .done: "done"
         case .projects: "projects"
         case .project(let name): "project:" + Data(name.utf8).base64EncodedString()
-        case .saved(let id): "saved:" + id.uuidString
         }
     }
 
     public var workspace: WorkspaceView {
         switch self {
         case .today: .today
-        case .upcoming: .upcoming
+        case .inbox, .unfinished, .done, .project: .inbox
+        case .projects: .projects
+        }
+    }
+
+    public var query: TaskQuery {
+        switch self {
         case .unfinished, .project: .unfinished
         case .done: .completed
-        case .projects: .projects
-        case .saved(let id): .custom(id)
+        default: workspace.query
         }
     }
 }
@@ -57,7 +59,6 @@ public struct TaskNavigationDestination: Sendable {
     public let view: TaskNavigationView
     public let title: String
     public let snapshot: TaskViewSnapshot
-    public let savedView: SavedTaskView?
     public let task: TaskRecord?
 }
 
@@ -71,33 +72,25 @@ public extension TaskManager {
         guard let current = destination.snapshot.listTasks.first(where: { $0.id == taskID }), current.canOpenInWorkspace else {
             throw TaskManagementError.taskNotFound(taskID)
         }
-        return TaskNavigationDestination(view: view, title: destination.title, snapshot: destination.snapshot, savedView: nil, task: current)
+        return TaskNavigationDestination(view: view, title: destination.title, snapshot: destination.snapshot, task: current)
     }
 
     func navigationDestination(view: TaskNavigationView) async throws -> TaskNavigationDestination {
         let snapshot: TaskViewSnapshot
-        let saved: SavedTaskView?
         let title: String
         switch view {
-        case .saved(let id):
-            guard let definition = try await savedViews().first(where: { $0.id == id }) else { throw TaskViewError.missingView(id) }
-            saved = definition
-            title = definition.name
-            snapshot = try await viewSnapshot(reference: .custom(id))
         case .project(let name):
             let records = try await tasks()
             guard !name.isEmpty, TaskProjectSelection.names(in: records).contains(where: { $0.matchesBytes(name) }) else {
                 throw TaskActionError.navigationFailed("This project no longer exists: \(name)")
             }
-            saved = nil
             title = name
             snapshot = try await viewSnapshot(query: .unfinished, project: .project(name))
         default:
-            saved = nil
             title = view.title
-            snapshot = try await viewSnapshot(query: view.workspace.query ?? .unfinished)
+            snapshot = try await viewSnapshot(query: view.query)
         }
-        return TaskNavigationDestination(view: view, title: title, snapshot: snapshot, savedView: saved, task: nil)
+        return TaskNavigationDestination(view: view, title: title, snapshot: snapshot, task: nil)
     }
 }
 

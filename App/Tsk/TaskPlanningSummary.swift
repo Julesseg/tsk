@@ -5,7 +5,9 @@ struct TaskPlanningSummary: View {
     let task: TaskRecord
     var body: some View {
         if let date = task.plannedDate {
-            LabeledContent("Scheduled") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
+            LabeledContent("Scheduled") {
+                Text(date.formatted(date: .abbreviated, time: task.scheduled()?.hasTime == true ? .shortened : .omitted))
+            }
                 .accessibilityIdentifier("task-planned-day")
         } else if let raw = task.attributes["scheduled"] {
             LabeledContent("Scheduled", value: "Unrecognized date: \(raw)")
@@ -30,19 +32,12 @@ struct TaskPlanningCaption: View {
     let today: Date
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            if let offset = task.scheduledDayOffset(relativeTo: today) {
-                Text("\(Image(systemName: "calendar")) \(label(offset, abbreviated: true))")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .accessibilityLabel("Scheduled \(label(offset))")
-                    .accessibilityIdentifier("task-row-scheduled-\(task.id.uuidString)")
-            }
-            if let offset = task.deadlineDayOffset(relativeTo: today) {
-                Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .accessibilityLabel("Deadline \(label(offset))")
-                    .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
-            }
+        if let deadline = task.deadline, let offset = task.deadlineDayOffset(relativeTo: today) {
+            Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
+                .font(.caption2)
+                .foregroundStyle(task.status == "pending" && deadline < today ? Color.red : Color.secondary)
+                .accessibilityLabel("Deadline \(label(offset))")
+                .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
         }
     }
 

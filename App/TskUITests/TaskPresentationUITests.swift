@@ -22,48 +22,34 @@ import XCTest
             XCUIDevice.shared.appearance = appearance == "dark" ? .dark : .light
             let app = try launch(largeText: largeText, now: "1792234800", replica: replica)
             let mode = appearance + (largeText ? " accessibility XXXL" : "")
-            app.tabBars.buttons["Today"].tap()
+            openWorkspaceView("Today", app: app)
             let row = app.buttons["task-" + ordinaryID]
             XCTAssertTrue(row.waitForExistence(timeout: 15))
             XCTAssertTrue(row.label.contains(title))
             XCTAssertTrue(row.label.contains("Release"))
             XCTAssertTrue(row.label.contains("Deadline Today"))
-            XCTAssertTrue(row.label.contains("Scheduled Today"))
+            XCTAssertFalse(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
-            for hidden in ["Active", "Waiting", "Generated occurrence"] {
+            XCTAssertTrue(row.label.contains("Waiting until"))
+            for hidden in ["Active", "Generated occurrence"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }
             let circle = app.buttons["complete-task-row-" + ordinaryID]
             let list = app.collectionViews["task-list"]
-            XCTAssertLessThanOrEqual(circle.frame.minX - list.frame.minX, 12)
+            let leading = app.descendants(matching: .any)["planner-leading-" + ordinaryID].firstMatch
+            XCTAssertTrue(leading.exists)
+            XCTAssertLessThan(leading.frame.minX, circle.frame.minX)
             capture("Today " + mode, app)
             openTaskInformation(row, app: app)
             app.terminate()
             app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
             app.launch()
             XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
-            app.tabBars.buttons["Upcoming"].tap()
-            XCTAssertTrue(upcoming("planned", app).firstMatch.waitForExistence(timeout: 10))
-            capture("Upcoming " + mode, app)
-            app.tabBars.buttons["Projects"].tap()
+            openWorkspaceView("Projects", app: app)
             let project = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Release")).firstMatch
             XCTAssertTrue(project.waitForExistence(timeout: 10)); project.tap()
             XCTAssertTrue(row.waitForExistence(timeout: 10))
             capture("Project " + mode, app)
-            let custom = app.tabBars.buttons["Release view"]
-            if custom.exists { custom.tap() }
-            else {
-                openWorkspaceSetting("custom-views", app: app)
-                app.buttons["new-custom-view"].tap()
-                let name = app.textFields["custom-view-name"]
-                XCTAssertTrue(name.waitForExistence(timeout: 5)); name.tap(); name.typeText("Release view")
-                let filter = app.textViews["raw-filter-expression"]
-                replaceTaskText(filter, with: "project.is:Release", app: app)
-                app.buttons["save-custom-view"].tap()
-                activateSavedWorkspaceView(app)
-            }
-            XCTAssertTrue(row.waitForExistence(timeout: 10))
-            capture("Custom " + mode, app)
             app.terminate()
         }
     }
@@ -126,9 +112,6 @@ import XCTest
         return app
     }
 
-    private func upcoming(_ role: String, _ app: XCUIApplication) -> XCUIElementQuery {
-        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-" + role + "-"))
-    }
 
     private func capture(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

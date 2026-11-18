@@ -64,3 +64,22 @@ import Testing
     #expect(try await manager.tasks(project: .project("Home")).isEmpty)
     #expect(try await manager.tasks(project: .project(" Home ")) == [spaced])
 }
+
+@Test func inboxKeepsOnlyUnfinishedOrphansWhileProjectsKeepScheduledMembers() async throws {
+    let now = Date(timeIntervalSince1970: 1792144800)
+    let replica = TestReplica()
+    let manager = TaskManager(replica: replica, now: { now })
+    for (name, fields) in [
+        ("Undated orphan", [String: String]()),
+        ("Deadline orphan", ["due": "1792231200"]),
+        ("Scheduled orphan", ["scheduled": "1792231200"]),
+        ("Project backlog", ["project": "Work"]),
+        ("Project scheduled", ["project": "Work", "scheduled": "1792231200"]),
+        ("Completed orphan", ["status": "completed"])
+    ] {
+        _ = try await replica.create(id: UUID(), attributes: TaskAttributes(["description": name, "status": "pending"].merging(fields) { _, new in new }))
+    }
+    #expect(Set(try await manager.tasks(query: .inbox).map(\.description)) == ["Undated orphan", "Deadline orphan"])
+    #expect(Set(try await manager.tasks(query: .unfinished, project: .project("Work")).map(\.description)) == ["Project backlog", "Project scheduled"])
+    #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1792231200)).contains { $0.description == "Deadline orphan" })
+}

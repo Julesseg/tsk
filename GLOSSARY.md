@@ -23,15 +23,6 @@ Unfinished work with an earlier planner date that appears on Today until complet
 **Inbox**:
 The task view of unfinished tasks with neither a Scheduled date nor a project. A Deadline alone does not exclude a task from Inbox.
 
-**Predefined view**:
-A task view supplied by tsk, such as Today, Upcoming, or a view by project.
-
-**Custom view**:
-A task view defined by the user's Taskwarrior filter.
-
-**Favorite view**:
-A task view chosen by the user for quick access. Other task views remain available without becoming favorites.
-
 **Taskwarrior filter**:
 An expression that selects tasks according to Taskwarrior's filtering language.
 
@@ -45,9 +36,6 @@ _Avoid_: Scheduled as a synonym for deadline
 
 **Today**:
 The day page for the current day, including carryover, the day's work and retained completion history, and calendar events.
-
-**Upcoming**:
-A view of future work organized by planner date.
 
 **Annotation**:
 A timestamped note attached to a task.

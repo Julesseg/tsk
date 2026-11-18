@@ -2,13 +2,13 @@ import Foundation
 import Testing
 @testable import TskCore
 
-@Test func openViewURLsUseStrictNamedArgumentsAndStableSavedIdentity() throws {
+@Test func openViewURLsUseStrictNamedArgumentsForAvailableViews() throws {
     let id = UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!
-    let views: [TaskNavigationView] = [.today, .upcoming, .unfinished, .done, .projects, .project("Café & +"), .saved(id)]
+    let views: [TaskNavigationView] = [.today, .inbox, .unfinished, .done, .projects, .project("Café & +")]
     for view in views {
         #expect(try TaskActionURL(url: view.url) == .openView(view))
     }
-    for query in ["", "view=all", "view=Today", "view=today&project=Home", "view=project", "view=project&project=", "view=saved&id=1", "view=saved&name=Old", "view=done&view=today", "view=projects&filter=+PENDING"] {
+    for query in ["", "view=all", "view=upcoming", "view=saved&id=\(id)", "view=Today", "view=today&project=Home", "view=project", "view=project&project=", "view=saved&id=1", "view=saved&name=Old", "view=done&view=today", "view=projects&filter=+PENDING"] {
         #expect(throws: (any Error).self) { try TaskActionURL(url: #require(URL(string: "tsk://open-view?" + query))) }
     }
     #expect(try TaskActionURL(url: #require(URL(string: "tsk://open-task?id=\(id)&x-success=caller%3A%2F%2Fdone"))) == .openTask(id))
@@ -38,8 +38,9 @@ import Testing
     _ = try await manager.create(TaskDraft(description: "Travel", attributes: ["project": "Work.Travel"]))
     let opened = try await manager.navigationDestination(view: .project("Work.Travel"))
     #expect(opened.snapshot.listTasks.map(\.description) == ["Travel"])
+    #expect(opened.view.query == .unfinished)
     await #expect(throws: (any Error).self) { try await manager.navigationDestination(view: .project("Work")) }
-    for view: TaskNavigationView in [.today, .upcoming, .unfinished, .done, .projects] {
+    for view: TaskNavigationView in [.today, .inbox, .unfinished, .done, .projects] {
         #expect(try await manager.navigationDestination(view: view).view == view)
     }
 }

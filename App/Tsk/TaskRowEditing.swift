@@ -9,7 +9,6 @@ final class TaskRowEditing {
     let rowID: String
     let context: TaskCompletionFeedback.Context
     let tasks: [TaskRecord]
-    let upcomingDays: [UpcomingDay]
     let referenceDate: Date
     var draft: TaskRowDraft
     var parameter: TaskRowParameter?
@@ -31,7 +30,6 @@ final class TaskRowEditing {
         self.context = context
         self.tasks = tasks
         referenceDate = now
-        upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
         draft = TaskRowDraft(task: task)
     }
 
@@ -43,7 +41,6 @@ final class TaskRowEditing {
         self.context = context
         self.tasks = tasks
         referenceDate = now
-        upcomingDays = UpcomingDay.groups(tasks: tasks, at: now)
     }
 
     func setExpanded(_ expanded: Bool, reduceMotion: Bool) async {
@@ -167,7 +164,7 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
     }
     func setDate(_ date: Date, in draft: inout TaskRowDraft) {
         switch self {
-        case .scheduled: draft.chooseScheduledDate(date)
+        case .scheduled: draft.taskDraft.setScheduled(TaskScheduledDate(date: date, hasTime: draft.taskDraft.scheduled()?.hasTime ?? false))
         case .deadline: draft.taskDraft.deadline = date
         case .waiting: draft.taskDraft.waitUntil = date
         default: break
@@ -176,7 +173,7 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
     func value(in draft: TaskDraft) -> String? {
         if self == .tags { return draft.tags.isEmpty ? nil : draft.tags.joined(separator: ", ") }
         if let date = date(in: draft) {
-            return date.formatted(date: .abbreviated, time: .shortened)
+            return date.formatted(date: .abbreviated, time: self == .scheduled && draft.scheduled()?.hasTime != true ? .omitted : .shortened)
         }
         guard let raw = draft.attributes[attribute], !raw.isEmpty else { return nil }
         switch self {
@@ -189,8 +186,4 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         ["": "None", "L": "Low", "M": "Medium", "H": "High"][value] ?? value
     }
     var identifier: String { self == .waiting ? "waiting-date" : rawValue }
-}
-
-extension UpcomingTaskEntry {
-    var rowIdentifier: String { "upcoming-\(role.rawValue)-\(Int(date.timeIntervalSince1970))-\(task.id.uuidString)" }
 }

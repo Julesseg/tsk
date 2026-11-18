@@ -77,7 +77,8 @@ extension TaskManager {
         let ids = Set(ids)
         guard !ids.isEmpty else { return [] }
         let records = try await replica.tasks()
-        let timestamp = String(Int(now().timeIntervalSince1970))
+        let instant = now()
+        let timestamp = String(Int(instant.timeIntervalSince1970))
         var updates: [TaskAtomicUpdate] = []
         var parents: [UUID: TaskRecord] = [:]
         for id in ids.sorted(by: { $0.uuidString < $1.uuidString }) {
@@ -88,12 +89,24 @@ extension TaskManager {
                 if let change = changes[field] {
                     let value = try change.value(replacing: task.attributes[field.attribute], calendar: calendar)
                     if value != task.attributes[field.attribute] { patch.updateValue(value, forKey: field.attribute) }
+                    if field == .scheduled {
+                        var draft = TaskDraft(attributes: task.attributes)
+                        switch change {
+                        case .day(let day): draft.schedule(on: day, calendar: calendar)
+                        case .remove: draft.setScheduled(nil)
+                        case .set:
+                            if value != task.attributes["scheduled"] { draft.plannedDate = planningDate(value) }
+                        }
+                        if draft.attributes[TaskScheduledDate.attribute] != task.attributes[TaskScheduledDate.attribute] {
+                            patch.updateValue(draft.attributes[TaskScheduledDate.attribute], forKey: TaskScheduledDate.attribute)
+                        }
+                    }
                 }
             }
             if changes.complete {
-                patch["status"] = "completed"
-                patch["end"] = task.attributes["end"] ?? timestamp
-                patch.updateValue(nil, forKey: "start")
+                var placed = task
+                for (key, value) in patch { placed.attributes[key] = value }
+                for (key, value) in completionChanges(for: placed, at: instant) { patch.updateValue(value, forKey: key) }
             }
             if task.isOccurrence {
                 let (parent, index) = try occurrencePosition(task, in: records)

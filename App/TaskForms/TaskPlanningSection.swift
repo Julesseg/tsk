@@ -9,15 +9,23 @@ struct TaskPlanningSection: View {
         Section("Planning") {
             Toggle("Scheduled", isOn: Binding(
                 get: { draft.attributes["scheduled"] != nil },
-                set: { draft.plannedDate = $0 ? Calendar.current.startOfDay(for: now) : nil }
+                set: { draft.setScheduled($0 ? TaskScheduledDate(date: Calendar.current.startOfDay(for: now), hasTime: false) : nil) }
             ))
             .accessibilityIdentifier("planned-day-enabled")
             if draft.attributes["scheduled"] != nil {
                 if let date = draft.plannedDate {
+                    Toggle("Include time", isOn: Binding(
+                        get: { draft.scheduled()?.hasTime ?? false },
+                        set: { hasTime in
+                            let value = hasTime ? date : Calendar.current.startOfDay(for: date)
+                            draft.setScheduled(TaskScheduledDate(date: value, hasTime: hasTime))
+                        }
+                    ))
+                    .accessibilityIdentifier("planned-day-has-time")
                     DatePicker("Scheduled", selection: Binding(
                         get: { date },
-                        set: { draft.plannedDate = $0 }
-                    ), displayedComponents: [.date, .hourAndMinute])
+                        set: { draft.setScheduled(TaskScheduledDate(date: $0, hasTime: draft.scheduled()?.hasTime ?? false)) }
+                    ), displayedComponents: draft.scheduled()?.hasTime == true ? [.date, .hourAndMinute] : [.date])
                     .accessibilityIdentifier("planned-day-picker")
                 } else {
                     Text("Unrecognized scheduled date: \(draft.attributes["scheduled"] ?? "")").font(.caption)
@@ -35,7 +43,7 @@ struct TaskPlanningSection: View {
                 Text("Waiting tasks keep their scheduled date and deadline. A matching task stays visible in Today with its waiting reason.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Text("Scheduled is the date and time when you intend to work. The deadline is when the task must be finished.")
+            Text("Scheduled is the day, with an optional time, when you intend to work. The deadline is when the task must be finished.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }

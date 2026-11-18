@@ -32,11 +32,6 @@ func installNavigationFixture() async throws {
         _ = try await manager.create(TaskDraft(description: "Second task"))
         let done = try await manager.create(TaskDraft(description: "Completed navigation task"))
         _ = try await manager.complete(id: done.id)
-        _ = try await manager.saveView(id: nil, name: "Navigation saved view", expression: "project.is:Work.Travel")
-    }
-    if let saved = try await manager.savedViews().first {
-        if environment["TSK_TEST_NAVIGATION_DELETE_VIEW"] == "1" { try await manager.deleteView(id: saved.id) }
-        else if let name = environment["TSK_TEST_NAVIGATION_VIEW_NAME"] { _ = try await manager.saveView(id: saved.id, name: name, expression: saved.expression) }
     }
 }
 #endif

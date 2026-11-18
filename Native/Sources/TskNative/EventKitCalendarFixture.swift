@@ -47,13 +47,19 @@ import TskCore
         try await requireAccess(store: store)
         guard let calendar = store.calendars(for: .event).first(where: { $0.title == name(token) && $0.source.sourceType == .local }) else { throw CocoaError(.fileNoSuchFile) }
         var evidence = try JSONSerialization.jsonObject(with: Data(contentsOf: file(token))) as? [String: Any] ?? [:]
-        let after = summaries(store: store, calendar: calendar, day: day)
+        guard let start = evidence["dayStart"] as? Double, let end = evidence["dayEnd"] as? Double else { throw CocoaError(.fileReadCorruptFile) }
+        let originalDay = DateInterval(start: Date(timeIntervalSince1970: start), end: Date(timeIntervalSince1970: end))
+        let after = summaries(store: store, calendar: calendar, day: originalDay)
         guard let before = evidence["storedBeforeDisplay"] as? [[String: Any]] else { throw CocoaError(.fileReadCorruptFile) }
         guard try encoded(before) == encoded(after) else { throw NSError(domain: "tsk.CalendarFixture", code: 2, userInfo: [NSLocalizedDescriptionKey: "Displaying Calendar changed owned source events."]) }
         let owned = displayed.filter { $0.calendarTitle == name(token) }
-        guard owned.count >= 3, owned.contains(where: { $0.title == "Calendar fixture all day" && $0.isAllDay }),
-              owned.contains(where: { $0.title == "Calendar fixture timed" }), owned.contains(where: { $0.title == "Calendar fixture spanning" }),
-              !owned.contains(where: { $0.title.contains("excluded") }) else { throw NSError(domain: "tsk.CalendarFixture", code: 3, userInfo: [NSLocalizedDescriptionKey: "Actual Calendar Today display did not match stored fixture boundaries."]) }
+        let expected = before.filter { value in
+            guard let start = value["start"] as? Double, let end = value["end"] as? Double else { return false }
+            return start == end ? start >= day.start.timeIntervalSince1970 && start < day.end.timeIntervalSince1970 : start < day.end.timeIntervalSince1970 && end > day.start.timeIntervalSince1970
+        }.compactMap { $0["title"] as? String }.sorted()
+        guard owned.filter({ $0.title != "Calendar fixture observed change" }).map(\.title).sorted() == expected else {
+            throw NSError(domain: "tsk.CalendarFixture", code: 3, userInfo: [NSLocalizedDescriptionKey: "Actual Calendar display did not match the selected day's stored fixture boundaries."])
+        }
         let color = EventKitCalendarSource.calendarColor(calendar.cgColor)
         let afterColor = color.map { [$0.red, $0.green, $0.blue, $0.alpha] }
         evidence["calendarColorAfter"] = afterColor

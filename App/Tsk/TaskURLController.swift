@@ -20,7 +20,7 @@ final class TaskURLController {
     }
 
     func executePending(in store: TaskStore) async {
-        guard !isExecuting, store.workspaceViewsLoaded, navigate != nil else { return }
+        guard !isExecuting, navigate != nil else { return }
         isExecuting = true
         defer { isExecuting = false }
         while !requests.isEmpty {

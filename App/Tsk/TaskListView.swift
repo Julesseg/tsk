@@ -8,31 +8,51 @@ struct TaskListView: View {
     let edit: (TaskRecord) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectionRows: [String: TaskSelectionRow] = [:]
+    @State private var eventRows: [CalendarEventIdentity: TaskCalendarDragRow] = [:]
     @State private var selectionScope = TaskSelectionScope()
     @State private var keyboardFrame = CGRect.null
+    @State private var isVisible = false
+    @State private var footerHeight: CGFloat = 0
+    @State var dayPaging = TaskDayPaging()
 
     var body: some View {
         GeometryReader { geometry in
         let keyboardInset = keyboardOverlap(in: geometry.frame(in: .global))
         Group {
-            if store.customView == nil && store.query == .today {
-                ScrollViewReader { proxy in
-                    List {
-                        TodayCalendarSection(calendar: calendar)
-                        Section {
-                            captureRow
-                            if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                            else if store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned or due today").foregroundStyle(.secondary) }
-                            ForEach(store.visibleTasks) { task in TaskListRow(task: task, store: store, edit: edit) }
-                        }
-                        .listSectionSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }.accessibilityIdentifier("task-list")
-                        .refreshable { await store.reload(); await calendar.refresh() }
-                        .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+            if store.isDayPage {
+                VStack(spacing: 0) {
+                    TodayCalendarSection(snapshot: dayCalendarSnapshot)
+                    ScrollViewReader { proxy in
+                        List {
+                            Section {
+                                CalendarFixtureControls(calendar: calendar)
+                                captureRow
+                                if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
+                                else if store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned for this day").foregroundStyle(.secondary) }
+                                ForEach(dayRows) { item in
+                                    switch item {
+                                    case .task(let task): TaskListRow(task: task, store: store, edit: edit).id(task.id)
+                                    case .event(let value):
+                                        TodayCalendarRow(value: value, timeZone: dayCalendarSnapshot?.timeZone ?? .autoupdatingCurrent)
+                                            .padding(.vertical, 10)
+                                            .background {
+                                                GeometryReader { row in
+                                                    Color.clear.preference(key: TaskCalendarDragRowsKey.self, value: [value.id: TaskCalendarDragRow(event: value.event, bounds: row.frame(in: .global))])
+                                                }
+                                            }
+                                    }
+                                }
+                            }
+                            .listSectionSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }.accessibilityIdentifier("task-list")
+                            .refreshable { await store.reload(); await calendar.refresh() }
+                            .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                            .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                            .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                    }
                 }
+                .modifier(TaskDayPagingPages(store: store, calendar: calendar, paging: dayPaging))
             } else if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil {
                 ContentUnavailableView {
                     Label("Tasks unavailable", systemImage: "exclamationmark.triangle")
@@ -40,9 +60,7 @@ struct TaskListView: View {
                     Button("Retry") { Task { await store.reload() } }
                 }
             } else if store.visibleTasks.isEmpty && store.captureTask == nil {
-                ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text(store.customView != nil ? "Edit the filter or choose another view to find tasks." : "Capture a task to get started. Saved tasks stay on this device when you're offline."))
-            } else if store.customView == nil && store.query == .upcoming {
-                UpcomingTaskList(store: store, edit: edit, viewport: CGRect(origin: geometry.frame(in: .global).origin, size: CGSize(width: geometry.size.width, height: geometry.size.height - keyboardInset)))
+                ContentUnavailableView(emptyTitle, systemImage: "checklist", description: Text("Capture a task to get started. Saved tasks stay on this device when you're offline."))
             } else {
                 ScrollViewReader { proxy in
                     List {
@@ -60,10 +78,20 @@ struct TaskListView: View {
             }
         }
         .background {
+            TaskNativeDrag(store: store, scope: selectionScope, rows: Array(selectionRows.values), eventRows: Array(eventRows.values), reduceMotion: reduceMotion)
+                .allowsHitTesting(false)
             TaskSelectionGesture(store: store, scope: selectionScope, viewport: geometry.frame(in: .global), rows: selectionRows)
                 .allowsHitTesting(false)
+            if (store.isDayPage || store.isSelectingTasks) && isVisible {
+                TaskDayPageSwipe(store: store, paging: dayPaging, viewport: geometry.frame(in: .global), rows: Array(selectionRows.values), reduceMotion: reduceMotion)
+                    .allowsHitTesting(false)
+            }
         }
+        #if DEBUG
+        .accessibilityValue(store.taskDragProof)
+        #endif
         .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
+        .onPreferenceChange(TaskCalendarDragRowsKey.self) { eventRows = $0 }
         .scrollDisabled(store.isSelectionGestureActive)
         .overlay(alignment: .top) {
             if store.selectionDateField != nil {
@@ -77,12 +105,15 @@ struct TaskListView: View {
                 .accessibilityIdentifier("dismiss-selection-date")
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             VStack(spacing: 0) {
                 if store.isSelectingTasks {
                     TaskSelectionBar(store: store).transition(.opacity)
                 }
+                if store.isDayPage || store.isSelectingTasks { TaskDayNavigator(store: store, paging: dayPaging, availableWidth: geometry.size.width) }
             }
+            .frame(width: geometry.size.width)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.isSelectingTasks)
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: store.selectionDateField)
@@ -93,17 +124,30 @@ struct TaskListView: View {
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
         .environment(\.taskRowViewport, geometry.frame(in: .global))
         }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
         .environment(\.taskSelectionScope, selectionScope)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.completionFeedback.removingIDs(context: store.completionContext))
         .environment(\.defaultMinListRowHeight, 0)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollEdgeEffectHidden(true, for: .bottom)
+        .contentMargins(.bottom, footerHeight, for: .scrollContent)
         .contentMargins(.horizontal, 0, for: .scrollContent)
         .overlay { if store.isLoading && store.visibleTasks.isEmpty { ProgressView() } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             keyboardFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .null
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardFrame = .null }
+    }
+
+    private var dayCalendarSnapshot: TodayCalendarSnapshot? {
+        if let value = calendar.snapshot, value.day?.start == store.displayedDay { return value }
+        return dayPaging.calendars[store.displayedDay]?.showing(calendar.preferences.visibility)
+    }
+
+    private var dayRows: [DayPageItem] {
+        dayCalendarSnapshot?.plannerRows(tasks: store.visibleTasks) ?? store.visibleTasks.map(DayPageItem.task)
     }
 
     @ViewBuilder private var captureRow: some View {
@@ -136,9 +180,7 @@ struct TaskListView: View {
     }
 
     private var emptyTitle: String {
-        if store.customView != nil { return "No matching tasks" }
         switch store.query {
-        case .upcoming: return "No upcoming plans or deadlines"
         case .today: return "Nothing planned or due today"
         case .completed: return "No completed tasks"
         default: return "No unfinished tasks"
@@ -151,10 +193,13 @@ struct TaskListRow: View {
     let store: TaskStore
     let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
+    var previewDay: Date?
+    private var isPreview: Bool { previewDay != nil }
+    private var day: Date? { previewDay ?? (store.isDayPage ? store.displayedDay : nil) }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @FocusState private var titleFocused: Bool
-    @State private var headerHeight: CGFloat = 28
+    @State private var headerHeight: CGFloat = 32
     @State private var titleHeight: CGFloat = 28
     @State private var titleContentHeight: CGFloat = 28
     @State private var rowGeometry = TaskRowGeometry()
@@ -163,19 +208,28 @@ struct TaskListRow: View {
     @Environment(\.taskRowViewport) private var viewport
     @Environment(\.taskRowActions) private var rowActions
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }
-    private var editing: TaskRowEditing? { store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
+    private var editing: TaskRowEditing? { isPreview ? nil : store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
     private var expanded: Bool { editing?.isExpanded == true }
     private var displayedTask: TaskRecord { editing?.savedTask ?? task }
     private var hasProject: Bool { !displayedTask.project.isEmpty }
     private var titleBottom: CGFloat { max(0, (headerHeight - titleContentHeight) / 2) + titleHeight }
     private var attributesOverlap: CGFloat { hasProject ? max(0, headerHeight - titleBottom - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
-    private var checked: Bool { phase == .checked || phase == .covering || phase == .collapsing }
+    private var checked: Bool { displayedTask.status == "completed" || phase == .checked || phase == .covering || phase == .collapsing }
     private var selected: Bool { store.selectedTaskIDs.contains(task.id) }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
+            if editing?.isCapture != true {
+                TaskPlannerLeadingDate(task: displayedTask, day: day, today: store.currentDate)
+                    .frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
+                    .contentShape(Rectangle())
+                    .modifier(TaskRowFade(editing: editing, disappearing: true))
+                    .accessibilityAddTraits(task.canComplete ? .isButton : [])
+                    .accessibilityHint(task.canComplete ? (selected ? "Deselect task" : "Select task") : "")
+                    .accessibilityAction { if task.canComplete { store.toggleSelection(task.id) } }
+            }
             if task.canComplete {
                 Button {
                     if store.isSelectingTasks { store.toggleSelection(task.id); return }
@@ -198,6 +252,14 @@ struct TaskListRow: View {
                 .accessibilityValue(store.isSelectingTasks ? (store.selectedTaskIDs.contains(task.id) ? "Selected" : "Not selected") : checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
                 .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
                 .accessibilityHidden(editing?.isCapture == true)
+            }
+            else if displayedTask.status == "completed" {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body).foregroundStyle(Color.secondary)
+                    .frame(minWidth: 44, minHeight: headerHeight)
+                    .accessibilityLabel("Completed task: \(task.description)")
+                    .accessibilityValue("Completed")
+                    .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
             }
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
@@ -227,10 +289,15 @@ struct TaskListRow: View {
                                 .modifier(TaskRowFade(editing: editing, disappearing: true))
                                 .accessibilityHidden(true)
                         }
+                        if store.isDayPage {
+                            TaskAvailabilityView(task: displayedTask, store: store)
+                                .accessibilityHidden(true)
+                                .modifier(TaskRowFade(editing: editing, disappearing: true))
+                        }
                     }
                     .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleContentHeight = $0 }
-                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-                    if displayedTask.plannedDate != nil || displayedTask.deadline != nil {
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                    if displayedTask.deadline != nil {
                         TimelineView(.periodic(from: .now, by: 60)) { _ in
                             TaskPlanningCaption(task: displayedTask, today: store.currentDate)
                                 .multilineTextAlignment(.trailing)
@@ -266,12 +333,13 @@ struct TaskListRow: View {
                             VStack {
                                 Text(task.description)
                                 if !task.project.isEmpty { Text(task.project) }
+                                if store.isDayPage { TaskAvailabilityView(task: task, store: store) }
                                 TaskPlanningCaption(task: task, today: store.currentDate)
                             }
                             .accessibilityElement(children: .combine)
                         }
                         .accessibilityIdentifier(identity)
-                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? "Tap to edit title and attributes, or long press and drag to select" : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
+                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? (store.taskDragContext != nil ? "Tap to edit; drag the title to reorder; touch the scheduled time to select" : "Tap to edit title and attributes; touch the scheduled time to select") : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
                         .accessibilityAction(named: "Edit title and attributes", expand)
                         .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                 }
@@ -289,6 +357,7 @@ struct TaskListRow: View {
         }
         .modifier(TaskRowSpacing(editing: editing))
         .modifier(TaskSelectionRowFeedback(selected: selected))
+        .opacity((checked ? 0.55 : 1) * (store.isTaskDragLifted && store.taskDrag?.ids.contains(task.id) == true ? 0 : 1))
         .onChange(of: expanded) { _, expanded in
             if !expanded { titleFocused = false }
             else if editing?.isCapture == true { titleFocused = true }
@@ -323,19 +392,7 @@ struct TaskListRow: View {
         }
         .onChange(of: viewport) { _, bounds in editing?.viewport = bounds }
         .mask {
-            Group {
-                if selected {
-                    Rectangle().fill(.white)
-                } else {
-                    VStack(spacing: 0) {
-                        LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom).frame(height: 6)
-                        Rectangle().fill(.white)
-                        LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .bottom).frame(height: 6)
-                    }
-                }
-            }
-            .padding(.horizontal, -12)
-            .scaleEffect(x: 1, y: visibility)
+            Rectangle().padding(.horizontal, -12).scaleEffect(x: 1, y: visibility)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.42), value: visibility)
         .accessibilityHidden(phase == .collapsing || store.rowEditing != nil && editing == nil)

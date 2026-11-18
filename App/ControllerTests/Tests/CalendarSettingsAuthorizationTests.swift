@@ -57,8 +57,13 @@ extension CalendarControllerProof {
         #expect(controller.snapshot?.events.isEmpty == true)
         #expect(controller.snapshot?.calendars == [work])
         #expect(await source.reads == 1)
+        let nextDay = try #require(controller.snapshot?.day?.end)
+        controller.displayedDay = nextDay
+        #expect(controller.snapshot == nil)
         await controller.refresh()
+        #expect(controller.snapshot?.day?.contains(nextDay) == true)
         #expect(controller.snapshot?.events.isEmpty == true)
+        #expect(await source.windows.last == controller.snapshot?.day)
         let reopened = TodayCalendarController(manager: controller.manager, source: source, preferences: CalendarOverviewPreferences(defaults: defaults))
         await reopened.refresh()
         #expect(reopened.snapshot?.events.isEmpty == true)
@@ -80,6 +85,7 @@ private actor CalendarSettingsSource: CalendarEventSource {
     var availableCalendars: [CalendarSnapshot] = []
     var requests = 0
     var reads = 0
+    var windows: [DateInterval] = []
     func authorization() -> CalendarReadAuthorization { access }
     func requestReadAccess() { requests += 1 }
     func setAccess(_ value: CalendarReadAuthorization) { access = value }
@@ -88,6 +94,7 @@ private actor CalendarSettingsSource: CalendarEventSource {
     func calendars() -> [CalendarSnapshot] { availableCalendars }
     func events(in window: DateInterval) throws -> [CalendarEventSnapshot] {
         reads += 1
+        windows.append(window)
         if failing { throw CocoaError(.fileReadUnknown) }
         return [CalendarEventSnapshot(calendarID: "work", eventID: "meeting", title: "Meeting", calendarTitle: "Work", start: window.start, end: window.end)]
     }

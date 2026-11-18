@@ -109,10 +109,18 @@ public struct TodayCalendarSnapshot: Equatable, Sendable {
 
 public extension TaskManager {
     func todayCalendar(from source: any CalendarEventSource, requestingAccess: Bool = false) async -> TodayCalendarSnapshot {
+        await calendarSnapshot(on: nil, from: source, requestingAccess: requestingAccess)
+    }
+
+    func dayCalendar(on date: Date, from source: any CalendarEventSource, requestingAccess: Bool = false) async -> TodayCalendarSnapshot {
+        await calendarSnapshot(on: date, from: source, requestingAccess: requestingAccess)
+    }
+
+    private func calendarSnapshot(on date: Date?, from source: any CalendarEventSource, requestingAccess: Bool) async -> TodayCalendarSnapshot {
         var dateCalendar = calendar
         dateCalendar.timeZone = calendar.timeZone
         var access = await source.authorization()
-        var day = dateCalendar.dateInterval(of: .day, for: now())
+        var day = dateCalendar.dateInterval(of: .day, for: date ?? now())
         var calendars: [CalendarSnapshot] = []
         func snapshot(events: [TodayCalendarEvent] = [], error: String? = nil, omitted: Int = 0) -> TodayCalendarSnapshot {
             TodayCalendarSnapshot(day: day, timeZone: dateCalendar.timeZone, authorization: access, calendars: access == .fullAccess ? calendars : [], events: events, readError: error, omittedEntryCount: omitted)
@@ -125,9 +133,9 @@ public extension TaskManager {
                 requestingPermission = false
                 access = await source.authorization()
             }
-            day = dateCalendar.dateInterval(of: .day, for: now())
+            day = dateCalendar.dateInterval(of: .day, for: date ?? now())
             guard access == .fullAccess else { return snapshot() }
-            guard let window = day, window.duration > 0 else { return snapshot(error: "Today's Calendar date window could not be determined.") }
+            guard let window = day, window.duration > 0 else { return snapshot(error: "Calendar day window could not be determined.") }
             let available = try await source.calendars()
             calendars = available.sorted {
                 if UTF8String($0.title) != UTF8String($1.title) { return UTF8String($0.title) < UTF8String($1.title) }
@@ -160,5 +168,46 @@ public extension TaskManager {
             access = await source.authorization()
             return snapshot(error: access == .fullAccess || (requestingPermission && access != .denied && access != .restricted) ? error.localizedDescription : nil)
         }
+    }
+}
+
+public enum DayPageItem: Equatable, Sendable, Identifiable {
+    case task(TaskRecord)
+    case event(TodayCalendarEvent)
+
+    public enum ID: Hashable, Sendable {
+        case task(UUID)
+        case event(CalendarEventIdentity)
+    }
+
+    public var id: ID {
+        switch self {
+        case .task(let task): .task(task.id)
+        case .event(let event): .event(event.id)
+        }
+    }
+}
+
+public extension TodayCalendarSnapshot {
+    var allDayEvents: [TodayCalendarEvent] {
+        guard authorization == .fullAccess, readError == nil else { return [] }
+        return events.filter { $0.event.isAllDay }
+    }
+
+    func plannerRows(tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) -> [DayPageItem] {
+        guard let day, authorization == .fullAccess, readError == nil else { return tasks.map(DayPageItem.task) }
+        var leading: [DayPageItem] = []
+        var timed: [(item: DayPageItem, date: Date, position: Int)] = []
+        for (position, task) in tasks.enumerated() {
+            if let intent = task.plannerDate(calendar: calendar), intent.hasTime, intent.date >= day.start {
+                timed.append((.task(task), intent.date, position))
+            } else {
+                leading.append(.task(task))
+            }
+        }
+        for (position, event) in events.filter({ !$0.event.isAllDay }).enumerated() {
+            timed.append((.event(event), event.event.start, tasks.count + position))
+        }
+        return leading + timed.sorted { $0.date == $1.date ? $0.position < $1.position : $0.date < $1.date }.map(\.item)
     }
 }

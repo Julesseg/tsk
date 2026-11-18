@@ -27,8 +27,7 @@ struct MutationProbe {
             do {
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
                 let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
-                let view = try await manager.saveView(name: "Other process completed", expression: "status:completed")
-                try write(["saved": saved.id.uuidString, "view": view.id.uuidString], to: arguments[4])
+                try write(["saved": saved.id.uuidString], to: arguments[4])
             } catch { try? write(["error": error.localizedDescription], to: arguments[4]) }
             return
         }
@@ -38,16 +37,6 @@ struct MutationProbe {
                 while !FileManager.default.fileExists(atPath: arguments[5]) { try await Task.sleep(nanoseconds: 10_000_000) }
                 let manager = try await TaskChampionSession.open(directory: URL(fileURLWithPath: arguments[2]))
                 let saved = try await manager.complete(id: UUID(uuidString: arguments[3])!)
-                try write(["saved": saved.id.uuidString], to: arguments[6])
-            } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
-            return
-        }
-        if arguments.count == 7, arguments[1] == "save-view" {
-            do {
-                let directory = URL(fileURLWithPath: arguments[2])
-                let store = SavedViewBarrierStore(directory: directory, ready: URL(fileURLWithPath: arguments[4]), release: URL(fileURLWithPath: arguments[5]))
-                let manager = TaskManager(replica: TaskChampionReplica(directory: directory), viewDefinitions: store)
-                let saved = try await manager.saveView(name: arguments[3], expression: "project:Work")
                 try write(["saved": saved.id.uuidString], to: arguments[6])
             } catch { try? write(["error": error.localizedDescription], to: arguments[6]) }
             return
@@ -73,29 +62,4 @@ struct MutationProbe {
     static func write(_ value: [String: String], to path: String) throws {
         try JSONSerialization.data(withJSONObject: value).write(to: URL(fileURLWithPath: path), options: .atomic)
     }
-}
-
-private actor SavedViewBarrierStore: TaskViewDefinitionsStore {
-    let native: LocalTaskViewStore
-    let ready: URL
-    let release: URL
-
-    init(directory: URL, ready: URL, release: URL) {
-        native = LocalTaskViewStore(directory: directory)
-        self.ready = ready
-        self.release = release
-    }
-
-    func load() async throws -> [SavedTaskView] {
-        let definitions = try await native.load()
-        try Data().write(to: ready)
-        let deadline = Date().addingTimeInterval(10)
-        while !FileManager.default.fileExists(atPath: release.path) {
-            guard Date() < deadline else { throw TaskManagementError.storage("Saved-view probe timed out") }
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return definitions
-    }
-
-    func save(_ definitions: [SavedTaskView]) async throws { try await native.save(definitions) }
 }

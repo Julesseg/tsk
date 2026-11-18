@@ -235,7 +235,7 @@ struct TaskRowParameterPicker: View {
         self.parameter = parameter
         self.tags = tags
         self.dismiss = dismiss
-        _selectedDate = State(initialValue: parameter.date(in: editing.draft.taskDraft) ?? now)
+        _selectedDate = State(initialValue: parameter.date(in: editing.draft.taskDraft) ?? (parameter == .scheduled ? Calendar.current.startOfDay(for: now) : now))
     }
 
     var body: some View {
@@ -276,12 +276,24 @@ struct TaskRowParameterPicker: View {
             case .tags:
                 TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
             default:
-                TaskParameterDatePicker(parameter: parameter, selection: $selectedDate)
+                if parameter == .scheduled {
+                    Toggle("Include time", isOn: Binding(
+                        get: { editing.draft.taskDraft.scheduled()?.hasTime ?? false },
+                        set: { hasTime in
+                            if !hasTime { selectedDate = Calendar.current.startOfDay(for: selectedDate) }
+                            editing.draft.taskDraft.setScheduled(TaskScheduledDate(date: selectedDate, hasTime: hasTime))
+                        }
+                    ))
+                    .accessibilityIdentifier("scheduled-has-time")
+                }
+                TaskParameterDatePicker(parameter: parameter, selection: $selectedDate,
+                                        includesTime: parameter != .scheduled || editing.draft.taskDraft.scheduled()?.hasTime == true)
                     .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
             }
             if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
                 Button("Remove " + parameter.title.lowercased(), role: .destructive) {
-                    editing.draft.taskDraft.attributes[parameter.attribute] = nil
+                    if parameter == .scheduled { editing.draft.taskDraft.setScheduled(nil) }
+                    else { editing.draft.taskDraft.attributes[parameter.attribute] = nil }
                     dismiss()
                 }
                 .accessibilityIdentifier("remove-" + parameter.identifier)
@@ -313,9 +325,10 @@ struct TaskRowParameterPicker: View {
 struct TaskParameterDatePicker: View {
     let parameter: TaskRowParameter
     @Binding var selection: Date
+    var includesTime = true
 
     var body: some View {
-        DatePicker(parameter.title, selection: $selection, displayedComponents: [.date, .hourAndMinute])
+        DatePicker(parameter.title, selection: $selection, displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
             .datePickerStyle(.graphical)
             .labelsHidden()
             .accessibilityLabel(parameter.title)

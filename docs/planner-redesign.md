@@ -36,7 +36,7 @@ Manually ordering tasks must not invent clock times. Incoming untimed tasks appe
 
 ## Dragging
 
-Long press followed by movement starts native iOS dragging. Other rows move visually to make room during the gesture. A Select tasks command enters selection mode; dragging a selected row moves the selected tasks as a block and preserves their relative order.
+Long press followed by movement starts native iOS dragging. Other rows move visually to make room during the gesture. Touching the Scheduled slot selects a task immediately. Sweeping up or down extends selection across other rows. Dragging a selected task by its title moves the selected tasks as a block in their relative order.
 
 Crossing another row in either direction records its effective Scheduled value. The last row crossed determines the value applied to all dragged tasks when dropped:
 
@@ -54,7 +54,7 @@ Dragging within a project changes manual order only and does not inherit Schedul
 
 ## Navigation and calendar scheduling
 
-Replace the tab bar as primary navigation with Inbox and Projects buttons in the top toolbar and a date pill that expands into a month calendar. The pill always offers a reliable swipe area for moving between days, including when task rows fill the page. Day-page swipes can also move between dates while preserving row swipe actions. Disable day-to-day swiping on both the pill and page during selection mode.
+The top toolbar links directly to Inbox and Projects, with a Today button outside the planner. A compact glass date pill overlays the planner list and expands into a month calendar. Saved and favorite views and the Views menu are retired. The pill always offers a reliable swipe area for moving between days, including when task rows fill the page. Day-page swipes can also move between dates while preserving row swipe actions. Disable day-to-day swiping on both the pill and page during selection mode.
 
 With no tasks selected, tapping a date in the month calendar navigates to that day. With tasks selected, tapping a date immediately assigns that Scheduled day, retaining each task's time or untimed intent. For a deadline-only task, preserve the effective time shown by the fallback when creating Scheduled.
 

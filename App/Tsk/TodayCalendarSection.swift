@@ -3,19 +3,28 @@ import TskCore
 import TskNative
 
 struct TodayCalendarSection: View {
-    let calendar: TodayCalendarController
+    let snapshot: TodayCalendarSnapshot?
 
     var body: some View {
-        if let snapshot = calendar.snapshot,
-           snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.events.isEmpty {
-            Section {
-                TodayCalendarOverview(snapshot: snapshot, hours: calendar.preferences.hours)
-                fixtureControls
+        if let snapshot,
+           snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.allDayEvents.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(snapshot.allDayEvents) { value in
+                    TodayCalendarRow(value: value, timeZone: snapshot.timeZone)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("planner-all-day-events")
         }
     }
+}
 
-    @ViewBuilder private var fixtureControls: some View {
+struct CalendarFixtureControls: View {
+    let calendar: TodayCalendarController
+
+    @ViewBuilder var body: some View {
         #if DEBUG && targetEnvironment(simulator)
         if calendar.fixtureVerified { Text("Actual Calendar source readback unchanged").font(.caption).accessibilityIdentifier("calendar-fixture-verified") }
         if let error = calendar.fixtureError { Text(error).foregroundStyle(.red).accessibilityIdentifier("calendar-fixture-error") }
@@ -66,7 +75,7 @@ struct TodayCalendarRow: View {
 }
 
 extension TodayCalendarEvent {
-    var accessibilityEventID: String { Data((event.calendarID + "\u{0}" + event.eventID + "\u{0}" + String(event.start.timeIntervalSince1970)).utf8).base64EncodedString() }
+    var accessibilityEventID: String { event.dragAccessibilityID }
 
     func calendarTimeDescription(timeZone: TimeZone) -> String {
         if event.isAllDay { return "All day" }
@@ -75,5 +84,11 @@ extension TodayCalendarEvent {
         if isInstant { return visibleStart.formatted(format) }
         let end = endsAtDayBoundary ? "midnight" : visibleEnd.formatted(format)
         return "\(visibleStart.formatted(format)) – \(end)"
+    }
+}
+
+extension CalendarEventSnapshot {
+    var dragAccessibilityID: String {
+        Data((calendarID + "\u{0}" + eventID + "\u{0}" + String(start.timeIntervalSince1970)).utf8).base64EncodedString()
     }
 }
