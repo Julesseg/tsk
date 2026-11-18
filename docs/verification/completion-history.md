@@ -42,8 +42,10 @@ retain the saved page, but their current intent participates in planner ordering
 ## Views and feedback
 
 Day pages (including Today) admit completed history on the retained page only.
-Inbox and unfinished project membership still require pending status. A retained row renders a permanent check
-and dimmed title/content. Transient checked/cover/collapse feedback still serves
+Inbox and unfinished project membership still require pending status. A
+retained row shows a checkmark and dimmed content. Tapping the checkmark
+restores pending status, clears the completion date and placement, and
+reapplies ordinary planner placement. Transient checked/cover/collapse feedback still serves
 views that actually lose the completed task; planner history never collapses.
 
 ## Evidence boundaries

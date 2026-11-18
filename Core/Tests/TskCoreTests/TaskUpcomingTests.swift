@@ -38,7 +38,7 @@ import Testing
     let occurrence = try await replica.create(id: UUID(), attributes: ["description": "Occurrence", "status": "pending", "due": "1806357600", "parent": UUID().uuidString, "wait": "1806530400"])
     let groups = try await manager.upcomingDays()
     #expect(groups.map(\.day) == [Date(timeIntervalSince1970: 1806271200), Date(timeIntervalSince1970: 1806357600)])
-    #expect(groups[0].entries.map { $0.task.id } == [planned.id, deadline.id, later.id])
+    #expect(groups[0].entries.map { $0.task.id } == [deadline.id, planned.id, later.id])
     #expect(groups[1].entries.map { $0.task.id } == [occurrence.id])
     var utc = Calendar(identifier: .gregorian)
     utc.timeZone = TimeZone(secondsFromGMT: 0)!

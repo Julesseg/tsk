@@ -6,59 +6,119 @@ struct TaskDayNavigator: View {
     let paging: TaskDayPaging
     let availableWidth: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState private var pull = Pull.idle
+    @State private var browsedMonth: Date?
+    @State private var labelWidth: CGFloat = 0
+    @State private var calendarHeight: CGFloat = 0
+
+    private enum Pull: Equatable {
+        case idle, horizontal, vertical(CGFloat)
+
+        var distance: CGFloat? {
+            if case .vertical(let distance) = self { return distance }
+            return nil
+        }
+    }
+
     private var expanded: Bool { paging.expanded }
-    @State private var month = Date()
+    private var month: Date { browsedMonth ?? store.displayedDay }
     private var calendar: Calendar { .autoupdatingCurrent }
     private var canChooseDate: Bool { !store.isSelectionPressActive && !store.isSelectionGestureActive && store.rowEditing == nil && !store.isSaving }
     private var isScheduling: Bool { !store.selectedTaskIDs.isEmpty }
+    private var openWidth: CGFloat { min(336, max(0, availableWidth - 32)) }
+    private var visibleHeight: CGFloat { min(calendarHeight, max(0, (expanded ? calendarHeight : 0) - (pull.distance ?? 0))) }
+    private var openness: CGFloat { calendarHeight > 0 ? visibleHeight / calendarHeight : 0 }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22 + 6 * openness) }
+    private var settleAnimation: Animation? { reduceMotion ? nil : .snappy(duration: 0.32) }
 
     var body: some View {
         VStack(spacing: 0) {
-            if expanded {
-                monthCalendar
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .transition(.opacity)
-            }
-            Button { setExpanded(!expanded) } label: {
-                HStack(spacing: 7) {
-                    Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                        .monospacedDigit()
-                    Image(systemName: expanded ? "chevron.down" : "chevron.up")
-                        .font(.caption2.weight(.semibold))
-                }
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .padding(.horizontal, 16)
-                .frame(height: 44)
-                .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Browse date")
-            .accessibilityValue(String(Int(store.displayedDay.timeIntervalSince1970)))
-            .accessibilityHint(isScheduling ? "Tap to schedule selected tasks" : store.isSelectingTasks ? "Swipe up or tap to open the month calendar" : "Swipe left or right to change day. Swipe up or tap to open the month calendar")
-            .accessibilityIdentifier("planner-date-pill")
+            monthCalendar
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .frame(width: openWidth)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calendarHeight = $0 }
+                .frame(height: visibleHeight, alignment: .top)
+                .clipped()
+                .allowsHitTesting(expanded && pull.distance == nil)
+                .accessibilityHidden(!expanded)
+            dateButton
         }
-        .frame(width: expanded ? min(336, max(0, availableWidth - 32)) : nil)
-        .contentShape(RoundedRectangle(cornerRadius: expanded ? 28 : 22))
-        .highPriorityGesture(DragGesture(minimumDistance: 8).onEnded { value in
-            let distance = value.translation
-            guard canChooseDate, !paging.isSettling,
-                  abs(distance.height) > 12, abs(distance.height) > abs(distance.width) * 1.5 else { return }
-            setExpanded(distance.height < 0)
-        })
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: expanded ? 28 : 22))
+        .frame(width: labelWidth > 0 ? labelWidth + (openWidth - labelWidth) * openness : nil)
+        .clipShape(shape)
+        .contentShape(shape)
+        .background {
+            Color.clear.contentShape(shape).onTapGesture {}
+        }
+        .glassEffect(.regular, in: shape)
         .accessibilityElement(children: .contain)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { paging.navigatorBounds = $0 }
+        .animation(pull.distance == nil ? settleAnimation : nil, value: openness)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
+        .onChange(of: pull.distance != nil) { _, dragging in
+            if dragging && !expanded { browsedMonth = store.displayedDay }
+        }
+        .onChange(of: pull.distance != nil && visibleHeight > 0) { _, visible in
+            paging.isPullingCalendar = visible
+        }
         .onChange(of: store.completionContext) { _, _ in setExpanded(false) }
+        .onDisappear { paging.isPullingCalendar = false }
+    }
+
+    private var dateButton: some View {
+        Button { setExpanded(!expanded) } label: {
+            HStack(spacing: 7) {
+                Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                    .monospacedDigit()
+                Image(systemName: "chevron.up")
+                    .font(.caption2.weight(.semibold))
+                    .rotationEffect(.degrees(180 * openness))
+            }
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 16)
+            .frame(height: 44)
+            .fixedSize(horizontal: true, vertical: false)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { labelWidth = min($0, openWidth) }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Browse date")
+        .accessibilityValue(String(Int(store.displayedDay.timeIntervalSince1970)))
+        .accessibilityHint(expanded ? "Tap or swipe down to close the month calendar" : isScheduling ? "Tap to schedule selected tasks" : "Swipe up or tap to open the month calendar")
+        .accessibilityIdentifier("planner-date-pill")
+        .highPriorityGesture(calendarPull)
+    }
+
+    private var calendarPull: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .updating($pull) { finger, pull, transaction in
+                guard canChooseDate, !paging.isSettling else { return }
+                let dy = finger.translation.height
+                let dx = finger.translation.width
+                switch pull {
+                case .horizontal: return
+                case .idle:
+                    if abs(dx) > abs(dy) * 1.5 { pull = .horizontal; return }
+                    guard abs(dy) > abs(dx) * 1.5 else { return }
+                case .vertical: break
+                }
+                transaction.animation = nil
+                pull = .vertical(dy)
+            }
+            .onEnded { finger in
+                guard canChooseDate, !paging.isSettling, pull.distance != nil else { return }
+                let projectedHeight = (expanded ? calendarHeight : 0) - finger.predictedEndTranslation.height
+                setExpanded(projectedHeight >= calendarHeight / 2)
+            }
     }
 
     private func setExpanded(_ value: Bool) {
-        if value { month = store.displayedDay }
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.32)) { paging.expanded = value }
+        if value && !expanded && pull.distance == nil { browsedMonth = store.displayedDay }
+        withAnimation(settleAnimation) { paging.expanded = value }
     }
 
     private var monthCalendar: some View {
@@ -138,7 +198,7 @@ struct TaskDayNavigator: View {
     }
 
     private func moveMonth(_ offset: Int) {
-        if let next = calendar.date(byAdding: .month, value: offset, to: month) { month = next }
+        if let next = calendar.date(byAdding: .month, value: offset, to: month) { browsedMonth = next }
     }
 }
 
@@ -146,6 +206,8 @@ struct TaskPlannerLeadingDate: View {
     let task: TaskRecord
     let day: Date?
     let today: Date
+
+    @ScaledMetric(relativeTo: .caption2) private var dateSize: CGFloat = 9
 
     var body: some View {
         let calendar = Calendar.autoupdatingCurrent
@@ -155,19 +217,19 @@ struct TaskPlannerLeadingDate: View {
         } ?? false
         let isCarried = task.status == "pending" && day == calendar.startOfDay(for: today)
             && scheduled.map { calendar.startOfDay(for: $0.date) < calendar.startOfDay(for: today) } == true
-        VStack(alignment: .trailing, spacing: 2) {
+        VStack(spacing: 1) {
             if let scheduled, showsDate {
                 Text(scheduled.date, format: .dateTime.day().month(.abbreviated))
-                    .font(.caption2)
+                    .font(.system(size: dateSize))
             }
             if let scheduled, scheduled.hasTime {
-                Text(scheduled.date, style: .time).font(.caption.monospacedDigit())
+                Text(scheduled.date, style: .time).font(.caption.bold().monospacedDigit())
             } else if !showsDate {
-                Text("-").font(.caption)
+                Text("-").font(.caption.bold())
             }
         }
         .foregroundStyle(isCarried ? Color.red : Color.secondary)
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scheduled.map {
             "Scheduled " + $0.date.formatted(date: .abbreviated, time: $0.hasTime ? .shortened : .omitted)

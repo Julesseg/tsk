@@ -18,6 +18,7 @@ struct TaskListView: View {
     var body: some View {
         GeometryReader { geometry in
         let keyboardInset = keyboardOverlap(in: geometry.frame(in: .global))
+        let extendsBehindHomeIndicator = store.isDayPage && store.rowEditing == nil
         Group {
             if store.isDayPage {
                 VStack(spacing: 0) {
@@ -53,6 +54,7 @@ struct TaskListView: View {
                     }
                 }
                 .modifier(TaskDayPagingPages(store: store, calendar: calendar, paging: dayPaging))
+                .ignoresSafeArea(.container, edges: extendsBehindHomeIndicator ? .bottom : [])
             } else if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil {
                 ContentUnavailableView {
                     Label("Tasks unavailable", systemImage: "exclamationmark.triangle")
@@ -90,6 +92,7 @@ struct TaskListView: View {
         #if DEBUG
         .accessibilityValue(store.taskDragProof)
         #endif
+        .contentMargins(.bottom, footerHeight + (extendsBehindHomeIndicator ? geometry.safeAreaInsets.bottom : 0), for: .scrollContent)
         .onPreferenceChange(TaskSelectionRowsKey.self) { selectionRows = $0 }
         .onPreferenceChange(TaskCalendarDragRowsKey.self) { eventRows = $0 }
         .scrollDisabled(store.isSelectionGestureActive)
@@ -132,7 +135,6 @@ struct TaskListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectHidden(true, for: .bottom)
-        .contentMargins(.bottom, footerHeight, for: .scrollContent)
         .contentMargins(.horizontal, 0, for: .scrollContent)
         .overlay { if store.isLoading && store.visibleTasks.isEmpty { ProgressView() } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
@@ -204,6 +206,7 @@ struct TaskListRow: View {
     @State private var titleContentHeight: CGFloat = 28
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
+    @ScaledMetric(relativeTo: .caption2) private var metadataSize: CGFloat = 10
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @Environment(\.taskRowViewport) private var viewport
     @Environment(\.taskRowActions) private var rowActions
@@ -254,12 +257,23 @@ struct TaskListRow: View {
                 .accessibilityHidden(editing?.isCapture == true)
             }
             else if displayedTask.status == "completed" {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.body).foregroundStyle(Color.secondary)
-                    .frame(minWidth: 44, minHeight: headerHeight)
-                    .accessibilityLabel("Completed task: \(task.description)")
+                if task.canReopen {
+                    Button {
+                        Task { _ = await store.reopen(id: task.id) }
+                    } label: {
+                        completedCheckmark
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(phase != nil || store.rowEditing != nil || store.isSaving || store.isSelectingTasks)
+                    .accessibilityLabel("Reopen task: \(task.description)")
                     .accessibilityValue("Completed")
                     .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
+                } else {
+                    completedCheckmark
+                        .accessibilityLabel("Completed task: \(task.description)")
+                        .accessibilityValue("Completed")
+                        .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
+                }
             }
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
@@ -282,10 +296,13 @@ struct TaskListRow: View {
                         .accessibilityHidden(!expanded)
                         if hasProject {
                             Text(displayedTask.project)
-                                .font(.caption)
+                                .font(.system(size: metadataSize))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .padding(.bottom, 2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.quaternary, in: Capsule())
+                                .padding(.top, 1)
                                 .modifier(TaskRowFade(editing: editing, disappearing: true))
                                 .accessibilityHidden(true)
                         }
@@ -406,6 +423,14 @@ struct TaskListRow: View {
             }
         }
     }
+    private var completedCheckmark: some View {
+        Image(systemName: "checkmark.circle.fill")
+            .font(.body)
+            .foregroundStyle(Color.secondary)
+            .frame(minWidth: 44, minHeight: headerHeight)
+            .contentShape(Rectangle())
+    }
+
     private func expand() {
         store.expandRow(task, rowID: identity)
     }

@@ -26,6 +26,10 @@ import XCTest
         XCTAssertTrue(thirdRow.waitForExistence(timeout: 10))
         XCTAssertLessThan(firstSlot.frame.maxX, firstRow.frame.minX)
         XCTAssertTrue(thirdRow.label.contains("Deadline Yesterday"))
+        let deadlineToday = app.buttons["task-A0000000-0000-0000-0000-000000000027"]
+        let allDay = app.buttons["task-A0000000-0000-0000-0000-000000000004"]
+        XCTAssertTrue(deadlineToday.exists)
+        XCTAssertLessThan(deadlineToday.frame.midY, allDay.frame.midY)
         let rowFrames = [firstRow, thirdRow].map(\.frame)
         captureBulkDateEvidence("Scheduled times, carryover and separate deadlines", app: app)
         touchScheduledSlot(first, app: app)
@@ -58,7 +62,16 @@ import XCTest
         let pill = app.buttons["planner-date-pill"]
         XCTAssertTrue(list.cells.allElementsBoundByIndex.contains { $0.frame.intersects(pill.frame) },
                       "Scrollable content extends behind the date pill")
+        XCTAssertTrue(list.cells.allElementsBoundByIndex.contains { $0.frame.intersects(
+            CGRect(x: app.frame.minX, y: app.frame.maxY - 12, width: app.frame.width, height: 12)) },
+            "Rows extend into the bottom safe area")
         captureBulkDateEvidence("Task list extends behind the glass date pill", app: app)
+        let settings = app.buttons["workspace-settings"].frame
+        expandPlannerCalendar(app)
+        captureBulkDateEvidence("Month calendar follows the upward pull", app: app)
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY)).tap()
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
         list.swipeUp()
         XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < rowFrames[0].minY, "Scrolling resumes after release")
     }
@@ -258,10 +271,11 @@ import XCTest
             let yesterday = calendar.date(byAdding: .day, value: -1, to: day)!
             let older = calendar.date(byAdding: .day, value: -1, to: yesterday)!
             func timestamp(_ date: Date) -> String { String(Int(date.timeIntervalSince1970)) }
-            add(first, ["description": "Carried timed work", "status": "pending", "scheduled": timestamp(older.addingTimeInterval(36_000))])
+            add(first, ["description": "Carried timed work", "status": "pending", "project": "Work", "scheduled": timestamp(older.addingTimeInterval(36_000))])
             add(second, ["description": "Carried untimed work", "status": "pending", "scheduled": timestamp(yesterday)])
             add(third, ["description": "Overdue deadline only", "status": "pending", "due": timestamp(yesterday.addingTimeInterval(72_000))])
             add("A0000000-0000-0000-0000-000000000004", ["description": "Untimed today", "status": "pending", "scheduled": timestamp(day)])
+            add("A0000000-0000-0000-0000-000000000027", ["description": "Deadline only today", "status": "pending", "due": timestamp(day.addingTimeInterval(72_000))])
             for index in 5...26 {
                 add(String(format: "A0000000-0000-0000-0000-%012d", index), [
                     "description": "Timed work \(index - 4)", "status": "pending", "scheduled": timestamp(day.addingTimeInterval(36_000 + Double(index * 60)))

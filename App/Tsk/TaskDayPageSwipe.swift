@@ -8,6 +8,8 @@ final class TaskDayPaging {
     var offset: CGFloat = 0
     var isSettling = false
     var expanded = false
+    var isPullingCalendar = false
+    var isCalendarVisible: Bool { expanded || isPullingCalendar }
     var navigatorBounds = CGRect.zero
     var pages: [Date: [TaskRecord]] = [:]
     var calendars: [Date: TodayCalendarSnapshot] = [:]
@@ -88,13 +90,13 @@ struct TaskDayPageSwipe: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard let store, let paging, !paging.isSettling, !store.isSelectionPressActive,
+            guard let store, let paging, !paging.isSettling, !paging.isCalendarVisible, !store.isSelectionPressActive,
                   !store.isSelectionGestureActive, store.rowEditing == nil, !store.isSaving,
                   store.presentedTaskPanels.isEmpty else { return false }
             origin = touch.location(in: nil)
             startsOnNavigator = paging.navigatorBounds.contains(origin)
             if startsOnNavigator { return true }
-            guard canPage, viewport.contains(origin), !paging.expanded else { return false }
+            guard canPage, viewport.contains(origin) else { return false }
             return !rows.contains { $0.bounds.contains(origin) }
         }
 
@@ -102,7 +104,7 @@ struct TaskDayPageSwipe: UIViewRepresentable {
             let speed = velocity(in: nil)
             let point = location(in: nil)
             let movement = abs(speed.x) + abs(speed.y) > 1 ? speed : CGPoint(x: point.x - origin.x, y: point.y - origin.y)
-            return canPage && abs(movement.x) > abs(movement.y) * 1.5
+            return paging?.isCalendarVisible == false && canPage && abs(movement.x) > abs(movement.y) * 1.5
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {

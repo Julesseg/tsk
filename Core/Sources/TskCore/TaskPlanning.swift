@@ -90,6 +90,9 @@ internal enum TaskPlannerOrder {
             let leftDay = calendar.startOfDay(for: left.date)
             let rightDay = calendar.startOfDay(for: right.date)
             if leftDay != rightDay { return leftDay < rightDay }
+            let leftDeadlineOnly = lhs.plannedDate == nil
+            let rightDeadlineOnly = rhs.plannedDate == nil
+            if leftDeadlineOnly != rightDeadlineOnly { return leftDeadlineOnly }
             if left.hasTime != right.hasTime { return !left.hasTime }
             if left.hasTime, left.date != right.date { return left.date < right.date }
         }

@@ -48,6 +48,23 @@ struct ContentView: View {
                 .overlay {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
+                .overlay {
+                    if dayPaging.isCalendarVisible {
+                        GeometryReader { geometry in
+                            let frame = geometry.frame(in: .global)
+                            let hole = dayPaging.navigatorBounds.offsetBy(dx: -frame.minX, dy: -frame.minY)
+                            Button {
+                                dayPaging.expanded = false
+                            } label: {
+                                Color.clear.contentShape(.interaction, OutsidePlannerCalendar(excluded: hole), eoFill: true)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Close month calendar")
+                            .accessibilityIdentifier("dismiss-planner-calendar")
+                        }
+                        .ignoresSafeArea(.container)
+                    }
+                }
         }
         .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
     }
@@ -99,7 +116,7 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if store.isDayPage && !dayPaging.expanded { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
+            if store.isDayPage && !dayPaging.isCalendarVisible { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
         }
     }
 
@@ -459,5 +476,16 @@ struct TaskRowDismissalOverlay: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+}
+
+private struct OutsidePlannerCalendar: Shape {
+    let excluded: CGRect
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        let inside = rect.intersection(excluded)
+        if !inside.isNull { path.addRect(inside) }
+        return path
     }
 }

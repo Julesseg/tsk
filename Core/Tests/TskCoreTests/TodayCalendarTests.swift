@@ -33,12 +33,13 @@ func calendarInstant(_ value: String) -> Date { ISO8601DateFormatter().date(from
     #expect(try await manager.dayPage(on: day.start) == [task])
     let carried = TaskRecord(id: UUID(), attributes: ["scheduled": "1772859600"])
     let timed = TaskRecord(id: UUID(), attributes: ["scheduled": "1772956800"])
-    let rows = today.plannerRows(tasks: [carried, task, timed], calendar: calendar)
-    #expect(rows == [.task(carried), .task(task), .event(today.events[2]), .event(today.events[1]), .task(timed)])
+    let deadlineOnly = TaskRecord(id: UUID(), attributes: ["due": "1772956800"])
+    let rows = today.plannerRows(tasks: [carried, deadlineOnly, task, timed], calendar: calendar)
+    #expect(rows == [.task(carried), .task(deadlineOnly), .task(task), .event(today.events[2]), .event(today.events[1]), .task(timed)])
     #expect(today.allDayEvents.map(\.event.title) == ["all-day"])
     var visibility = CalendarVisibility()
     visibility.setVisible(false, calendarID: "local")
-    #expect(today.showing(visibility).plannerRows(tasks: [carried, task, timed], calendar: calendar) == [.task(carried), .task(task), .task(timed)])
+    #expect(today.showing(visibility).plannerRows(tasks: [carried, deadlineOnly, task, timed], calendar: calendar) == [.task(carried), .task(deadlineOnly), .task(task), .task(timed)])
 }
 
 func calendarEvent(_ title: String, start: String, end: String, allDay: Bool = false, canceled: Bool = false, identity: String? = nil) -> CalendarEventSnapshot {

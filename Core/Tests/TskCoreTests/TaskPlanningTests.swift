@@ -38,7 +38,7 @@ import Testing
     _ = try await replica.create(id: UUID(), attributes: ["description": "Template", "status": "recurring", "due": "1791842400"])
     _ = try await replica.create(id: UUID(), attributes: ["description": "Completed", "status": "completed", "scheduled": "1791842400"])
     let today = try await manager.dayPage(on: Date(timeIntervalSince1970: 1791972000))
-    #expect(today.map(\.description) == ["Older deadline fallback", "Carried untimed", "Carried timed", "Today untimed first", "Today untimed second", "Explicit midnight", "Deadline fallback", "Today last second", "Waiting carryover"])
+    #expect(today.map(\.description) == ["Older deadline fallback", "Carried untimed", "Carried timed", "Deadline fallback", "Today untimed first", "Today untimed second", "Explicit midnight", "Today last second", "Waiting carryover"])
     #expect(try await manager.tasks(query: .today).map(\.id) == today.map(\.id))
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1791885600)).isEmpty)
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1792015200)).map(\.description) == ["Tomorrow overrides overdue Deadline"])

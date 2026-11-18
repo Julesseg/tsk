@@ -14,6 +14,9 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
     public var isOccurrence: Bool { attributes["parent"] != nil }
     public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && occurrenceIndex != nil && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
     public var canComplete: Bool { canEdit && status == "pending" }
+    public var canReopen: Bool {
+        status == "completed" && (isOccurrence ? UUID(uuidString: attributes["parent"] ?? "") != nil && occurrenceIndex != nil : !isRecurring)
+    }
     public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }
 
@@ -238,6 +241,19 @@ public actor TaskManager {
         let saved = try await replica.update(id: id, changes: changes)
         await localChangeWasCommitted(tasks: [saved])
         return saved
+    }
+
+    public func reopen(id: UUID) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
+        let task = try await self.task(id: id, includingDeleted: false)
+        if task.canComplete { return task }
+        guard task.canReopen else { throw TaskManagementError.unsupportedTaskKind }
+        let patch: TaskAttributePatch = [
+            "status": "pending", "end": nil, TaskCompletionPlacement.attribute: nil,
+            "modified": String(Int(now().timeIntervalSince1970))
+        ]
+        return try await saveTaskMutation(task, changes: patch)
     }
 
 }

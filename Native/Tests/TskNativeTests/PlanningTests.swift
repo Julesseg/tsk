@@ -141,3 +141,18 @@ private func exportedPlanningTask(binary: String, config: URL, id: UUID? = nil) 
     }
     return try #require(records.first)
 }
+
+@Test func reopeningAnOrdinaryTaskPersistsItsOriginalDatesWithoutCompletionMetadata() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let manager = TaskChampionSession.makeManager(directory: directory)
+    let original = try await manager.create(TaskDraft(description: "Complete and reopen", attributes: ["scheduled": "1792170900", "due": "1792257300", "opaque": "retain"]))
+    _ = try await manager.complete(id: original.id)
+    _ = try await manager.reopen(id: original.id)
+    let reader = TaskChampionSession.makeManager(directory: directory)
+    let saved = try await reader.task(id: original.id)
+    #expect(saved.status == "pending")
+    #expect(saved.attributes["end"] == nil && saved.attributes["tsk_completion_page"] == nil)
+    #expect(saved.plannedDate == original.plannedDate && saved.deadline == original.deadline)
+    #expect(saved.attributes["opaque"] == "retain")
+}

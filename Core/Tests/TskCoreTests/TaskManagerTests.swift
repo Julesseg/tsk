@@ -155,3 +155,28 @@ private struct UnwritableReplica: TaskReplica {
     #expect(try await manager.dayPage(on: friday) == [editedHistory])
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1792281600)).isEmpty)
 }
+
+@Test func uncompletingReleasesRetainedPlacementAndPreservesScheduledIntent() async throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let day = Date(timeIntervalSince1970: 1792108800)
+    let tomorrow = day.addingTimeInterval(86400)
+    let manager = TaskManager(replica: TestReplica(), now: { day.addingTimeInterval(3600) }, calendar: calendar)
+    var draft = TaskDraft(description: "Reopen on its planned day", attributes: ["due": "1792400000", "opaque": "keep"])
+    draft.setScheduled(.init(date: day, hasTime: true))
+    let task = try await manager.create(draft)
+    let completed = try await manager.complete(id: task.id)
+    #expect(completed.attributes[TaskCompletionPlacement.attribute] != nil)
+    let edited = try await manager.update(id: task.id, changes: ["scheduled": String(Int(tomorrow.timeIntervalSince1970))])
+    #expect(try await manager.dayPage(on: day) == [edited])
+    let reopened = try await manager.reopen(id: task.id)
+    #expect(reopened.status == "pending")
+    #expect(reopened.attributes["end"] == nil)
+    #expect(reopened.attributes[TaskCompletionPlacement.attribute] == nil)
+    #expect(reopened.deadline == task.deadline)
+    #expect(reopened.scheduled(calendar: calendar) == edited.scheduled(calendar: calendar))
+    #expect(reopened.attributes["opaque"] == "keep")
+    #expect(try await manager.dayPage(on: day).isEmpty)
+    #expect(try await manager.dayPage(on: tomorrow) == [reopened])
+    #expect(try await manager.reopen(id: task.id) == reopened)
+}

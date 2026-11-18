@@ -199,7 +199,7 @@ public extension TodayCalendarSnapshot {
         var leading: [DayPageItem] = []
         var timed: [(item: DayPageItem, date: Date, position: Int)] = []
         for (position, task) in tasks.enumerated() {
-            if let intent = task.plannerDate(calendar: calendar), intent.hasTime, intent.date >= day.start {
+            if let intent = task.scheduled(calendar: calendar), intent.hasTime, intent.date >= day.start {
                 timed.append((.task(task), intent.date, position))
             } else {
                 leading.append(.task(task))

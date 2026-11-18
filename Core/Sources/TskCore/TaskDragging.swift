@@ -105,7 +105,8 @@ internal enum TaskManualOrder {
     static func plannerGroup(_ task: TaskRecord, calendar: Calendar) -> String? {
         guard let intent = task.plannerDate(calendar: calendar) else { return nil }
         let day = Int(calendar.startOfDay(for: intent.date).timeIntervalSince1970)
-        return "\(day):\(intent.hasTime ? String(Int(intent.date.timeIntervalSince1970)) : "untimed")"
+        let key = "\(day):\(intent.hasTime ? String(Int(intent.date.timeIntervalSince1970)) : "untimed")"
+        return task.plannedDate == nil ? "deadline:" + key : key
     }
 
     static func value(group: String, rank: Int) -> String {
@@ -113,10 +114,13 @@ internal enum TaskManualOrder {
     }
 
     static func rank(_ task: TaskRecord, attribute: String, group: String) -> Int? {
-        let prefix = "v1:\(Data(group.utf8).base64EncodedString()):"
-        guard let value = task.attributes[attribute], value.hasPrefix(prefix),
-              let rank = Int(value.dropFirst(prefix.count)), rank >= 0 else { return nil }
-        return rank
+        guard let value = task.attributes[attribute] else { return nil }
+        let keys = group.hasPrefix("deadline:") && attribute == plannerAttribute ? [group, String(group.dropFirst("deadline:".count))] : [group]
+        for key in keys {
+            let prefix = "v1:\(Data(key.utf8).base64EncodedString()):"
+            if value.hasPrefix(prefix), let rank = Int(value.dropFirst(prefix.count)), rank >= 0 { return rank }
+        }
+        return nil
     }
 
     static func precedes(_ lhs: TaskRecord, _ rhs: TaskRecord, attribute: String, group: String) -> Bool? {

@@ -110,3 +110,22 @@ actor OccurrenceReplica: TaskAtomicTransitionReplica {
     await #expect(throws: (any Error).self) { try await manager.complete(id: child) }
     #expect(await replica.batches == 0)
 }
+
+@Test func reopeningAWaitingOccurrenceRestoresItsSeriesMaskAtomically() async throws {
+    let parent = UUID(), child = UUID()
+    let replica = OccurrenceReplica(records: [
+        TaskRecord(id: parent, attributes: ["status": "recurring", "mask": "W-"]),
+        TaskRecord(id: child, attributes: ["status": "pending", "parent": parent.uuidString, "imask": "0", "due": "400", "wait": "300"])
+    ])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
+    let completed = try await manager.complete(id: child)
+    #expect(try await manager.task(id: parent).attributes["mask"] == "+-")
+    await replica.rejectNextUpdate()
+    await #expect(throws: (any Error).self) { try await manager.reopen(id: child) }
+    #expect(try await manager.task(id: child) == completed)
+    #expect(try await manager.task(id: parent).attributes["mask"] == "+-")
+    let reopened = try await manager.reopen(id: child)
+    #expect(reopened.status == "pending" && reopened.attributes["end"] == nil)
+    #expect(reopened.attributes["wait"] == "300" && reopened.attributes["due"] == "400")
+    #expect(try await manager.task(id: parent).attributes["mask"] == "W-")
+}

@@ -356,6 +356,10 @@ final class TaskStore {
         await perform { try await $0.complete(id: id) }
     }
 
+    func reopen(id: UUID) async -> TaskRecord? {
+        await perform { try await $0.reopen(id: id) }
+    }
+
     func completeFromList(id: UUID, animated: Bool = true) async -> TaskRecord? {
         guard !isSelectionPressActive, !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
         let context = completionContext

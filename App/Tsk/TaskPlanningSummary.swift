@@ -30,11 +30,12 @@ struct TaskPlanningSummary: View {
 struct TaskPlanningCaption: View {
     let task: TaskRecord
     let today: Date
+    @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 10
 
     var body: some View {
         if let deadline = task.deadline, let offset = task.deadlineDayOffset(relativeTo: today) {
             Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
-                .font(.caption2)
+                .font(.system(size: textSize))
                 .foregroundStyle(task.status == "pending" && deadline < today ? Color.red : Color.secondary)
                 .accessibilityLabel("Deadline \(label(offset))")
                 .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
@@ -43,7 +44,7 @@ struct TaskPlanningCaption: View {
 
     private func label(_ offset: Int, abbreviated: Bool = false) -> String {
         switch offset {
-        case -1: "Yesterday"
+        case -1: abbreviated ? "yes." : "Yesterday"
         case 0: abbreviated ? "tod." : "Today"
         case 1: abbreviated ? "tom." : "Tomorrow"
         case ..<0: abbreviated ? "\(-offset)d ago" : "\(-offset) days ago"
