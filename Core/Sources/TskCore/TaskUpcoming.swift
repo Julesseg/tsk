@@ -33,7 +33,7 @@ public struct UpcomingDay: Identifiable, Equatable, Sendable {
         }
         return days.keys.sorted().map { day in
             UpcomingDay(day: day, entries: days[day, default: []].sorted {
-                TaskPlannerOrder.precedes($0.task, $1.task, calendar: calendar)
+                TaskPlannerOrder.precedes($0.task, $1.task, on: day, calendar: calendar)
             })
         }
     }

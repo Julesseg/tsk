@@ -49,18 +49,9 @@ struct ContentView: View {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
                 .overlay {
-                    if dayPaging.isCalendarVisible {
-                        GeometryReader { geometry in
-                            let frame = geometry.frame(in: .global)
-                            let hole = dayPaging.navigatorBounds.offsetBy(dx: -frame.minX, dy: -frame.minY)
-                            Button {
-                                dayPaging.expanded = false
-                            } label: {
-                                Color.clear.contentShape(.interaction, OutsidePlannerCalendar(excluded: hole), eoFill: true)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Close month calendar")
-                            .accessibilityIdentifier("dismiss-planner-calendar")
+                    if dayPaging.expanded {
+                        PlannerCalendarDismissal(calendarBounds: dayPaging.navigatorBounds) {
+                            dayPaging.expanded = false
                         }
                         .ignoresSafeArea(.container)
                     }
@@ -116,7 +107,7 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if store.isDayPage && !dayPaging.isCalendarVisible { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
+            if store.isDayPage && !dayPaging.expanded { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
         }
     }
 
@@ -479,13 +470,41 @@ struct TaskRowDismissalOverlay: View {
     }
 }
 
-private struct OutsidePlannerCalendar: Shape {
-    let excluded: CGRect
+private struct PlannerCalendarDismissal: View {
+    let calendarBounds: CGRect
+    let dismiss: () -> Void
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path(rect)
-        let inside = rect.intersection(excluded)
-        if !inside.isNull { path.addRect(inside) }
-        return path
+    var body: some View {
+        GeometryReader { geometry in
+            let page = geometry.frame(in: .global)
+            let calendar = page.intersection(calendarBounds)
+            if calendar.isNull {
+                dismissButton
+            } else {
+                VStack(spacing: 0) {
+                    dismissButton.frame(height: calendar.minY - page.minY)
+                    HStack(spacing: 0) {
+                        dismissButton.frame(width: calendar.minX - page.minX)
+                            .accessibilityHidden(true)
+                        Color.clear.frame(width: calendar.width)
+                            .allowsHitTesting(false)
+                        dismissButton.frame(width: page.maxX - calendar.maxX)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(height: calendar.height)
+                    dismissButton.frame(height: page.maxY - calendar.maxY)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+    }
+
+    private var dismissButton: some View {
+        Button(action: dismiss) {
+            Color.clear.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close month calendar")
+        .accessibilityIdentifier("dismiss-planner-calendar")
     }
 }

@@ -87,12 +87,13 @@ public struct TaskDragSession: Sendable {
     }
 
     private mutating func constrainDayOrder() {
-        guard case .day = context else { return }
+        guard case .day(let date) = context else { return }
+        let day = calendar.startOfDay(for: date)
         let positions = Dictionary(uniqueKeysWithValues: tasks.enumerated().map { ($0.element.id, $0.offset) })
         let calendar = calendar
         tasks.sort {
-            if TaskPlannerOrder.groupPrecedes($0, $1, calendar: calendar) { return true }
-            if TaskPlannerOrder.groupPrecedes($1, $0, calendar: calendar) { return false }
+            if TaskPlannerOrder.groupPrecedes($0, $1, on: day, calendar: calendar) { return true }
+            if TaskPlannerOrder.groupPrecedes($1, $0, on: day, calendar: calendar) { return false }
             return positions[$0.id]! < positions[$1.id]!
         }
     }
@@ -242,12 +243,13 @@ extension TaskManager {
         let seen = Set(incoming.map(\.id))
         let groups = Set(incoming.compactMap { TaskManualOrder.plannerGroup($0, calendar: calendar) })
         let instant = now()
+        let day = calendar.startOfDay(for: instant)
         let destination = records.filter { task in
             let retainedHistory = task.status == "completed" && task.plannerDate(calendar: calendar).map {
                 task.isOnDay(max(instant, $0.date), at: instant, calendar: calendar)
             } == true
             return (task.canComplete || retainedHistory) && !seen.contains(task.id) && TaskManualOrder.plannerGroup(task, calendar: calendar).map { groups.contains($0) } == true
-        }.sorted { TaskPlannerOrder.precedes($0, $1, calendar: calendar) }
+        }.sorted { TaskPlannerOrder.precedes($0, $1, on: day, calendar: calendar) }
         return destination + incoming
     }
 

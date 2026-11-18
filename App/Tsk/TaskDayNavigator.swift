@@ -6,46 +6,42 @@ struct TaskDayNavigator: View {
     let paging: TaskDayPaging
     let availableWidth: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var pull = Pull.idle
+    @GestureState private var touchingPill = false
+    @State private var dragAxis: Axis?
     @State private var browsedMonth: Date?
-    @State private var labelWidth: CGFloat = 0
     @State private var calendarHeight: CGFloat = 0
-
-    private enum Pull: Equatable {
-        case idle, horizontal, vertical(CGFloat)
-
-        var distance: CGFloat? {
-            if case .vertical(let distance) = self { return distance }
-            return nil
-        }
-    }
 
     private var expanded: Bool { paging.expanded }
     private var month: Date { browsedMonth ?? store.displayedDay }
     private var calendar: Calendar { .autoupdatingCurrent }
     private var canChooseDate: Bool { !store.isSelectionPressActive && !store.isSelectionGestureActive && store.rowEditing == nil && !store.isSaving }
+    private var canPage: Bool { store.isDayPage && !store.isSelectingTasks && store.taskDrag == nil && !expanded }
     private var isScheduling: Bool { !store.selectedTaskIDs.isEmpty }
     private var openWidth: CGFloat { min(336, max(0, availableWidth - 32)) }
-    private var visibleHeight: CGFloat { min(calendarHeight, max(0, (expanded ? calendarHeight : 0) - (pull.distance ?? 0))) }
+    private var visibleHeight: CGFloat { min(calendarHeight, max(0, (expanded ? calendarHeight : 0) - (paging.calendarPullDistance ?? 0))) }
     private var openness: CGFloat { calendarHeight > 0 ? visibleHeight / calendarHeight : 0 }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22 + 6 * openness) }
     private var settleAnimation: Animation? { reduceMotion ? nil : .snappy(duration: 0.32) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            monthCalendar
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .frame(width: openWidth)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calendarHeight = $0 }
-                .frame(height: visibleHeight, alignment: .top)
-                .clipped()
-                .allowsHitTesting(expanded && pull.distance == nil)
-                .accessibilityHidden(!expanded)
+        TaskDayPillWidth(expandedWidth: openWidth, openness: openness) {
             dateButton
         }
-        .frame(width: labelWidth > 0 ? labelWidth + (openWidth - labelWidth) * openness : nil)
+        .padding(.top, visibleHeight)
+        .overlay(alignment: .top) {
+            if paging.isCalendarVisible {
+                monthCalendar
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .frame(width: openWidth)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { calendarHeight = $0 }
+                    .frame(height: visibleHeight, alignment: .top)
+                    .clipped()
+                    .allowsHitTesting(expanded && paging.calendarPullDistance == nil)
+                    .accessibilityHidden(!expanded)
+            }
+        }
         .clipShape(shape)
         .contentShape(shape)
         .background {
@@ -54,70 +50,85 @@ struct TaskDayNavigator: View {
         .glassEffect(.regular, in: shape)
         .accessibilityElement(children: .contain)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { paging.navigatorBounds = $0 }
-        .animation(pull.distance == nil ? settleAnimation : nil, value: openness)
+        .animation(paging.calendarPullDistance == nil ? settleAnimation : nil, value: openness)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .onChange(of: pull.distance != nil) { _, dragging in
-            if dragging && !expanded { browsedMonth = store.displayedDay }
-        }
-        .onChange(of: pull.distance != nil && visibleHeight > 0) { _, visible in
-            paging.isPullingCalendar = visible
+        .onChange(of: paging.isCalendarVisible) { _, visible in
+            if visible { browsedMonth = store.displayedDay }
         }
         .onChange(of: store.completionContext) { _, _ in setExpanded(false) }
-        .onDisappear { paging.isPullingCalendar = false }
+        .onChange(of: touchingPill) { _, touching in
+            if !touching {
+                Task { @MainActor in
+                    guard !touchingPill, dragAxis != nil else { return }
+                    finishDrag(distance: .zero, velocity: .zero, cancelled: true)
+                }
+            }
+        }
+        .onDisappear { paging.calendarPullDistance = nil }
     }
 
     private var dateButton: some View {
-        Button { setExpanded(!expanded) } label: {
-            HStack(spacing: 7) {
-                Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                    .monospacedDigit()
-                Image(systemName: "chevron.up")
-                    .font(.caption2.weight(.semibold))
-                    .rotationEffect(.degrees(180 * openness))
-            }
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 16)
-            .frame(height: 44)
-            .fixedSize(horizontal: true, vertical: false)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { labelWidth = min($0, openWidth) }
-            .contentShape(Capsule())
+        HStack(spacing: 7) {
+            Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                .monospacedDigit()
+            Image(systemName: "chevron.up")
+                .font(.caption2.weight(.semibold))
+                .rotationEffect(.degrees(180 * openness))
         }
-        .buttonStyle(.plain)
+        .font(.subheadline.weight(.semibold))
+        .lineLimit(1)
+        .padding(.horizontal, 16)
+        .frame(height: TaskDayPaging.pillHeight)
+        .contentShape(Rectangle())
+        .gesture(pillDrag)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { setExpanded(!expanded) }
         .accessibilityLabel("Browse date")
         .accessibilityValue(String(Int(store.displayedDay.timeIntervalSince1970)))
         .accessibilityHint(expanded ? "Tap or swipe down to close the month calendar" : isScheduling ? "Tap to schedule selected tasks" : "Swipe up or tap to open the month calendar")
         .accessibilityIdentifier("planner-date-pill")
-        .highPriorityGesture(calendarPull)
     }
 
-    private var calendarPull: some Gesture {
-        DragGesture(minimumDistance: 6, coordinateSpace: .global)
-            .updating($pull) { finger, pull, transaction in
+    private var pillDrag: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .updating($touchingPill) { _, touching, _ in touching = true }
+            .onChanged { finger in
                 guard canChooseDate, !paging.isSettling else { return }
-                let dy = finger.translation.height
-                let dx = finger.translation.width
-                switch pull {
-                case .horizontal: return
-                case .idle:
-                    if abs(dx) > abs(dy) * 1.5 { pull = .horizontal; return }
-                    guard abs(dy) > abs(dx) * 1.5 else { return }
-                case .vertical: break
+                let x = finger.translation.width
+                let y = finger.translation.height
+                if dragAxis == nil, max(abs(x), abs(y)) > 8 {
+                    dragAxis = abs(y) > abs(x) ? .vertical : .horizontal
                 }
-                transaction.animation = nil
-                pull = .vertical(dy)
+                switch dragAxis {
+                case .vertical: paging.calendarPullDistance = y
+                case .horizontal where canPage: paging.offset = min(availableWidth, max(-availableWidth, x))
+                default: break
+                }
             }
             .onEnded { finger in
-                guard canChooseDate, !paging.isSettling, pull.distance != nil else { return }
-                let projectedHeight = (expanded ? calendarHeight : 0) - finger.predictedEndTranslation.height
-                setExpanded(projectedHeight >= calendarHeight / 2)
+                finishDrag(distance: finger.translation, velocity: finger.velocity, cancelled: !canChooseDate || paging.isSettling)
             }
+    }
+
+    private func finishDrag(distance: CGSize, velocity: CGSize, cancelled: Bool) {
+        let axis = dragAxis
+        dragAxis = nil
+        switch axis {
+        case .vertical:
+            paging.settleCalendar(distance: distance.height, velocity: velocity.height, reduceMotion: reduceMotion, cancelled: cancelled)
+        case .horizontal where canPage || paging.offset != 0:
+            paging.settle(distance: distance.width, velocity: velocity.width, width: availableWidth, store: store,
+                          reduceMotion: reduceMotion, cancelled: cancelled || !canPage)
+        case nil where !cancelled && max(abs(distance.width), abs(distance.height)) <= 8:
+            setExpanded(!expanded)
+        default: break
+        }
     }
 
     private func setExpanded(_ value: Bool) {
-        if value && !expanded && pull.distance == nil { browsedMonth = store.displayedDay }
         withAnimation(settleAnimation) { paging.expanded = value }
     }
 
@@ -202,6 +213,28 @@ struct TaskDayNavigator: View {
     }
 }
 
+private struct TaskDayPillWidth: Layout {
+    let expandedWidth: CGFloat
+    var openness: CGFloat
+
+    var animatableData: CGFloat {
+        get { openness }
+        set { openness = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let label = subviews[0].sizeThatFits(.unspecified)
+        let closed = min(label.width, expandedWidth)
+        let progress = min(1, max(0, openness))
+        return CGSize(width: closed + (expandedWidth - closed) * progress, height: label.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
+                          proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
 struct TaskPlannerLeadingDate: View {
     let task: TaskRecord
     let day: Date?
@@ -223,7 +256,10 @@ struct TaskPlannerLeadingDate: View {
                     .font(.system(size: dateSize))
             }
             if let scheduled, scheduled.hasTime {
-                Text(scheduled.date, style: .time).font(.caption.bold().monospacedDigit())
+                Text(scheduled.date, style: .time)
+                    .font(.caption.bold().monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             } else if !showsDate {
                 Text("-").font(.caption.bold())
             }

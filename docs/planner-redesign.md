@@ -13,12 +13,12 @@ The app remains an iPhone app. The existing Mac CLI and Tuna capture workflow re
 Each unfinished task has at most one actionable planner placement:
 
 - When Scheduled exists, it determines the day, even when Deadline is earlier or overdue.
-- Otherwise, Deadline supplies the fallback day and time. Give these tasks a warning treatment, such as an exclamation mark or red tint.
+- Otherwise, Deadline supplies the fallback placement and appears in the Deadline column.
 - With neither date, the task has no planner placement.
 
 Deadline remains independent and appears in task detail. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
 
-Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting tasks that qualify remain visible with their reason.
+Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting tasks that qualify remain visible with their reason. Order each day page by carried Scheduled date and time, then Deadline-only tasks by deadline, then untimed Scheduled work, then timed Scheduled work.
 
 Scheduled supports a date without a time and a date with an explicit time, including 00:00. These are distinct intentions. For legacy or external timestamps without precision metadata, interpret midnight as untimed and other clock times as timed; preserve the underlying timestamp. Supporting explicit midnight prospectively requires additional task metadata alongside the existing Taskwarrior date field. See [ADR 0008](adr/0008-preserve-planner-date-intent.md).
 

@@ -23,15 +23,40 @@ import XCTest
         let firstSlot = scheduledSlot(first, app: app)
         let count = app.buttons["task-selection-apply"]
         let list = app.collectionViews["task-list"]
+        let pill = app.buttons["planner-date-pill"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 5))
+        XCTAssertLessThan(pill.frame.width, app.frame.width * 0.6)
+        XCTAssertFalse(pill.frame.intersects(app.buttons["New task"].frame))
         XCTAssertTrue(thirdRow.waitForExistence(timeout: 10))
         XCTAssertLessThan(firstSlot.frame.maxX, firstRow.frame.minX)
         XCTAssertTrue(thirdRow.label.contains("Deadline Yesterday"))
         let deadlineToday = app.buttons["task-A0000000-0000-0000-0000-000000000027"]
         let allDay = app.buttons["task-A0000000-0000-0000-0000-000000000004"]
         XCTAssertTrue(deadlineToday.exists)
+        let secondRow = app.buttons["task-" + second]
+        XCTAssertLessThan(firstRow.frame.midY, secondRow.frame.midY)
+        XCTAssertLessThan(secondRow.frame.midY, thirdRow.frame.midY)
+        XCTAssertLessThan(thirdRow.frame.midY, deadlineToday.frame.midY)
         XCTAssertLessThan(deadlineToday.frame.midY, allDay.frame.midY)
         let rowFrames = [firstRow, thirdRow].map(\.frame)
         captureBulkDateEvidence("Scheduled times, carryover and separate deadlines", app: app)
+        let settings = app.buttons["workspace-settings"].frame
+        expandPlannerCalendar(app)
+        captureBulkDateEvidence("Month calendar follows the upward pull", app: app)
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY)).tap()
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
+        pill.tap()
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForExistence(timeout: 5))
+        let day = try XCTUnwrap(pill.value as? String)
+        let date = Date(timeIntervalSince1970: try XCTUnwrap(TimeInterval(day)))
+        let tomorrow = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 1, to: date))
+        let next = String(Int(tomorrow.timeIntervalSince1970))
+        tapTaskControl(app.buttons["planner-date-" + next], app: app)
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
+        assertPlannerDay(next, app: app)
+        pill.swipeRight()
+        assertPlannerDay(day, app: app)
         touchScheduledSlot(first, app: app)
         XCTAssertTrue(count.waitForExistence(timeout: 5))
         XCTAssertEqual(count.label, "1 selected")
@@ -59,19 +84,12 @@ import XCTest
         end.press(forDuration: 0.02, thenDragTo: start, withVelocity: .slow, thenHoldForDuration: 0)
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
         XCTAssertEqual([firstRow, thirdRow].map(\.frame), rowFrames)
-        let pill = app.buttons["planner-date-pill"]
         XCTAssertTrue(list.cells.allElementsBoundByIndex.contains { $0.frame.intersects(pill.frame) },
                       "Scrollable content extends behind the date pill")
         XCTAssertTrue(list.cells.allElementsBoundByIndex.contains { $0.frame.intersects(
             CGRect(x: app.frame.minX, y: app.frame.maxY - 12, width: app.frame.width, height: 12)) },
             "Rows extend into the bottom safe area")
         captureBulkDateEvidence("Task list extends behind the glass date pill", app: app)
-        let settings = app.buttons["workspace-settings"].frame
-        expandPlannerCalendar(app)
-        captureBulkDateEvidence("Month calendar follows the upward pull", app: app)
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY)).tap()
-        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
-        XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
         list.swipeUp()
         XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < rowFrames[0].minY, "Scrolling resumes after release")
     }

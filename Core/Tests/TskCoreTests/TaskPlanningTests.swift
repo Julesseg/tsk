@@ -38,13 +38,13 @@ import Testing
     _ = try await replica.create(id: UUID(), attributes: ["description": "Template", "status": "recurring", "due": "1791842400"])
     _ = try await replica.create(id: UUID(), attributes: ["description": "Completed", "status": "completed", "scheduled": "1791842400"])
     let today = try await manager.dayPage(on: Date(timeIntervalSince1970: 1791972000))
-    #expect(today.map(\.description) == ["Older deadline fallback", "Carried untimed", "Carried timed", "Deadline fallback", "Today untimed first", "Today untimed second", "Explicit midnight", "Today last second", "Waiting carryover"])
+    #expect(today.map(\.description) == ["Carried untimed", "Carried timed", "Older deadline fallback", "Deadline fallback", "Today untimed first", "Today untimed second", "Explicit midnight", "Today last second", "Waiting carryover"])
     #expect(try await manager.tasks(query: .today).map(\.id) == today.map(\.id))
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1791885600)).isEmpty)
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1792015200)).map(\.description) == ["Tomorrow overrides overdue Deadline"])
     let waiting = try #require(today.last)
     #expect(try await manager.availability(id: waiting.id).reasons.count == 1)
-    #expect(try await manager.task(id: today[1].id).plannedDate == Date(timeIntervalSince1970: 1791842400))
+    #expect(try await manager.task(id: today[0].id).plannedDate == Date(timeIntervalSince1970: 1791842400))
 }
 
 @Test func todayCarriesForwardOverDSTAndUsesCalendarDayRatherThan24Hours() async throws {

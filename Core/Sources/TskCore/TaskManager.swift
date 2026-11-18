@@ -115,12 +115,13 @@ public actor TaskManager {
     public func tasks(query: TaskQuery = .all, project: TaskProjectSelection = .all) async throws -> [TaskRecord] {
         let instant = now()
         let records = try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) && project.includes($0) }
-        return sortedTasks(records, query: query, project: project)
+        return sortedTasks(records, query: query, project: project, at: instant)
     }
 
-    func sortedTasks(_ records: [TaskRecord], query: TaskQuery, project: TaskProjectSelection) -> [TaskRecord] {
-        records.sorted {
-            if query == .today { return TaskPlannerOrder.precedes($0, $1, calendar: calendar) }
+    func sortedTasks(_ records: [TaskRecord], query: TaskQuery, project: TaskProjectSelection, at instant: Date) -> [TaskRecord] {
+        let day = calendar.startOfDay(for: instant)
+        return records.sorted {
+            if query == .today { return TaskPlannerOrder.precedes($0, $1, on: day, calendar: calendar) }
             if case .project(let name) = project, let result = TaskManualOrder.precedes($0, $1, attribute: TaskManualOrder.projectAttribute, group: name) { return result }
             return TaskPlannerOrder.entryPrecedes($0, $1)
         }
@@ -139,8 +140,9 @@ public actor TaskManager {
     public func dayPageSnapshot(on day: Date) async throws -> TaskViewSnapshot {
         let records = try await tasks()
         let instant = now()
-        let visible = records.filter { $0.isOnDay(day, at: instant, calendar: calendar) }
-            .sorted { TaskPlannerOrder.precedes($0, $1, calendar: calendar) }
+        let dayStart = calendar.startOfDay(for: day)
+        let visible = records.filter { $0.isOnDay(dayStart, at: instant, calendar: calendar) }
+            .sorted { TaskPlannerOrder.precedes($0, $1, on: dayStart, calendar: calendar) }
         return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
     }
 

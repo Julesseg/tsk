@@ -85,23 +85,24 @@ func taskDate(on day: Date, keepingTimeFrom date: Date?, calendar: Calendar) -> 
 }
 
 internal enum TaskPlannerOrder {
-    static func groupPrecedes(_ lhs: TaskRecord, _ rhs: TaskRecord, calendar: Calendar) -> Bool {
-        if let left = lhs.plannerDate(calendar: calendar), let right = rhs.plannerDate(calendar: calendar) {
-            let leftDay = calendar.startOfDay(for: left.date)
-            let rightDay = calendar.startOfDay(for: right.date)
-            if leftDay != rightDay { return leftDay < rightDay }
-            let leftDeadlineOnly = lhs.plannedDate == nil
-            let rightDeadlineOnly = rhs.plannedDate == nil
-            if leftDeadlineOnly != rightDeadlineOnly { return leftDeadlineOnly }
-            if left.hasTime != right.hasTime { return !left.hasTime }
-            if left.hasTime, left.date != right.date { return left.date < right.date }
+    private static func position(_ task: TaskRecord, on day: Date, calendar: Calendar) -> (Int, Date, Int) {
+        if let scheduled = task.scheduled(calendar: calendar) {
+            if scheduled.date < day { return (0, scheduled.date, scheduled.hasTime ? 1 : 0) }
+            if scheduled.hasTime { return (3, scheduled.date, 0) }
+            return (2, calendar.startOfDay(for: scheduled.date), 0)
         }
-        return false
+        if let deadline = task.deadline { return (1, deadline, 0) }
+        return (2, day, 1)
     }
 
-    static func precedes(_ lhs: TaskRecord, _ rhs: TaskRecord, calendar: Calendar) -> Bool {
-        if groupPrecedes(lhs, rhs, calendar: calendar) { return true }
-        if groupPrecedes(rhs, lhs, calendar: calendar) { return false }
+    static func groupPrecedes(_ lhs: TaskRecord, _ rhs: TaskRecord, on day: Date, calendar: Calendar) -> Bool {
+        position(lhs, on: day, calendar: calendar) < position(rhs, on: day, calendar: calendar)
+    }
+
+    static func precedes(_ lhs: TaskRecord, _ rhs: TaskRecord, on day: Date, calendar: Calendar) -> Bool {
+        let left = position(lhs, on: day, calendar: calendar)
+        let right = position(rhs, on: day, calendar: calendar)
+        if left != right { return left < right }
         if let group = TaskManualOrder.plannerGroup(lhs, calendar: calendar),
            let result = TaskManualOrder.precedes(lhs, rhs, attribute: TaskManualOrder.plannerAttribute, group: group) { return result }
         return entryPrecedes(lhs, rhs)

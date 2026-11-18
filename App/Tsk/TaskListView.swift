@@ -301,7 +301,7 @@ struct TaskListRow: View {
                                 .lineLimit(1)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(.quaternary, in: Capsule())
+                                .background(Color.secondary.opacity(0.11), in: Capsule())
                                 .padding(.top, 1)
                                 .modifier(TaskRowFade(editing: editing, disappearing: true))
                                 .accessibilityHidden(true)
