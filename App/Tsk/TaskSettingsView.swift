@@ -22,10 +22,7 @@ struct TaskSettingsView: View {
                     }.accessibilityIdentifier("calendar-display-settings")
                     Button("Synchronization", systemImage: "arrow.triangle.2.circlepath") { choose(.synchronization) }
                         .accessibilityIdentifier("synchronization-settings")
-                    Button("Copy from Reminders", systemImage: "square.and.arrow.down") { choose(.remindersImport) }
-                        .accessibilityIdentifier("reminders-import")
-                    Button("Move from Reminders automatically", systemImage: "arrow.down.forward.circle") { choose(.continuousReminders) }
-                        .accessibilityIdentifier("continuous-reminders-settings")
+
                 }
             }
             .accessibilityIdentifier("workspace-settings-list")

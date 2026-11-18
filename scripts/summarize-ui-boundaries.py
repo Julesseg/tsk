@@ -16,10 +16,9 @@ PREFIX = b'TSK_BOUNDARY_SUMMARY_V1 '
 UUID = r'[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}'
 PATTERNS = {
     'participant': re.compile(rf'participant-fixture-({UUID})-([1-9][0-9]{{0,9}})\.json'),
-    'readback': re.compile(rf'reminders-fixture-authorization-({UUID})-([1-9][0-9]{{0,9}})\.json'),
 }
 LIMITS = {'files': 128, 'file': 1048576, 'input': 8388608, 'output': 131072, 'line': 2048, 'family': 32768, 'reserve': 4096}
-STAGES = set('''reminders.access reminders.access.begin reminders.access.callback reminders.access.returned reminders.access.error reminders.access.rejected reminders.access.publication-sample reminders.lists.begin reminders.lists.returned reminders.fixture.prepare.begin reminders.fixture.prepare.error reminders.fixture.removal.begin reminders.fixture.removal.returned reminders.recurring-fixture.prepare.begin reminders.move.removal.begin calendar.authorization calendar.access.begin calendar.access.callback calendar.access.returned calendar.access.error calendar.refresh.begin calendar.refresh.snapshot calendar.refresh.discarded calendar.refresh.published calendar.scene'''.split())
+STAGES = set('''calendar.authorization calendar.access.begin calendar.access.callback calendar.access.returned calendar.access.error calendar.refresh.begin calendar.refresh.snapshot calendar.refresh.discarded calendar.refresh.published calendar.scene'''.split())
 
 
 def number(value):
@@ -91,17 +90,6 @@ def eventkit(payload, pid, counts):
     return result
 
 
-def readback(payload, pid, counts):
-    if type(payload) is not dict or type(payload.get('processID')) is not int or payload['processID'] != pid:
-        counts['invalid'] += 1
-        return []
-    validators = dict.fromkeys(['processID', 'authorization', 'authorizationAfterRead', 'ownedCalendarCount', 'ownedReminderCount'], integer)
-    validators.update(dict.fromkeys(['time', 'finishedTime'], number))
-    validators.update(dict.fromkeys(['fetchStarted', 'fetchReturnedNonNil', 'timedOut', 'cancelRequested'], boolean))
-    validators['stage'] = lambda v: v == 'fresh-process-before-cleanup'
-    return [dict(kind='eventkit-readback', **fields(payload, validators, counts))]
-
-
 def summarize(directory, limits=None):
     limits = dict(LIMITS, **(limits or {}))
     counts = collections.Counter(dict(discovered=0, read=0, invalid=0, symlink=0, oversize=0, capped=0, omittedFields=0, omittedRecords=0, filteredRecords=0))
@@ -160,13 +148,12 @@ def summarize(directory, limits=None):
                 counts['oversize'] += 1
                 continue
             payload = json.loads(raw)
-            rows = readback(payload, pid, counts) if kind == 'readback' else eventkit(payload, pid, counts)
+            rows = eventkit(payload, pid, counts)
             counts['read'] += 1
             families[kind]['read'] += 1
             source = {'replica': str(uuid.UUID(token)).upper(), 'processID': pid, 'sha256': hashlib.sha256(raw).hexdigest()}
             observed = payload if type(payload) is list else payload.get('events', []) if type(payload) is dict else []
             if type(observed) is not list: observed = []
-            if kind == 'readback': observed = [payload]
             times = [v['time'] for v in observed if type(v) is dict and number(v.get('time'))]
             source['observedRows'] = len(observed)
             if times: source.update(firstTime=min(times), lastTime=max(times))

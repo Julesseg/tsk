@@ -1,3 +1,5 @@
+> Scope update (2026-11-18): Apple Reminders import is removed; references to its copy/move screens below are historical. Calendar, synchronization and existing task data remain.
+
 > Product scope update (2026-11-17): hardware keyboard commands and widgets are
 > retired. References to keyboard commands below describe historical proposals;
 > ordinary on-screen text entry, touch editing and accessibility remain supported.

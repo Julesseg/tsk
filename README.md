@@ -7,7 +7,7 @@ system services; SwiftUI presents the app.
 
 Implemented workflows include task editing, projects/tags, Today/Upcoming,
 Taskwarrior filters and saved views, recurring templates and occurrence/series
-editing, Shortcuts, Calendar display and Reminders import. The designated desktop
+editing, Shortcuts and Calendar display. The designated desktop
 Taskwarrior client creates recurring occurrences after sync and a recurrence-enabled
 report.
 

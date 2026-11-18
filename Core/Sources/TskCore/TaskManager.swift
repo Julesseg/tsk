@@ -84,7 +84,6 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 public actor TaskManager {
     let replica: any TaskReplica
     let viewDefinitions: (any TaskViewDefinitionsStore)?
-    let reminderImportConfiguration: (any ContinuousReminderConfigurationStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
     var synchronizationState: SynchronizationState = .localOnly
@@ -94,8 +93,6 @@ public actor TaskManager {
     var synchronizationTask: Task<Void, Never>?
     var synchronizationWaiters: [CheckedContinuation<[TaskRecord], any Error>] = []
     var synchronizationObservers: [UUID: AsyncStream<SynchronizationState>.Continuation] = [:]
-    var reminderMoveInProgress = false
-    let reminderImportAdmission: any ReminderImportCoordinating
     var activeMutationScope: TaskMutationScope?
     let postCommitEffects: any TaskPostCommitEffect
     var mutationInProgress = false
@@ -104,11 +101,9 @@ public actor TaskManager {
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, reminderImportConfiguration: (any ContinuousReminderConfigurationStore)? = nil, reminderImportAdmission: any ReminderImportCoordinating = ReminderImportCoordinator(), changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
         self.replica = replica
         self.viewDefinitions = viewDefinitions
-        self.reminderImportConfiguration = reminderImportConfiguration
-        self.reminderImportAdmission = reminderImportAdmission
         self.postCommitEffects = postCommitEffects
         self.changeTracking = changeTracking
         self.now = now

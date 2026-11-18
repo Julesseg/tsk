@@ -7,6 +7,5 @@ let package = Package(
     dependencies: [.package(path: "../../Core"), .package(path: "../../Native")],
     targets: [.testTarget(name: "CalendarControllerProof", dependencies: [.product(name: "TskCore", package: "Core"), .product(name: "TskNative", package: "Native")], path: "Tests"),
               .testTarget(name: "TaskControlReadinessProof", path: "ReadinessTests"),
-              .testTarget(name: "ReminderStatusPublicationProof", dependencies: [.product(name: "TskCore", package: "Core"), .product(name: "TskNative", package: "Native")], path: "ReminderStatusTests"),
               .testTarget(name: "TaskCaptureProof", dependencies: [.product(name: "TskCore", package: "Core"), .product(name: "TskNative", package: "Native")], path: "CaptureTests")]
 )

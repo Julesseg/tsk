@@ -17,9 +17,9 @@ final class WorkspaceSettingsUITests: XCTestCase {
     func testSettingsRemainReachableAtLargestTextSize() {
         let app = launch(arguments: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.buttons["New task"].isHittable)
-        XCTAssertTrue(revealWorkspaceSetting("continuous-reminders-settings", app: app))
+        XCTAssertTrue(revealWorkspaceSetting("synchronization-settings", app: app))
         capture("After settings at largest text size")
-        XCTAssertTrue(app.buttons["continuous-reminders-settings"].isHittable)
+        XCTAssertTrue(app.buttons["synchronization-settings"].isHittable)
         XCTAssertTrue(revealWorkspaceSetting("custom-views", app: app, initialScrollUp: false))
         tapTaskControl(app.buttons["custom-views"], app: app)
         XCTAssertTrue(app.collectionViews["views-list"].waitForExistence(timeout: 5))

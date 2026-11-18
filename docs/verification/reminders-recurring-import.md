@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # Verified recurring Reminders import
 
 Both one-time copying and continuous moving can create a real Taskwarrior recurring template from one verified EventKit rule. The template starts at the source's current incomplete occurrence, not the first historical occurrence. Completed Reminders history is excluded. Notes, URL, project and priority use the ordinary import mapping; no source identity, import history or provenance is stored. Each template receives a new UUID.

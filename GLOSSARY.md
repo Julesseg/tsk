@@ -35,9 +35,6 @@ A task view chosen by the user for quick access. Other task views remain availab
 **Taskwarrior filter**:
 An expression that selects tasks according to Taskwarrior's filtering language.
 
-**Imported task**:
-A task created in tsk from an Apple reminder.
-
 **Scheduled**:
 The date, with an optional time, on which the user intends to work on a task, distinct from its deadline and any waiting constraint. An explicit midnight time is distinct from a date without a time.
 _Avoid_: Planned day; Deadline as a synonym for Scheduled
@@ -45,13 +42,6 @@ _Avoid_: Planned day; Deadline as a synonym for Scheduled
 **Deadline**:
 The date or time by which a task must be finished.
 _Avoid_: Scheduled as a synonym for deadline
-
-**Continuous import**:
-Repeatedly moving eligible reminders from selected Apple Reminders lists into tsk and removing the imported source reminders. Imported tasks are subsequently managed independently.
-_Avoid_: Two-way synchronization
-
-**One-time import**:
-Copying eligible reminders from selected Apple Reminders lists into tsk once, leaving the originals in Apple Reminders.
 
 **Today**:
 The day page for the current day, including carryover, the day's work and retained completion history, and calendar events.

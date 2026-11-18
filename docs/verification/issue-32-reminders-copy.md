@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # One-time Reminders copy
 
 The workspace offers Copy from Reminders in the compact More menu and iPad sidebar. The native sheet requests full Reminders access, lists source lists, defaults each selected list's destination project to its list name, and permits a different project or no project. Preview shows eligible content, planned date, deadline, priority and skipped-item reasons. Copy refetches selected incomplete reminders before creating durable tasks. Results distinguish copied, skipped and failed items. Ordinary task management remains available after optional Reminders permission or fetch failures.

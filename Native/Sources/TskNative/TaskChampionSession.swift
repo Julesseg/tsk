@@ -55,9 +55,8 @@ public enum TaskChampionSession {
         return destination
     }
 
-    public static func makeManager(directory: URL, library: String? = nil, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, reminderDeviceIdentifier: @escaping @Sendable () async throws -> UUID = LocalContinuousReminderStore.platformDeviceID, postCommitEffects: (any TaskPostCommitEffect)? = nil) -> TaskManager {
-        let reminders = LocalContinuousReminderStore(directory: directory, deviceIdentifier: reminderDeviceIdentifier)
-        return TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, viewDefinitions: LocalTaskViewStore(directory: directory), reminderImportConfiguration: reminders, reminderImportAdmission: reminders, changeTracking: LocalTaskChangeStore(directory: directory), postCommitEffects: postCommitEffects ?? TaskPostCommitEffects())
+    public static func makeManager(directory: URL, library: String? = nil, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, postCommitEffects: (any TaskPostCommitEffect)? = nil) -> TaskManager {
+        return TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, viewDefinitions: LocalTaskViewStore(directory: directory), changeTracking: LocalTaskChangeStore(directory: directory), postCommitEffects: postCommitEffects ?? TaskPostCommitEffects())
     }
 
     public static func open(directory: URL, library: String? = nil) async throws -> TaskManager {

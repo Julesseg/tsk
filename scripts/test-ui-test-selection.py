@@ -29,8 +29,8 @@ class SelectionTests(unittest.TestCase):
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 28)
-        self.assertEqual(len(diagnostic), 25)
+        self.assertEqual(len(nightly), 23)
+        self.assertEqual(len(diagnostic), 23)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
             "TskUITests/TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity",
@@ -91,12 +91,10 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (22, 6))
+        self.assertEqual((len(workspace), len(rows)), (17, 6))
         for partition, filters in groups.items():
             self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
             self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
-        for cls in ("ReminderImportUITests", "ContinuousReminderImportUITests", "ReminderRecurrenceUITests"):
-            self.assertTrue(any("/" + cls + "/" in case for case in workspace), cls)
         self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)

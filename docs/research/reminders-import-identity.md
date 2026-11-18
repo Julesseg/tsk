@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # Reminders import identity and copy-once behavior
 
 Research date: 2026-10-14. Scope: current Apple documentation and TaskChampion API review. No importer implementation, provider-specific identity test, or device import was performed.

@@ -12,7 +12,7 @@ This PRD records the agreed product contract without recording personal infrastr
 
 Build a first-class native iPhone Taskwarrior client with Liquid Glass and a thin SwiftUI app over a deep Core module. The primary workflow is capture, choose, and act. Provide Things 3-inspired Today, Upcoming, and project views; device-local custom views defined using Taskwarrior filters; a complete task editor; offline local persistence; and automatic synchronization with a configured TaskChampion server as soon as connectivity and iOS execution permit.
 
-The initial product includes Shortcuts/Siri, calendar events displayed only in Today, and selected-list Apple Reminders import. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
+The initial product includes Shortcuts/Siri and calendar events displayed only in Today. Apple Reminders integration is out of scope. Recurring templates can be created and edited in tsk, while one designated external Taskwarrior client generates occurrences. Optional on-device generation remains a later, lower-priority capability.
 
 The behavior below is the initial scope. It is not an assertion that interoperability or device behavior has already been verified, and it does not prescribe a delivery estimate.
 
@@ -94,23 +94,11 @@ The behavior below is the initial scope. It is not an assertion that interoperab
 61. Removed from product scope on 2026-11-17: incoming system sharing.
 62. Removed from product scope on 2026-11-17: incoming system sharing.
 
-### Calendar and Reminders import
+### Calendar
 
 63. As a task owner, I want to see calendar events in Today alongside my tasks, so that I can account for existing commitments when choosing work.
 64. As an iOS user, I want to display calendar events without creating or modifying them, so that calendar integration remains limited to the agreed purpose.
-65. As an iOS user, I want to choose which Reminders lists to import, so that only selected sources enter tsk.
-66. As a task owner, I want to use each selected Reminders list as the project for imported tasks, so that the existing list organization carries into Taskwarrior.
-67. As an iOS user, I want to import incomplete reminders without an extra priority criterion, so that all eligible unfinished work is included.
-68. As an iOS user switching apps, I want to run a one-time import that leaves original reminders in place, so that migration does not remove the source records.
-69. As an iOS user, I want to enable continuous import that moves eligible reminders into tsk and removes successfully imported sources, so that Reminders can remain a capture entry point without retaining normal imported copies.
-70. As an iOS user, I want to save each imported task durably before its source reminder is deleted, so that a failed destination save cannot remove my only copy.
-71. As an iOS user, I want to keep the source reminder and see a failure when source deletion fails, so that an incomplete move is visible and does not lose the source.
-72. As an iOS user, I want to retain no import provenance, processed IDs, or source-derived task identity, so that import does not leave an additional tracking model behind.
-73. As an iOS user, I want to operate continuous import on one designated device, so that multiple devices do not normally race to import the same source.
-74. As an iOS user, I want to understand that an interrupted move or later retry can produce a duplicate without bookkeeping, so that the importer does not promise an impossible exactly-once guarantee.
-75. As a task owner, I want to manage imported tasks independently after import, so that later edits do not require two-way synchronization with Reminders.
-76. As a task owner, I want to convert recurring reminders only when their complete rule has a verified supported mapping, so that the resulting Taskwarrior template preserves the supported recurrence semantics.
-77. As an iOS user, I want to leave unsupported or unverified recurring reminders untouched and receive a reason, so that import does not silently flatten or destroy their recurrence.
+65. Apple Reminders import, including one-time copy, continuous move and recurring conversion, was removed from scope on 2026-11-18. Existing task data remains.
 
 ### Retired notifications and Spotlight
 
@@ -122,7 +110,7 @@ Notifications and Spotlight indexing were removed from product scope on 2026-11-
 93. Superseded by [ADR 0007](adr/0007-iphone-only.md): native iPad adaptive layout is out of scope. External keyboard commands and widgets were subsequently removed from product scope on 2026-11-17.
 94. As an iOS user, I want to use native navigation, typography, gestures, accessibility, appearance, and Liquid Glass, so that tsk behaves as a first-class iOS app.
 95. As a task owner, I want to scan compact lists and reveal additional detail when needed, so that the interface balances density with clarity.
-96. As an iOS user, I want to retain ordinary task management when Calendar or Reminders permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
+96. As an iOS user, I want to retain ordinary task management when Calendar permissions are denied or revoked, so that optional system access does not prevent use of my tasks.
 97. As an iOS user, I want to receive clear permission and integration failure states, so that I can understand which requested capability is unavailable.
 
 ## Implementation Decisions
@@ -130,7 +118,7 @@ Notifications and Spotlight indexing were removed from product scope on 2026-11-
 ### Modules and interfaces
 
 - Core is the platform-independent module for task behavior. The SwiftUI app stays thin. iOS extensions and actions use the same Core behavior rather than implement competing task rules.
-- Introduce one primary public task-management interface in Core through which callers and behavior tests create, edit, complete, query, plan, and synchronize tasks. Keep field validation, view membership, filter evaluation, recurrence bookkeeping, and import orchestration behind that interface.
+- Introduce one primary public task-management interface in Core through which callers and behavior tests create, edit, complete, query, plan, and synchronize tasks. Keep field validation, view membership, filter evaluation, recurrence bookkeeping behind that interface.
 - Reuse the existing Core and XCUITest testing seams. Where platform execution actually varies, supply concrete adapters for persistent TaskChampion data, synchronization, EventKit, clock/time zone, and system entry points. Keep adapter details internal where possible; do not create a public interface for each individual field or UI action.
 - Keep platform-independent decisions testable without EventKit. Actual OS reads, writes, permission requests, scheduling, and extension execution belong in platform adapters; their results flow back through the Core interface.
 - Preserve task identity and unfamiliar attributes. Local custom-attribute editing and definition management are not supported. Do not round-trip tasks through a reduced schema that discards fields another client understands.
@@ -163,18 +151,6 @@ Notifications and Spotlight indexing were removed from product scope on 2026-11-
 - Changing template properties alone does not update already-generated occurrences. Implement and verify the affected-occurrence updates and bookkeeping before exposing series editing as compatible. Do not reset template state as a shortcut that regenerates duplicates.
 - If the external generator stops, existing occurrences remain usable, but new ones cannot arrive beyond the already-generated horizon. Do not embed a generator in the initial app or automatically take over generation from another client.
 
-### Apple Reminders import
-
-- Let users select source lists. Each selected list maps to the project for its imported tasks. Import incomplete reminders only, without an additional priority or importance filter.
-- One-time import copies eligible reminders and leaves the originals in Reminders. Continuous import moves eligible reminders and removes successfully imported sources.
-- Commit a valid destination task or recurring template durably locally before deleting its source. Never delete the source following a failed destination save. If source deletion fails, preserve the reminder, show the failure, and avoid repeatedly copying it within that running attempt.
-- Retain no provenance fields, processed reminder IDs, source-derived task identities, import history, or durable import bookkeeping. Source-list selection and its project mapping are operating configuration, not a retained per-item tracking model.
-- Run continuous import on one designated device, with it disabled on other devices. An interrupted save/delete sequence or a later retry can still duplicate a task; this trade-off was explicitly accepted. Do not claim cross-store atomicity or exactly-once import.
-- Imported tasks are managed independently. There is no subsequent source-edit propagation, export, or two-way synchronization.
-- Convert a recurring reminder only when its full rule has a verified supported mapping into a Taskwarrior template. Skip unsupported or unverified rules, leave the source untouched, and explain the reason. Never silently flatten recurrence or delete the source after an approximate or partial conversion.
-- Establish supported EventKit field and recurrence conversions with real interoperability checks. Similar frequency labels do not establish equivalence around selectors, completion-gated recurrence, time zones, daylight saving, month ends, or end conditions.
-- Continuous import can react to source changes and available execution opportunities. Do not promise instant background ingestion when iOS does not run the app.
-
 ### iOS capabilities
 
 - Shortcuts and simple, unversioned URLs expose Add, Modify, Delete, Find, Complete, Open Task, and Open View with named inputs and shared behavior. Task-targeted actions use one entity or full UUID. Mutations execute immediately and acknowledge durable local storage; optional URL callbacks return structured results and never undo or retry a committed change on delivery failure. Existing saved shortcuts may break; Modify replaces standalone Reschedule. See [ADR 0005](adr/0005-structured-actions-for-urls-and-shortcuts.md) for the decision and implementation tickets.
@@ -193,23 +169,18 @@ The user confirmed Core’s public task-management interface, the existing XCUIT
 - Compare Taskwarrior filter results against the pinned Taskwarrior client using shared task fixtures. Cover expression operators, parentheses, attribute modifiers, relative dates, virtual tags, dependencies, built-in typed fields, missing values, and explicit invalid/unsupported-expression errors.
 - Exercise Scheduled time selection and preservation, including non-midnight and existing midnight values. Exercise Today and Upcoming at day/DST boundaries: overdue, earlier Scheduled dates, times later today, future Scheduled/Deadline timestamps, tasks present at both dates, completion, rescheduling, waiting/blocked inclusion, and Scheduled-versus-Deadline separation. Verify calendar events appear only in Today.
 - Round-trip recurring templates through a real external Taskwarrior generator. Verify creation, occurrence return sync, occurrence completion bookkeeping, single-occurrence edits, effective-date series edits, preserved completed history, masks/relationships, and continued generation without duplicated or missing instances. Include date boundaries, relative dates, month ends, leap days, and daylight saving in the supported contract.
-- Test one-time import leaves sources unchanged and continuous import deletes only after durable destination save. Inject destination-save failure, deletion failure, and interruption between stores; verify source preservation and honest duplicate limitations rather than an exactly-once assertion. Verify completed and unselected source items are excluded, lists map to projects, and no per-item provenance or bookkeeping is retained.
-- Verify each supported recurring-reminder conversion against both actual EventKit data and the pinned external generator. Unsupported/unverified rules must remain untouched and be explained; verify source deletion scope for a supported recurring set before claiming safe continuous migration.
-- Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings, import results, and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
-- Exercise Shortcuts/App Intents and Calendar/Reminders access using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
+- Grow the existing XCUITest suite with capture/edit/list actions, Today/Upcoming/projects/custom views, offline use and visible retry states, occurrence-versus-series editing, settings and graceful denied-permission states. The macOS CI XCUITest job is the canonical UI gate; local simulator execution is optional.
+- Exercise Shortcuts/App Intents and Calendar access using real platform adapters in simulator or device environments as appropriate. Where CI cannot prove account or background behavior, record the missing evidence and require the relevant integration/device verification before claiming support.
 - Verify iPhone navigation, system appearance, and accessibility. Simulator/CI success alone does not prove background timing, or external-account behavior.
 - A documentation review or green scaffold CI does not fulfill these feature-level checks. Every delivered capability needs evidence at its stated seam, with unsupported cases and remaining verification limits reported explicitly.
 
 ## Out of Scope
 
 - On-device occurrence generation in the initial release, including an enabled recurrence generator or automatic takeover from another generating client. Optional iOS generation is later and lower priority.
-- Guaranteed immediate background sync/import or exact background generation timing.
+- Guaranteed immediate background sync or exact background generation timing.
 - Desktop report, context, or configuration import.
 - Synchronization of saved custom views between devices.
 - Creating or modifying calendar events, time blocking, or displaying calendar events as an Upcoming integration.
-- Export or two-way synchronization with Apple Reminders, updating source reminders after one-time import, and propagating later source changes into independently managed tasks.
-- Persistent per-item import provenance, processed IDs, source-derived task identity, or exactly-once import guarantees across separate stores and retries.
-- Importing completed reminders, additional priority-based source selection, silently flattening unsupported recurrence, or deleting unsupported recurring sources.
 - File attachment storage and a dedicated Mac experience.
 - Provisioning or configuring any personal external generator or server. The PRD describes generic client capabilities only.
 - Implementing the application as part of publishing this PRD. It specifies the product; the current repository remains a scaffold.

@@ -7,7 +7,7 @@ struct ContentView: View {
     private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
 
     enum WorkspaceSetting {
-        case customViews, recurring, synchronization, continuousReminders, remindersImport
+        case customViews, recurring, synchronization
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -17,13 +17,10 @@ struct ContentView: View {
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
     @State private var calendar: TodayCalendarController
-    @State private var continuousReminders: ContinuousReminderController
-    @State private var isConfiguringContinuousReminders = false
     @State private var isConfiguringSync = false
     @State private var isChoosingCustomView = false
     @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
-    @State private var isImportingReminders = false
     @State private var isShowingSettings = false
     @State private var pendingWorkspaceSetting: WorkspaceSetting?
     @State private var editingTask: TaskRecord?
@@ -41,7 +38,6 @@ struct ContentView: View {
         _calendar = State(initialValue: TodayCalendarController(manager: store.manager))
         _synchronization = State(initialValue: SynchronizationStore(manager: store.manager, directory: store.directory))
         _opportunities = State(initialValue: SynchronizationOpportunities(manager: store.manager))
-        _continuousReminders = State(initialValue: ContinuousReminderController(store: store))
     }
 
     var body: some View {
@@ -219,14 +215,8 @@ struct ContentView: View {
         }
     }
 
-    private var integrationSheets: some View {
-        navigationWorkspace
-        .sheet(isPresented: $isConfiguringContinuousReminders) { ContinuousReminderSettingsView(controller: continuousReminders).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "continuous-reminders"]) } }
-        .sheet(isPresented: $isImportingReminders) { ReminderImportView(store: store).onAppear { TaskUIBoundaryDiagnostics.event("workspace.sheet.appeared", details: ["destination": "reminders-import"]) } }
-    }
-
     private var editorSheets: some View {
-        integrationSheets
+        navigationWorkspace
         .sheet(isPresented: $isChoosingCustomView, onDismiss: {
             tabsBeforeEditingViews = nil
             Task { await loadSavedViews() }
@@ -273,7 +263,6 @@ struct ContentView: View {
             await loadSavedViews()
             opportunities.start()
             await opportunities.foreground()
-            await continuousReminders.scan()
         }
     }
 
@@ -304,9 +293,6 @@ struct ContentView: View {
             await automation.executePending(in: store)
         }
         .task(id: scenePhase) {
-            if scenePhase == .active { await continuousReminders.observeStatus() }
-        }
-        .task(id: scenePhase) {
             if scenePhase == .active { await store.observeParticipantChanges() }
         }
         .onChange(of: automation.deletedTaskID) { _, id in
@@ -322,20 +308,16 @@ struct ContentView: View {
         participantLifecycle
         .onChange(of: scenePhase) { _, phase in
             TaskUIBoundaryDiagnostics.event("calendar.scene", details: ["phase": String(describing: phase)])
-            #if DEBUG && targetEnvironment(simulator)
-            continuousReminders.source.recordAccessDiagnostic("reminders.scene", details: ["phase": String(describing: phase)])
-            #endif
             if phase == .active {
                 Task {
                     await synchronization.loadConfiguration()
                     await opportunities.foreground()
-                    await continuousReminders.scan()
                     await store.reload()
                     await loadSavedViews()
                 }
             } else if phase == .background { opportunities.background() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in continuousReminders.sourceChanged(); calendar.sourceChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
     }
@@ -374,9 +356,6 @@ struct ContentView: View {
                             .font(.callout).padding(8)
                             .accessibilityIdentifier("capture-confirmation")
                             .accessibilityAddTraits(.updatesFrequently)
-                    }
-                    if continuousReminders.status?.active == true && (continuousReminders.status?.paused == true || continuousReminders.error != nil) {
-                        Button("Review Reminders import") { isConfiguringContinuousReminders = true }.font(.footnote).padding().accessibilityIdentifier("continuous-reminders-attention")
                     }
                     if let error = store.error, !store.isSelectingTasks, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
                     if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
@@ -436,20 +415,12 @@ struct ContentView: View {
         case .customViews: presentViews()
         case .recurring: isShowingRecurring = true
         case .synchronization: isConfiguringSync = true
-        case .continuousReminders: requestIntegrationPresentation("continuous-reminders", state: $isConfiguringContinuousReminders)
-        case .remindersImport: requestIntegrationPresentation("reminders-import", state: $isImportingReminders)
         }
     }
 
     private func presentViews() {
         tabsBeforeEditingViews = store.workspaceViews.active
         isChoosingCustomView = true
-    }
-
-    private func requestIntegrationPresentation(_ destination: String, state: Binding<Bool>) {
-        TaskUIBoundaryDiagnostics.event("workspace.menu.action-entry", details: ["destination": destination, "presented": String(state.wrappedValue)])
-        state.wrappedValue = true
-        TaskUIBoundaryDiagnostics.event("workspace.menu.state-assigned", details: ["destination": destination, "presented": String(state.wrappedValue)])
     }
 
     private func errorBanner(_ error: String, retry: @escaping () -> Void) -> some View {

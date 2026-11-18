@@ -38,17 +38,7 @@ Attempt synchronization after changes, when the app opens, and when connectivity
 
 ## iOS integration
 
-Shortcuts and Siri, Calendar, and Apple Reminders import are all important parts of the initial product scope.
-
-Apple Reminders integration is import-only: a one-time or continuous import of incomplete reminders from selected lists. Users choose which lists to import. Each selected Reminders list becomes the Taskwarrior project for its imported tasks. Completed reminders are excluded. There is no additional priority or importance criterion.
-
-One-time import is for switching apps: copy eligible reminders into tsk and leave the originals in Apple Reminders. Continuous import moves eligible reminders into tsk and removes the imported reminders from Apple Reminders. The two modes deliberately differ in source deletion.
-
-After import, manage the task independently in tsk. Export and two-way synchronization are outside the agreed scope. Do not retain provenance, processed reminder IDs, source-derived task identifiers, or import bookkeeping. Selected list configuration and its project mapping remain necessary for operating import.
-
-Save the task durably in local storage before deleting its source reminder. If source deletion fails, preserve the reminder; an interrupted move or later retry can create a duplicate. The user accepts this occasional duplication in exchange for retaining no bookkeeping. Continuous import runs on one designated device and stays disabled on others; task synchronization still reaches every client. See [the integration boundary decision](adr/0001-import-only-apple-reminders.md).
-
-Convert recurring Apple reminders into Taskwarrior templates only for verified supported recurrence rules. Skip unsupported or unverified rules, leave the source reminder untouched, and explain why. Do not silently flatten a recurring reminder or approximate its rule. In continuous mode, remove the source only after durably saving a valid replacement. Supported conversions require interoperability tests against the external generator; matching frequency labels alone does not establish compatibility. See [the mapping research](research/reminders-recurrence-mapping.md).
+Shortcuts, Siri and Calendar remain in scope. Apple Reminders import was removed by explicit user decision on 2026-11-18; existing saved tasks are retained. [ADR 0001](adr/0001-import-only-apple-reminders.md) records the retired design.
 
 Calendar integration only displays calendar events in Today. tsk does not create calendar events or time blocks.
 
@@ -59,7 +49,6 @@ Incoming system sharing was removed from product scope on 2026-11-17. A future s
 
 
 
-After synchronization, immediately fire newly discovered missed alerts for unfinished tasks. Evaluate the final synchronized task state first: if the same sync reveals completion, do not fire its missed alert. Completion or deletion suppresses task alerts. An already delivered event is not newly discovered on every subsequent sync.
 
 ## Devices
 
@@ -85,8 +74,8 @@ Everyday task management works offline as described above; generation of new rec
 
 ## Deferred scope and verification
 
-Optional iOS recurrence generation and file attachment storage are deferred. A dedicated Mac experience is a later decision. Desktop configuration import, saved-view synchronization, calendar event creation, and export or two-way synchronization with Apple Reminders are outside the agreed scope.
+Optional iOS recurrence generation and file attachment storage are deferred. A dedicated Mac experience is a later decision. Desktop configuration import, saved-view synchronization, calendar event creation, and Apple Reminders integration are outside the agreed scope.
 
-Before implementation can claim interoperability, select and pin supported Taskwarrior and TaskChampion versions, verify the Swift integration route, and test filter behavior, template editing, occurrence completion bookkeeping, and supported Reminders conversions. Verify sync reconciliation and background behavior on iOS. Source-based feasibility research is not evidence that those capabilities already work.
+Before implementation can claim interoperability, select and pin supported Taskwarrior and TaskChampion versions, verify the Swift integration route, and test filter behavior, template editing, occurrence completion bookkeeping. Verify sync reconciliation and background behavior on iOS. Source-based feasibility research is not evidence that those capabilities already work.
 
-Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Task dates, ordinary task search, Shortcuts, Calendar and Reminders remain.
+Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Task dates, ordinary task search, Shortcuts, Calendar remain.

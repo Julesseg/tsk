@@ -1,3 +1,5 @@
+> Historical Reminders import evidence. Apple Reminders import was removed by explicit user decision on 2026-11-18; its APIs, UI, fixtures and tests are no longer current acceptance gates. Existing task data and Calendar remain.
+
 # Shared continuous Reminders admission
 
 All native managers made by TaskChampionSession.makeManager share an import-only filesystem gate in their task directory. A move holds it across a single finite source fetch, durable task creation and source revalidation/removal. A second window or process waits before fetching. This gate is independent of the ordinary semantic mutation lease: each durable create uses that existing short lease, while EventKit work holds only the import gate. Ordinary capture, editing and settings remain available during source work. Waiting is cancellable; exiting the owner process releases its operating-system lock.

@@ -19,20 +19,6 @@ extension XCTestCase {
         return app
     }
 
-    @MainActor func resetOwnedReminderAuthorization(_ app: XCUIApplication, token: String, stage: String) {
-        guard ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", UUID(uuidString: token) != nil else {
-            XCTFail("Reminders authorization timeline requires the owned isolated fixture")
-            return
-        }
-        let started = Date().timeIntervalSince1970
-        app.resetAuthorizationStatus(for: .reminders)
-        let evidence: [String: Any] = ["token": token, "stage": stage, "started": started, "returned": Date().timeIntervalSince1970,
-                                       "testProcessID": ProcessInfo.processInfo.processIdentifier]
-        let data = try? JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
-        let attachment = XCTAttachment(string: data.map { String(decoding: $0, as: UTF8.self) } ?? "Reset timeline encoding failed")
-        attachment.name = "Owned Reminders authorization reset timeline \(stage)"; attachment.lifetime = .keepAlways; add(attachment)
-    }
-
     @MainActor func selectDoneTasks(_ app: XCUIApplication) {
         let done = app.tabBars.buttons["Done"]
         if done.exists { tapTaskControl(done, app: app); return }

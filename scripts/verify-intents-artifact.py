@@ -9,6 +9,8 @@ app = pathlib.Path(sys.argv[1])
 
 def verify_group(bundle):
     bundle_info = plistlib.loads((bundle / 'Info.plist').read_bytes())
+    if any(key.startswith('NSReminders') for key in bundle_info):
+        raise SystemExit('The app must not retain retired Reminders access metadata')
     binary = (bundle / bundle_info['CFBundleExecutable']).read_bytes()
     if struct.unpack_from('<I', binary)[0] != 0xFEEDFACF:
         raise SystemExit('Expected a thin 64-bit simulator Mach-O executable')
