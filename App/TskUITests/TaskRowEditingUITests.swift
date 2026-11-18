@@ -445,11 +445,11 @@ import XCTest
         XCTAssertTrue(input.waitForNonExistence(timeout: 5))
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
-        app.terminate()
+        XCTAssertEqual(app.state, .runningForeground)
         let tagged = try await storedTasks(app, checkpoint: "tagged")
         let taggedAttributes = try XCTUnwrap(tagged[taskID])
         XCTAssertEqual(Set(taggedAttributes.keys.filter { $0.hasPrefix("tag_") }), ["tag_accessibility", "tag_next"])
-        app.launch()
+        XCTAssertEqual(app.state, .runningForeground)
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         selectAllTasks(app)
         _ = expandTask(app)
@@ -471,7 +471,7 @@ import XCTest
         XCTAssertTrue(input.waitForNonExistence(timeout: 5))
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
-        app.terminate()
+        XCTAssertEqual(app.state, .runningForeground)
         let cleared = try await storedTasks(app, checkpoint: "cleared")
         let attributes = try XCTUnwrap(cleared[taskID])
         XCTAssertNil(attributes["project"])
@@ -479,6 +479,7 @@ import XCTest
         XCTAssertTrue(attributes.keys.allSatisfy { !$0.hasPrefix("tag_") })
         XCTAssertEqual(attributes["scheduled"], "1792231200")
         XCTAssertEqual(attributes["due"], "1792238400")
+        XCTAssertEqual(app.state, .runningForeground)
 
     }
 

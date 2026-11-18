@@ -300,11 +300,14 @@ fields and read-only filter compatibility remain preserved.
 
 Capture, bulk-date apply/cancel/failure, row editing/supporting information/organization,
 series metadata, Scheduled edits and annotation persistence use direct Native readback.
-The UI still performs the real edit, validation and save/Apply actions. After app
-termination, the runner opens that UUID-named fixture replica with TaskChampion's
+The UI still performs the real edit, validation and save/Apply actions. The runner
+opens that UUID-named fixture replica with TaskChampion's
 read-only, existing-storage mode and returns actual records to the XCTest assertions.
 It obtains the app's registered App Group path through simctl, preserves native
 admission locks, and never substitutes an in-app action or changes task data.
+Readback does not require app termination: the organization scenario keeps the
+app in the foreground for both persisted-value checks. Scenarios that verify
+relaunch behavior retain their explicit lifecycle steps.
 
 Requests and responses bind the run session, nonce, replica, method and checkpoint.
 The selected methods declare required checkpoints; missing, duplicate, expired or

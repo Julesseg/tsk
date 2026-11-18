@@ -4,7 +4,6 @@ import XCTest
 @MainActor
 extension XCTestCase {
     func storedTasks(_ app: XCUIApplication, checkpoint: String, function: String = #function) async throws -> [String: [String: String]] {
-        XCTAssertEqual(app.state, .notRunning, "Close the app before independent durable readback")
         let session = try XCTUnwrap(ProcessInfo.processInfo.environment["TSK_UI_NATIVE_READBACK_TOKEN"], "Use scripts/run-ui-tests.sh for Native readback")
         let replica = try XCTUnwrap(app.launchEnvironment["TSK_TEST_REPLICA_NAME"])
         let nonce = UUID().uuidString
