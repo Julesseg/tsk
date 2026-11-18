@@ -64,6 +64,7 @@ ON_DEMAND = (
 )
 
 DIAGNOSTIC = ON_DEMAND
+MANUAL_SYNC = 'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
 TEXT = (
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
 )
@@ -80,7 +81,7 @@ REGRESSION = (
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
-              text=TEXT, menu=MENU, regression=REGRESSION)
+              text=TEXT, menu=MENU, regression=REGRESSION, sync=(MANUAL_SYNC,))
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
@@ -172,20 +173,18 @@ def requires_action_fixture(filters):
 
 
 def requires_sync_peer(filters):
-    return "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer" in selected_methods(filters)
+    return "TskUITests/" + MANUAL_SYNC in selected_methods(filters)
 
 
 def requires_sync_server(filters):
-    return bool(selected_methods(filters) & {
-        "TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-    })
+    return requires_sync_peer(filters)
 
 
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     select = commands.add_parser("select")
-    select.add_argument("suite", choices=("smoke", "full", "diagnostic", "text", "regression", "menu"))
+    select.add_argument("suite", choices=SUITES)
     select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
     peer = commands.add_parser("sync-peer")

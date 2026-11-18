@@ -45,6 +45,11 @@ class ExecutionTests(unittest.TestCase):
         self.assertFalse(smoke['peer'])
         self.assertEqual(plan.plan('diagnostic')['families'], ['iPhone'])
         self.assertFalse(plan.plan('text')['server'])
+        sync = plan.plan('sync')
+        self.assertEqual(sync['matrix']['include'], [dict(family='iPhone', partition='all', server=True, peer=True)])
+        self.assertEqual(plan.selection.selection('sync', 'iPhone'), [
+            '-only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
+        ])
         plan.validate_source('frozen', 'frozen')
         plan.validate_source(None, 'current')
         with self.assertRaisesRegex(ValueError, 'Branch moved'):
@@ -56,6 +61,31 @@ class ExecutionTests(unittest.TestCase):
         for key in identity:
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, key):
                 products.verify_identity(identity, dict(identity, **{key: 'different'}))
+
+    def test_replay_requires_an_ancestor_with_unchanged_product_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root, text=True, stderr=subprocess.PIPE).strip()
+            git('init', '-q')
+            git('config', 'user.name', 'CI replay tests')
+            git('config', 'user.email', 'ci@example.invalid')
+            (root / 'App').mkdir()
+            source_file = root / 'App/Test.swift'
+            source_file.write_text('original')
+            git('add', 'App')
+            git('commit', '-qm', 'original')
+            source = git('rev-parse', 'HEAD')
+            git('commit', '-qm', 'diagnostics', '--allow-empty')
+            diagnostics = git('rev-parse', 'HEAD')
+            self.assertEqual(products.replay_identity(dict(source=diagnostics), source, root),
+                             dict(source=source, tree=git('rev-parse', source + '^{tree}')))
+            with self.assertRaises(subprocess.CalledProcessError):
+                products.replay_identity(dict(source=source), diagnostics, root)
+            source_file.write_text('changed')
+            git('commit', '-qam', 'changed')
+            with self.assertRaises(subprocess.CalledProcessError):
+                products.replay_identity(dict(source=git('rev-parse', 'HEAD')), source, root)
 
     def test_product_transfer_preserves_executables_links_and_detects_corruption(self):
         with tempfile.TemporaryDirectory() as directory:

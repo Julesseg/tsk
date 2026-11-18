@@ -14,6 +14,7 @@ The manual form defaults to smoke.
 | Text | 1 method | Explicit dispatch |
 | Regression | 4 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
+| Sync | 1 manual synchronization method and independent peer | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
@@ -252,6 +253,19 @@ same 90-second run-ID convergence budget. Authorization errors, malformed respon
 and terminal test failures fail immediately; API retries never replay tests.
 
 ## Dispatch and retries
+
+The focused Sync lane runs the existing manual synchronization case with the
+real server and independent peer. It retains loopback TCP timestamps, flags and
+lengths, plus server timeout and access logs. It writes no packet payloads or
+packet capture files. Full runs also retain Actix's request-dispatch trace for
+the owned fixture. The hosted focused lane requires permission to observe its
+loopback port.
+
+To replay signed products from an earlier completed CI run, pass
+`--suite sync --sync-products-run <run-id>` to the dispatch helper. Replay
+requires matching App, Core and Native source trees, archive integrity and an
+exact toolchain and runtime match. The result records the original product
+identity and exercises only the selected sync method.
 
 Use the helper after publishing a frozen branch:
 

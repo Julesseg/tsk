@@ -23,6 +23,8 @@ if [[ $(python3 ../scripts/ui-test-selection.py sync-server -- "${coverage[@]}")
     if [[ $(python3 ../scripts/ui-test-selection.py sync-peer -- "${coverage[@]}") == yes ]]; then
         peer=(--verify-peer ../.build/ui-tools/tsk-native-probe)
     fi
-    exec python3 ../scripts/with-sync-fixture.py --server ../.build/ui-tools/taskchampion-sync-server --output ../.build/ui-sync "${peer[@]}" -- "${command[@]}"
+    trace=()
+    if [[ "$UI_SUITE" == sync ]]; then trace=(--trace-loopback); fi
+    exec python3 ../scripts/with-sync-fixture.py --server ../.build/ui-tools/taskchampion-sync-server --output ../.build/ui-sync "${peer[@]}" "${trace[@]}" -- "${command[@]}"
 fi
 exec "${command[@]}"

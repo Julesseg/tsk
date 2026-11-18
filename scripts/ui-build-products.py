@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import platform
+import re
 import subprocess
 import tarfile
 from pathlib import Path
@@ -33,12 +34,24 @@ def verify_identity(expected, actual):
         raise ValueError('Prebuilt products do not match this source/toolchain/runtime: ' + ', '.join(sorted(differences)))
 
 
+def replay_identity(current, source, root):
+    if not re.fullmatch(r'[0-9a-f]{40}', source):
+        raise ValueError('Replay requires a frozen source SHA')
+    subprocess.run(['git', 'merge-base', '--is-ancestor', source, current['source']], cwd=root, check=True)
+    subprocess.run(['git', 'diff', '--quiet', source, current['source'], '--', 'App', 'Core', 'Native'], cwd=root, check=True)
+    tree = subprocess.check_output(['git', 'rev-parse', source + '^{tree}'], cwd=root, text=True).strip()
+    return dict(current, source=source, tree=tree)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', choices=['pack', 'unpack'])
     parser.add_argument('--root', type=Path, default=Path.cwd())
     parser.add_argument('--archive', type=Path, required=True)
+    parser.add_argument('--replay-source')
     args = parser.parse_args()
+    if args.replay_source and args.command != 'unpack':
+        parser.error('--replay-source applies only to unpacking')
     root = args.root.resolve()
     archive = args.archive.resolve()
     manifest = archive.with_suffix('.json')
@@ -54,6 +67,8 @@ def main():
         manifest.write_text(json.dumps(dict(identity=current, sha256=digest(archive)), indent=2) + '\n')
     else:
         data = json.loads(manifest.read_text())
+        if args.replay_source:
+            current = replay_identity(current, args.replay_source, root)
         verify_identity(data['identity'], current)
         if data['sha256'] != digest(archive):
             raise ValueError('Prebuilt product archive checksum mismatch')
