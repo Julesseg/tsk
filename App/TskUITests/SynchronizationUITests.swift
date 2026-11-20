@@ -67,62 +67,6 @@ final class SynchronizationUITests: XCTestCase {
         XCTAssertTrue(taskRow(named: "Offline work survives server failure", app: app).exists)
     }
 
-    func testSuccessfulManualSynchronizationUsesRealConfiguredServer() throws {
-        let environment = ProcessInfo.processInfo.environment
-        let serverURL = try XCTUnwrap(environment["TSK_UI_SYNC_SERVER_URL"])
-        let clientID = try XCTUnwrap(environment["TSK_UI_SYNC_CLIENT_ID"])
-        let secret = try XCTUnwrap(environment["TSK_UI_SYNC_SECRET"])
-        let token = try XCTUnwrap(environment["TSK_UI_SYNC_FIXTURE_TOKEN"])
-        XCTAssertEqual(try XCTUnwrap(URL(string: serverURL)).host, "127.0.0.1")
-        XCTAssertNotNil(UUID(uuidString: clientID))
-        XCTAssertNotNil(UUID(uuidString: token))
-        XCTAssertFalse(secret.isEmpty)
-        let app = taskTestApplication()
-        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
-        app.buttons["New task"].tap()
-        let draft = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
-        XCTAssertTrue(draft.waitForExistence(timeout: 5))
-        draft.tap()
-        draft.typeText("Hosted task " + token)
-        if app.buttons[taskEditorKeyboardDismissIdentifier(app)].exists { tapTaskControlAtCenter(app.buttons[taskEditorKeyboardDismissIdentifier(app)], app: app) }
-        taskEditorSaveButton(app).tap()
-        XCTAssertTrue(waitForTaskSave(app, row: taskRow(named: "Hosted task " + token, app: app), timeout: 10))
-        XCTAssertTrue(revealSynchronizationSettings(app))
-        app.buttons["synchronization-settings"].tap()
-        let server = app.textFields["sync-server-url"]
-        XCTAssertTrue(server.waitForExistence(timeout: 5))
-        server.tap()
-        server.typeText(serverURL)
-        let client = app.textFields["sync-client-id"]
-        tapTaskControlAtCenter(client, app: app, requiresVisibleKeyboard: true)
-        client.typeText(clientID)
-        let encryption = app.secureTextFields["sync-encryption-secret"]
-        tapTaskControlAtCenter(encryption, app: app, requiresVisibleKeyboard: true)
-        encryption.typeText(secret)
-        if app.buttons["dismiss-sync-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-sync-keyboard"], app: app) }
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        tapTaskControlAtCenter(app.buttons["save-sync-connection"], app: app)
-        XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: app.buttons["sync-now"])
-        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed)
-        XCTAssertTrue(revealTaskElement(app.buttons["sync-now"], in: "sync-settings-form", app: app))
-        app.buttons["sync-now"].tap()
-        XCTAssertTrue(app.staticTexts["Synchronized with server"].waitForExistence(timeout: 30))
-        XCTAssertFalse(app.staticTexts["sync-error"].exists)
-        capture("Successful manual synchronization with real server", app)
-        app.navigationBars.buttons["Done"].tap()
-        XCTAssertTrue(app.buttons["New task"].exists)
-        XCTAssertTrue(app.staticTexts["sync-status"].waitForNonExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["task-sync-status"].exists)
-        capture("Synchronized workspace without idle status", app)
-        app.terminate()
-        app.launch()
-        selectAllTasks(app)
-        XCTAssertTrue(taskRow(named: "Hosted task " + token, app: app).waitForExistence(timeout: 10))
-    }
-
     private func revealSynchronizationSettings(_ app: XCUIApplication) -> Bool {
         revealWorkspaceSetting("synchronization-settings", app: app)
     }

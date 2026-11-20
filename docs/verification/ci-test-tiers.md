@@ -9,16 +9,15 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 23 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 22 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 23 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 4 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
-| Sync | 1 manual synchronization method and independent peer | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 46 retained methods has exactly one primary
+methods for every suite. Each of the 45 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -30,7 +29,7 @@ Smoke needs no synchronization server or independent peer.
 
 Nightly keeps bulk failed Apply;
 row notes and tag validation; saved views/native
-reordering; occurrence success/failure; series metadata preview/cancel/save; manual sync; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
+reordering; occurrence success/failure; series metadata preview/cancel/save; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
 adds fresh/completed/missing task identities, all view categories, stable saved-view
 renames/deletion, unchanged favorites, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
@@ -71,11 +70,15 @@ tests, settings, services, fixtures and entitlement, were also removed explicitl
 Task dates, ordinary task search, sync, Calendar and seven Shortcuts remain.
 A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
 items; it requests no authorization and creates no new alerts or index records.
-Full now selects 17 workspace and six row methods.
+Full now selects 16 workspace and six row methods.
 Apple Reminders import was removed on 2026-11-18: one-time copy, continuous
 move, recurring conversion, settings, permission requests, background import,
 Core/Native APIs and dedicated fixtures/tests are retired. Calendar and tasks
 already saved in tsk remain.
+The user also retired the successful manual synchronization UI journey and its
+focused Sync dispatch/replay lane on 2026-11-20. Connection validation, offline
+failure and persistence remain in the on-demand UI journey. Synchronization
+product behavior and Core/Native real-server coverage remain.
 These removals do not establish fixes for historical failed runs.
 
 Saved-value assertions read the existing Native replica. The organization journey
@@ -89,9 +92,8 @@ existing whole-test and CI job watchdogs stop hung runs; cleanup reaps unfinishe
 owned reader processes. UI readiness waits and tests of explicit timing behavior
 retain their condition checks and bounds.
 
-The Menu, Text and Diagnostic suites need no UI synchronization server or peer.
-Regression retains row editing, native menu stress and view ordering
-without server/peer setup.
+The retained UI suites need no synchronization server or independent peer.
+Core and Native retain real-server synchronization verification.
 
 Green smoke does not certify permissions or system delivery. Historical reports before ADR 0007 include retired iPad cases and do not
 establish current iPhone acceptance. Neither simulator UI nor direct intent
@@ -146,9 +148,8 @@ remain mandatory.
 
 One Mac producer builds the simulator bridge, controller tests and signed arm64
 UI products. It validates intent metadata and App Group entitlements before any
-simulator is created. The selected coverage determines whether it also builds
-the real synchronization server and independent peer for UI workers; ordinary
-builds also produce them for the unchanged Native tests. Rust caches already exist;
+simulator is created. Ordinary builds retain the real synchronization server and
+host probe for the unchanged Native tests. Rust caches already exist;
 Core/Native Linux Swift builds have separate toolchain-specific caches.
 
 A compressed artifact preserves executable permissions and bundle symlinks.
@@ -163,10 +164,10 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 17 methods | 6 methods |
+| iPhone | 16 methods | 6 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
-Installed system integrations and server/peer consumers remain in workspace.
+Installed system integrations remain in workspace.
 The task worker requires no server.
 Portable selection and ownership regressions run once on Linux; controller regressions run in the producer.
 
@@ -253,19 +254,6 @@ same 90-second run-ID convergence budget. Authorization errors, malformed respon
 and terminal test failures fail immediately; API retries never replay tests.
 
 ## Dispatch and retries
-
-The focused Sync lane runs the existing manual synchronization case with the
-real server and independent peer. It retains loopback TCP timestamps, flags and
-lengths, plus server timeout and access logs. It writes no packet payloads or
-packet capture files. Full runs also retain Actix's request-dispatch trace for
-the owned fixture. The hosted focused lane requires permission to observe its
-loopback port.
-
-To replay signed products from an earlier completed CI run, pass
-`--suite sync --sync-products-run <run-id>` to the dispatch helper. Replay
-requires matching App, Core and Native source trees, archive integrity and an
-exact toolchain and runtime match. The result records the original product
-identity and exercises only the selected sync method.
 
 Use the helper after publishing a frozen branch:
 

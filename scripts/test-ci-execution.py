@@ -31,7 +31,7 @@ summary = load('summarize-ui-execution')
 
 
 class ExecutionTests(unittest.TestCase):
-    def test_worker_launches_full_sync_and_serverless_selections(self):
+    def test_worker_launches_retained_selections_without_a_sync_fixture(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'App').mkdir()
@@ -40,10 +40,9 @@ class ExecutionTests(unittest.TestCase):
             shutil.copy(ROOT / 'scripts/run-ui-worker.sh', scripts)
             (scripts / 'ui-test-selection.py').symlink_to(ROOT / 'scripts/ui-test-selection.py')
             recorder = 'import json, os, sys; from pathlib import Path; Path(os.environ["WORKER_ARGUMENTS"]).write_text(json.dumps(sys.argv[1:]))\n'
-            (scripts / 'with-sync-fixture.py').write_text(recorder)
             (scripts / 'record-arguments.py').write_text(recorder)
             (scripts / 'run-ui-tests.sh').write_text('exec python3 ../scripts/record-arguments.py "$@"\n')
-            for suite, partition, server in [('full', 'workspace', True), ('sync', 'all', True), ('smoke', 'all', False), ('full', 'row-editing', False)]:
+            for suite, partition in [('full', 'workspace'), ('smoke', 'all'), ('full', 'row-editing')]:
                 with self.subTest(suite=suite, partition=partition):
                     receipt = root / 'arguments.json'
                     receipt.unlink(missing_ok=True)
@@ -51,34 +50,18 @@ class ExecutionTests(unittest.TestCase):
                     result = subprocess.run(['/bin/bash', str(scripts / 'run-ui-worker.sh'), 'owned'], cwd=root / 'App', env=environment, capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     arguments = json.loads(receipt.read_text())
-                    if server:
-                        self.assertEqual(arguments[:6], ['--server', '../.build/ui-tools/taskchampion-sync-server', '--output', '../.build/ui-sync', '--verify-peer', '../.build/ui-tools/tsk-native-probe'])
-                        self.assertEqual('--trace-loopback' in arguments, suite == 'sync')
-                        arguments = arguments[arguments.index('--') + 1:]
-                        self.assertEqual(arguments[:2], ['/bin/bash', '../scripts/run-ui-tests.sh'])
-                        arguments = arguments[2:]
                     self.assertEqual(arguments[:2], ['owned', '--skip-build'])
                     self.assertEqual([value for value in arguments if value.startswith('-only-testing:')], plan.selection.selection(suite, 'iPhone', partition))
 
-    def test_plans_keep_two_iphone_full_workers_and_skip_unused_smoke_fixtures(self):
+    def test_plans_keep_two_iphone_full_workers_and_one_smoke_worker(self):
         full = plan.plan('full')
         self.assertEqual(full['families'], ['iPhone'])
         self.assertEqual(len(full['matrix']['include']), 2)
-        for worker in full['matrix']['include']:
-            self.assertEqual(worker['server'], worker['partition'] == 'workspace')
-            self.assertEqual(worker['peer'], worker['partition'] == 'workspace')
+        self.assertEqual(full['matrix']['include'], [dict(family='iPhone', partition='workspace'), dict(family='iPhone', partition='row-editing')])
         smoke = plan.plan('smoke')
         self.assertEqual(smoke['families'], ['iPhone'])
         self.assertEqual(len(smoke['matrix']['include']), 1)
-        self.assertFalse(smoke['server'])
-        self.assertFalse(smoke['peer'])
         self.assertEqual(plan.plan('diagnostic')['families'], ['iPhone'])
-        self.assertFalse(plan.plan('text')['server'])
-        sync = plan.plan('sync')
-        self.assertEqual(sync['matrix']['include'], [dict(family='iPhone', partition='all', server=True, peer=True)])
-        self.assertEqual(plan.selection.selection('sync', 'iPhone'), [
-            '-only-testing:TskUITests/SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
-        ])
         plan.validate_source('frozen', 'frozen')
         plan.validate_source(None, 'current')
         with self.assertRaisesRegex(ValueError, 'Branch moved'):

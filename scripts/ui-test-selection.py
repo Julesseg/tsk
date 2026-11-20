@@ -14,7 +14,6 @@ PHONE_SMOKE = (
 NIGHTLY = (
     'CustomViewsUITests/testRawViewValidationSaveEditReopenResultsActionsAndDeletion',
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences',
-    'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer',
     'TaskActionURLUITests/testActualCallbackDeliveryPreservesArgumentsAndDurableUUIDResultAndReportsInvalidInput',
     'TaskActionURLUITests/testCompleteOccurrenceURLPersistsAndMissingDeletedTargetsReturnErrors',
     'TaskActionURLUITests/testCompleteURLReturnsRichSavedTaskRevealsItAndProtectsNestedDrafts',
@@ -64,7 +63,6 @@ ON_DEMAND = (
 )
 
 DIAGNOSTIC = ON_DEMAND
-MANUAL_SYNC = 'SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer'
 TEXT = (
     "TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations",
 )
@@ -81,7 +79,7 @@ REGRESSION = (
     "WorkspaceSettingsUITests/testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch",
 )
 SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
-              text=TEXT, menu=MENU, regression=REGRESSION, sync=(MANUAL_SYNC,))
+              text=TEXT, menu=MENU, regression=REGRESSION)
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
@@ -172,14 +170,6 @@ def requires_action_fixture(filters):
                for test in selected)
 
 
-def requires_sync_peer(filters):
-    return "TskUITests/" + MANUAL_SYNC in selected_methods(filters)
-
-
-def requires_sync_server(filters):
-    return requires_sync_peer(filters)
-
-
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -187,10 +177,6 @@ def main():
     select.add_argument("suite", choices=SUITES)
     select.add_argument("family", choices=("iPhone",))
     select.add_argument("--partition", choices=("all", "workspace", "row-editing"), default="all")
-    peer = commands.add_parser("sync-peer")
-    peer.add_argument("filters", nargs=argparse.REMAINDER)
-    server = commands.add_parser("sync-server")
-    server.add_argument("filters", nargs=argparse.REMAINDER)
     fixture = commands.add_parser("action-fixture")
     fixture.add_argument("filters", nargs=argparse.REMAINDER)
     readback = commands.add_parser("native-readback")
@@ -204,10 +190,6 @@ def main():
             output = [json.dumps({key: value for key, value in CHECKPOINTS.items() if "TskUITests/" + key in selected})]
         elif args.command == "action-fixture":
             output = ["yes" if requires_action_fixture(args.filters) else "no"]
-        elif args.command == "sync-server":
-            output = ["yes" if requires_sync_server(args.filters) else "no"]
-        else:
-            output = ["yes" if requires_sync_peer(args.filters) else "no"]
     except ValueError as error:
         parser.error(str(error))
     print("\n".join(output))

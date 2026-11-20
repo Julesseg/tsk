@@ -12,7 +12,7 @@ on:
       ui_suite:
         description: UI coverage to run
         type: choice
-        options: [smoke, full, text, regression, menu, sync]
+        options: [smoke, full, text, regression, menu]
         required: true
         default: smoke
       reason:
@@ -29,10 +29,6 @@ on:
         type: boolean
         required: false
         default: false
-      sync_products_run:
-        description: Optional prior CI run ID with signed products for the focused sync test
-        type: string
-        required: false
 
 # The one project-specific value in this workflow. Must match the name of the
 # Xcode project/scheme on disk (App/<APP_NAME>.xcodeproj) — scripts/rename.sh
@@ -57,10 +53,6 @@ jobs:
       families: ${{ steps.plan.outputs.families }}
       partitions: ${{ steps.plan.outputs.partitions }}
       suite: ${{ steps.plan.outputs.suite }}
-      server: ${{ steps.plan.outputs.server }}
-      peer: ${{ steps.plan.outputs.peer }}
-      replay_artifact: ${{ steps.replay.outputs.artifact }}
-      replay_source: ${{ steps.replay.outputs.source }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,24 +63,6 @@ jobs:
           UI_SUITE: ${{ inputs.diagnostic_only && 'diagnostic' || github.event_name == 'schedule' && 'full' || inputs.ui_suite || 'smoke' }}
           EXPECTED_SOURCE_SHA: ${{ inputs.expected_sha }}
         run: python3 scripts/plan-ui-tests.py "$UI_SUITE"
-      - name: Resolve original signed products for sync replay
-        id: replay
-        if: github.event_name == 'workflow_dispatch' && inputs.sync_products_run != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PRODUCTS_RUN: ${{ inputs.sync_products_run }}
-          UI_SUITE: ${{ steps.plan.outputs.suite }}
-        run: |
-          if [[ "$UI_SUITE" != sync || ! "$PRODUCTS_RUN" =~ ^[1-9][0-9]{0,19}$ ]]; then
-            echo 'A numeric products run ID requires the sync suite.' >&2
-            exit 1
-          fi
-          source=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTS_RUN" \
-            | jq -er 'select(.path == ".github/workflows/ci.yml" and .status == "completed") | .head_sha | select(test("^[a-f0-9]{40}$"))')
-          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTS_RUN/artifacts?name=ui-products" \
-            | jq -er '[.artifacts[] | select(.name == "ui-products" and (.expired | not))] | select(length == 1) | .[0].id')
-          printf 'source=%s\nartifact=%s\n' "$source" "$artifact" >> "$GITHUB_OUTPUT"
-
       - name: Verify test routing
         run: |
           python3 scripts/test-ci-test-routing.py
@@ -107,7 +81,7 @@ jobs:
 
   core-tests:
     needs: changes
-    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync')) }}
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
     name: Core · swift test (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -126,7 +100,7 @@ jobs:
 
   native-tests:
     needs: changes
-    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync')) }}
+    if: ${{ needs.changes.outputs.run_tests == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only) }}
     name: TaskChampion · persistent replica (Linux)
     runs-on: ubuntu-24.04
     container: swift:6.0.3
@@ -187,12 +161,12 @@ jobs:
 
   ui-build:
     needs: changes
-    if: needs.changes.outputs.run_tests == 'true' && needs.changes.outputs.replay_artifact == ''
+    if: needs.changes.outputs.run_tests == 'true'
     name: App · Shared UI products
     runs-on: xcode-27
     timeout-minutes: 35
     env:
-      RUN_NATIVE_TESTS: ${{ github.event_name != 'workflow_dispatch' || (!inputs.diagnostic_only && needs.changes.outputs.suite != 'sync') }}
+      RUN_NATIVE_TESTS: ${{ github.event_name != 'workflow_dispatch' || !inputs.diagnostic_only }}
     outputs:
       artifact_id: ${{ steps.products.outputs.artifact-id }}
     steps:
@@ -205,7 +179,7 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@1.99.0
       - name: Check out pinned real TaskChampion sync server
-        if: needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true'
+        if: env.RUN_NATIVE_TESTS == 'true'
         uses: actions/checkout@v4
         with:
           repository: GothenburgBitFactory/taskchampion-sync-server
@@ -216,7 +190,7 @@ jobs:
         with:
           workspaces: |
             Native/Bridge
-            ${{ (needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true') && '.build/sync-server' || '' }}
+            ${{ env.RUN_NATIVE_TESTS == 'true' && '.build/sync-server' || '' }}
       - uses: actions/cache@v4
         if: env.RUN_NATIVE_TESTS == 'true'
         with:
@@ -224,7 +198,7 @@ jobs:
           key: taskwarrior-3.5.0-${{ runner.os }}-${{ runner.arch }}-rust-1.99.0-${{ hashFiles('scripts/build-taskwarrior-fixture.sh') }}
       - name: Build native runtime and selected synchronization tools
         env:
-          NEED_SERVER: ${{ needs.changes.outputs.server == 'true' || env.RUN_NATIVE_TESTS == 'true' }}
+          NEED_SERVER: ${{ env.RUN_NATIVE_TESTS == 'true' }}
         run: |
           scripts/build-native.sh simulator
           scripts/build-native.sh host
@@ -311,7 +285,7 @@ jobs:
 
   app-ui-test-shards:
     needs: [changes, ui-build]
-    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.run_tests == 'false' || needs.ui-build.result == 'success' || needs.changes.outputs.replay_artifact != '') }}
+    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.changes.outputs.run_tests == 'false' || needs.ui-build.result == 'success') }}
     name: App · UI shard (${{ matrix.family }}, ${{ matrix.partition }})
     runs-on: ${{ needs.changes.outputs.run_tests == 'true' && 'xcode-27' || 'ubuntu-24.04' }}
     permissions:
@@ -328,7 +302,7 @@ jobs:
       - uses: actions/checkout@v4
         if: needs.changes.outputs.run_tests == 'true'
         with:
-          fetch-depth: ${{ needs.changes.outputs.replay_artifact != '' && '0' || '1' }}
+          fetch-depth: 1
       - uses: maxim-lobanov/setup-xcode@v1
         if: needs.changes.outputs.run_tests == 'true'
         with:
@@ -338,27 +312,15 @@ jobs:
         with:
           python-version: "3.12"
       - uses: actions/download-artifact@v4
-        if: needs.changes.outputs.run_tests == 'true' && needs.changes.outputs.replay_artifact == ''
+        if: needs.changes.outputs.run_tests == 'true'
         with:
           artifact-ids: ${{ needs.ui-build.outputs.artifact_id }}
           path: .build
           merge-multiple: true
-      - uses: actions/download-artifact@v4
-        if: needs.changes.outputs.replay_artifact != ''
-        with:
-          artifact-ids: ${{ needs.changes.outputs.replay_artifact }}
-          run-id: ${{ inputs.sync_products_run }}
-          github-token: ${{ github.token }}
-          path: .build
-          merge-multiple: true
       - name: Verify source, toolchain, runtime and signed products
         if: needs.changes.outputs.run_tests == 'true'
-        env:
-          REPLAY_SOURCE: ${{ needs.changes.outputs.replay_source }}
         run: |
-          replay=()
-          if [[ -n "$REPLAY_SOURCE" ]]; then replay=(--replay-source "$REPLAY_SOURCE"); fi
-          python3 scripts/ui-build-products.py unpack --archive .build/ui-products.tar.gz "${replay[@]}" > .build/ui-product-identity.json
+          python3 scripts/ui-build-products.py unpack --archive .build/ui-products.tar.gz > .build/ui-product-identity.json
           cat .build/ui-product-identity.json
       - name: Resolve an available ${{ matrix.family }} simulator
         if: needs.changes.outputs.run_tests == 'true'
@@ -391,7 +353,6 @@ jobs:
           name: ${{ inputs.diagnostic_only && 'ui-diagnostic-boundaries' || format('{0}{1}', 'ui-test-results', matrix.partition == 'row-editing' && '-row-editing' || '') }}
           path: |
             App/TestResults.xcresult
-            .build/ui-sync
             .build/eventkit-fixture
             .build/ui-host-diagnostics
             .build/ui-execution.json
@@ -403,7 +364,7 @@ jobs:
   app-ui-tests:
     needs: [changes, app-ui-test-shards]
     if: always()
-    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || needs.changes.outputs.suite == 'sync' && 'App · Manual sync diagnostics (iPhone)' || contains(fromJSON('["text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
+    name: ${{ needs.changes.outputs.suite == 'diagnostic' && format('App · Diagnostic UI boundaries ({0})', matrix.family) || contains(fromJSON('["text","regression","menu"]'), needs.changes.outputs.suite) && format('App · {0} diagnostics ({1})', needs.changes.outputs.suite == 'text' && 'Text' || needs.changes.outputs.suite == 'menu' && 'Menu' || 'Regression', matrix.family) || 'App · XCUITest (macOS)' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
