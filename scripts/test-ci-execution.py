@@ -31,6 +31,35 @@ summary = load('summarize-ui-execution')
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_worker_launches_full_sync_and_serverless_selections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'App').mkdir()
+            scripts = root / 'scripts'
+            scripts.mkdir()
+            shutil.copy(ROOT / 'scripts/run-ui-worker.sh', scripts)
+            (scripts / 'ui-test-selection.py').symlink_to(ROOT / 'scripts/ui-test-selection.py')
+            recorder = 'import json, os, sys; from pathlib import Path; Path(os.environ["WORKER_ARGUMENTS"]).write_text(json.dumps(sys.argv[1:]))\n'
+            (scripts / 'with-sync-fixture.py').write_text(recorder)
+            (scripts / 'record-arguments.py').write_text(recorder)
+            (scripts / 'run-ui-tests.sh').write_text('exec python3 ../scripts/record-arguments.py "$@"\n')
+            for suite, partition, server in [('full', 'workspace', True), ('sync', 'all', True), ('smoke', 'all', False), ('full', 'row-editing', False)]:
+                with self.subTest(suite=suite, partition=partition):
+                    receipt = root / 'arguments.json'
+                    receipt.unlink(missing_ok=True)
+                    environment = dict(os.environ, UI_SUITE=suite, UI_FAMILY='iPhone', UI_PARTITION=partition, APP_NAME='Tsk', WORKER_ARGUMENTS=str(receipt))
+                    result = subprocess.run(['/bin/bash', str(scripts / 'run-ui-worker.sh'), 'owned'], cwd=root / 'App', env=environment, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    arguments = json.loads(receipt.read_text())
+                    if server:
+                        self.assertEqual(arguments[:6], ['--server', '../.build/ui-tools/taskchampion-sync-server', '--output', '../.build/ui-sync', '--verify-peer', '../.build/ui-tools/tsk-native-probe'])
+                        self.assertEqual('--trace-loopback' in arguments, suite == 'sync')
+                        arguments = arguments[arguments.index('--') + 1:]
+                        self.assertEqual(arguments[:2], ['/bin/bash', '../scripts/run-ui-tests.sh'])
+                        arguments = arguments[2:]
+                    self.assertEqual(arguments[:2], ['owned', '--skip-build'])
+                    self.assertEqual([value for value in arguments if value.startswith('-only-testing:')], plan.selection.selection(suite, 'iPhone', partition))
+
     def test_plans_keep_two_iphone_full_workers_and_skip_unused_smoke_fixtures(self):
         full = plan.plan('full')
         self.assertEqual(full['families'], ['iPhone'])

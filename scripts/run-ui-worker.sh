@@ -19,12 +19,11 @@ command=(/bin/bash ../scripts/run-ui-tests.sh "$simulator_id" --skip-build
     -resultBundlePath TestResults.xcresult -derivedDataPath ../.build/ui
     CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=)
 if [[ $(python3 ../scripts/ui-test-selection.py sync-server -- "${coverage[@]}") == yes ]]; then
-    peer=()
+    fixture=(--server ../.build/ui-tools/taskchampion-sync-server --output ../.build/ui-sync)
     if [[ $(python3 ../scripts/ui-test-selection.py sync-peer -- "${coverage[@]}") == yes ]]; then
-        peer=(--verify-peer ../.build/ui-tools/tsk-native-probe)
+        fixture+=(--verify-peer ../.build/ui-tools/tsk-native-probe)
     fi
-    trace=()
-    if [[ "$UI_SUITE" == sync ]]; then trace=(--trace-loopback); fi
-    exec python3 ../scripts/with-sync-fixture.py --server ../.build/ui-tools/taskchampion-sync-server --output ../.build/ui-sync "${peer[@]}" "${trace[@]}" -- "${command[@]}"
+    if [[ "$UI_SUITE" == sync ]]; then fixture+=(--trace-loopback); fi
+    exec python3 ../scripts/with-sync-fixture.py "${fixture[@]}" -- "${command[@]}"
 fi
 exec "${command[@]}"
