@@ -161,7 +161,7 @@ private struct TaskDayPreview: View {
                     if paging.pages[day] != nil && tasks.isEmpty { Text("Nothing planned for this day").foregroundStyle(.secondary) }
                     ForEach(rows) { item in
                         switch item {
-                        case .task(let task): TaskListRow(task: task, store: store, edit: { _ in }, previewDay: day)
+                        case .task(let task): TaskListRow(task: task, store: store, previewDay: day)
                         case .event(let value): TodayCalendarRow(value: value, timeZone: snapshot?.timeZone ?? .autoupdatingCurrent).padding(.vertical, 10)
                         }
                     }

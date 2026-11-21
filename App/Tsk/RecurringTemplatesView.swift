@@ -39,7 +39,7 @@ struct RecurringTemplatesView: View {
             .accessibilityIdentifier("recurring-template-list")
             .navigationTitle("Recurring templates")
             .navigationDestination(for: UUID.self) { id in
-                if let task = store.allTasks.first(where: { $0.id == id }) { TaskDetailView(store: store, task: task) }
+                RecurringTemplateView(store: store, templateID: id)
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }

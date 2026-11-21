@@ -75,8 +75,12 @@ import XCTest
     func testNavigationCallbacksReportActualDraftFailureAndSuccessfulDestination() throws {
         let app = fixture()
         app.launch()
-        selectAllTasks(app)
-        taskRow(named: "Navigation task", app: app).tap()
+        openWorkspaceView("Projects", app: app)
+        tapTaskControl(app.buttons["project-Work.Travel"], app: app)
+        let project = app.navigationBars["Work.Travel"]
+        XCTAssertTrue(project.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["back-from-task-action"].exists)
+        tapTaskControl(taskRow(named: "Navigation task", app: app), app: app)
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 10))
         replaceTaskText(title, with: " ", app: app)
@@ -89,6 +93,7 @@ import XCTest
         XCTAssertEqual(error["code"] as? String, "navigation_error")
         app.activate()
         XCTAssertEqual(title.value as? String, " ")
+        XCTAssertTrue(project.exists)
         XCTAssertFalse(app.buttons["back-from-task-action"].exists)
         capture("After failed navigation draft retained", app)
         replaceTaskText(title, with: "Saved before Open View", app: app)
@@ -101,6 +106,7 @@ import XCTest
         XCTAssertTrue(app.navigationBars["Done"].waitForExistence(timeout: 10))
         capture("Actual success callback follows Done navigation", app)
         app.buttons["back-from-task-action"].tap()
+        XCTAssertTrue(project.waitForExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Saved before Open View", app: app).waitForExistence(timeout: 10))
         host.terminate()
         app.terminate()

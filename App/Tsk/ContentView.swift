@@ -20,10 +20,8 @@ struct ContentView: View {
     @State private var isShowingRecurring = false
     @State private var isShowingSettings = false
     @State private var pendingWorkspaceSetting: WorkspaceSetting?
-    @State private var editingTask: TaskRecord?
     @State private var selectedTaskID: UUID?
     @State private var path: [UUID] = []
-    @State private var linkedTaskIDs: Set<UUID> = []
     @State private var linkedTaskPresentationID = UUID()
     @State private var projectPath = NavigationPath()
     @State private var taskActionReturnPaths: (tasks: [UUID], projects: NavigationPath, selected: UUID?)?
@@ -57,7 +55,7 @@ struct ContentView: View {
                     }
                 }
         }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
+        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {
@@ -68,7 +66,7 @@ struct ContentView: View {
         }
     }
 
-    private func showInformation(_ task: TaskRecord) {
+    private func showLinkedTask(_ task: TaskRecord) {
         selectedTaskID = task.id
         if isProjectWorkspace { projectPath.append(task.id) }
         else { path = [task.id] }
@@ -171,16 +169,8 @@ struct ContentView: View {
     }
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
-        if let task = store.allTasks.first(where: { $0.id == id }) {
-            if linkedTaskIDs.contains(id), task.canEdit || task.status == "completed" {
-                TaskLinkedTaskList(source: store, taskID: id)
-                    .id(linkedTaskPresentationID)
-            } else {
-                TaskDetailView(store: store, task: task, edit: { editingTask = $0 })
-            }
-        } else {
-            ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
-        }
+        TaskLinkedTaskList(source: store, taskID: id)
+            .id(linkedTaskPresentationID)
     }
 
     private var editorSheets: some View {
@@ -192,7 +182,6 @@ struct ContentView: View {
         .sheet(isPresented: $isShowingSettings, onDismiss: presentPendingWorkspaceSetting) {
             TaskSettingsView(calendar: calendar, choose: chooseWorkspaceSetting).modifier(TaskWorkspacePanel(store: store))
         }
-        .sheet(item: $editingTask) { task in TaskEditorView(store: store, task: task) }
     }
 
     private var taskLifecycle: some View {
@@ -231,8 +220,7 @@ struct ContentView: View {
             await store.reload()
             guard !Task.isCancelled else { return }
             linkedTaskPresentationID = UUID()
-            linkedTaskIDs.insert(task.id)
-            showInformation(task)
+            showLinkedTask(task)
             automation.taskToOpen = nil
         }
         .task {
@@ -253,8 +241,7 @@ struct ContentView: View {
             if scenePhase == .active { await store.observeParticipantChanges() }
         }
         .onChange(of: automation.deletedTaskID) { _, id in
-            if let id, selectedTaskID == id || linkedTaskIDs.contains(id) || editingTask?.id == id {
-                editingTask = nil
+            if let id, selectedTaskID == id {
                 resetNavigation()
             }
         }
@@ -307,7 +294,7 @@ struct ContentView: View {
     }
 
     private func taskList(title: String? = nil) -> some View {
-        TaskListView(store: store, calendar: calendar, edit: { showInformation($0) }, dayPaging: dayPaging)
+        TaskListView(store: store, calendar: calendar, dayPaging: dayPaging)
             .navigationTitle(title ?? dayPageTitle ?? store.navigationTitle ?? store.selectedWorkspaceView.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

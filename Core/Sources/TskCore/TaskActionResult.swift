@@ -8,7 +8,6 @@ public struct TaskActionResult: Encodable, Sendable {
     public let priority: String?
     public let scheduled: String?
     public let deadline: String?
-    public let waitingUntil: String?
     public let status: String
     public let openTaskURL: URL
 
@@ -21,13 +20,12 @@ public struct TaskActionResult: Encodable, Sendable {
         let formatter = ISO8601DateFormatter()
         scheduled = task.plannedDate.map(formatter.string)
         deadline = task.deadline.map(formatter.string)
-        waitingUntil = task.waitUntil.map(formatter.string)
         status = task.status
         openTaskURL = URL(string: "tsk://open-task?id=" + task.id.uuidString)!
     }
 
     private enum CodingKeys: String, CodingKey {
-        case uuid, description, project, tags, priority, scheduled, deadline, waitingUntil, status, openTaskURL
+        case uuid, description, project, tags, priority, scheduled, deadline, status, openTaskURL
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -39,7 +37,6 @@ public struct TaskActionResult: Encodable, Sendable {
         try values.encode(priority, forKey: .priority)
         try values.encode(scheduled, forKey: .scheduled)
         try values.encode(deadline, forKey: .deadline)
-        try values.encode(waitingUntil, forKey: .waitingUntil)
         try values.encode(status, forKey: .status)
         try values.encode(openTaskURL, forKey: .openTaskURL)
     }

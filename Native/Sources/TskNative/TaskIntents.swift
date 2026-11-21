@@ -15,7 +15,6 @@ public struct IntentTaskEntity: AppEntity {
     @Property(title: "Priority") public var priority: String?
     @Property(title: "Scheduled") public var scheduled: Date?
     @Property(title: "Deadline") public var deadline: Date?
-    @Property(title: "Waiting until") public var waitingUntil: Date?
     @Property(title: "Status") public var status: String
     @Property(title: "Open Task URL") public var openTaskURL: URL
     public var displayRepresentation: DisplayRepresentation {
@@ -31,7 +30,6 @@ public struct IntentTaskEntity: AppEntity {
         priority = task.priority.isEmpty ? nil : task.priority
         scheduled = task.plannedDate
         deadline = task.deadline
-        waitingUntil = task.waitUntil
         status = task.status
         openTaskURL = TaskActionResult(task).openTaskURL
     }
@@ -78,12 +76,12 @@ public enum IntentTaskPriority: String, AppEnum {
 @available(iOS 16, macOS 13, *)
 public enum IntentTaskSort: String, AppEnum {
     case newest = "created-desc", oldest = "created-asc", description = "description-asc"
-    case scheduled = "scheduled-asc", deadline = "deadline-asc", waitingUntil = "waiting-until-asc", priority = "priority-desc"
+    case scheduled = "scheduled-asc", deadline = "deadline-asc", priority = "priority-desc"
     public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Task sort"
     public static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
         .newest: "Newest created first", .oldest: "Oldest created first", .description: "Description (UTF-8 order)",
         .scheduled: "Scheduled (earliest first)", .deadline: "Deadline (earliest first)",
-        .waitingUntil: "Waiting until (earliest first)", .priority: "Priority (High first)"
+        .priority: "Priority (High first)"
     ]
     var selection: FindTaskSort { FindTaskSort(rawValue: rawValue)! }
 }
@@ -102,8 +100,6 @@ public struct FindTasksIntent: AppIntent {
     @Parameter(title: "Scheduled through (inclusive)") public var scheduledThrough: Date?
     @Parameter(title: "Deadline from (inclusive)") public var deadlineFrom: Date?
     @Parameter(title: "Deadline through (inclusive)") public var deadlineThrough: Date?
-    @Parameter(title: "Waiting until from (inclusive)") public var waitingUntilFrom: Date?
-    @Parameter(title: "Waiting until through (inclusive)") public var waitingUntilThrough: Date?
     @Parameter(title: "Sort", default: .newest) public var sort: IntentTaskSort
     @Parameter(title: "Limit") public var limit: Int?
     @Parameter(title: "Offset", default: 0) public var offset: Int
@@ -118,8 +114,6 @@ public struct FindTasksIntent: AppIntent {
             \.$scheduledThrough
             \.$deadlineFrom
             \.$deadlineThrough
-            \.$waitingUntilFrom
-            \.$waitingUntilThrough
             \.$sort
             \.$limit
             \.$offset
@@ -127,7 +121,7 @@ public struct FindTasksIntent: AppIntent {
     }
 
     public init() {}
-    public init(searchText: String = "", project: String? = nil, tags: [String] = [], status: IntentTaskStatus = .unfinished, priority: IntentTaskPriority? = nil, scheduledFrom: Date? = nil, scheduledThrough: Date? = nil, deadlineFrom: Date? = nil, deadlineThrough: Date? = nil, waitingUntilFrom: Date? = nil, waitingUntilThrough: Date? = nil, sort: IntentTaskSort = .newest, limit: Int? = nil, offset: Int = 0, directory: URL? = nil) {
+    public init(searchText: String = "", project: String? = nil, tags: [String] = [], status: IntentTaskStatus = .unfinished, priority: IntentTaskPriority? = nil, scheduledFrom: Date? = nil, scheduledThrough: Date? = nil, deadlineFrom: Date? = nil, deadlineThrough: Date? = nil, sort: IntentTaskSort = .newest, limit: Int? = nil, offset: Int = 0, directory: URL? = nil) {
         self.searchText = searchText
         self.project = project
         self.tags = tags
@@ -137,8 +131,6 @@ public struct FindTasksIntent: AppIntent {
         self.scheduledThrough = scheduledThrough
         self.deadlineFrom = deadlineFrom
         self.deadlineThrough = deadlineThrough
-        self.waitingUntilFrom = waitingUntilFrom
-        self.waitingUntilThrough = waitingUntilThrough
         self.sort = sort
         self.limit = limit
         self.offset = offset
@@ -149,7 +141,7 @@ public struct FindTasksIntent: AppIntent {
         let input = FindTasksInput(description: searchText, project: project, tags: tags ?? [], status: status.selection, priority: priority?.rawValue,
                                    scheduled: TaskDateRange(from: scheduledFrom, through: scheduledThrough),
                                    deadline: TaskDateRange(from: deadlineFrom, through: deadlineThrough),
-                                   waitingUntil: TaskDateRange(from: waitingUntilFrom, through: waitingUntilThrough), sort: sort.selection, limit: limit, offset: offset)
+                                   sort: sort.selection, limit: limit, offset: offset)
         try input.validate()
         let manager = try await IntentTaskSession.open(directory: directory)
         let tasks = try await manager.findTasks(input).map(IntentTaskEntity.init)

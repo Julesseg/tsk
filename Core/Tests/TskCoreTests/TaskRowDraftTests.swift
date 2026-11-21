@@ -24,32 +24,6 @@ import Testing
     #expect(saved.attributes["opaque"] == "retain")
 }
 
-@Test func supportingMutationsPreserveUnsavedRowEditsAndFreshHiddenValues() throws {
-    let id = UUID()
-    let original = TaskRecord(id: id, attributes: ["description": "Original", "status": "pending", "project": "Old", "opaque": "retain", "tag_old": "x", "tag_keep": "original", "annotation_10": "Original note"])
-    var draft = TaskRowDraft(task: original)
-    draft.taskDraft.description = "Unsaved title"
-    draft.taskDraft.project = "New"
-    draft.taskDraft.removeTag("old")
-    try draft.taskDraft.addTag("next")
-    draft.tagInput = "pending"
-    draft.taskDraft.attributes["annotation_10"] = "Unsaved note"
-    draft.noteInput = "Unsaved new note"
-    let annotated = TaskRecord(id: id, attributes: ["description": "Original", "status": "pending", "project": "Old", "annotation_1792144800": "Supporting note", "opaque": "updated", "start": "1792144800", "tag_old": "x", "tag_keep": "updated", "tag_remote": "x", "annotation_10": "Original note"])
-    draft.rebase(on: annotated)
-    #expect(draft.original == annotated)
-    #expect(draft.taskDraft.description == "Unsaved title")
-    #expect(draft.taskDraft.attributes["annotation_1792144800"] == "Supporting note")
-    #expect(draft.taskDraft.attributes["opaque"] == "updated")
-    #expect(draft.taskDraft.attributes["start"] == "1792144800")
-    #expect(draft.taskDraft.tags == ["keep", "next", "remote"])
-    #expect(draft.taskDraft.attributes["tag_keep"] == "updated")
-    #expect(draft.tagInput == "pending")
-    #expect(draft.taskDraft.attributes["annotation_10"] == "Unsaved note")
-    #expect(draft.noteInput == "Unsaved new note")
-    #expect(try draft.changes() == ["description": "Unsaved title", "project": "New", "tag_old": nil, "tag_next": "", "tag_pending": ""])
-}
-
 @Test func rowPlanningChangesOnlyScheduledAndPreservesHiddenValues() throws {
     let task = TaskRecord(id: UUID(), attributes: ["description": "Ship", "status": "pending", "due": "1792238400", "wait": "unrecognized", "opaque": "retain"])
     var draft = TaskRowDraft(task: task)
@@ -287,20 +261,4 @@ func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp
     #expect(draft.taskDraft.description == "Keep my input")
     draft.tagInput = "valid"
     #expect(try draft.creationDraft(at: .now).tags == ["valid"])
-}
-
-@Test func rebasingARowKeepsAnUnsavedScheduledIntentTogether() async throws {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792144800) }, calendar: calendar)
-    let original = try await manager.create(TaskDraft(description: "Plan", attributes: ["scheduled": "1792195200", "due": "1792238400"]))
-    var row = TaskRowDraft(task: original)
-    row.taskDraft.setScheduled(TaskScheduledDate(date: original.plannedDate!, hasTime: true))
-    let external = try await manager.update(id: original.id, changes: ["scheduled": "1792281600", "opaque": "external"])
-    row.rebase(on: external)
-    let saved = try await manager.updateRow(row)
-    #expect(saved.plannedDate == original.plannedDate)
-    #expect(saved.scheduled(calendar: calendar)?.hasTime == true)
-    #expect(saved.attributes["due"] == "1792238400")
-    #expect(saved.attributes["opaque"] == "external")
 }

@@ -5,7 +5,6 @@ public struct TaskSeriesTransitionDefaults: Sendable {
     public let firstDue: Date
     public let recurrence: String
     public let planned: Date
-    public let wait: Date
     public let hasUntil: Bool
     public let until: Date
 
@@ -16,7 +15,6 @@ public struct TaskSeriesTransitionDefaults: Sendable {
         recurrence = template.attributes["recur"] ?? "weekly"
         let anchor = template.deadline ?? firstDue
         planned = firstDue.addingTimeInterval((template.plannedDate ?? firstDue).timeIntervalSince(anchor))
-        wait = firstDue.addingTimeInterval((template.waitUntil ?? firstDue).timeIntervalSince(anchor))
         hasUntil = template.attributes["until"] != nil
         until = template.attributes["until"].flatMap(TimeInterval.init).map(Date.init(timeIntervalSince1970:)) ?? firstDue.addingTimeInterval(31536000)
     }

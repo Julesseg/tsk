@@ -24,12 +24,10 @@ public struct ModifyTaskIntent: AppIntent {
     @Parameter(title: "Priority") public var priority: IntentTaskPriority?
     @Parameter(title: "Scheduled") public var scheduled: Date?
     @Parameter(title: "Deadline") public var deadline: Date?
-    @Parameter(title: "Waiting until") public var waitingUntil: Date?
     @Parameter(title: "Clear project", default: false) public var clearProject: Bool
     @Parameter(title: "Clear priority", default: false) public var clearPriority: Bool
     @Parameter(title: "Clear Scheduled", default: false) public var clearScheduled: Bool
     @Parameter(title: "Clear Deadline", default: false) public var clearDeadline: Bool
-    @Parameter(title: "Clear Waiting until", default: false) public var clearWaitingUntil: Bool
     private var directory: URL?
 
     public static var parameterSummary: some ParameterSummary {
@@ -41,17 +39,15 @@ public struct ModifyTaskIntent: AppIntent {
             \.$priority
             \.$scheduled
             \.$deadline
-            \.$waitingUntil
             \.$clearProject
             \.$clearPriority
             \.$clearScheduled
             \.$clearDeadline
-            \.$clearWaitingUntil
         }
     }
 
     public init() {}
-    public init(task: IntentTaskEntity, description: String? = nil, project: String? = nil, tags: [String]? = nil, tagOperation: IntentTaskTagOperation = .add, priority: IntentTaskPriority? = nil, scheduled: Date? = nil, deadline: Date? = nil, waitingUntil: Date? = nil, clearProject: Bool = false, clearPriority: Bool = false, clearScheduled: Bool = false, clearDeadline: Bool = false, clearWaitingUntil: Bool = false, directory: URL? = nil) {
+    public init(task: IntentTaskEntity, description: String? = nil, project: String? = nil, tags: [String]? = nil, tagOperation: IntentTaskTagOperation = .add, priority: IntentTaskPriority? = nil, scheduled: Date? = nil, deadline: Date? = nil, clearProject: Bool = false, clearPriority: Bool = false, clearScheduled: Bool = false, clearDeadline: Bool = false, directory: URL? = nil) {
         self.task = task
         taskDescription = description
         self.project = project
@@ -60,17 +56,15 @@ public struct ModifyTaskIntent: AppIntent {
         self.priority = priority
         self.scheduled = scheduled
         self.deadline = deadline
-        self.waitingUntil = waitingUntil
         self.clearProject = clearProject
         self.clearPriority = clearPriority
         self.clearScheduled = clearScheduled
         self.clearDeadline = clearDeadline
-        self.clearWaitingUntil = clearWaitingUntil
         self.directory = directory
     }
 
     public func perform() async throws -> some IntentResult & ReturnsValue<IntentTaskEntity> & ProvidesDialog {
-        let input = ModifyTaskInput(description: taskDescription, project: project, tags: tags, tagOperation: TaskTagOperation(rawValue: tagOperation.rawValue)!, priority: priority?.rawValue, scheduled: scheduled, deadline: deadline, waitingUntil: waitingUntil, clearProject: clearProject, clearPriority: clearPriority, clearScheduled: clearScheduled, clearDeadline: clearDeadline, clearWaitingUntil: clearWaitingUntil)
+        let input = ModifyTaskInput(description: taskDescription, project: project, tags: tags, tagOperation: TaskTagOperation(rawValue: tagOperation.rawValue)!, priority: priority?.rawValue, scheduled: scheduled, deadline: deadline, clearProject: clearProject, clearPriority: clearPriority, clearScheduled: clearScheduled, clearDeadline: clearDeadline)
         let location = try directory ?? TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
         let manager = try await TaskChampionSession.open(directory: location)
         let saved = try await manager.modifyTask(id: task.id, input: input)

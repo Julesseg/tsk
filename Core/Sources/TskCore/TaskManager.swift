@@ -127,12 +127,6 @@ public actor TaskManager {
         }
     }
 
-    public func availability(id: UUID) async throws -> TaskAvailability {
-        let records = try await tasks()
-        guard let record = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
-        return record.availability(at: now())
-    }
-
     public func dayPage(on day: Date) async throws -> [TaskRecord] {
         let records = try await tasks()
         return dayPage(on: day, in: records)

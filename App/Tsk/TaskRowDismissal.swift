@@ -1,5 +1,4 @@
 import SwiftUI
-import TskCore
 
 private struct TaskRowAvailableHeight: EnvironmentKey {
     static let defaultValue: CGFloat = 400
@@ -46,7 +45,6 @@ struct TaskRowDismissal: View {
 
 struct TaskRowActions {
     var close: () -> Void = {}
-    var information: (TaskRecord) -> Void = { _ in }
 }
 
 private struct TaskRowActionsKey: EnvironmentKey {

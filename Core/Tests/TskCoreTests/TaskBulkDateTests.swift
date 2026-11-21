@@ -26,7 +26,7 @@ import TskCore
     let midnight = TaskScheduledDate(date: yesterday, hasTime: true)
     let saved = try await manager.applySelection(ids: ids, changes: .init(scheduled: .exact(midnight), deadline: .exact(past)))
     #expect(saved.count == 2 && saved.allSatisfy { $0.scheduled(calendar: calendar) == midnight && $0.dateIntent(for: .deadline, calendar: calendar) == past })
-    #expect(saved.first { $0.id == first.id }?.waitUntil == first.waitUntil)
+    #expect(saved.first { $0.id == first.id }?.attributes["wait"] == first.attributes["wait"])
 }
 
 @Test func bulkScheduledDateChangesOnlyTheChosenFieldAndDeduplicatesMixedTasks() async throws {

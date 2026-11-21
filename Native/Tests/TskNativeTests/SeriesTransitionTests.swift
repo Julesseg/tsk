@@ -137,7 +137,7 @@ struct SeriesTransitionTests {
             let before = try await manager.tasks()
             let first = try #require(formatter.date(from: rawFirst))
             let setsOffsets = rule == "weekly"
-            let draft = TaskSeriesTransitionDraft(effectiveDate: Date(), firstDue: first, recurrence: rule, generatorTimeZone: "Europe/Paris", planned: clearOffsets ? .clear : setsOffsets ? .set(-5400) : .preserve, wait: clearOffsets ? .clear : setsOffsets ? .set(-1800) : .preserve, until: finiteUntil ? first.addingTimeInterval(1209600) : nil)
+            let draft = TaskSeriesTransitionDraft(effectiveDate: Date(), firstDue: first, recurrence: rule, generatorTimeZone: "Europe/Paris", planned: clearOffsets ? .clear : setsOffsets ? .set(-5400) : .preserve, until: finiteUntil ? first.addingTimeInterval(1209600) : nil)
             let preview = try await manager.previewSeriesTransition(id: original.id, draft: draft)
             #expect(Set(preview.affected.map(\.id)) == Set(generated[3...5].map(\.id)))
             #expect(try await manager.tasks() == before)
@@ -165,7 +165,7 @@ struct SeriesTransitionTests {
             for (index, child) in movedAndGenerated.enumerated() {
                 let plannedOffset: Double? = clearOffsets ? nil : setsOffsets ? -5400 : (index == 0 ? -9000 : -7200)
                 #expect(child.plannedDate?.timeIntervalSince1970 == plannedOffset.map { child.deadline!.timeIntervalSince1970 + $0 })
-                #expect(child.waitUntil?.timeIntervalSince1970 == (clearOffsets ? nil : child.deadline!.timeIntervalSince1970 - (setsOffsets ? 1800 : 3600)))
+                #expect(child.attributes["wait"] == child.deadline.map { String(Int($0.timeIntervalSince1970 - 3600)) })
             }
             #expect(try await reopened.task(id: original.id).attributes["mask"] == "+++XXX")
             #expect(try await reopened.task(id: original.id).attributes["opaque"]?.matchesBytes("parent café e\u{301}") == true)

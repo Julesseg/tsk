@@ -28,7 +28,7 @@ struct TaskFindResultsView: View {
                         Section {
                             ForEach(currentTasks) { task in
                                 NavigationLink {
-                                    TaskFindResultDestination(store: store, taskID: task.id)
+                                    TaskLinkedTaskList(source: store, taskID: task.id)
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(task.description)
@@ -54,19 +54,6 @@ struct TaskFindResultsView: View {
                     Button("Done") { dismiss() }.accessibilityIdentifier("close-find-results")
                 }
             }
-        }
-    }
-}
-
-private struct TaskFindResultDestination: View {
-    let store: TaskStore
-    let taskID: UUID
-
-    var body: some View {
-        if let task = store.allTasks.first(where: { $0.id == taskID && $0.status != "deleted" }) {
-            TaskDetailView(store: store, task: task)
-        } else {
-            ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
         }
     }
 }

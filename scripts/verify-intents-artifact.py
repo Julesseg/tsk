@@ -54,33 +54,33 @@ if not any('tsk' in item.get('CFBundleURLSchemes', []) for item in info.get('CFB
     raise SystemExit('The app must register the tsk URL scheme')
 
 add_parameters = {item['name']: item for item in metadata['actions']['AddTaskIntent']['parameters']}
-if set(add_parameters) != {'taskDescription', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil'}:
-    raise SystemExit('Add Task must expose exactly its seven named inputs')
+if set(add_parameters) != {'taskDescription', 'project', 'tags', 'priority', 'scheduled', 'deadline'}:
+    raise SystemExit('Add Task must expose exactly its six named inputs')
 if add_parameters['taskDescription']['isOptional'] or any(not item['isOptional'] for name, item in add_parameters.items() if name != 'taskDescription'):
     raise SystemExit('Only the Add Task Description input is required')
-for name in ('scheduled', 'deadline', 'waitingUntil'):
+for name in ('scheduled', 'deadline'):
     if add_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
         raise SystemExit('Add Task date inputs must be native dates: ' + name)
 properties = {item['identifier'] for item in metadata['entities']['IntentTaskEntity']['properties']}
-if not {'uuid', 'description', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'status', 'openTaskURL'}.issubset(properties):
+if properties != {'uuid', 'description', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'status', 'openTaskURL'}:
     raise SystemExit('The task entity must expose all rich result properties')
-print('Verified seven Add Task inputs, native dates, required Description, rich entity properties and tsk URL registration')
+print('Verified six Add Task inputs, native dates, required Description, rich entity properties and tsk URL registration')
 
 find_parameters = {item['name']: item for item in metadata['actions']['FindTasksIntent']['parameters']}
-if set(find_parameters) != {'searchText', 'project', 'tags', 'status', 'priority', 'scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough', 'waitingUntilFrom', 'waitingUntilThrough', 'sort', 'limit', 'offset'}:
+if set(find_parameters) != {'searchText', 'project', 'tags', 'status', 'priority', 'scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough', 'sort', 'limit', 'offset'}:
     raise SystemExit('Find Tasks must expose exactly its named filters, sort and pagination inputs')
-for name in ('scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough', 'waitingUntilFrom', 'waitingUntilThrough'):
+for name in ('scheduledFrom', 'scheduledThrough', 'deadlineFrom', 'deadlineThrough'):
     if find_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
         raise SystemExit('Find Tasks bounds must be native dates: ' + name)
 if metadata['actions']['FindTasksIntent']['outputType'] != {'array': {'wrapper': {'capabilities': 3, 'memberValueType': {'entity': {'wrapper': {'typeName': 'IntentTaskEntity'}}}}}}:
     raise SystemExit('Find Tasks must return a native list of task entities')
-print('Verified fourteen structured Find Tasks inputs, native date bounds and native entity list result')
+print('Verified eleven structured Find Tasks inputs, native date bounds and native entity list result')
 modify_parameters = {item['name']: item for item in metadata['actions']['ModifyTaskIntent']['parameters']}
-if set(modify_parameters) != {'task', 'taskDescription', 'project', 'tags', 'tagOperation', 'priority', 'scheduled', 'deadline', 'waitingUntil', 'clearProject', 'clearPriority', 'clearScheduled', 'clearDeadline', 'clearWaitingUntil'}:
-    raise SystemExit('Modify Task must expose its task, seven fields, tag operation and five clear controls')
-if modify_parameters['task']['isOptional'] or any(not modify_parameters[name]['isOptional'] for name in ('taskDescription', 'project', 'tags', 'priority', 'scheduled', 'deadline', 'waitingUntil')):
+if set(modify_parameters) != {'task', 'taskDescription', 'project', 'tags', 'tagOperation', 'priority', 'scheduled', 'deadline', 'clearProject', 'clearPriority', 'clearScheduled', 'clearDeadline'}:
+    raise SystemExit('Modify Task must expose its task, six fields, tag operation and four clear controls')
+if modify_parameters['task']['isOptional'] or any(not modify_parameters[name]['isOptional'] for name in ('taskDescription', 'project', 'tags', 'priority', 'scheduled', 'deadline')):
     raise SystemExit('Modify requires one task and permits omitted field values')
-for name in ('scheduled', 'deadline', 'waitingUntil'):
+for name in ('scheduled', 'deadline'):
     if modify_parameters[name]['valueType'] != {'primitive': {'wrapper': {'typeIdentifier': 8}}}:
         raise SystemExit('Modify Task date inputs must be native dates: ' + name)
 print('Verified Modify Task inputs and removal of standalone Reschedule')

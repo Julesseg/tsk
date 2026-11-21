@@ -18,7 +18,6 @@ public enum FindTaskSort: String, CaseIterable, Sendable {
     case description = "description-asc"
     case scheduled = "scheduled-asc"
     case deadline = "deadline-asc"
-    case waitingUntil = "waiting-until-asc"
     case priority = "priority-desc"
 
     func precedes(_ lhs: TaskRecord, _ rhs: TaskRecord) -> Bool {
@@ -29,8 +28,8 @@ public enum FindTaskSort: String, CaseIterable, Sendable {
         case .description:
             let left = UTF8String(lhs.description), right = UTF8String(rhs.description)
             if left != right { return left < right }
-        case .scheduled, .deadline, .waitingUntil:
-            let key = self == .scheduled ? "scheduled" : self == .deadline ? "due" : "wait"
+        case .scheduled, .deadline:
+            let key = self == .scheduled ? "scheduled" : "due"
             let left = Self.date(lhs, key: key), right = Self.date(rhs, key: key)
             if left != right { return Self.datePrecedes(left, right) }
         case .priority:
@@ -92,12 +91,11 @@ public struct FindTasksInput: Equatable, Sendable {
     public var priority: String?
     public var scheduled: TaskDateRange
     public var deadline: TaskDateRange
-    public var waitingUntil: TaskDateRange
     public var sort: FindTaskSort
     public var limit: Int?
     public var offset: Int
 
-    public init(description: String = "", project: String? = nil, tags: [String] = [], status: FindTaskStatus = .unfinished, priority: String? = nil, scheduled: TaskDateRange = TaskDateRange(), deadline: TaskDateRange = TaskDateRange(), waitingUntil: TaskDateRange = TaskDateRange(), sort: FindTaskSort = .newest, limit: Int? = nil, offset: Int = 0) {
+    public init(description: String = "", project: String? = nil, tags: [String] = [], status: FindTaskStatus = .unfinished, priority: String? = nil, scheduled: TaskDateRange = TaskDateRange(), deadline: TaskDateRange = TaskDateRange(), sort: FindTaskSort = .newest, limit: Int? = nil, offset: Int = 0) {
         self.description = description
         self.project = project
         self.tags = tags
@@ -105,7 +103,6 @@ public struct FindTasksInput: Equatable, Sendable {
         self.priority = priority
         self.scheduled = scheduled
         self.deadline = deadline
-        self.waitingUntil = waitingUntil
         self.sort = sort
         self.limit = limit
         self.offset = offset
@@ -115,7 +112,6 @@ public struct FindTasksInput: Equatable, Sendable {
         if let priority, !["", "H", "M", "L"].contains(priority) { throw TaskManagementError.invalidPriority(priority) }
         try scheduled.validate()
         try deadline.validate()
-        try waitingUntil.validate()
         guard offset >= 0, limit.map({ $0 > 0 }) != false else { throw TaskActionError.invalidInput("Offset must be nonnegative and limit must be positive.") }
     }
 
@@ -127,7 +123,6 @@ public struct FindTasksInput: Equatable, Sendable {
             && (priority.map { task.priority == $0 } ?? true)
             && scheduled.includes(task.plannedDate)
             && deadline.includes(task.deadline)
-            && waitingUntil.includes(task.waitUntil)
     }
 }
 

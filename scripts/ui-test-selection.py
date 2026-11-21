@@ -43,7 +43,6 @@ ON_DEMAND = (
     'RecurringTemplateUITests/testRecordedRealGeneratorOccurrenceEditsAndCompletesWithoutChangingItsTemplate',
     'RecurringTemplateUITests/testRecurringTemplateValidationCreationInspectionAndPersistentReopen',
     'SynchronizationUITests/testConnectionValidationPersistenceAndServerFailureRetainOfflineTask',
-    'TaskActivityUITests/testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState',
     'TaskActionURLUITests/testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd',
     'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations',
     'TaskBulkSelectionUITests/testPlannerInteractionFrameIntervals',
@@ -84,7 +83,7 @@ SUITES = dict(smoke=PHONE_SMOKE, full=NIGHTLY, diagnostic=DIAGNOSTIC,
 TEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "App" / "TskUITests"
 TASK_PARTITION = {
     'RecurringTemplateUITests', 'SeriesMetadataUITests', 'SeriesTransitionUITests',
-    'TaskActivityUITests', 'TaskBulkSelectionUITests', 'TaskRowEditingUITests',
+    'TaskBulkSelectionUITests', 'TaskRowEditingUITests',
     'TaskScheduledUITests', 'TskUITests',
 }
 

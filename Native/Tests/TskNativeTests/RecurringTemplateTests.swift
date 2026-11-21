@@ -114,7 +114,7 @@ struct RecurringTemplateTests {
             #expect(child.canEdit && child.canComplete)
             let due = try #require(child.deadline)
             #expect(child.plannedDate == due.addingTimeInterval(-7200))
-            #expect(child.waitUntil == due.addingTimeInterval(-3600))
+            #expect(child.attributes["wait"] == String(Int(due.timeIntervalSince1970 - 3600)))
             #expect(external.contains { $0["uuid"] as? String == child.id.uuidString.lowercased() })
         }
     }

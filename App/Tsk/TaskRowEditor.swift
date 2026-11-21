@@ -5,11 +5,10 @@ struct TaskRowEditor: View {
     let store: TaskStore
     @Bindable var editing: TaskRowEditing
     @FocusState.Binding var titleFocused: Bool
-    let information: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
-    @State private var measuredActionsHeight: CGFloat = 44
+    @State private var measuredActionsHeight: CGFloat = 0
     @FocusState private var focusedNote: UTF8String?
     @Environment(\.taskRowActions) private var rowActions
 
@@ -17,46 +16,34 @@ struct TaskRowEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             ScrollView {
                 TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, focusedNote: $focusedNote)
-                    .disabled(!editing.isCapture && !editing.draft.original.canEdit)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
-            .accessibilityIdentifier("task-row-supporting-scroll")
+            .accessibilityIdentifier("task-row-editor")
+            .accessibilityAction(named: "Save and close task", rowActions.close)
+            .accessibilityAction(.escape, rowActions.close)
             VStack(alignment: .leading, spacing: 8) {
                 if let error = editing.error ?? store.error {
                     Text(error).font(.callout).foregroundStyle(.red)
                         .accessibilityIdentifier("draft-error")
                         .accessibilityAddTraits(.updatesFrequently)
                 }
-                HStack(alignment: .top) {
-                    if !editing.isCapture {
-                        Button("More task information", systemImage: "info.circle", action: information)
-                            .accessibilityIdentifier("task-row-information")
-                    }
-                    Spacer()
-                    Button(editing.draft.original.canEdit || editing.isCapture ? "Save and close" : "Close", systemImage: "checkmark", action: rowActions.close)
+                if titleFocused || focusedNote != nil {
+                    Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false; focusedNote = nil }
                         .labelStyle(.iconOnly)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .top)
-                        .accessibilityIdentifier("collapse-task-row")
-                    if titleFocused || focusedNote != nil {
-                        Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false; focusedNote = nil }
-                            .labelStyle(.iconOnly)
-                            .frame(minWidth: 44, minHeight: 44, alignment: .top)
-                            .accessibilityIdentifier("dismiss-row-keyboard")
-                    }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .accessibilityIdentifier("dismiss-row-keyboard")
                 }
             }
             .font(.subheadline)
-            .padding(.bottom, 8)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredActionsHeight = $0 }
         }
         .frame(height: editing.revealProgress * min(measuredContentHeight + measuredActionsHeight + 8, availableHeight), alignment: .top)
         .disabled(editing.isSaving || store.isSaving)
         .clipped()
         .buttonStyle(.borderless)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("task-row-editor")
         .task(id: measuredContentHeight > 0) {
             guard measuredContentHeight > 0 else { return }
             await Task.yield()
@@ -92,6 +79,7 @@ private struct TaskRowEditorContent: View {
                     .accessibilityIdentifier("row-note-input")
             }
             .textFieldStyle(.plain)
+            .disabled(!editing.isCapture && !task.canEdit)
             .font(.subheadline)
             .lineLimit(1...5)
             .padding(.bottom, 4)
@@ -106,9 +94,6 @@ private struct TaskRowEditorContent: View {
                                 focusedNote = nil
                             }
                         }
-                        if !editing.isCapture {
-                        TaskActivityButton(task: task, store: store, isDetail: true, isPill: true, onSave: editing.absorb)
-                        }
                     }.padding(.horizontal, 4)
                 }
             }
@@ -116,14 +101,11 @@ private struct TaskRowEditorContent: View {
             .clipped()
             .accessibilityIdentifier("row-date-parameters")
             .transition(.opacity)
-            if !editing.isCapture {
-            VStack(alignment: .leading, spacing: 12) {
-                TaskAvailabilityView(task: task, store: store)
+            .disabled(!editing.isCapture && !task.canEdit)
+            if task.recurrenceInspection != nil {
                 TaskRecurrenceSection(task: task, store: store)
+                    .padding(.vertical, 8)
             }
-            .padding(.vertical, 8)
-            }
-
         }
         .padding(.bottom, 8)
         .disabled(editing.isSaving || store.isSaving)
@@ -197,7 +179,7 @@ private struct TaskRowParameterPill: View {
         .contentShape(Rectangle())
         .accessibilityLabel(parameter.title)
         .accessibilityValue(value ?? "Not set")
-        .accessibilityIdentifier("row-" + parameter.identifier)
+        .accessibilityIdentifier("row-" + parameter.rawValue)
     }
 
     private var label: some View {
@@ -308,7 +290,7 @@ struct TaskRowParameterPicker: View {
                     else { editing.draft.taskDraft.attributes[parameter.attribute] = nil }
                     dismiss()
                 }
-                .accessibilityIdentifier("remove-" + parameter.identifier)
+                .accessibilityIdentifier("remove-" + parameter.rawValue)
             }
         }
         .buttonStyle(.borderless)
@@ -345,7 +327,7 @@ struct TaskParameterDatePicker: View {
             .datePickerStyle(.graphical)
             .labelsHidden()
             .accessibilityLabel(parameter.title)
-            .accessibilityIdentifier(parameter.identifier + "-picker")
+            .accessibilityIdentifier(parameter.rawValue + "-picker")
     }
 }
 

@@ -354,7 +354,7 @@ import XCTest
                     for child in node.children { collect(child) }
                 }
                 collect(snapshot)
-                guard !nodes.contains(where: { $0.identifier == "task-description" && $0.elementType == .textField || $0.identifier == "task-row-editor" && $0.elementType == .other }) else {
+                guard !nodes.contains(where: { $0.identifier == "task-description" && $0.elementType == .textField || $0.identifier == "task-row-editor" }) else {
                     previous = nil
                     lastSample = "editor remains open"
                     return false

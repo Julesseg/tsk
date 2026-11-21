@@ -13,7 +13,7 @@ struct TaskSeriesOccurrencesView: View {
                 if !records.isEmpty {
                     Section(status == "pending" ? "Unfinished occurrences" : status == "completed" ? "Completed history" : "Deleted occurrences") {
                         ForEach(records) { task in
-                            NavigationLink { TaskDetailView(store: store, task: task) } label: { VStack(alignment: .leading) { Text(task.description); if let due = task.deadline { Text(due, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) } } }
+                            NavigationLink { TaskLinkedTaskList(source: store, taskID: task.id) } label: { VStack(alignment: .leading) { Text(task.description); if let due = task.deadline { Text(due, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) } } }
                                 .accessibilityIdentifier("series-history-\(task.id.uuidString)")
                         }
                     }

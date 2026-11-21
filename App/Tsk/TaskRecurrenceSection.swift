@@ -23,8 +23,8 @@ struct TaskRecurrenceSection: View {
                     if task.attributes["until"] != nil { Text("Taskwarrior 3.5 can generate the first occurrence beyond the Until date. Review the generator's result before relying on a precise series end.").font(.footnote) }
                 } else if recurrence.kind == .occurrence {
                     if let id = recurrence.parentID {
-                        if let template = store.allTasks.first(where: { $0.id == id }) {
-                            NavigationLink("View recurring template") { TaskDetailView(store: store, task: template) }.accessibilityIdentifier("occurrence-template")
+                        if store.allTasks.contains(where: { $0.id == id }) {
+                            NavigationLink("View recurring template") { RecurringTemplateView(store: store, templateID: id) }.accessibilityIdentifier("occurrence-template")
                         } else { Text("The linked template has not arrived in this saved dataset.") }
                     }
                     Text(task.status == "completed" ? "This completed occurrence remains in the series history." : "Edits and completion apply only to this occurrence. Other occurrences and the template remain unchanged.").accessibilityIdentifier("occurrence-only-explanation")
