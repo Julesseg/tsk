@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tsk — Builds</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 520px; margin: 48px auto; padding: 0 24px; color: #1c1c1e; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .sub { color: #666; margin: 0 0 32px; font-size: 0.95rem; }
+    a.btn { display: inline-block; background: #007AFF; color: #fff; text-decoration: none;
+            padding: 12px 28px; border-radius: 12px; font-size: 1.05rem; font-weight: 600; }
+    ul.builds { list-style: none; padding: 0; margin: 0; }
+    li.build { border: 1px solid #e2e2e6; border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+    li.build.latest { border-color: #007AFF; }
+    .title { font-weight: 600; font-size: 1.05rem; margin-bottom: 2px; }
+    .meta { color: #888; font-size: 0.82rem; margin-bottom: 12px; }
+    .badge { display: inline-block; background: #007AFF; color: #fff; font-size: 0.7rem;
+             font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+    .hint { color: #999; font-size: 0.8rem; margin-top: 32px; text-align: center; }
+    a.back { display: inline-block; color: #007AFF; text-decoration: none; font-size: 0.95rem;
+             font-weight: 600; margin-bottom: 24px; }
+    a.back:hover { text-decoration: underline; }
+    a.pr-link { color: #007AFF; text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    a.pr-link:hover { text-decoration: underline; }
+    .slot-pr { margin-top: 18px; }
+    .build .pr-link { margin-left: 14px; }
+    .new-badge { display: none; background: #FF3B30; color: #fff; font-size: 0.7rem; font-weight: 700;
+                 padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; cursor: pointer; }
+    .seen-tag { display: none; color: #34C759; font-size: 0.78rem; font-weight: 600; margin-left: 8px; cursor: pointer; }
+    .time-pill { display: inline-block; background: #5856D6; color: #fff; font-size: 0.7rem; font-weight: 700;
+                 padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+    .time-pill:empty { display: none; }
+    [data-build-id].unseen .new-badge { display: inline-block; }
+    [data-build-id].seen .seen-tag { display: inline-block; }
+    li.build.seen { opacity: 0.5; }
+    @media (prefers-color-scheme: dark) {
+      body { color: #f2f2f7; background: #000; }
+      li.build { border-color: #2c2c2e; }
+      .sub, .meta { color: #98989f; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tsk</h1>
+  <p class="sub">The 5 most recent builds, newest first.</p>
+  <ul class="builds">
+    <li class="build latest" data-build-id="117-e569707">
+      <div class="title">perf(planner): reduce work during scrolling and selection<span class="badge">latest</span><span class="new-badge">NEW</span><span class="time-pill" data-time="2026-11-21T19:30:53.806Z"></span><span class="seen-tag">✓ installed</span></div>
+      <div class="meta">PR #117 · e569707 · 2026-11-21 19:30 UTC</div>
+      <a class="btn" href="itms-services://?action=download-manifest&amp;url=https://julesseg.github.io/tsk/builds/pr-117/manifest.plist">Install</a>
+      <a class="pr-link" href="https://github.com/Julesseg/tsk/pull/117">View PR #117 →</a>
+    </li>
+    <li class="build" data-build-id="113-6114ecb">
+      <div class="title">feat(planner): implement Taskwarrior-backed daily planning<span class="new-badge">NEW</span><span class="time-pill" data-time="2026-11-21T13:56:22.020Z"></span><span class="seen-tag">✓ installed</span></div>
+      <div class="meta">PR #113 · 6114ecb · 2026-11-21 13:56 UTC</div>
+      <a class="btn" href="itms-services://?action=download-manifest&amp;url=https://julesseg.github.io/tsk/builds/pr-113/manifest.plist">Install</a>
+      <a class="pr-link" href="https://github.com/Julesseg/tsk/pull/113">View PR #113 →</a>
+    </li>
+    <li class="build" data-build-id="116-ad071ac">
+      <div class="title">fix(ci): avoid empty optional arrays in UI worker<span class="new-badge">NEW</span><span class="time-pill" data-time="2026-11-20T17:59:07.473Z"></span><span class="seen-tag">✓ installed</span></div>
+      <div class="meta">PR #116 · ad071ac · 2026-11-20 17:59 UTC</div>
+      <a class="btn" href="itms-services://?action=download-manifest&amp;url=https://julesseg.github.io/tsk/builds/pr-116/manifest.plist">Install</a>
+      <a class="pr-link" href="https://github.com/Julesseg/tsk/pull/116">View PR #116 →</a>
+    </li>
+    <li class="build" data-build-id="115-26d3105">
+      <div class="title">feat(app)!: remove retired input and system integrations<span class="new-badge">NEW</span><span class="time-pill" data-time="2026-11-18T14:31:09.247Z"></span><span class="seen-tag">✓ installed</span></div>
+      <div class="meta">PR #115 · 26d3105 · 2026-11-18 14:31 UTC</div>
+      <a class="btn" href="itms-services://?action=download-manifest&amp;url=https://julesseg.github.io/tsk/builds/pr-115/manifest.plist">Install</a>
+      <a class="pr-link" href="https://github.com/Julesseg/tsk/pull/115">View PR #115 →</a>
+    </li>
+    <li class="build" data-build-id="112-33d5023">
+      <div class="title">fix(ci): stabilize native UI input and capture simulator failures<span class="new-badge">NEW</span><span class="time-pill" data-time="2026-11-16T22:51:39.182Z"></span><span class="seen-tag">✓ installed</span></div>
+      <div class="meta">PR #112 · 33d5023 · 2026-11-16 22:51 UTC</div>
+      <a class="btn" href="itms-services://?action=download-manifest&amp;url=https://julesseg.github.io/tsk/builds/pr-112/manifest.plist">Install</a>
+      <a class="pr-link" href="https://github.com/Julesseg/tsk/pull/112">View PR #112 →</a>
+    </li>
+  </ul>
+  <p class="hint">Open this page in Safari on your iPhone, then tap Install on the build you want.</p>
+<script>
+(function () {
+  var KEY = "tsk-seen-builds";
+  var load = function () {
+    try { return new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); }
+    catch (e) { return new Set(); }
+  };
+  var save = function (set) {
+    try { localStorage.setItem(KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  };
+  var seen = load();
+  var apply = function (el) {
+    var id = el.getAttribute("data-build-id");
+    var isSeen = seen.has(id);
+    el.classList.toggle("seen", isSeen);
+    el.classList.toggle("unseen", !isSeen);
+  };
+  document.querySelectorAll("[data-build-id]").forEach(function (el) {
+    apply(el);
+    var id = el.getAttribute("data-build-id");
+    var btn = el.querySelector("a.btn");
+    if (btn) btn.addEventListener("click", function () { seen.add(id); save(seen); apply(el); });
+    el.querySelectorAll(".new-badge, .seen-tag").forEach(function (t) {
+      t.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (seen.has(id)) seen.delete(id); else seen.add(id);
+        save(seen); apply(el);
+      });
+    });
+  });
+  var ago = function (iso) {
+    var s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 10) return "just now";
+    if (s < 60) return s + "s ago";
+    var m = Math.round(s / 60);
+    if (m < 60) return m + "m ago";
+    var h = Math.round(m / 60);
+    if (h < 24) return h + "h ago";
+    return Math.round(h / 24) + "d ago";
+  };
+  document.querySelectorAll("[data-time]").forEach(function (el) {
+    el.textContent = ago(el.getAttribute("data-time"));
+  });
+})();
+</script>
+</body>
+</html>

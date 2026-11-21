@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 117,
+    "title": "perf(planner): reduce work during scrolling and selection",
+    "sha": "e569707",
+    "time": "2026-11-21T19:30:53.806Z"
+  },
+  {
+    "pr": 113,
+    "title": "feat(planner): implement Taskwarrior-backed daily planning",
+    "sha": "6114ecb",
+    "time": "2026-11-21T13:56:22.020Z"
+  },
+  {
+    "pr": 116,
+    "title": "fix(ci): avoid empty optional arrays in UI worker",
+    "sha": "ad071ac",
+    "time": "2026-11-20T17:59:07.473Z"
+  },
+  {
+    "pr": 115,
+    "title": "feat(app)!: remove retired input and system integrations",
+    "sha": "26d3105",
+    "time": "2026-11-18T14:31:09.247Z"
+  },
+  {
+    "pr": 112,
+    "title": "fix(ci): stabilize native UI input and capture simulator failures",
+    "sha": "33d5023",
+    "time": "2026-11-16T22:51:39.182Z"
+  }
+]
