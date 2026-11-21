@@ -14,12 +14,13 @@ import XCTest
         XCUIDevice.shared.appearance = .light
     }
 
-    func testPopulatedCalendarMixesTimedEventsAndTasksAcrossAppearances() throws {
+    func testPopulatedCalendarShowsEventsAboveTasksAcrossAppearances() throws {
         for (appearance, largeText) in [("light", false), ("dark", false), ("light", true)] {
             XCUIDevice.shared.appearance = appearance == "dark" ? .dark : .light
             let app = try launch("populated", largeText: largeText)
             let timed = event("Design review with the product team", app)
             XCTAssertTrue(timed.waitForExistence(timeout: 10))
+            XCTAssertTrue(dayOverview(app).exists)
             capture("Populated initial render", app)
             XCTAssertTrue(event("Team offsite", app).label.contains("All day"))
             XCTAssertTrue(event("Untitled event", app).exists)
@@ -32,9 +33,9 @@ import XCTest
             capture("Populated \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
             let task = taskRow(named: "Prepare the release", app: app)
             XCTAssertTrue(revealTaskElement(task, in: "task-list", app: app, requireFullVisibility: true))
-            XCTAssertGreaterThan(task.frame.minY, spanning.frame.minY)
-            XCTAssertLessThan(task.frame.minY, timed.frame.minY)
-            capture("Tasks among timed Calendar events \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
+            XCTAssertGreaterThanOrEqual(task.frame.minY, spanning.frame.maxY)
+            XCTAssertGreaterThanOrEqual(task.frame.minY, timed.frame.maxY)
+            capture("Tasks below the Calendar strip \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
             openTaskInformation(task, app: app)
             XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
             XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Prepare the release")
@@ -73,7 +74,8 @@ import XCTest
         openTaskInformation(task, app: app)
         XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
         tapTaskControl(app.buttons["complete-task"], app: app)
-        XCTAssertTrue(task.waitForNonExistence(timeout: 10))
+        let completed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "Completed"), object: app.staticTexts["task-detail-status"])
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 10), .completed)
     }
 
     func testDisplayedDayCalendarReadsEventsWithoutChangingTasks() throws {
@@ -81,9 +83,15 @@ import XCTest
         let app = try launch("populated", replica: replica)
         let timed = event("Design review with the product team", app)
         XCTAssertTrue(timed.waitForExistence(timeout: 10))
-        let allDay = event("Team offsite", app)
-        XCTAssertLessThan(allDay.frame.maxY, app.collectionViews["task-list"].frame.minY)
-        capture("Chronological events with compact all-day context above the list", app)
+        let task = taskRow(named: "Prepare the release", app: app)
+        XCTAssertTrue(task.isHittable)
+        XCTAssertEqual(dayOverview(app).value as? String, "8:00–18:00")
+        for title in ["Team offsite", "Overnight support", "Design review with the product team", "Untitled event"] {
+            let displayed = event(title, app)
+            XCTAssertTrue(displayed.exists)
+            XCTAssertLessThanOrEqual(displayed.frame.maxY, task.frame.minY)
+        }
+        capture("Calendar strip above the task list", app)
         let originalEventID = timed.identifier
         browseDay(1, app: app)
         let nextDayEvent = event("Design review with the product team", app)
@@ -91,6 +99,7 @@ import XCTest
         XCTAssertEqual(XCTWaiter.wait(for: [refreshed], timeout: 10), .completed)
         XCTAssertFalse(taskRow(named: "Prepare the release", app: app).exists)
         XCTAssertTrue(event("Untitled event", app).exists)
+        XCTAssertTrue(dayOverview(app).exists)
         capture("Displayed next day reads its Calendar events", app)
         browseDay(-1, app: app)
         XCTAssertTrue(taskRow(named: "Prepare the release", app: app).waitForExistence(timeout: 10))
@@ -101,10 +110,25 @@ import XCTest
         XCTAssertTrue(taskRow(named: "Prepare the release", app: reopened).waitForExistence(timeout: 10))
         XCTAssertTrue(event("Team offsite", reopened).exists)
         openCalendarSettings(reopened)
-        XCTAssertFalse(reopened.steppers["calendar-start-hour"].exists)
-        XCTAssertFalse(reopened.steppers["calendar-end-hour"].exists)
+        let start = reopened.steppers["calendar-start-hour"]
+        let end = reopened.steppers["calendar-end-hour"]
+        XCTAssertEqual(start.value as? String, "08:00")
+        XCTAssertEqual(end.value as? String, "18:00")
         XCTAssertTrue(reopened.switches["calendar-visibility-presentation"].exists)
-        capture("Calendar settings retain visibility without obsolete overview hours", reopened)
+        capture("Calendar settings with restored hour controls", reopened)
+        for _ in 0..<3 { tapTaskControl(start.buttons["calendar-start-hour-Increment"], app: reopened) }
+        XCTAssertEqual(start.value as? String, "11:00")
+        reopened.terminate()
+
+        let configured = try launch("populated", replica: replica)
+        let overview = dayOverview(configured)
+        XCTAssertTrue(overview.waitForExistence(timeout: 10))
+        XCTAssertEqual(overview.value as? String, "11:00–18:00")
+        let outsideHours = event("Design review with the product team", configured)
+        XCTAssertTrue(outsideHours.exists)
+        XCTAssertLessThanOrEqual(overview.frame.maxY, outsideHours.frame.minY)
+        XCTAssertLessThanOrEqual(outsideHours.frame.maxY, taskRow(named: "Prepare the release", app: configured).frame.minY)
+        capture("Saved hours keep out-of-hours events above tasks", configured)
     }
 
     func testCalendarVisibilityTogglesFilterIndependentlyAndPersistAcrossLaunches() throws {
@@ -176,12 +200,13 @@ import XCTest
         let date = app.buttons["planner-date-\(Int(destination.timeIntervalSince1970))"]
         XCTAssertTrue(date.waitForExistence(timeout: 5))
         date.tap()
-        XCTAssertEqual(pill.value as? String, String(Int(destination.timeIntervalSince1970)))
+        let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", String(Int(destination.timeIntervalSince1970))), object: pill)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
     }
 
     private func assertCalendarHidden(_ app: XCUIApplication) {
         assertTodayTaskList(app)
-        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch.exists)
+        XCTAssertFalse(dayOverview(app).exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'calendar-event-'")).firstMatch.exists)
         XCTAssertFalse(app.buttons["calendar-request-access"].exists)
         XCTAssertFalse(app.buttons["calendar-refresh"].exists)
@@ -221,6 +246,10 @@ import XCTest
 
     private func event(_ title: String, _ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "calendar-event-", title)).firstMatch
+    }
+
+    private func dayOverview(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "calendar-day-overview").firstMatch
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

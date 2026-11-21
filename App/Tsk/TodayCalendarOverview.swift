@@ -4,6 +4,7 @@ import TskCore
 struct TodayCalendarOverview: View {
     let snapshot: TodayCalendarSnapshot
     let hours: CalendarDisplayHours
+    let acceptsTaskDrops: Bool
     @ScaledMetric(relativeTo: .caption2) private var labelSize = 10
 
     private var overview: CalendarOverview { CalendarOverview(snapshot: snapshot, hours: hours) }
@@ -22,9 +23,11 @@ struct TodayCalendarOverview: View {
                                 .font(.system(size: labelSize))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .background(Color(uiColor: .systemGroupedBackground))
+                                .calendarDropTarget(item.value.event, enabled: acceptsTaskDrops)
                                 .accessibilityLabel("\(item.value.calendarTimeDescription(timeZone: snapshot.timeZone)), \(item.value.event.title.isEmpty ? "Untitled event" : item.value.event.title)")
                                 .accessibilityIdentifier("calendar-event-\(item.value.accessibilityEventID)")
                             Capsule().fill(item.value.event.color?.swiftUIColor ?? .secondary)
+                                .calendarDropTarget(item.value.event, enabled: acceptsTaskDrops)
                                 .accessibilityHidden(true)
                         }
                     }
@@ -37,6 +40,7 @@ struct TodayCalendarOverview: View {
             }
             ForEach(overview.outsideHours) { value in
                 TodayCalendarRow(value: value, timeZone: snapshot.timeZone)
+                    .calendarDropTarget(value.event, enabled: acceptsTaskDrops)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -67,6 +71,19 @@ struct TodayCalendarOverview: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+private extension View {
+    func calendarDropTarget(_ event: CalendarEventSnapshot, enabled: Bool) -> some View {
+        background {
+            if enabled {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: TaskCalendarDropTargetsKey.self,
+                        value: [TaskCalendarDropTarget(event: event, bounds: geometry.frame(in: .global))])
+                }
+            }
+        }
     }
 }
 
