@@ -33,14 +33,13 @@ extension XCTestCase {
 
     @MainActor func openWorkspaceView(_ title: String, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
         let heading = app.staticTexts["workspace-title-text"]
-        let identifiers = ["Today": "open-today", "Inbox": "open-inbox", "Projects": "open-projects"]
         if !(heading.exists && heading.label == title) {
-            guard let identifier = identifiers[title] else { XCTFail("Unknown workspace: " + title, file: file, line: line); return }
             if app.buttons["back-from-task-action"].exists {
                 tapTaskControl(app.buttons["back-from-task-action"], app: app, beforeSample: beforeSample, file: file, line: line)
             }
             if !(heading.exists && heading.label == title) {
-                tapTaskControl(app.buttons[identifier], app: app, beforeSample: beforeSample, file: file, line: line)
+                tapTaskControl(app.buttons["workspace-menu"], app: app, beforeSample: beforeSample, file: file, line: line)
+                tapTaskControl(app.buttons[title == "Today" ? "Planner" : title], app: app, beforeSample: beforeSample, file: file, line: line)
             }
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in heading.exists && heading.label == title }, object: nil)
