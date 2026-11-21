@@ -204,15 +204,21 @@ import XCTest
         XCTAssertLessThanOrEqual(try XCTUnwrap(measurements["maximumVerticalDrift"] as? Double), 1, "Value changes must not move the bottom actions during animation")
         captureBulkDateEvidence("Animation-enabled picker after value changes", app: app)
         let includeTime = app.switches["selection-set-time"]
-        XCTAssertEqual(includeTime.value as? String, "1")
-        turnOffTime(includeTime, app: app)
-        captureBulkDateEvidence("Bulk Scheduled date without time", app: app)
-        app.buttons["close-selection-date"].tap()
-        app.buttons["selection-deadline"].tap()
-        XCTAssertEqual(includeTime.value as? String, "1")
-        turnOffTime(includeTime, app: app)
-        captureBulkDateEvidence("Bulk Deadline date without time", app: app)
-        app.buttons["close-selection-date"].tap()
+        let time = app.datePickers["selection-time-picker"]
+        for field in ["scheduled", "deadline"] {
+            if field == "deadline" { app.buttons["selection-deadline"].tap() }
+            let calendar = app.datePickers[field + "-picker"]
+            XCTAssertTrue(time.waitForExistence(timeout: 5))
+            XCTAssertEqual(includeTime.value as? String, "1")
+            XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
+            XCTAssertLessThanOrEqual(includeTime.frame.maxY, time.frame.minY)
+            captureBulkDateEvidence("Bulk \(field) date and time separated by the toggle", app: app)
+            turnOffTime(includeTime, app: app)
+            XCTAssertTrue(time.waitForNonExistence(timeout: 5))
+            XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
+            captureBulkDateEvidence("Bulk \(field) date without time", app: app)
+            app.buttons["close-selection-date"].tap()
+        }
         app.buttons["cancel-task-selection"].tap()
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 5))
     }

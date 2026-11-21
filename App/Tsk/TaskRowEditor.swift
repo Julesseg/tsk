@@ -280,7 +280,13 @@ struct TaskRowParameterPicker: View {
             case .tags:
                 TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
             default:
-                if parameter == .scheduled {
+                let isScheduled = parameter == .scheduled
+                let hasTime = editing.draft.taskDraft.scheduled()?.hasTime == true
+                TaskParameterDatePicker(parameter: parameter,
+                                        selection: isScheduled ? $selectedDate.calendarDay(includesTime: hasTime) : $selectedDate,
+                                        includesTime: !isScheduled, minimumDate: isScheduled && !hasTime ? today : nil)
+                    .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
+                if isScheduled {
                     Toggle("Include time", isOn: Binding(
                         get: { editing.draft.taskDraft.scheduled()?.hasTime ?? false },
                         set: { hasTime in
@@ -289,11 +295,12 @@ struct TaskRowParameterPicker: View {
                         }
                     ))
                     .accessibilityIdentifier("scheduled-has-time")
+                    if hasTime {
+                        DatePicker("Time", selection: $selectedDate, displayedComponents: .hourAndMinute)
+                            .datePickerStyle(.compact)
+                            .accessibilityIdentifier("scheduled-time-picker")
+                    }
                 }
-                TaskParameterDatePicker(parameter: parameter, selection: $selectedDate,
-                                        includesTime: parameter != .scheduled || editing.draft.taskDraft.scheduled()?.hasTime == true,
-                                        minimumDate: parameter == .scheduled && editing.draft.taskDraft.scheduled()?.hasTime != true ? today : nil)
-                    .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
             }
             if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
                 Button("Remove " + parameter.title.lowercased(), role: .destructive) {

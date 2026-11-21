@@ -16,6 +16,13 @@ struct TaskPlanningSection: View {
                 if let date = draft.plannedDate {
                     let hasTime = draft.scheduled()?.hasTime == true
                     let today = Calendar.current.startOfDay(for: now)
+                    let selection = Binding(
+                        get: { hasTime ? date : max(date, today) },
+                        set: { draft.setScheduled(TaskScheduledDate(date: $0, hasTime: hasTime)) }
+                    )
+                    DatePicker("Scheduled", selection: selection.calendarDay(includesTime: hasTime),
+                               in: (hasTime ? Date.distantPast : today)..., displayedComponents: .date)
+                        .accessibilityIdentifier("planned-day-picker")
                     Toggle("Include time", isOn: Binding(
                         get: { draft.scheduled()?.hasTime ?? false },
                         set: { hasTime in
@@ -24,11 +31,11 @@ struct TaskPlanningSection: View {
                         }
                     ))
                     .accessibilityIdentifier("planned-day-has-time")
-                    DatePicker("Scheduled", selection: Binding(
-                        get: { hasTime ? date : max(date, today) },
-                        set: { draft.setScheduled(TaskScheduledDate(date: $0, hasTime: draft.scheduled()?.hasTime ?? false)) }
-                    ), in: (hasTime ? Date.distantPast : today)..., displayedComponents: hasTime ? [.date, .hourAndMinute] : [.date])
-                    .accessibilityIdentifier("planned-day-picker")
+                    if hasTime {
+                        DatePicker("Time", selection: selection, displayedComponents: .hourAndMinute)
+                            .datePickerStyle(.compact)
+                            .accessibilityIdentifier("planned-time-picker")
+                    }
                 } else {
                     Text("Unrecognized scheduled date: \(draft.attributes["scheduled"] ?? "")").font(.caption)
                 }
@@ -48,5 +55,21 @@ struct TaskPlanningSection: View {
             Text("Scheduled is the day, with an optional time, when you intend to work. The deadline is when the task must be finished.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
+    }
+}
+
+extension Binding where Value == Date {
+    func calendarDay(includesTime: Bool) -> Self {
+        Binding(get: { wrappedValue }, set: { day in
+            let calendar = Calendar.autoupdatingCurrent
+            if includesTime {
+                let time = calendar.dateComponents([.hour, .minute, .second], from: wrappedValue)
+                if let date = calendar.date(bySettingHour: time.hour ?? 0, minute: time.minute ?? 0, second: time.second ?? 0, of: day) {
+                    wrappedValue = date
+                }
+            } else {
+                wrappedValue = calendar.startOfDay(for: day)
+            }
+        })
     }
 }

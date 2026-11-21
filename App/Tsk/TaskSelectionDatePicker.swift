@@ -68,11 +68,17 @@ struct TaskSelectionDatePicker: View {
                 .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
                 .accessibilityIdentifier("close-selection-date")
             }
+            TaskSelectionCalendar(calendars: calendars, field: field,
+                                  selection: selectedDate.calendarDay(includesTime: includesTime), minimumDate: minimumDate)
+                .fixedSize(horizontal: false, vertical: true)
             Toggle("Set time", isOn: Binding(get: { includesTime }, set: { setDate(selectedDate.wrappedValue, hasTime: $0) }))
                 .font(.subheadline)
                 .accessibilityIdentifier("selection-set-time")
-            TaskSelectionCalendar(calendars: calendars, field: field, selection: selectedDate, includesTime: includesTime, minimumDate: minimumDate)
-                .fixedSize(horizontal: false, vertical: true)
+            if includesTime {
+                DatePicker("Time", selection: selectedDate, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.compact)
+                    .accessibilityIdentifier("selection-time-picker")
+            }
             HStack(spacing: 6) {
                 Button { store.resetSelectionDate(field) } label: {
                     actionLabel("Reset", symbol: "arrow.counterclockwise", color: .orange)

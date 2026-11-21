@@ -320,8 +320,12 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
         setScheduledTime(true, app: app)
         let picker = app.datePickers["scheduled-picker"]
-        let timeControl = picker.buttons.matching(NSPredicate(format: "label CONTAINS ':' OR value CONTAINS ':'")).firstMatch
-        XCTAssertTrue(timeControl.exists, "Scheduled must expose its native time control: " + picker.debugDescription)
+        let toggle = app.switches["scheduled-has-time"].firstMatch
+        let timeControl = app.datePickers["scheduled-time-picker"]
+        XCTAssertTrue(timeControl.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(picker.frame.maxY, toggle.frame.minY)
+        XCTAssertLessThanOrEqual(toggle.frame.maxY, timeControl.frame.minY)
+        capture("Inline Scheduled date and time separated by the toggle", app: app)
         picker.buttons["Sunday, October 18"].tap()
         app.buttons["close-row-parameter"].tap()
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, scheduled(on: 18))
@@ -333,7 +337,13 @@ final class TaskScheduledUITests: XCTestCase {
         app.buttons["edit-task"].tap()
         tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app)
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(revealTaskElement(app.datePickers["planned-day-picker"], in: "task-editor-form", app: app, bottomInset: app.buttons["dismiss-editor-keyboard"]))
+        let plannedDay = app.datePickers["planned-day-picker"]
+        let plannedTime = app.datePickers["planned-time-picker"]
+        let plannedToggle = app.switches["planned-day-has-time"].firstMatch
+        XCTAssertTrue(revealTaskElement(plannedTime, in: "task-editor-form", app: app, bottomInset: app.buttons["dismiss-editor-keyboard"]))
+        XCTAssertLessThanOrEqual(plannedDay.frame.maxY, plannedToggle.frame.minY)
+        XCTAssertLessThanOrEqual(plannedToggle.frame.maxY, plannedTime.frame.minY)
+        capture("Task editor Scheduled date and time separated by the toggle", app: app)
         let tomorrow = app.buttons["plan-tomorrow"]
         XCTAssertTrue(revealTaskElement(tomorrow, in: "task-editor-form", app: app, initialScrollUp: false, bottomInset: app.buttons["dismiss-editor-keyboard"]))
         tomorrow.tap()
