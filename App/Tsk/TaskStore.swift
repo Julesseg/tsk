@@ -25,7 +25,7 @@ final class TaskStore {
         if !isDayPage { selectWorkspaceView(.today) }
         let nextDay = Calendar.autoupdatingCurrent.startOfDay(for: day)
         if displayedDay != nextDay { tasks = cachedTasks ?? [] }
-        plannerDay = nextDay
+        plannerDay = Calendar.autoupdatingCurrent.isDate(nextDay, inSameDayAs: currentDate) ? nil : nextDay
         captureConfirmation = nil
         Task { await reload() }
     }
@@ -133,6 +133,7 @@ final class TaskStore {
     var isLoading = false
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
+    var nextDayBoundary: Date? { fixedDate == nil ? Calendar.autoupdatingCurrent.dateInterval(of: .day, for: currentDate)?.end : nil }
     let completionFeedback = TaskCompletionFeedback()
     #if DEBUG
     var selectionGestureProof = ""
@@ -197,7 +198,7 @@ final class TaskStore {
         isSaving = true
         defer { isSaving = false }
         do {
-            _ = try await manager.schedule(ids: ordered + remaining, change: .day(day))
+            _ = try await manager.schedule(ids: ordered + remaining, change: .intent(.init(date: day, hasTime: false)))
             if generation == taskSelectionGeneration { endTaskSelection() }
             await reload()
             return true
@@ -216,7 +217,7 @@ final class TaskStore {
         endTaskSelection()
         captureConfirmation = nil
         let context: TaskCaptureContext
-        if isDayPage { context = .day(displayedDay) }
+        if isDayPage { context = displayedDay < Calendar.autoupdatingCurrent.startOfDay(for: currentDate) ? .inbox : .day(displayedDay) }
         else if let name = projectSelection.projectName { context = .project(name) }
         else { context = .inbox }
         let draft = TaskRowDraft(capturing: context)
@@ -311,6 +312,10 @@ final class TaskStore {
         let requestedProject = projectSelection
         isLoading = true
         defer { if generation == reloadGeneration { isLoading = false } }
+        var rolloverError: String?
+        do { try await manager.rollOverUntimedScheduledTasks() }
+        catch { rolloverError = error.localizedDescription }
+        guard !Task.isCancelled else { return }
         do {
             let snapshot: TaskViewSnapshot
             if let requestedDay { snapshot = try await manager.dayPageSnapshot(on: requestedDay) }
@@ -321,7 +326,7 @@ final class TaskStore {
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil
             filterRefreshGeneration += 1
-            error = nil
+            error = rolloverError
         } catch {
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, (isDayPage ? displayedDay : nil) == requestedDay else { return }
             self.error = error.localizedDescription

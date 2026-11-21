@@ -14,18 +14,20 @@ struct TaskPlanningSection: View {
             .accessibilityIdentifier("planned-day-enabled")
             if draft.attributes["scheduled"] != nil {
                 if let date = draft.plannedDate {
+                    let hasTime = draft.scheduled()?.hasTime == true
+                    let today = Calendar.current.startOfDay(for: now)
                     Toggle("Include time", isOn: Binding(
                         get: { draft.scheduled()?.hasTime ?? false },
                         set: { hasTime in
-                            let value = hasTime ? date : Calendar.current.startOfDay(for: date)
+                            let value = hasTime ? date : max(today, Calendar.current.startOfDay(for: date))
                             draft.setScheduled(TaskScheduledDate(date: value, hasTime: hasTime))
                         }
                     ))
                     .accessibilityIdentifier("planned-day-has-time")
                     DatePicker("Scheduled", selection: Binding(
-                        get: { date },
+                        get: { hasTime ? date : max(date, today) },
                         set: { draft.setScheduled(TaskScheduledDate(date: $0, hasTime: draft.scheduled()?.hasTime ?? false)) }
-                    ), displayedComponents: draft.scheduled()?.hasTime == true ? [.date, .hourAndMinute] : [.date])
+                    ), in: (hasTime ? Date.distantPast : today)..., displayedComponents: hasTime ? [.date, .hourAndMinute] : [.date])
                     .accessibilityIdentifier("planned-day-picker")
                 } else {
                     Text("Unrecognized scheduled date: \(draft.attributes["scheduled"] ?? "")").font(.caption)

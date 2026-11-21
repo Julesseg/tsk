@@ -25,9 +25,7 @@ public extension TaskRecord {
 
     func plannerDate(calendar: Calendar = .autoupdatingCurrent) -> TaskScheduledDate? {
         if let scheduled = scheduled(calendar: calendar) { return scheduled }
-        guard let deadline else { return nil }
-        let clock = calendar.dateComponents([.hour, .minute, .second], from: deadline)
-        return TaskScheduledDate(date: deadline, hasTime: clock.hour != 0 || clock.minute != 0 || clock.second != 0)
+        return TaskScheduledDate.read(from: attributes, field: .deadline, calendar: calendar, inferDeadlinePrecision: true)
     }
 
     internal func isOnDay(_ day: Date, at now: Date, calendar: Calendar) -> Bool {
@@ -68,7 +66,40 @@ public extension TaskDraft {
 
     var deadline: Date? {
         get { planningDate(attributes["due"]) }
-        set { attributes["due"] = newValue.map { String(Int($0.timeIntervalSince1970)) } }
+        set {
+            let raw = newValue.map { String(Int($0.timeIntervalSince1970)) }
+            if raw != attributes["due"] { attributes[TaskScheduledDate.deadlineAttribute] = nil }
+            attributes["due"] = raw
+        }
+    }
+}
+
+public extension TaskManager {
+    func rollOverUntimedScheduledTasks() async throws {
+        let today = calendar.startOfDay(for: now())
+        let candidates = try await replica.tasks()
+        guard candidates.contains(where: { needsScheduledRollover($0, today: today) }) else { return }
+
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
+        let currentDay = calendar.startOfDay(for: now())
+        let records = try await replica.tasks()
+        let incoming = records.filter { needsScheduledRollover($0, today: currentDay) }
+            .sorted { TaskPlannerOrder.precedes($0, $1, on: currentDay, calendar: calendar) }
+            .map { task in
+                var rolled = task
+                var draft = TaskDraft(attributes: task.attributes)
+                draft.setScheduled(.init(date: currentDay, hasTime: false))
+                rolled.attributes = draft.attributes
+                return rolled
+            }
+        guard !incoming.isEmpty else { return }
+        _ = try await saveOrder(appendingIncoming(incoming, to: records), context: .day(currentDay), records: records)
+    }
+
+    private func needsScheduledRollover(_ task: TaskRecord, today: Date) -> Bool {
+        guard task.canComplete, let intent = task.scheduled(calendar: calendar) else { return false }
+        return !intent.hasTime && intent.date < today
     }
 }
 

@@ -2,6 +2,33 @@ import Foundation
 import Testing
 import TskCore
 
+@Test func explicitBulkDatesClearExistingTimesAndRejectPastUntimedScheduledDates() async throws {
+    let calendar = Calendar(identifier: .iso8601)
+    let now = Date(timeIntervalSince1970: 1792144800)
+    let today = calendar.startOfDay(for: now)
+    let yesterday = try #require(calendar.date(byAdding: .day, value: -1, to: today))
+    let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "1792144800", "due": "1792238400", "wait": "1792100000"])
+    let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "due": "1792238400"])
+    let replica = OccurrenceReplica(records: [first, second])
+    let manager = TaskManager(replica: replica, now: { now }, calendar: calendar)
+    let ids = [first.id, second.id]
+    let past = TaskScheduledDate(date: yesterday, hasTime: false)
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.schedule(ids: ids, change: .intent(past)) }
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.applySelection(ids: ids, changes: .init(scheduled: .exact(past), deadline: .remove)) }
+    var draft = TaskDraft(description: "Past")
+    draft.setScheduled(past)
+    let pastDraft = draft
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.create(pastDraft) }
+    #expect(await replica.records == [first, second])
+
+    let ready = try await manager.schedule(ids: ids, change: .intent(.init(date: now, hasTime: false)))
+    #expect(ready.count == 2 && ready.allSatisfy { $0.scheduled(calendar: calendar) == .init(date: today, hasTime: false) && $0.deadline == first.deadline })
+    let midnight = TaskScheduledDate(date: yesterday, hasTime: true)
+    let saved = try await manager.applySelection(ids: ids, changes: .init(scheduled: .exact(midnight), deadline: .exact(past)))
+    #expect(saved.count == 2 && saved.allSatisfy { $0.scheduled(calendar: calendar) == midnight && $0.dateIntent(for: .deadline, calendar: calendar) == past })
+    #expect(saved.first { $0.id == first.id }?.waitUntil == first.waitUntil)
+}
+
 @Test func bulkScheduledDateChangesOnlyTheChosenFieldAndDeduplicatesMixedTasks() async throws {
     let first = TaskRecord(id: UUID(), attributes: ["description": "First", "status": "pending", "scheduled": "200", "due": "400", "wait": "50", "opaque": "e\u{301}"])
     let second = TaskRecord(id: UUID(), attributes: ["description": "Second", "status": "pending", "due": "600", "project": "work"])

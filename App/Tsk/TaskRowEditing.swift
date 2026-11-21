@@ -173,7 +173,12 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
     func value(in draft: TaskDraft) -> String? {
         if self == .tags { return draft.tags.isEmpty ? nil : draft.tags.joined(separator: ", ") }
         if let date = date(in: draft) {
-            return date.formatted(date: .abbreviated, time: self == .scheduled && draft.scheduled()?.hasTime != true ? .omitted : .shortened)
+            let hasTime = switch self {
+            case .scheduled: draft.scheduled()?.hasTime == true
+            case .deadline: draft.dateIntent(for: .deadline)?.hasTime == true
+            default: true
+            }
+            return date.formatted(date: .abbreviated, time: hasTime ? .shortened : .omitted)
         }
         guard let raw = draft.attributes[attribute], !raw.isEmpty else { return nil }
         switch self {

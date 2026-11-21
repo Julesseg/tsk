@@ -226,6 +226,7 @@ struct TaskRowParameterPicker: View {
     let parameter: TaskRowParameter
     let tags: [String]
     let dismiss: () -> Void
+    private let today: Date
     @State private var selectedDate: Date
     @State private var contentHeight: CGFloat = 400
     @State private var tagError: String?
@@ -235,7 +236,10 @@ struct TaskRowParameterPicker: View {
         self.parameter = parameter
         self.tags = tags
         self.dismiss = dismiss
-        _selectedDate = State(initialValue: parameter.date(in: editing.draft.taskDraft) ?? (parameter == .scheduled ? Calendar.current.startOfDay(for: now) : now))
+        today = Calendar.current.startOfDay(for: now)
+        var initial = parameter.date(in: editing.draft.taskDraft) ?? (parameter == .scheduled ? today : now)
+        if parameter == .scheduled, editing.draft.taskDraft.scheduled()?.hasTime != true { initial = max(today, initial) }
+        _selectedDate = State(initialValue: initial)
     }
 
     var body: some View {
@@ -280,14 +284,15 @@ struct TaskRowParameterPicker: View {
                     Toggle("Include time", isOn: Binding(
                         get: { editing.draft.taskDraft.scheduled()?.hasTime ?? false },
                         set: { hasTime in
-                            if !hasTime { selectedDate = Calendar.current.startOfDay(for: selectedDate) }
+                            if !hasTime { selectedDate = max(today, Calendar.current.startOfDay(for: selectedDate)) }
                             editing.draft.taskDraft.setScheduled(TaskScheduledDate(date: selectedDate, hasTime: hasTime))
                         }
                     ))
                     .accessibilityIdentifier("scheduled-has-time")
                 }
                 TaskParameterDatePicker(parameter: parameter, selection: $selectedDate,
-                                        includesTime: parameter != .scheduled || editing.draft.taskDraft.scheduled()?.hasTime == true)
+                                        includesTime: parameter != .scheduled || editing.draft.taskDraft.scheduled()?.hasTime == true,
+                                        minimumDate: parameter == .scheduled && editing.draft.taskDraft.scheduled()?.hasTime != true ? today : nil)
                     .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
             }
             if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
@@ -326,9 +331,10 @@ struct TaskParameterDatePicker: View {
     let parameter: TaskRowParameter
     @Binding var selection: Date
     var includesTime = true
+    var minimumDate: Date?
 
     var body: some View {
-        DatePicker(parameter.title, selection: $selection, displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
+        DatePicker(parameter.title, selection: $selection, in: (minimumDate ?? .distantPast)..., displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
             .datePickerStyle(.graphical)
             .labelsHidden()
             .accessibilityLabel(parameter.title)

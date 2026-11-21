@@ -226,7 +226,7 @@ private actor CaptureReplica: TaskReplica {
 @MainActor @Test func workspaceCaptureDefaultsStaySeparateFromExternalActions() async throws {
     let manager = TaskManager(replica: CaptureReplica())
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
-    let day = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1792281600))
+    let day = try #require(Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())))
     for (view, project, scheduled) in [(WorkspaceView.today, "", Optional(day)), (.projects, "Work", nil), (.inbox, "", nil)] {
         store.selectWorkspaceView(view)
         if view == .today { store.plannerDay = day }

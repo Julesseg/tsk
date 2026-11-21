@@ -18,6 +18,12 @@ struct TaskSelectionDatePicker: View {
     }
 
     private var parameter: TaskRowParameter { field == .scheduled ? .scheduled : .deadline }
+    private var includesTime: Bool {
+        if case .exact(let intent) = store.selectionChanges[field] { return intent.hasTime }
+        return store.selectionTasks.contains { $0.dateIntent(for: field)?.hasTime == true }
+    }
+
+    private var minimumDate: Date? { field == .scheduled && !includesTime ? referenceDay : nil }
 
     private var selectedDate: Binding<Date> {
         Binding(get: {
@@ -25,12 +31,26 @@ struct TaskSelectionDatePicker: View {
             let first = values.first ?? nil
             let common = values.allSatisfy { $0 == first } ? first : nil
             let original = field == .scheduled ? store.selectionTasks.first?.plannedDate : store.selectionTasks.first?.deadline
-            if let change = store.selectionChanges[field], let date = try? change.resolvedDate(replacing: common) { return date }
-            return common == nil ? referenceDay : original ?? referenceDay
+            let edited = store.selectionChanges[field].flatMap { try? $0.resolvedDate(replacing: common) }
+            let date = edited ?? (common == nil ? referenceDay : original ?? referenceDay)
+            return minimumDate.map { max($0, date) } ?? date
         }, set: { date in
-            store.error = nil
-            store.selectionChanges[field] = .set(date)
+            setDate(date, hasTime: includesTime)
         })
+    }
+
+    private func setDate(_ date: Date, hasTime: Bool) {
+        let untimedDay = Calendar.autoupdatingCurrent.startOfDay(for: date)
+        let value = hasTime ? date : field == .scheduled ? max(referenceDay, untimedDay) : untimedDay
+        store.error = nil
+        store.selectionChanges[field] = .exact(.init(date: value, hasTime: hasTime))
+    }
+
+    private func shortcut(to day: Date) -> TaskDateChange {
+        if case .exact(let intent) = store.selectionChanges[field], !intent.hasTime {
+            return .exact(.init(date: day, hasTime: false))
+        }
+        return .day(day)
     }
 
     var body: some View {
@@ -48,7 +68,10 @@ struct TaskSelectionDatePicker: View {
                 .accessibilityLabel("Close " + parameter.title.lowercased() + " picker")
                 .accessibilityIdentifier("close-selection-date")
             }
-            TaskSelectionCalendar(calendars: calendars, field: field, selection: selectedDate)
+            Toggle("Set time", isOn: Binding(get: { includesTime }, set: { setDate(selectedDate.wrappedValue, hasTime: $0) }))
+                .font(.subheadline)
+                .accessibilityIdentifier("selection-set-time")
+            TaskSelectionCalendar(calendars: calendars, field: field, selection: selectedDate, includesTime: includesTime, minimumDate: minimumDate)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
                 Button { store.resetSelectionDate(field) } label: {
@@ -58,9 +81,9 @@ struct TaskSelectionDatePicker: View {
                 .accessibilityLabel("Reset " + parameter.title.lowercased())
                 .accessibilityIdentifier("reset-selection-date")
                 choice("Remove", id: "remove", change: .remove, symbol: "trash", color: .red)
-                choice("Today", id: "today", change: .day(referenceDay))
+                choice("Today", id: "today", change: shortcut(to: referenceDay))
                 if let tomorrow = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: referenceDay) {
-                    choice("Tomorrow", id: "tomorrow", change: .day(tomorrow))
+                    choice("Tomorrow", id: "tomorrow", change: shortcut(to: tomorrow))
                 }
             }
             .font(.caption.weight(.semibold))
@@ -113,6 +136,7 @@ struct TaskSelectionDatePicker: View {
         case .remove: "Remove \(parameter.title.lowercased()) when you tap Apply."
         case .day(let date): "\(date.formatted(date: .abbreviated, time: .omitted)). Existing times are kept. Tap Apply to save."
         case .set(let date): "\(date.formatted(date: .abbreviated, time: .shortened)). Tap Apply to save."
+        case .exact(let intent): "\(intent.date.formatted(date: .abbreviated, time: intent.hasTime ? .shortened : .omitted)). Tap Apply to save."
         }
     }
 }

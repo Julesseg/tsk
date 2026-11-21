@@ -4,11 +4,13 @@ public enum TaskDateField: String, Sendable, CaseIterable {
     case scheduled, deadline
 
     var attribute: String { self == .scheduled ? "scheduled" : "due" }
+    var precisionAttribute: String { self == .scheduled ? TaskScheduledDate.attribute : TaskScheduledDate.deadlineAttribute }
 }
 
 public enum TaskDateChange: Equatable, Sendable {
     case set(Date)
     case day(Date)
+    case exact(TaskScheduledDate)
     case remove
 
     public func resolvedDate(replacing raw: String?, calendar: Calendar = .autoupdatingCurrent) throws -> Date? {
@@ -20,6 +22,11 @@ public enum TaskDateChange: Equatable, Sendable {
         switch self {
         case .remove: return nil
         case .set(let value): date = value
+        case .exact(let intent):
+            guard intent.date.timeIntervalSince1970.isFinite, abs(intent.date.timeIntervalSince1970) <= 253402300799 else {
+                throw TaskReschedulingError.invalidDate
+            }
+            date = intent.hasTime ? intent.date : calendar.startOfDay(for: intent.date)
         case .day(let day):
             guard day.timeIntervalSince1970.isFinite, abs(day.timeIntervalSince1970) <= 253402300799 else {
                 throw TaskManagementError.storage("Choose a valid calendar day. No tasks were changed.")
@@ -34,6 +41,31 @@ public enum TaskDateChange: Equatable, Sendable {
             throw TaskManagementError.storage("Choose a valid date. No tasks were changed.")
         }
         return String(Int(seconds))
+    }
+
+    func patch(for task: TaskRecord, field: TaskDateField, calendar: Calendar) throws -> TaskAttributePatch {
+        let original = task.attributes[field.attribute]
+        let raw = try value(replacing: original, calendar: calendar)
+        let date = planningDate(raw)
+        var draft = TaskDraft(attributes: task.attributes)
+        switch self {
+        case .exact(let explicit):
+            let intent = date.map { TaskScheduledDate(date: $0, hasTime: explicit.hasTime) }
+            draft.setDateIntent(intent, for: field)
+        case .day:
+            draft.attributes[field.attribute] = raw
+            if task.attributes[field.precisionAttribute] != nil, let date,
+               let originalIntent = task.dateIntent(for: field, calendar: calendar) {
+                draft.setDateIntent(TaskScheduledDate(date: date, hasTime: originalIntent.hasTime), for: field)
+            }
+        case .set:
+            if raw != original {
+                draft.attributes[field.attribute] = raw
+                draft.attributes[field.precisionAttribute] = nil
+            }
+        case .remove: draft.setDateIntent(nil, for: field)
+        }
+        return draft.attributes.changes(comparedTo: task.attributes)
     }
 }
 
@@ -60,7 +92,7 @@ public struct TaskSelectionChanges: Equatable, Sendable {
 
     public func modifies(_ field: TaskDateField, tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) throws -> Bool {
         guard let change = self[field] else { return false }
-        return try tasks.contains { try change.value(replacing: $0.attributes[field.attribute], calendar: calendar) != $0.attributes[field.attribute] }
+        return try tasks.contains { try !change.patch(for: $0, field: field, calendar: calendar).isEmpty }
     }
 }
 
@@ -87,22 +119,12 @@ extension TaskManager {
             var patch: TaskAttributePatch = [:]
             for field in TaskDateField.allCases {
                 if let change = changes[field] {
-                    let value = try change.value(replacing: task.attributes[field.attribute], calendar: calendar)
-                    if value != task.attributes[field.attribute] { patch.updateValue(value, forKey: field.attribute) }
-                    if field == .scheduled {
-                        var draft = TaskDraft(attributes: task.attributes)
-                        switch change {
-                        case .day(let day): draft.schedule(on: day, calendar: calendar)
-                        case .remove: draft.setScheduled(nil)
-                        case .set:
-                            if value != task.attributes["scheduled"] { draft.plannedDate = planningDate(value) }
-                        }
-                        if draft.attributes[TaskScheduledDate.attribute] != task.attributes[TaskScheduledDate.attribute] {
-                            patch.updateValue(draft.attributes[TaskScheduledDate.attribute], forKey: TaskScheduledDate.attribute)
-                        }
+                    for (key, value) in try change.patch(for: task, field: field, calendar: calendar) {
+                        patch.updateValue(value, forKey: key)
                     }
                 }
             }
+            try validateScheduledChange(patch, original: task.attributes, at: instant)
             if changes.complete {
                 var placed = task
                 for (key, value) in patch { placed.attributes[key] = value }

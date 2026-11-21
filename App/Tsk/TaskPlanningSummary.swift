@@ -12,8 +12,10 @@ struct TaskPlanningSummary: View {
         } else if let raw = task.attributes["scheduled"] {
             LabeledContent("Scheduled", value: "Unrecognized date: \(raw)")
         }
-        if let date = task.deadline {
-            LabeledContent("Deadline") { Text(date, format: .dateTime.day().month().year().hour().minute()) }
+        if let intent = task.dateIntent(for: .deadline) {
+            LabeledContent("Deadline") {
+                Text(intent.date.formatted(date: .abbreviated, time: intent.hasTime ? .shortened : .omitted))
+            }
                 .accessibilityIdentifier("task-deadline")
         } else if let raw = task.attributes["due"] {
             LabeledContent("Deadline", value: "Unrecognized date: \(raw)")
@@ -33,10 +35,10 @@ struct TaskPlanningCaption: View {
     @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 10
 
     var body: some View {
-        if let deadline = task.deadline, let offset = task.deadlineDayOffset(relativeTo: today) {
+        if let deadline = task.dateIntent(for: .deadline), let offset = task.deadlineDayOffset(relativeTo: today) {
             Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
                 .font(.system(size: textSize))
-                .foregroundStyle(task.status == "pending" && deadline < today ? Color.red : Color.secondary)
+                .foregroundStyle(task.status == "pending" && (deadline.hasTime ? deadline.date < today : offset < 0) ? Color.red : Color.secondary)
                 .accessibilityLabel("Deadline \(label(offset))")
                 .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
         }

@@ -18,7 +18,7 @@ Each unfinished task has at most one actionable planner placement:
 
 Deadline remains independent and appears in task detail. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
 
-Unfinished tasks whose effective planner date precedes today appear on Today until completed or rescheduled. This carryover changes visibility without rewriting dates overnight. They do not also remain actionable on their original past page. Waiting tasks that qualify remain visible with their reason. Order each day page by carried Scheduled date and time, then Deadline-only tasks by deadline, then untimed Scheduled work, then timed Scheduled work.
+Unfinished untimed Scheduled tasks roll forward to Today when the app refreshes the planner. This writes today as their Scheduled day without a time. Untimed Scheduled dates must be today or later. Timed Scheduled and Deadline-only tasks carry forward in the list with their original timestamps. Waiting tasks that qualify remain visible with their reason.
 
 Scheduled supports a date without a time and a date with an explicit time, including 00:00. These are distinct intentions. For legacy or external timestamps without precision metadata, interpret midnight as untimed and other clock times as timed; preserve the underlying timestamp. Supporting explicit midnight prospectively requires additional task metadata alongside the existing Taskwarrior date field. See [ADR 0008](adr/0008-preserve-planner-date-intent.md).
 
@@ -26,11 +26,12 @@ Scheduled supports a date without a time and a date with an explicit time, inclu
 
 The task list is continuous, without section headers or separators. Its order is:
 
-1. Carried-over tasks: oldest original day first; within each day, untimed tasks before timed tasks, then ascending time. Preserve manual order among tasks with the same date and time intent.
-2. Untimed tasks for the displayed day, in free manual order.
-3. Timed tasks for the displayed day, in chronological order, with manual order among equal times.
+1. Carried timed Scheduled tasks, ordered by original date and time.
+2. Deadline-only tasks, ordered by Deadline.
+3. Untimed Scheduled tasks for the displayed day, in manual order. Rolled-over tasks append to this group.
+4. Timed Scheduled tasks for the displayed day, ordered by time. Manual order breaks ties among equal times.
 
-The scheduled time sits at the far left of the row, before the checkmark. Carried-over rows also show their original date in small text in that same leading area. An untimed carried task shows the original date without a time. Other rows omit the Scheduled date because the page already supplies it.
+The scheduled time sits at the far left of the row, before the checkmark. Carried timed tasks show their original date and time in red. Untimed Scheduled tasks have a dash in the leading slot.
 
 Manually ordering tasks must not invent clock times. Incoming untimed tasks append to the untimed portion; incoming timed tasks enter chronological position after existing tasks at the same time. Preserve the relative order of an incoming batch and the existing destination tasks.
 
@@ -42,7 +43,7 @@ Crossing another row in either direction records its effective Scheduled value. 
 
 | Last row crossed | Scheduled assigned on drop |
 | --- | --- |
-| Carried-over task | Its original date and time or untimed intent, including an overdue date |
+| Carried-over task | Its original timed Scheduled date |
 | Untimed task on the displayed day | The displayed day without a time |
 | Timed task | Its date and time |
 | Deadline-only task | Its displayed fallback date and time or untimed intent |
@@ -56,7 +57,7 @@ Dragging within a project changes manual order only and does not inherit Schedul
 
 The top toolbar links directly to Inbox and Projects, with a Today button outside the planner. A compact glass date pill overlays the planner list and expands into a month calendar. Saved and favorite views and the Views menu are retired. The pill always offers a reliable swipe area for moving between days, including when task rows fill the page. Day-page swipes can also move between dates while preserving row swipe actions. Disable day-to-day swiping on both the pill and page during selection mode.
 
-With no tasks selected, tapping a date in the month calendar navigates to that day. With tasks selected, tapping a date immediately assigns that Scheduled day, retaining each task's time or untimed intent. For a deadline-only task, preserve the effective time shown by the fallback when creating Scheduled.
+Swipe across the expanded calendar to browse months. Hold the collapsed date pill to return to Today. With no tasks selected, tapping a calendar date navigates to that day. With tasks selected, tapping today or a later date immediately sets Scheduled to that day without a time. The separate bulk Scheduled and Deadline pickers can each set a date with or without a time.
 
 After a successful calendar scheduling action, close the calendar and clear selection. Tasks disappear from the current day or Inbox when they no longer match it. Project members remain in their project because scheduling does not change project membership. There is no Apply confirmation or Undo after successful calendar scheduling. A failed save retains the tasks and selection.
 
@@ -68,7 +69,8 @@ Project views show all unfinished members, including scheduled tasks.
 
 | Capture context | Default Scheduled | Default project |
 | --- | --- | --- |
-| Day page | Displayed day, untimed | None |
+| Today or future day page | Displayed day, untimed | None |
+| Past day page | None | None |
 | Project | None | Current project |
 | Inbox or external quick capture | None | None |
 
@@ -93,7 +95,7 @@ Notifications were removed from product scope on 2026-11-17. Planner date placem
 | Situation | Expected result |
 | --- | --- |
 | Scheduled next Monday, Deadline last Friday | One planner entry on Monday; Deadline stays in detail |
-| Only Deadline Friday at 14:00; calendar scheduling to Monday | Scheduled becomes Monday at 14:00; Deadline stays Friday at 14:00 |
+| Only Deadline Friday at 14:00; calendar scheduling to Monday | Scheduled becomes Monday without a time. Deadline stays Friday at 14:00 |
 | Drag across a timed task, then an untimed task, and drop | Save the untimed task's day without a time |
 | Drag across an overdue task last | Copy its original overdue Scheduled value; the dragged task can become carried-over |
 | Several selected tasks are dragged across one timed row | All receive that row's Scheduled date and time on drop, preserving their relative order |

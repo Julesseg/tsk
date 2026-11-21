@@ -2,6 +2,33 @@ import Foundation
 import Testing
 @testable import TskCore
 
+@Test func untimedScheduledRolloverWritesTodayOnceAndLeavesTimedAndCompletedTasksUnchanged() async throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+    let now = Date(timeIntervalSince1970: 1806235200)
+    let today = calendar.startOfDay(for: now)
+    let yesterday = try #require(calendar.date(byAdding: .day, value: -1, to: today))
+    let seconds = String(Int(yesterday.timeIntervalSince1970))
+    let untimed = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": seconds, "due": "1806500000", "project": "work"])
+    let midnight = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": seconds, "tsk_scheduled_precision": "v1:\(seconds):timed"])
+    let completed = TaskRecord(id: UUID(), attributes: ["status": "completed", "scheduled": seconds])
+    let replica = OccurrenceReplica(records: [untimed, midnight, completed])
+    let manager = TaskManager(replica: replica, now: { now }, calendar: calendar)
+
+    await replica.rejectNextUpdate()
+    await #expect(throws: TaskManagementError.self) { try await manager.rollOverUntimedScheduledTasks() }
+    #expect(await replica.records == [untimed, midnight, completed])
+    try await manager.rollOverUntimedScheduledTasks()
+    try await manager.rollOverUntimedScheduledTasks()
+    let saved = try #require(await replica.records.first { $0.id == untimed.id })
+    #expect(saved.scheduled(calendar: calendar) == .init(date: today, hasTime: false))
+    #expect(saved.deadline == untimed.deadline && saved.project == "work")
+    let records = await replica.records
+    #expect(records.contains(midnight) && records.contains(completed))
+    #expect(await replica.batches == 1)
+    #expect(try await manager.dayPage(on: today).map(\.id) == [midnight.id, untimed.id])
+}
+
 @Test func dayPagesUseOnePlannerDateAndContinuousCarryoverOrder() async throws {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Europe/Paris")!

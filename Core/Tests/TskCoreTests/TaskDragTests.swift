@@ -136,7 +136,7 @@ import TskCore
     let day = Date(timeIntervalSince1970: 1792108800)
     let ids = (1...6).map { UUID(uuidString: String(format: "A1061000-0000-0000-0000-%012d", $0))! }
     let records = ids.enumerated().map { index, id in
-        TaskRecord(id: id, attributes: ["status": "pending", "description": "Task \(index)", "scheduled": index < 2 ? "1792108800" : "1792022400", "due": "1792400000", "opaque": "retain", "entry": "1"])
+        TaskRecord(id: id, attributes: ["status": "pending", "description": "Task \(index)", "scheduled": index < 2 ? "1792108800" : "1792026000", "due": "1792400000", "opaque": "retain", "entry": "1"])
     }
     let replica = OccurrenceReplica(records: records, allowsSingleWrites: true)
     let manager = TaskManager(replica: replica, now: { day }, calendar: calendar)
@@ -158,12 +158,12 @@ import TskCore
     _ = try await manager.updateRow(row)
     let afterEditor = try await manager.dayPage(on: day).map(\.id)
     #expect(afterEditor == [ids[2], ids[3], ids[5], ids[0], ids[1], captured.id, ids[4]])
-    _ = try await manager.update(id: ids[4], changes: ["scheduled": "1792022400"])
+    _ = try await manager.update(id: ids[4], changes: ["scheduled": "1792026000"])
     _ = try await manager.update(id: captured.id, changes: ["scheduled": nil])
     var drag = try TaskDragSession(tasks: try await manager.dayPage(on: day), ids: [ids[1]], context: .day(day), calendar: calendar)
     drag.cross(ids[0])
     _ = try await manager.drop(drag)
-    _ = try await manager.schedule(ids: [ids[3], ids[2]], change: .day(day))
+    _ = try await manager.schedule(ids: [ids[3], ids[2]], change: .intent(.init(date: day, hasTime: false)))
     #expect(try await manager.dayPage(on: day).suffix(4).map(\.id) == [ids[1], ids[0], ids[3], ids[2]])
     _ = try await manager.schedule(ids: [ids[0]], change: .intent(.init(date: day.addingTimeInterval(3600), hasTime: true)))
     _ = try await manager.schedule(ids: [ids[5], ids[4]], change: .intent(.init(date: day.addingTimeInterval(3600), hasTime: true)))

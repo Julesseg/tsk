@@ -107,7 +107,7 @@ private struct UnwritableReplica: TaskReplica {
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let monday = Date(timeIntervalSince1970: 1791763200)
     let wednesday = Date(timeIntervalSince1970: 1791936000)
-    let records = (0..<3).map { _ in TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Carried", "scheduled": "1791763200", "due": "1792108800", "opaque": "retain"]) }
+    let records = (0..<3).map { _ in TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Carried", "scheduled": "1791763200", "tsk_scheduled_precision": "v1:1791763200:timed", "due": "1792108800", "opaque": "retain"]) }
     let incoming = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Incoming work"])
     let replica = OccurrenceReplica(records: records + [incoming])
     let manager = TaskManager(replica: replica, now: { wednesday }, calendar: calendar)
@@ -127,7 +127,7 @@ private struct UnwritableReplica: TaskReplica {
     drag.cross(ordered[2].id)
     _ = try await manager.drop(drag)
     #expect(try await manager.dayPage(on: wednesday).map(\.id) == [target.id, ordered[2].id, ordered[0].id])
-    _ = try await manager.schedule(ids: [incoming.id], change: .intent(.init(date: monday, hasTime: false)))
+    _ = try await manager.schedule(ids: [incoming.id], change: .intent(.init(date: monday, hasTime: true)))
     #expect(try await manager.dayPage(on: wednesday).map(\.id) == [target.id, ordered[2].id, ordered[0].id, incoming.id])
     let later = TaskManager(replica: replica, now: { wednesday.addingTimeInterval(86400) }, calendar: calendar)
     #expect(try await later.dayPage(on: wednesday).map(\.id) == [target.id])

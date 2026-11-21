@@ -160,6 +160,7 @@ struct TaskSelectionBar: View {
         case .remove: "None"
         case .day(let date): date.formatted(date: .abbreviated, time: .omitted)
         case .set(let date): date.formatted(date: .abbreviated, time: .shortened)
+        case .exact(let intent): intent.date.formatted(date: .abbreviated, time: intent.hasTime ? .shortened : .omitted)
         }
     }
 

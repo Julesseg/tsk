@@ -16,11 +16,12 @@ final class TaskScheduledUITests: XCTestCase {
         app.launchEnvironment["TSK_TEST_NATIVE_DRAG"] = "1"
         app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
         let day = Calendar.current.startOfDay(for: Date(timeIntervalSince1970: 1792144800))
+        let carriedTime = day.addingTimeInterval(-82800).timeIntervalSince1970
         let ids = (1...5).map { String(format: "A1060000-0000-0000-0000-%012d", $0) }
         let records: [[String: Any]] = ids.enumerated().map { index, id in
             var attributes = ["status": "pending", "description": ["Carried work", "Drag this task", "Untimed neighbor", "Timed neighbor", "Deadline fallback"][index], "project": "Drag", "entry": String(100 - index)]
             if index == 4 { attributes["due"] = "1792160000" }
-            else { attributes["scheduled"] = String(Int(day.timeIntervalSince1970) + (index == 0 ? -86400 : index == 3 ? 3600 : 0)) }
+            else { attributes["scheduled"] = String(Int(index == 0 ? carriedTime : day.timeIntervalSince1970 + (index == 3 ? 3600 : 0))) }
             if index == 1 { attributes["due"] = "1792400000" }
             return ["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }]
         }
@@ -139,7 +140,7 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertLessThan(untimed.frame.midY, carried.frame.midY)
         for id in [ids[1], ids[2]] {
             app.buttons["task-" + id].tap()
-            XCTAssertEqual(app.buttons["row-scheduled"].value as? String, day.addingTimeInterval(-86400).formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "en_US"))))
+            XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(carriedTime))
             if id == ids[1] { XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792400000)) }
             app.buttons["collapse-task-row"].tap()
         }
@@ -156,7 +157,7 @@ final class TaskScheduledUITests: XCTestCase {
         let future = Calendar.current.date(byAdding: .day, value: 2, to: day)!
         let ids = (1...4).map { String(format: "A1100000-0000-0000-0000-%012d", $0) }
         let records: [[String: Any]] = ids.enumerated().map { index, id in
-            let date = index == 3 ? future : day.addingTimeInterval(-172800)
+            let date = index == 3 ? future : day.addingTimeInterval(-169200)
             let attributes = ["status": "pending", "description": ["Earlier carried neighbor", "Complete carried work", "Later carried neighbor", "Complete future work early"][index], "entry": String(900 - index), "scheduled": String(Int(date.timeIntervalSince1970)), "due": "1792400000"]
             return ["id": id, "attributes": attributes.map { ["key": $0.key, "value": $0.value] }]
         }
@@ -272,7 +273,7 @@ final class TaskScheduledUITests: XCTestCase {
         XCTAssertTrue(todayRow.waitForExistence(timeout: 10))
         todayRow.tap()
         XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792257300))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, untimed(tomorrowDay))
         XCTAssertEqual(app.buttons["row-deadline"].value as? String, formatted(1792177200))
         XCTAssertEqual(app.buttons["row-waiting-date"].value as? String, formatted(1792184400))
         app.buttons["collapse-task-row"].tap()
@@ -308,13 +309,16 @@ final class TaskScheduledUITests: XCTestCase {
         let midnight = app.buttons["task-A6400000-0000-0000-0000-000000000002"]
         XCTAssertTrue(midnight.exists)
         XCTAssertLessThan(midnight.frame.minY, future.frame.minY)
+        pill.press(forDuration: 0.7)
+        assertPlannerDay(originalDay, app: app)
         let row = app.buttons["task-" + taskID]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
         XCTAssertTrue(app.buttons["row-scheduled"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, formatted(1792170900))
+        XCTAssertEqual(app.buttons["row-scheduled"].value as? String, untimed(Date(timeIntervalSince1970: Double(originalDay)!)))
         openTaskRowParameter("scheduled", app: app)
         XCTAssertTrue(app.datePickers["scheduled-picker"].waitForExistence(timeout: 5))
+        setScheduledTime(true, app: app)
         let picker = app.datePickers["scheduled-picker"]
         let timeControl = picker.buttons.matching(NSPredicate(format: "label CONTAINS ':' OR value CONTAINS ':'")).firstMatch
         XCTAssertTrue(timeControl.exists, "Scheduled must expose its native time control: " + picker.debugDescription)
@@ -359,9 +363,10 @@ final class TaskScheduledUITests: XCTestCase {
         app.terminate()
         let saved = try await storedTasks(app, checkpoint: "saved")
         let attributes = try XCTUnwrap(saved[taskID])
-        var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: 1792170900))
+        var components = Calendar.current.dateComponents([.year, .month], from: tomorrowDay)
         components.day = 17
         XCTAssertEqual(attributes["scheduled"], String(Int(try XCTUnwrap(Calendar.current.date(from: components)).timeIntervalSince1970)))
+        XCTAssertEqual(attributes["tsk_scheduled_precision"], "v1:\(try XCTUnwrap(attributes["scheduled"])):timed")
         XCTAssertEqual(attributes["due"], "1792177200")
         XCTAssertEqual(attributes["wait"], "1792184400")
         XCTAssertEqual(attributes["description"], "Review the release")
@@ -416,9 +421,13 @@ final class TaskScheduledUITests: XCTestCase {
     }
 
     private func scheduled(on day: Int) -> String {
-        var components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: 1792170900))
+        var components = Calendar.current.dateComponents([.year, .month], from: Date(timeIntervalSince1970: 1792170900))
         components.day = day
         return formatted(Calendar.current.date(from: components)!.timeIntervalSince1970)
+    }
+
+    private func untimed(_ date: Date) -> String {
+        date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "en_US")))
     }
 
     private func launch() throws -> XCUIApplication {

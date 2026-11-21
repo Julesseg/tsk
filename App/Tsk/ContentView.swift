@@ -285,13 +285,13 @@ struct ContentView: View {
             calendar.displayedDay = store.isDayPage ? store.displayedDay : nil
             if displaysCalendar { await calendar.refresh() }
         }
-        .task(id: displaysCalendar && store.plannerDay == nil ? calendar.snapshot?.day?.end : nil) {
-            guard displaysCalendar, let next = calendar.snapshot?.day?.end else { return }
+        .task(id: scenePhase == .active ? store.nextDayBoundary : nil) {
+            guard scenePhase == .active, let next = store.nextDayBoundary else { return }
             do {
                 try await Task.sleep(for: .seconds(max(1, next.timeIntervalSince(store.currentDate))))
                 try Task.checkCancellation()
-                await calendar.refresh()
                 await store.reload()
+                if displaysCalendar { await calendar.refresh() }
             } catch {}
         }
     }

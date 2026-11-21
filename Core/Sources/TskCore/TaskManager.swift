@@ -171,7 +171,9 @@ public actor TaskManager {
             throw TaskManagementError.unsupportedTaskKind
         }
         var attributes = try TaskOrganization.normalizedAttributes(draft.attributes)
-        let timestamp = String(Int(now().timeIntervalSince1970))
+        let instant = now()
+        try validateScheduled(TaskScheduledDate.read(from: attributes, calendar: calendar), at: instant)
+        let timestamp = String(Int(instant.timeIntervalSince1970))
         attributes["description"] = description
         attributes["status"] = "pending"
         attributes["entry"] = timestamp
@@ -179,7 +181,7 @@ public actor TaskManager {
         let task = TaskRecord(id: UUID(), attributes: attributes)
         if TaskManualOrder.plannerGroup(task, calendar: calendar) != nil {
             let records = try await replica.tasks()
-            let saved = try await saveOrder(appendingIncoming([task], to: records), context: .day(now()), records: records, creating: task)
+            let saved = try await saveOrder(appendingIncoming([task], to: records), context: .day(instant), records: records, creating: task)
             guard let created = saved.first(where: { $0.id == task.id }) else { throw TaskManagementError.storage("The save returned no task.") }
             return created
         }
@@ -209,6 +211,13 @@ public actor TaskManager {
             patch["description"] = description
         }
         patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
+        for field in TaskDateField.allCases {
+            if let value = patch[field.attribute], value != task.attributes[field.attribute], patch[field.precisionAttribute] == nil,
+               task.attributes[field.precisionAttribute] != nil {
+                patch.updateValue(nil, forKey: field.precisionAttribute)
+            }
+        }
+        try validateScheduledChange(patch, original: task.attributes, at: now())
         for (key, value) in annotationChanges { patch.updateValue(value, forKey: key) }
         patch["modified"] = String(Int(now().timeIntervalSince1970))
         var edited = task

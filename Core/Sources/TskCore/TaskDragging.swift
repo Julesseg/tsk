@@ -166,7 +166,8 @@ extension TaskManager {
         var ranks: [String: Int] = [:]
         var updates: [TaskAtomicUpdate] = []
         var parents: [UUID: TaskRecord] = [:]
-        let timestamp = String(Int(now().timeIntervalSince1970))
+        let instant = now()
+        let timestamp = String(Int(instant.timeIntervalSince1970))
         var created = creating
         for var task in ordered {
             let attribute: String
@@ -190,6 +191,7 @@ extension TaskManager {
             guard let original = records.first(where: { $0.id == task.id }) else { throw TaskManagementError.taskNotFound(task.id) }
             var patch = task.attributes.changes(comparedTo: original.attributes)
             guard !patch.isEmpty else { continue }
+            try validateScheduledChange(patch, original: original.attributes, at: instant)
             let retainedHistory = task.status == "completed" && patch.keys.allSatisfy { $0 == attribute }
             guard task.canComplete || retainedHistory else { throw TaskManagementError.unsupportedTaskKind }
             if task.isOccurrence && !retainedHistory {
@@ -257,13 +259,14 @@ extension TaskManager {
         let lease = try await beginMutation()
         defer { endMutation(lease) }
         let records = try await replica.tasks()
+        let instant = now()
         var seen: Set<UUID> = []
         let ids = ids.filter { seen.insert($0).inserted }
         guard !ids.isEmpty else { return [] }
         let incoming = try ids.map { id -> TaskRecord in
             guard var task = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
             guard task.canComplete else { throw TaskManagementError.unsupportedTaskKind }
-            let intent: TaskScheduledDate
+            var intent: TaskScheduledDate
             switch change {
             case .intent(let value): intent = value
             case .day(let day):
@@ -274,12 +277,14 @@ extension TaskManager {
             }
             let seconds = intent.date.timeIntervalSince1970
             guard seconds.isFinite, abs(seconds) <= 253402300799 else { throw TaskReschedulingError.invalidDate }
+            if case .intent = change, !intent.hasTime { intent.date = calendar.startOfDay(for: intent.date) }
+            try validateScheduled(intent, at: instant)
             var draft = TaskDraft(attributes: task.attributes)
             draft.setScheduled(intent)
             task.attributes = draft.attributes
             return task
         }
-        let saved = try await saveOrder(appendingIncoming(incoming, to: records), context: .day(now()), records: records)
+        let saved = try await saveOrder(appendingIncoming(incoming, to: records), context: .day(instant), records: records)
         return ids.compactMap { id in saved.first { $0.id == id } }
     }
 }

@@ -34,10 +34,12 @@ import XCTest
         let allDay = app.buttons["task-A0000000-0000-0000-0000-000000000004"]
         XCTAssertTrue(deadlineToday.exists)
         let secondRow = app.buttons["task-" + second]
-        XCTAssertLessThan(firstRow.frame.midY, secondRow.frame.midY)
-        XCTAssertLessThan(secondRow.frame.midY, thirdRow.frame.midY)
+        XCTAssertLessThan(firstRow.frame.midY, thirdRow.frame.midY)
         XCTAssertLessThan(thirdRow.frame.midY, deadlineToday.frame.midY)
         XCTAssertLessThan(deadlineToday.frame.midY, allDay.frame.midY)
+        XCTAssertLessThan(allDay.frame.midY, secondRow.frame.midY)
+        let today: Date = Date(timeIntervalSince1970: 1792144800)
+        XCTAssertEqual(scheduledSlot(second, app: app).label, "Scheduled " + today.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "en_US"))))
         let rowFrames = [firstRow, thirdRow].map(\.frame)
         captureBulkDateEvidence("Scheduled times, carryover and separate deadlines", app: app)
         let settings = app.buttons["workspace-settings"].frame
@@ -55,6 +57,25 @@ import XCTest
         tapTaskControl(app.buttons["planner-date-" + next], app: app)
         XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
         assertPlannerDay(next, app: app)
+        pill.tap()
+        let calendar = app.otherElements["planner-month-calendar"]
+        XCTAssertTrue(calendar.waitForExistence(timeout: 5))
+        XCTAssertFalse(calendar.buttons["Today"].exists)
+        captureBulkDateEvidence("Expanded calendar away from Today", app: app)
+        let nextMonth = try XCTUnwrap(Calendar.current.date(byAdding: .month, value: 1, to: tomorrow))
+        let nextMonthButton = app.buttons["planner-date-\(Int(nextMonth.timeIntervalSince1970))"]
+        calendar.swipeLeft()
+        XCTAssertTrue(nextMonthButton.waitForExistence(timeout: 5))
+        captureBulkDateEvidence("Swipe opens the following month", app: app)
+        calendar.swipeRight()
+        XCTAssertTrue(app.buttons["planner-date-" + next].waitForExistence(timeout: 5))
+        pill.tap()
+        XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
+        pill.press(forDuration: 0.7)
+        assertPlannerDay(day, app: app)
+        XCTAssertFalse(calendar.exists)
+        pill.swipeLeft()
+        assertPlannerDay(next, app: app)
         pill.swipeRight()
         assertPlannerDay(day, app: app)
         touchScheduledSlot(first, app: app)
@@ -62,7 +83,7 @@ import XCTest
         XCTAssertEqual(count.label, "1 selected")
         app.buttons["cancel-task-selection"].tap()
         let start = firstSlot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        let last = scheduledSlot(third, app: app)
+        let last = scheduledSlot("A0000000-0000-0000-0000-000000000027", app: app)
         let end = start.withOffset(CGVector(dx: 0, dy: last.frame.midY - firstSlot.frame.midY))
         start.press(forDuration: 0.02, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
         XCTAssertEqual(count.label, "3 selected")
@@ -182,9 +203,31 @@ import XCTest
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(measurements["changes"] as? Int), 6)
         XCTAssertLessThanOrEqual(try XCTUnwrap(measurements["maximumVerticalDrift"] as? Double), 1, "Value changes must not move the bottom actions during animation")
         captureBulkDateEvidence("Animation-enabled picker after value changes", app: app)
+        let includeTime = app.switches["selection-set-time"]
+        XCTAssertEqual(includeTime.value as? String, "1")
+        turnOffTime(includeTime, app: app)
+        captureBulkDateEvidence("Bulk Scheduled date without time", app: app)
+        app.buttons["close-selection-date"].tap()
+        app.buttons["selection-deadline"].tap()
+        XCTAssertEqual(includeTime.value as? String, "1")
+        turnOffTime(includeTime, app: app)
+        captureBulkDateEvidence("Bulk Deadline date without time", app: app)
         app.buttons["close-selection-date"].tap()
         app.buttons["cancel-task-selection"].tap()
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 5))
+    }
+
+    private func turnOffTime(_ toggle: XCUIElement, app: XCUIApplication) {
+        XCTAssertTrue(toggle.exists)
+        let thumb = toggle.switches.firstMatch
+        if thumb.exists {
+            tapTaskControlAtCenter(thumb, app: app)
+        } else {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                .withOffset(CGVector(dx: -25, dy: 0)).tap()
+        }
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: toggle)
+        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
     }
 
     private func selectPair(_ app: XCUIApplication) {
