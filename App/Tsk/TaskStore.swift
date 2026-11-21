@@ -16,6 +16,7 @@ final class TaskStore {
     var selectedWorkspaceView: WorkspaceView = .today
     var allTasks: [TaskRecord] = []
     var query: TaskQuery = .today
+    private(set) var awaitingDaySnapshot: Date?
     var plannerDay: Date?
     var displayedDay: Date { Calendar.autoupdatingCurrent.startOfDay(for: plannerDay ?? currentDate) }
     var isDayPage: Bool { query == .today }
@@ -24,7 +25,10 @@ final class TaskStore {
         guard taskDrag == nil, selectedTaskIDs.isEmpty, !isSelectionPressActive, rowEditing == nil, !isSaving else { return }
         if !isDayPage { selectWorkspaceView(.today) }
         let nextDay = Calendar.autoupdatingCurrent.startOfDay(for: day)
-        if displayedDay != nextDay { tasks = cachedTasks ?? [] }
+        if displayedDay != nextDay {
+            tasks = cachedTasks ?? []
+            awaitingDaySnapshot = cachedTasks == nil ? nextDay : nil
+        }
         plannerDay = Calendar.autoupdatingCurrent.isDate(nextDay, inSameDayAs: currentDate) ? nil : nextDay
         captureConfirmation = nil
     }
@@ -318,7 +322,12 @@ final class TaskStore {
         let requestedDay = isDayPage ? displayedDay : nil
         let requestedProject = projectSelection
         isLoading = true
-        defer { if generation == reloadGeneration { isLoading = false } }
+        defer {
+            if generation == reloadGeneration {
+                isLoading = false
+                if !Task.isCancelled, awaitingDaySnapshot == requestedDay { awaitingDaySnapshot = nil }
+            }
+        }
         var rolloverError: String?
         do { try await manager.rollOverUntimedScheduledTasks() }
         catch { rolloverError = error.localizedDescription }

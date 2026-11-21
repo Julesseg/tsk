@@ -57,11 +57,16 @@ bash scripts/run-ui-tests.sh "$SIMULATOR_UDID" -project App/Tsk.xcodeproj -schem
 ```
 
 The test seeds 27 tasks, enables animations and repeats six interactions three
-times. Its Debug-only display link requests 60 Hz on the app's main thread.
+times. Set `TEST_RUNNER_TSK_PLANNER_NAVIGATION_BENCHMARK=1` to measure only
+page swipes and the date pill, with five repetitions each. Its Debug-only
+display link requests 60 Hz on the app's main thread.
 For each interaction, `PLANNER-FRAMES` prints the elapsed time, count of
 intervals longer than 25 ms, sum of their time beyond 17 ms (`excessMs`), and
-longest such interval. Compare medians per interaction. The windows include
-XCTest input, accessibility queries and settling. Use a physical-device
+longest such interval. The full windows include XCTest input, accessibility
+queries and settling. `touchExcessMs` counts the same excess time within UIKit
+touch intervals and the 350 ms following each release. Overlapping windows
+count once. Compare medians per interaction. After timing, the test selects a
+date eight days ahead and returns to Today through the calendar. Use a physical-device
 Animation Hitches trace to evaluate frames presented on a ProMotion display.
 
 The Menu suite retains three native Project-menu journeys plus touch-based annotation

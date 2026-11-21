@@ -136,7 +136,9 @@ import XCTest
             XCTAssertEqual(app.buttons["complete-task-row-" + id].value as? String, "Selected")
         }
         captureBulkDateEvidence("Calendar failure retains the calendar and selected tasks", app: app)
+        XCTAssertEqual(pill.frame.height, 44, accuracy: 1)
         pill.tap()
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
         app.buttons["selection-scheduled"].tap()
         app.buttons["selection-date-remove"].tap()
         app.buttons["close-selection-date"].tap()
@@ -242,27 +244,45 @@ import XCTest
             RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
             let end = now()
             let raw = try XCTUnwrap(probe.value as? String)
-            let samples = raw.split(separator: " ").compactMap { Int($0) }
+            let sections = raw.components(separatedBy: "|")
+            let samples = sections[0].split(separator: " ").compactMap { Int($0) }
+            let touches = try XCTUnwrap(sections.last).split(separator: " ").compactMap { Int($0) }
+            XCTAssertEqual(touches.count % 2, 0)
             XCTAssertGreaterThan(try XCTUnwrap(samples.first), start)
             XCTAssertEqual(samples.count % 2, 1)
             let gaps = stride(from: 1, to: samples.count, by: 2).compactMap { index in
                 (start...end).contains(samples[index]) ? samples[index + 1] : nil
             }
             let excess = gaps.reduce(0) { $0 + $1 - 17 }
-            print("PLANNER-FRAMES \(name) elapsed=\(end - start) gaps=\(gaps.count) excessMs=\(excess) maxMs=\(gaps.max() ?? 0)")
+            var touchWindows: [Range<Int>] = []
+            for index in stride(from: 0, to: touches.count, by: 2) where (start..<end).contains(touches[index]) {
+                let lower = max(touches[index], touchWindows.last?.upperBound ?? start)
+                let upper = min(end, touches[index + 1] + 350)
+                if lower < upper { touchWindows.append(lower..<upper) }
+            }
+            XCTAssertFalse(touchWindows.isEmpty)
+            var touchExcess = 0
+            for index in stride(from: 1, to: samples.count, by: 2) {
+                let late = (samples[index] - samples[index + 1] + 17)..<samples[index]
+                for window in touchWindows { touchExcess += late.clamped(to: window).count }
+            }
+            print("PLANNER-FRAMES \(name) elapsed=\(end - start) gaps=\(gaps.count) excessMs=\(excess) touchExcessMs=\(touchExcess) maxMs=\(gaps.max() ?? 0)")
         }
 
         let settings = app.buttons["workspace-settings"].frame
         let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY))
         let firstRow = app.buttons["task-" + first]
-        for _ in 0..<3 {
-            let top = firstRow.frame.minY
-            try record("scroll") {
-                list.swipeUp()
-                XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < top - 4, "The scroll sample must move the list")
-                list.swipeDown()
+        let navigationOnly = ProcessInfo.processInfo.environment["TSK_PLANNER_NAVIGATION_BENCHMARK"] == "1"
+        for _ in 0..<(navigationOnly ? 5 : 3) {
+            if !navigationOnly {
+                let top = firstRow.frame.minY
+                try record("scroll") {
+                    list.swipeUp()
+                    XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < top - 4, "The scroll sample must move the list")
+                    list.swipeDown()
+                }
+                XCTAssertTrue(scheduledSlot(first, app: app).isHittable)
             }
-            XCTAssertTrue(scheduledSlot(first, app: app).isHittable)
             try record("pages") {
                 let center = pill.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: -155, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
@@ -276,6 +296,7 @@ import XCTest
             }
             XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
             assertPlannerDay(day, app: app)
+            if navigationOnly { continue }
             let start = scheduledSlot(first, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let end = scheduledSlot(third, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             try record("selection") { start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2) }
@@ -289,6 +310,16 @@ import XCTest
                 XCTAssertTrue(picker.waitForNonExistence(timeout: 5))
             }
             app.buttons["cancel-task-selection"].tap()
+        }
+        for delta in [8, 0] {
+            let target = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: delta, to: today))
+            let value = String(Int(target.timeIntervalSince1970))
+            pill.tap()
+            let button = app.buttons["planner-date-" + value]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            tapTaskControl(button, app: app)
+            assertPlannerDay(value, app: app)
+            XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
         }
     }
 

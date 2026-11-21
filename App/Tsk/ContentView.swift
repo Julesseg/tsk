@@ -50,7 +50,7 @@ struct ContentView: View {
                 }
                 .overlay {
                     if dayPaging.expanded {
-                        PlannerCalendarDismissal(calendarBounds: dayPaging.navigatorBounds) {
+                        PlannerCalendarDismissal(paging: dayPaging) {
                             dayPaging.expanded = false
                         }
                         .ignoresSafeArea(.container)
@@ -470,41 +470,40 @@ struct TaskRowDismissalOverlay: View {
     }
 }
 
-private struct PlannerCalendarDismissal: View {
-    let calendarBounds: CGRect
+private struct PlannerCalendarDismissal: UIViewRepresentable {
+    let paging: TaskDayPaging
     let dismiss: () -> Void
 
-    var body: some View {
-        GeometryReader { geometry in
-            let page = geometry.frame(in: .global)
-            let calendar = page.intersection(calendarBounds)
-            if calendar.isNull {
-                dismissButton
-            } else {
-                VStack(spacing: 0) {
-                    dismissButton.frame(height: calendar.minY - page.minY)
-                    HStack(spacing: 0) {
-                        dismissButton.frame(width: calendar.minX - page.minX)
-                            .accessibilityHidden(true)
-                        Color.clear.frame(width: calendar.width)
-                            .allowsHitTesting(false)
-                        dismissButton.frame(width: page.maxX - calendar.maxX)
-                            .accessibilityHidden(true)
-                    }
-                    .frame(height: calendar.height)
-                    dismissButton.frame(height: page.maxY - calendar.maxY)
-                        .accessibilityHidden(true)
-                }
-            }
-        }
+    func makeUIView(context: Context) -> DismissButton {
+        let button = DismissButton()
+        button.accessibilityLabel = "Close month calendar"
+        button.accessibilityIdentifier = "dismiss-planner-calendar"
+        button.addTarget(button, action: #selector(DismissButton.closeCalendar), for: .touchUpInside)
+        return button
     }
 
-    private var dismissButton: some View {
-        Button(action: dismiss) {
-            Color.clear.contentShape(Rectangle())
+    func updateUIView(_ button: DismissButton, context: Context) {
+        button.paging = paging
+        button.dismiss = dismiss
+    }
+
+    final class DismissButton: UIButton {
+        weak var paging: TaskDayPaging?
+        var dismiss: (() -> Void)?
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            super.point(inside: point, with: event) && paging?.navigatorBounds.contains(convert(point, to: nil)) != true
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Close month calendar")
-        .accessibilityIdentifier("dismiss-planner-calendar")
+
+        override var accessibilityFrame: CGRect {
+            get {
+                guard let window, let paging else { return super.accessibilityFrame }
+                let top = convert(CGPoint(x: 0, y: paging.navigatorBounds.minY), from: window).y
+                return UIAccessibility.convertToScreenCoordinates(bounds.divided(atDistance: max(0, top), from: .minYEdge).slice, in: self)
+            }
+            set { super.accessibilityFrame = newValue }
+        }
+
+        @objc func closeCalendar() { dismiss?() }
     }
 }

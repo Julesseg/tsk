@@ -32,7 +32,7 @@ struct TaskListView: View {
                                 CalendarFixtureControls(calendar: calendar)
                                 captureRow
                                 if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                                else if store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned for this day").foregroundStyle(.secondary) }
+                                else if store.awaitingDaySnapshot != store.displayedDay && store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned for this day").foregroundStyle(.secondary) }
                                 ForEach(dayRows) { item in
                                     switch item {
                                     case .task(let task): TaskListRow(task: task, store: store, edit: edit).id(task.id)
@@ -139,7 +139,7 @@ struct TaskListView: View {
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectHidden(true, for: .bottom)
         .contentMargins(.horizontal, 0, for: .scrollContent)
-        .overlay { if store.isLoading && store.visibleTasks.isEmpty { ProgressView() } }
+        .overlay { if !store.isDayPage && store.isLoading && store.visibleTasks.isEmpty { ProgressView() } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
             keyboardFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect) ?? .null
         }
@@ -256,7 +256,7 @@ private struct TaskListRowContent: View {
     private var hasProject: Bool { !displayedTask.project.isEmpty }
     private var titleBottom: CGFloat { max(0, (headerHeight - titleContentHeight) / 2) + titleHeight }
     private var attributesOverlap: CGFloat { hasProject ? max(0, headerHeight - titleBottom - 4) : 0 }
-    private var phase: TaskCompletionFeedback.Phase? { store.completionFeedback.phase(for: task.id, context: store.completionContext) }
+    private var phase: TaskCompletionFeedback.Phase? { isPreview ? nil : store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { displayedTask.status == "completed" || phase == .checked || phase == .covering || phase == .collapsing }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
 
@@ -386,7 +386,7 @@ private struct TaskListRowContent: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay {
-                if !expanded {
+                if !expanded && !isPreview {
                     Button {
                         if store.isSelectingTasks { store.toggleSelection(task.id) }
                         else if task.canEdit { expand() } else { edit(task) }
@@ -445,7 +445,9 @@ private struct TaskListRowContent: View {
         .modifier(TaskRowDimming(editing: editing == nil ? store.rowEditing : nil))
         .allowsHitTesting(store.rowEditing == nil || editing != nil)
         .frame(maxHeight: .infinity, alignment: .top)
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { bounds in
+        .onGeometryChange(for: CGRect.self) { [isPreview] geometry in
+            isPreview ? .zero : geometry.frame(in: .global)
+        } action: { bounds in
             rowGeometry.bounds = bounds
             editing?.measure(bounds)
         }
