@@ -89,8 +89,10 @@ final class TskUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
-        XCTAssertTrue(pill.waitForExistence(timeout: 10))
-        pill.swipeLeft()
+        let relaunchedPill = app.buttons.matching(identifier: "planner-date-pill").firstMatch
+        XCTAssertTrue(relaunchedPill.waitForExistence(timeout: 10))
+        assertPlannerDay(today, app: app)
+        relaunchedPill.swipeLeft()
         assertPlannerDay(String(Int(capturedDay.timeIntervalSince1970)), app: app)
         for (name, project, scheduled) in [("Buy milk from the market", "Not set", scheduledValue), ("Inbox capture", "Not set", "Not set"), ("Project capture", "Work", "Not set")] {
             if name == "Inbox capture" { openWorkspaceView("Inbox", app: app) }
@@ -110,7 +112,8 @@ final class TskUITests: XCTestCase {
         }
         screenshot("Tasks after relaunch", app: app)
         openWorkspaceView("Today", app: app)
-        pill.swipeLeft()
+        assertPlannerDay(today, app: app)
+        app.buttons["planner-date-pill"].swipeLeft()
         assertPlannerDay(String(Int(capturedDay.timeIntervalSince1970)), app: app)
         expandTaskRow(taskRow(named: "Buy milk from the market", app: app), app: app)
         let savedDescription = app.textFields["task-description"]
