@@ -29,8 +29,10 @@ final class TaskDayPaging {
         guard !isSettling else { return }
         let day = store.displayedDay
         let projected = distance + velocity * 0.15
-        let move = !cancelled && abs(distance) > 20 && abs(projected) > max(60, width * 0.22)
-        let direction = move ? (projected < 0 ? 1 : -1) : 0
+        let threshold = max(60, width * 0.22)
+        let travel = abs(distance) > threshold ? distance : projected
+        let move = !cancelled && abs(distance) > 20 && abs(travel) > threshold
+        let direction = move ? (travel < 0 ? 1 : -1) : 0
         isSettling = true
         if move { snapFeedback.prepare() }
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.28), completionCriteria: .logicallyComplete) {

@@ -61,7 +61,15 @@ struct TaskDayNavigator: View {
             if !touching {
                 Task { @MainActor in
                     guard !touchingPill else { return }
-                    finishDrag(distance: .zero, velocity: .zero, cancelled: true)
+                    todayPress?.cancel()
+                    todayPress = nil
+                    didReturnToToday = false
+                    guard dragAxis != nil else { return }
+                    dragAxis = nil
+                    withAnimation(settleAnimation) {
+                        paging.calendarPullDistance = nil
+                        if !paging.isSettling { paging.offset = 0 }
+                    }
                 }
             }
         }
