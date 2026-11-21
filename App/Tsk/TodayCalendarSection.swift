@@ -12,6 +12,7 @@ struct TodayCalendarSection: View {
            snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.events.isEmpty {
             Section {
                 TodayCalendarOverview(snapshot: snapshot, hours: hours, acceptsTaskDrops: acceptsTaskDrops)
+                    .taskDayRowInsets()
             }
             .listSectionSeparator(.hidden)
         }

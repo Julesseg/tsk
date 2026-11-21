@@ -157,7 +157,9 @@ private struct TaskDayPreview: View {
             List {
                 TodayCalendarSection(snapshot: snapshot, hours: calendar.preferences.hours)
                 Section {
-                    if paging.pages[day] != nil && tasks.isEmpty { Text("Nothing planned for this day").foregroundStyle(.secondary) }
+                    if paging.pages[day] != nil && tasks.isEmpty {
+                        TaskDayEmptyRow().taskDayRowInsets()
+                    }
                     ForEach(tasks) { task in
                         TaskListRow(task: task, store: store, edit: { _ in }, previewDay: day)
                     }

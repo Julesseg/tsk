@@ -32,7 +32,9 @@ struct TaskListView: View {
                                 CalendarFixtureControls(calendar: calendar)
                                 captureRow
                                 if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                                else if store.awaitingDaySnapshot != store.displayedDay && store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned for this day").foregroundStyle(.secondary) }
+                                else if store.awaitingDaySnapshot != store.displayedDay && store.visibleTasks.isEmpty && store.captureTask == nil {
+                                    TaskDayEmptyRow().taskDayRowInsets()
+                                }
                                 ForEach(store.visibleTasks) { task in
                                     TaskListRow(task: task, store: store, edit: edit).id(task.id)
                                 }
@@ -180,6 +182,20 @@ struct TaskListView: View {
         case .completed: return "No completed tasks"
         default: return "No unfinished tasks"
         }
+    }
+}
+
+struct TaskDayEmptyRow: View {
+    var body: some View {
+        Text("Nothing planned for this day")
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension View {
+    func taskDayRowInsets() -> some View {
+        listRowInsets(.horizontal, 20)
     }
 }
 
