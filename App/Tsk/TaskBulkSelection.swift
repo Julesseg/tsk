@@ -18,29 +18,6 @@ extension TaskStore {
         }
     }
 
-    func beginSelectionGesture() async -> Bool {
-        let generation = taskSelectionGeneration
-        let context = completionContext
-        guard !isSaving, await finishRowEditingForSelection(), !Task.isCancelled,
-              generation == taskSelectionGeneration, context == completionContext else { return false }
-        return activateSelectionGesture()
-    }
-
-    func activateSelectionGesture() -> Bool {
-        guard !isSaving, selectionDateField == nil else { return false }
-        selectionGestureTasks = visibleTasks
-        selectionGestureDays = upcomingDays
-        isSelectionGestureActive = true
-        return true
-    }
-
-    func applySelectionGesture(startingAt initial: UUID, from selection: Set<UUID>, entering path: [TaskSelectionVisit]) -> Bool {
-        let updated = manager.selectedTasks(in: visibleTasks, from: selection, startingAt: initial, entering: path)
-        guard updated != selectedTaskIDs else { return false }
-        selectedTaskIDs = updated
-        return true
-    }
-
     var selectionTasks: [TaskRecord] { allTasks.filter { selectedTaskIDs.contains($0.id) } }
 
     func selectionDateIsModified(_ field: TaskDateField) -> Bool {
@@ -183,6 +160,7 @@ struct TaskSelectionBar: View {
         case .remove: "None"
         case .day(let date): date.formatted(date: .abbreviated, time: .omitted)
         case .set(let date): date.formatted(date: .abbreviated, time: .shortened)
+        case .exact(let intent): intent.date.formatted(date: .abbreviated, time: intent.hasTime ? .shortened : .omitted)
         }
     }
 

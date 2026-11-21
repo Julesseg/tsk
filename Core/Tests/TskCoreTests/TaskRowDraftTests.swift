@@ -220,8 +220,9 @@ private struct RowUnwritableReplica: TaskReplica {
 
 @Test(arguments: ["1792195200", "1806235200", "1792888200", "1792891800"])
 func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp: String) async throws {
-    let manager = TaskManager(replica: TestReplica())
-    let original = try await manager.create(TaskDraft(description: "Imported", attributes: ["scheduled": timestamp, "due": "1806271199", "wait": "1806357600", "opaque": "retain"]))
+    let replica = TestReplica()
+    let manager = TaskManager(replica: replica)
+    let original = try await replica.create(id: UUID(), attributes: ["description": "Imported", "status": "pending", "scheduled": timestamp, "due": "1806271199", "wait": "1806357600", "opaque": "retain"])
     var draft = TaskRowDraft(task: original)
     #expect(try draft.changes().isEmpty)
     draft.taskDraft.description = "Revised"
@@ -251,15 +252,29 @@ func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp
     #expect(try await manager.tasks() == [saved])
 }
 
-@Test func captureInOtherViewsLeavesSchedulingUnsetAndProjectCanBeChanged() throws {
+@Test func captureContextsSupplyDefaultsAndExplicitEditsWin() throws {
+    #expect(TaskCaptureContext.project("caf\u{00e9}") != .project("cafe\u{0301}"))
+    #expect(TaskCaptureContext.project("caf\u{00e9}") == .project("caf\u{00e9}"))
     let now = Date(timeIntervalSince1970: 1792144800)
-    for query in [TaskQuery.unfinished, .upcoming, .completed, .all] {
-        var draft = TaskRowDraft(capturing: query, project: .project("Work"), now: now)
-        #expect(draft.taskDraft.plannedDate == nil)
-        #expect(draft.taskDraft.project == "Work")
-        draft.taskDraft.project = "Home"
+    let day = Date(timeIntervalSince1970: 1792281600)
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    for (context, expectedDate, expectedProject) in [
+        (TaskCaptureContext.day(day), Optional(day), ""),
+        (.project("Work"), nil, "Work"),
+        (.inbox, nil, ""),
+        (.external, nil, "")
+    ] {
+        var draft = TaskRowDraft(capturing: context, calendar: calendar)
+        #expect(draft.taskDraft.plannedDate == expectedDate)
+        #expect(draft.taskDraft.project == expectedProject)
+        #expect(draft.taskDraft.scheduled(calendar: calendar)?.hasTime != true)
         draft.taskDraft.description = "Changed default"
-        #expect(try draft.creationDraft(at: now).project == "Home")
+        draft.taskDraft.project = "Home"
+        draft.taskDraft.setScheduled(TaskScheduledDate(date: now, hasTime: true))
+        let explicit = try draft.creationDraft(at: now)
+        #expect(explicit.project == "Home")
+        #expect(explicit.scheduled(calendar: calendar) == TaskScheduledDate(date: now, hasTime: true))
     }
 }
 
@@ -272,4 +287,20 @@ func reopeningAndEditingOtherFieldsPreservesImportedScheduledTimestamp(timestamp
     #expect(draft.taskDraft.description == "Keep my input")
     draft.tagInput = "valid"
     #expect(try draft.creationDraft(at: .now).tags == ["valid"])
+}
+
+@Test func rebasingARowKeepsAnUnsavedScheduledIntentTogether() async throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let manager = TaskManager(replica: TestReplica(), now: { Date(timeIntervalSince1970: 1792144800) }, calendar: calendar)
+    let original = try await manager.create(TaskDraft(description: "Plan", attributes: ["scheduled": "1792195200", "due": "1792238400"]))
+    var row = TaskRowDraft(task: original)
+    row.taskDraft.setScheduled(TaskScheduledDate(date: original.plannedDate!, hasTime: true))
+    let external = try await manager.update(id: original.id, changes: ["scheduled": "1792281600", "opaque": "external"])
+    row.rebase(on: external)
+    let saved = try await manager.updateRow(row)
+    #expect(saved.plannedDate == original.plannedDate)
+    #expect(saved.scheduled(calendar: calendar)?.hasTime == true)
+    #expect(saved.attributes["due"] == "1792238400")
+    #expect(saved.attributes["opaque"] == "external")
 }

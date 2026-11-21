@@ -6,7 +6,7 @@ func calendarInstant(_ value: String) -> Date { ISO8601DateFormatter().date(from
 
 @Test func todayCalendarUsesLocalDSTDayAndClipsSpanningEventsWithoutWritingTasks() async throws {
     var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "America/New_York")!
-    let now = calendarInstant("2026-03-08T16:00:00Z")
+    let now = calendarInstant("2026-03-07T16:00:00Z")
     let manager = TaskManager(replica: TestReplica(), now: { now }, calendar: calendar)
     let task = try await manager.create(TaskDraft(description: "Keep Today task", attributes: ["scheduled": "1772946000", "opaque": "unchanged"]))
     let source = CalendarTestSource(events: [
@@ -16,7 +16,7 @@ func calendarInstant(_ value: String) -> Date { ISO8601DateFormatter().date(from
         calendarEvent("tomorrow", start: "2026-03-09T04:00:00Z", end: "2026-03-09T05:00:00Z"),
         calendarEvent("point", start: "2026-03-08T05:00:00Z", end: "2026-03-08T05:00:00Z")
     ])
-    let today = await manager.todayCalendar(from: source)
+    let today = await manager.dayCalendar(on: calendarInstant("2026-03-08T16:00:00Z"), from: source)
     let day = try #require(today.day)
     #expect(day.start == calendarInstant("2026-03-08T05:00:00Z"))
     #expect(day.end == calendarInstant("2026-03-09T04:00:00Z"))
@@ -30,7 +30,16 @@ func calendarInstant(_ value: String) -> Date { ISO8601DateFormatter().date(from
     #expect(overnight.visibleStart == day.start && overnight.continuesBefore && !overnight.continuesAfter)
     #expect(await source.requestedWindows == [day])
     #expect(try await manager.task(id: task.id) == task)
-    #expect(try await manager.tasks(query: .today) == [task])
+    #expect(try await manager.dayPage(on: day.start) == [task])
+    let carried = TaskRecord(id: UUID(), attributes: ["scheduled": "1772859600"])
+    let timed = TaskRecord(id: UUID(), attributes: ["scheduled": "1772956800"])
+    let deadlineOnly = TaskRecord(id: UUID(), attributes: ["due": "1772956800"])
+    let rows = today.plannerRows(tasks: [carried, deadlineOnly, task, timed], calendar: calendar)
+    #expect(rows == [.task(carried), .task(deadlineOnly), .task(task), .event(today.events[2]), .event(today.events[1]), .task(timed)])
+    #expect(today.allDayEvents.map(\.event.title) == ["all-day"])
+    var visibility = CalendarVisibility()
+    visibility.setVisible(false, calendarID: "local")
+    #expect(today.showing(visibility).plannerRows(tasks: [carried, deadlineOnly, task, timed], calendar: calendar) == [.task(carried), .task(deadlineOnly), .task(task), .task(timed)])
 }
 
 func calendarEvent(_ title: String, start: String, end: String, allDay: Bool = false, canceled: Bool = false, identity: String? = nil) -> CalendarEventSnapshot {

@@ -214,25 +214,23 @@ import XCTest
         XCTAssertEqual(completed[taskID]?["description"], "Release revised")
     }
 
-    func testUpcomingAnchorAndMembershipChangeAfterCollapse() throws {
+    func testDayPageAnchorAndMembershipChangeAfterCollapse() throws {
         let app = try launch()
-        app.tabBars.buttons["Upcoming"].tap()
-        let planned = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "upcoming-planned-")).firstMatch
-        XCTAssertTrue(planned.waitForExistence(timeout: 10))
-        let identifier = planned.identifier
-        planned.tap()
+        openWorkspaceView("Today", app: app)
+        let row = app.buttons["task-" + taskID]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
         XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
         openTaskRowParameter("scheduled", app: app)
         app.buttons["remove-scheduled"].tap()
-        XCTAssertTrue(app.staticTexts["Scheduled"].exists, "Draft edits must not regroup the anchored row")
-        capture("Upcoming draft remains in its original group", app)
+        XCTAssertTrue(app.textFields["task-description"].exists)
         openTaskRowParameter("deadline", app: app)
         app.buttons["remove-deadline"].tap()
-        XCTAssertTrue(app.staticTexts["Deadlines"].exists)
+        XCTAssertTrue(app.textFields["task-description"].exists)
         closeTaskRow(app)
-        XCTAssertTrue(app.buttons[identifier].waitForNonExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["No upcoming plans or deadlines"].waitForExistence(timeout: 10))
-        capture("Upcoming membership applies after collapse", app)
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["planner-date-pill"].exists)
+        capture("Day page membership applies after collapse", app)
     }
 
     func testNativeProjectMenuRetainsScrolledPositionWhileOpen() throws {
@@ -523,9 +521,9 @@ import XCTest
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         let information = app.buttons["task-row-information"]
-        let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in information.isHittable && information.frame.maxY <= app.tabBars.firstMatch.frame.minY }, object: nil)
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in information.isHittable && information.frame.maxY <= self.taskContentBottom(app) }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 5), .completed)
-        XCTAssertLessThanOrEqual(information.frame.maxY, app.tabBars.firstMatch.frame.minY)
+        XCTAssertLessThanOrEqual(information.frame.maxY, taskContentBottom(app))
         capture("Lower-list row expanded within available height", app)
         title.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
@@ -770,7 +768,7 @@ import XCTest
     private func tapOutsideParameter(_ app: XCUIApplication) throws {
         let frame = app.frame
         let top = max(frame.minY, app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? frame.minY)
-        var bottom = min(frame.maxY, app.tabBars.firstMatch.frame.minY)
+        var bottom = min(frame.maxY, taskContentBottom(app))
         if app.keyboards.firstMatch.exists { bottom = min(bottom, app.keyboards.firstMatch.frame.minY) }
         let visible = CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
         let picker = app.descendants(matching: .any)["row-parameter-picker"].firstMatch.frame.intersection(visible)

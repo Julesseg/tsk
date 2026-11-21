@@ -4,22 +4,19 @@ import TskNative
 import EventKit
 
 struct ContentView: View {
-    private enum WorkspaceTab: Hashable { case view(WorkspaceView), capture }
-
     enum WorkspaceSetting {
-        case customViews, recurring, synchronization
+        case recurring, synchronization
     }
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(TaskURLController.self) private var automation
+    @State private var dayPaging = TaskDayPaging()
     @State private var store: TaskStore
     @State private var synchronization: SynchronizationStore
     @State private var opportunities: SynchronizationOpportunities
     @State private var calendar: TodayCalendarController
     @State private var isConfiguringSync = false
-    @State private var isChoosingCustomView = false
-    @State private var tabsBeforeEditingViews: [WorkspaceView]?
     @State private var isShowingRecurring = false
     @State private var isShowingSettings = false
     @State private var pendingWorkspaceSetting: WorkspaceSetting?
@@ -28,7 +25,6 @@ struct ContentView: View {
     @State private var path: [UUID] = []
     @State private var linkedTaskIDs: Set<UUID> = []
     @State private var linkedTaskPresentationID = UUID()
-    @State private var sidebarError: String?
     @State private var projectPath = NavigationPath()
     @State private var taskActionReturnPaths: (tasks: [UUID], projects: NavigationPath, selected: UUID?)?
     @State private var isRequestingCapture = false
@@ -52,6 +48,14 @@ struct ContentView: View {
                 .overlay {
                     TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
                 }
+                .overlay {
+                    if dayPaging.expanded {
+                        PlannerCalendarDismissal(calendarBounds: dayPaging.navigatorBounds) {
+                            dayPaging.expanded = false
+                        }
+                        .ignoresSafeArea(.container)
+                    }
+                }
         }
         .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }, information: { task in closeRow { showInformation(task) } }))
     }
@@ -70,9 +74,9 @@ struct ContentView: View {
         else { path = [task.id] }
     }
 
-    private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects && store.customView == nil }
+    private var isProjectWorkspace: Bool { store.selectedWorkspaceView == .projects }
 
-    private var tabSelection: Binding<WorkspaceView> {
+    private var workspaceSelection: Binding<WorkspaceView> {
         Binding(get: { store.selectedWorkspaceView }, set: { view in
             let select = {
                 resetNavigation()
@@ -89,47 +93,6 @@ struct ContentView: View {
         path = []
     }
 
-    private var workspaceTabSelection: Binding<WorkspaceTab> {
-        Binding(get: { .view(store.selectedWorkspaceView) }, set: { tab in
-            switch tab {
-            case .view(let view): tabSelection.wrappedValue = view
-            case .capture: capture()
-            }
-        })
-    }
-
-    private var captureTabRole: TabRole {
-        if #available(iOS 27, *) { .prominent }
-        else { .search }
-    }
-
-    private var navigationWorkspace: some View {
-        Group {
-            if !store.workspaceViewsLoaded && sidebarError == nil {
-                ProgressView("Loading views")
-            } else if store.navigationReturn != nil || (store.customView != nil && store.customView?.id == nil) {
-                workspaceContent
-            } else {
-                TabView(selection: workspaceTabSelection) {
-                    ForEach(tabsBeforeEditingViews ?? store.workspaceViews.active) { view in
-                        Tab(view.title(in: store), systemImage: view.systemImage, value: WorkspaceTab.view(view)) {
-                            if view == store.selectedWorkspaceView {
-                                workspaceContent
-                                    .background { CaptureTabAction(capture: capture).frame(width: 0, height: 0).allowsHitTesting(false) }
-                            }
-                        }
-                        .accessibilityIdentifier("tab-" + view.id)
-                    }
-                    Tab("New task", systemImage: "plus", value: WorkspaceTab.capture, role: captureTabRole) {
-                        EmptyView()
-                    }
-                    .accessibilityIdentifier("new-task")
-                }
-                .tabViewStyle(.tabBarOnly)
-            }
-        }
-    }
-
     private var workspaceContent: some View {
         Group {
             if isProjectWorkspace {
@@ -139,7 +102,12 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
-            if store.navigationReturn != nil || (store.customView != nil && store.customView?.id == nil) { captureButton.padding() }
+            if !store.isDayPage {
+                HStack { Spacer(); captureButton }.padding(.horizontal, 16).padding(.vertical, 8)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if store.isDayPage && !dayPaging.expanded { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
         }
     }
 
@@ -216,16 +184,7 @@ struct ContentView: View {
     }
 
     private var editorSheets: some View {
-        navigationWorkspace
-        .sheet(isPresented: $isChoosingCustomView, onDismiss: {
-            tabsBeforeEditingViews = nil
-            Task { await loadSavedViews() }
-        }) {
-            CustomViewsView(store: store, select: {
-                tabsBeforeEditingViews = nil
-                tabSelection.wrappedValue = $0
-            }).modifier(TaskWorkspacePanel(store: store))
-        }
+        workspaceContent
         .sheet(isPresented: $isConfiguringSync) {
             SyncSettingsView(synchronization: synchronization, tasks: store, backgroundError: opportunities.backgroundError).modifier(TaskWorkspacePanel(store: store))
         }
@@ -238,7 +197,7 @@ struct ContentView: View {
 
     private var taskLifecycle: some View {
         editorSheets
-        .task(id: TaskListSelection(external: store.navigationReturn != nil, query: store.query, project: store.projectSelection, customView: store.customView)) {
+        .task(id: TaskListSelection(external: store.navigationReturn != nil, query: store.query, project: store.projectSelection, day: store.isDayPage ? store.displayedDay : nil)) {
             if store.navigationReturn == nil, let previous = taskActionReturnPaths {
                 path = previous.tasks
                 projectPath = previous.projects
@@ -260,7 +219,6 @@ struct ContentView: View {
         .task {
             synchronization.startObserving(tasks: store)
             await synchronization.loadConfiguration()
-            await loadSavedViews()
             opportunities.start()
             await opportunities.foreground()
         }
@@ -268,8 +226,8 @@ struct ContentView: View {
 
     private var participantLifecycle: some View {
         taskLifecycle
-        .task(id: store.workspaceViewsLoaded ? automation.taskToOpen?.id : nil) {
-            guard store.workspaceViewsLoaded, let task = automation.taskToOpen else { return }
+        .task(id: automation.taskToOpen?.id) {
+            guard let task = automation.taskToOpen else { return }
             await store.reload()
             guard !Task.isCancelled else { return }
             linkedTaskPresentationID = UUID()
@@ -277,8 +235,7 @@ struct ContentView: View {
             showInformation(task)
             automation.taskToOpen = nil
         }
-        .task(id: store.workspaceViewsLoaded) {
-            guard store.workspaceViewsLoaded else { return }
+        .task {
             automation.navigate = { destination in
                 automation.findResults = nil
                 if store.navigationReturn == nil {
@@ -313,7 +270,6 @@ struct ContentView: View {
                     await synchronization.loadConfiguration()
                     await opportunities.foreground()
                     await store.reload()
-                    await loadSavedViews()
                 }
             } else if phase == .background { opportunities.background() }
         }
@@ -324,29 +280,38 @@ struct ContentView: View {
 
     private var calendarWorkspace: some View {
         applicationLifecycle
-        .task(id: displaysCalendar) {
+        .task(id: displaysCalendar ? store.displayedDay : nil) {
             calendar.isDisplayingToday = displaysCalendar
+            calendar.displayedDay = store.isDayPage ? store.displayedDay : nil
             if displaysCalendar { await calendar.refresh() }
         }
-        .task(id: displaysCalendar ? calendar.snapshot?.day?.end : nil) {
-            guard displaysCalendar, let next = calendar.snapshot?.day?.end else { return }
+        .task(id: scenePhase == .active ? store.nextDayBoundary : nil) {
+            guard scenePhase == .active, let next = store.nextDayBoundary else { return }
             do {
                 try await Task.sleep(for: .seconds(max(1, next.timeIntervalSince(store.currentDate))))
                 try Task.checkCancellation()
-                await calendar.refresh()
                 await store.reload()
+                if displaysCalendar { await calendar.refresh() }
             } catch {}
         }
     }
 
-    private var displaysCalendar: Bool { scenePhase == .active && store.customView == nil && store.query == .today }
+    private var displaysCalendar: Bool {
+        scenePhase == .active && store.isDayPage
+    }
+
+    private var dayPageTitle: String? {
+        guard store.isDayPage else { return nil }
+        return Calendar.autoupdatingCurrent.isDate(store.displayedDay, inSameDayAs: store.currentDate)
+            ? "Today" : store.displayedDay.formatted(.dateTime.weekday(.wide).day().month())
+    }
 
     private func taskList(title: String? = nil) -> some View {
-        TaskListView(store: store, calendar: calendar, edit: { showInformation($0) })
-            .navigationTitle(title ?? store.navigationTitle ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+        TaskListView(store: store, calendar: calendar, edit: { showInformation($0) }, dayPaging: dayPaging)
+            .navigationTitle(title ?? dayPageTitle ?? store.navigationTitle ?? store.selectedWorkspaceView.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                workspaceTitle(title ?? store.navigationTitle ?? store.customView?.name ?? store.selectedWorkspaceView.title(in: store))
+                workspaceTitle(title ?? dayPageTitle ?? store.navigationTitle ?? store.selectedWorkspaceView.title)
                 settingsToolbar
             }
             .safeAreaInset(edge: .bottom) {
@@ -358,7 +323,6 @@ struct ContentView: View {
                             .accessibilityAddTraits(.updatesFrequently)
                     }
                     if let error = store.error, !store.isSelectingTasks, !store.tasks.isEmpty, store.rowEditing == nil, selectedTaskID == nil { errorBanner(error, retry: { Task { await store.reload() } }) }
-                    if let sidebarError { errorBanner(sidebarError, retry: { Task { await loadSavedViews() } }) }
                 }
             }
     }
@@ -379,9 +343,18 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
-        if store.customView != nil && store.customView?.id == nil {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Close filter", systemImage: "xmark") { tabSelection.wrappedValue = store.selectedWorkspaceView }
+        if store.navigationReturn == nil {
+            ToolbarItemGroup(placement: .topBarLeading) {
+                if !store.isDayPage {
+                    Button("Today", systemImage: "calendar") { workspaceSelection.wrappedValue = .today }
+                        .accessibilityIdentifier("open-today")
+                }
+                Button("Inbox", systemImage: "tray") { workspaceSelection.wrappedValue = .inbox }
+                    .accessibilityIdentifier("open-inbox")
+                    .accessibilityAddTraits(store.selectedWorkspaceView == .inbox ? .isSelected : [])
+                Button("Projects", systemImage: "folder") { workspaceSelection.wrappedValue = .projects }
+                    .accessibilityIdentifier("open-projects")
+                    .accessibilityAddTraits(isProjectWorkspace ? .isSelected : [])
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
@@ -412,15 +385,9 @@ struct ContentView: View {
         guard let destination = pendingWorkspaceSetting else { return }
         pendingWorkspaceSetting = nil
         switch destination {
-        case .customViews: presentViews()
         case .recurring: isShowingRecurring = true
         case .synchronization: isConfiguringSync = true
         }
-    }
-
-    private func presentViews() {
-        tabsBeforeEditingViews = store.workspaceViews.active
-        isChoosingCustomView = true
     }
 
     private func errorBanner(_ error: String, retry: @escaping () -> Void) -> some View {
@@ -459,18 +426,13 @@ struct ContentView: View {
         store.query = .unfinished
         store.projectSelection = project
     }
-
-    private func loadSavedViews() async {
-        do { try await store.loadSavedViews(); sidebarError = nil }
-        catch { sidebarError = error.localizedDescription }
-    }
 }
 
 private struct TaskListSelection: Equatable {
     let external: Bool
     let query: TaskQuery
     let project: TaskProjectSelection
-    let customView: CustomViewSelection?
+    let day: Date?
 }
 
 struct TaskRowDismissalOverlay: View {
@@ -505,5 +467,44 @@ struct TaskRowDismissalOverlay: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+}
+
+private struct PlannerCalendarDismissal: View {
+    let calendarBounds: CGRect
+    let dismiss: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            let page = geometry.frame(in: .global)
+            let calendar = page.intersection(calendarBounds)
+            if calendar.isNull {
+                dismissButton
+            } else {
+                VStack(spacing: 0) {
+                    dismissButton.frame(height: calendar.minY - page.minY)
+                    HStack(spacing: 0) {
+                        dismissButton.frame(width: calendar.minX - page.minX)
+                            .accessibilityHidden(true)
+                        Color.clear.frame(width: calendar.width)
+                            .allowsHitTesting(false)
+                        dismissButton.frame(width: page.maxX - calendar.maxX)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(height: calendar.height)
+                    dismissButton.frame(height: page.maxY - calendar.maxY)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+    }
+
+    private var dismissButton: some View {
+        Button(action: dismiss) {
+            Color.clear.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close month calendar")
+        .accessibilityIdentifier("dismiss-planner-calendar")
     }
 }

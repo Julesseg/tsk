@@ -31,7 +31,7 @@ import TskCore
 
     private func makePicker(date: Date) -> UIDatePicker {
         let picker = UIDatePicker()
-        picker.datePickerMode = .dateAndTime
+        picker.datePickerMode = .date
         picker.preferredDatePickerStyle = .inline
         picker.date = date
         picker.accessibilityElementsHidden = true
@@ -43,6 +43,7 @@ struct TaskSelectionCalendar: UIViewRepresentable {
     let calendars: TaskSelectionCalendars
     let field: TaskDateField
     @Binding var selection: Date
+    let minimumDate: Date?
 
     func makeCoordinator() -> Coordinator { Coordinator(selection: $selection, calendars: calendars, field: field) }
 
@@ -54,6 +55,7 @@ struct TaskSelectionCalendar: UIViewRepresentable {
 
     func updateUIView(_ picker: UIDatePicker, context: Context) {
         context.coordinator.selection = $selection
+        picker.minimumDate = minimumDate
         picker.accessibilityIdentifier = field.rawValue + "-picker"
         picker.accessibilityLabel = field == .scheduled ? "Scheduled" : "Deadline"
         picker.accessibilityElementsHidden = false

@@ -14,7 +14,6 @@ import TskNative
     _ = try await replica.create(id: UUID(), attributes: ["description": "Train deleted", "status": "deleted", "entry": "11"])
     _ = try await replica.create(id: UUID(), attributes: ["description": "Train template", "status": "recurring", "entry": "12"])
     let manager = try await TaskChampionSession.open(directory: directory)
-    let beforeViews = try await manager.savedViews()
     let all = try await manager.findTasks(FindTasksInput(status: .all))
     #expect(all.map(\.id) == [a, b])
     let input = FindTasksInput(description: "train", project: "café", tags: ["rail", "cafe\u{301}"], priority: "H", scheduled: TaskDateRange(from: Date(timeIntervalSince1970: 1000), through: Date(timeIntervalSince1970: 1000)), deadline: TaskDateRange(through: Date(timeIntervalSince1970: 2000)), waitingUntil: TaskDateRange(from: Date(timeIntervalSince1970: 500)))
@@ -23,5 +22,4 @@ import TskNative
     #expect(try await manager.findTasks(FindTasksInput(tags: ["café"])).isEmpty)
     #expect(try await manager.findTasks(FindTasksInput(status: .all, limit: 1, offset: 1)).map(\.id) == [b])
     #expect(try await manager.findTasks(FindTasksInput(status: .completed)).map(\.id) == [b])
-    #expect(try await manager.savedViews() == beforeViews)
 }

@@ -64,7 +64,7 @@ struct TaskLinkedTaskList: View {
                 if task.canEdit { store.expandRow(task) }
                 else { destination = task }
             }
-            await store.observeParticipantChanges(reconcileWorkspace: false)
+            await store.observeParticipantChanges()
         }
     }
 

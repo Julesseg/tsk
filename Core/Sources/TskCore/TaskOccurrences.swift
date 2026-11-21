@@ -45,8 +45,9 @@ extension TaskManager {
     func occurrenceMutationMask(_ occurrence: TaskRecord, changes: TaskAttributePatch, parent: TaskRecord, index: Int, completing: Bool = false, deleting: Bool = false) throws -> UInt8 {
         let mask = Array(parent.attributes["mask"]!.utf8)[index]
         let validPending = occurrence.status == "pending" && [45, 87].contains(mask)
-        let validCompletedDeletion = deleting && occurrence.status == "completed" && mask == 43
-        guard validPending || validCompletedDeletion else {
+        let reopening = changes["status"] == .some("pending")
+        let validCompletedTransition = (deleting || reopening) && occurrence.status == "completed" && mask == 43
+        guard validPending || validCompletedTransition else {
             throw TaskManagementError.storage("The occurrence state disagrees with its series mask. No tasks were changed.")
         }
         if deleting { return 88 }

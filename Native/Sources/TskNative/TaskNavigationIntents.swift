@@ -45,8 +45,7 @@ public struct IntentTaskViewQuery: EntityStringQuery {
         let manager = try await IntentTaskSession.open(directory: directory)
         let builtins = TaskNavigationView.predefined.map { IntentTaskViewEntity(view: $0, name: $0.title) }
         let projects = try await manager.projects().map { IntentTaskViewEntity(view: .project($0), name: $0) }
-        let saved = try await manager.savedViews().map { IntentTaskViewEntity(view: .saved($0.id), name: $0.name) }
-        return builtins + projects + saved
+        return builtins + projects
     }
 }
 
@@ -70,7 +69,7 @@ public struct OpenTaskIntent: AppIntent {
 @available(iOS 16, macOS 13, *)
 public struct OpenTaskViewIntent: AppIntent {
     public static let title: LocalizedStringResource = "Open View"
-    public static let description = IntentDescription("Open an existing task view in tsk without changing favorites. Saved views keep their identity after renaming.")
+    public static let description = IntentDescription("Open Today, Inbox, or a project in tsk.")
     public static let openAppWhenRun = true
     @Parameter(title: "View") public var view: IntentTaskViewEntity
     private var navigation: ForegroundTaskNavigation?

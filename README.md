@@ -5,7 +5,7 @@ stored locally in a shared App Group and synchronized through TaskChampion's
 encrypted protocol. `TskCore` owns task behavior; `TskNative` connects storage and
 system services; SwiftUI presents the app.
 
-Implemented workflows include task editing, projects/tags, Today/Upcoming,
+Implemented workflows include task editing, projects/tags, Today and Inbox,
 Taskwarrior filters and saved views, recurring templates and occurrence/series
 editing, Shortcuts and Calendar display. The designated desktop
 Taskwarrior client creates recurring occurrences after sync and a recurrence-enabled

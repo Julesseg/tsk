@@ -70,18 +70,17 @@ Modify uses the same durable offline acknowledgement, rich Task entity and JSON 
 
 Shortcuts exposes **Open Task** with a required Task entity and **Open View** with a required native view picker. These foreground actions open tsk and await the workspace navigation result; an invalid draft, unavailable target or failed save throws instead of reporting successful navigation. Add, Find, Complete and Modify remain background data actions. Open actions do not wrap custom URLs.
 
-Open View selects an existing view, including views hidden from favorites. It never creates a custom view or changes favorite order or membership. Saved views use their durable UUID and current name/filter after renaming. Exact project names do not include child projects. Missing projects and saved views fail clearly.
+Open View offers Today, Inbox, Projects and exact project names in the Shortcuts picker. Exact project names exclude child projects. Missing projects report an error.
 
 | Destination | URL |
 | --- | --- |
 | Today | `tsk://open-view?view=today` |
-| Upcoming | `tsk://open-view?view=upcoming` |
-| All unfinished | `tsk://open-view?view=unfinished` |
-| Done | `tsk://open-view?view=done` |
+| Inbox | `tsk://open-view?view=inbox` |
+| Legacy unfinished list URL | `tsk://open-view?view=unfinished` |
+| Legacy completed list URL | `tsk://open-view?view=done` |
 | Projects | `tsk://open-view?view=projects` |
 | Exact project | `tsk://open-view?view=project&project=Work.Travel` |
-| Existing saved view | `tsk://open-view?view=saved&id=<full UUID>` |
 
-Names are case-sensitive. Percent-encode project names; saved display names are not accepted as identity. Unknown, duplicate, irrelevant or missing arguments fail. Both open routes accept the same optional `x-success` and `x-error` callback arguments as Add Task. Navigation callbacks are delivered after the workspace transition, with `success:true`, `navigated:true`, `savedLocally:false`, the canonical view URL and current title; Open Task also includes the current rich task result. `savedLocally:false` means the open action did not create a task. Existing valid edits may have been saved before opening. Errors use the common error payload and never silently discard current drafts.
+Names are case-sensitive. Percent-encode project names. Unknown, duplicate, irrelevant or missing arguments fail. Both open routes accept the same optional `x-success` and `x-error` callback arguments as Add Task. Navigation callbacks are delivered after the workspace transition, with `success:true`, `navigated:true`, `savedLocally:false`, the canonical view URL and current title; Open Task also includes the current rich task result. `savedLocally:false` means the open action did not create a task. Existing valid edits may have been saved before opening. Errors use the common error payload and never silently discard current drafts.
 
 Back saves valid edits and restores the originating view and navigation path. Current invalid input or failed persistence retains the draft, picker and error. iPhone is the supported UI family under ADR-0007.

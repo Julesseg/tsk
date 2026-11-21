@@ -20,110 +20,8 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(revealWorkspaceSetting("synchronization-settings", app: app))
         capture("After settings at largest text size")
         XCTAssertTrue(app.buttons["synchronization-settings"].isHittable)
-        XCTAssertTrue(revealWorkspaceSetting("custom-views", app: app, initialScrollUp: false))
-        tapTaskControl(app.buttons["custom-views"], app: app)
-        XCTAssertTrue(app.collectionViews["views-list"].waitForExistence(timeout: 5))
-        capture("Views at largest text size")
-        tapTaskControl(app.buttons["close-views"], app: app)
-        tapTaskControl(app.buttons["workspace-settings"], app: app)
         tapTaskControl(app.buttons["close-workspace-settings"], app: app)
         XCTAssertTrue(app.collectionViews["workspace-settings-list"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["New task"].isHittable)
-    }
-
-    func testViewsCapacityReorderingAndFirstTabPersistAcrossLaunch() {
-        let app = launch(animationsEnabled: true)
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), ["Today", "Upcoming", "Projects", "All", "New task"])
-        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
-        openWorkspaceSetting("custom-views", app: app)
-        capture("Views with four default active tabs")
-        tapTaskControl(app.buttons["new-custom-view"], app: app)
-        let name = app.textFields["custom-view-name"]
-        focusTaskText(name, app: app)
-        name.typeText("All local tasks")
-        tapTaskControlAtCenter(app.buttons["dismiss-filter-keyboard"], app: app)
-        XCTAssertEqual(name.value as? String, "All local tasks")
-        tapTaskControl(app.buttons["save-custom-view"], app: app)
-        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
-        XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app))
-        let id = String(saved.identifier.dropFirst("saved-view-".count))
-        let add = app.buttons["activate-custom-" + id]
-        XCTAssertFalse(add.isEnabled)
-        capture("Views inactive custom filter at tab capacity")
-        let remove = app.buttons["deactivate-unfinished"]
-        XCTAssertTrue(revealTaskElement(remove, in: "views-list", app: app, initialScrollUp: false))
-        tapTaskControl(remove, app: app)
-        XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app))
-        XCTAssertTrue(add.isEnabled)
-        tapTaskControl(add, app: app)
-        XCTAssertTrue(revealTaskElement(saved, in: "views-list", app: app, initialScrollUp: false))
-        let source = app.collectionViews["views-list"].cells.containing(.button, identifier: saved.identifier).firstMatch
-        let first = app.collectionViews["views-list"].cells.containing(.button, identifier: "view-today").firstMatch
-        let handle = source.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).firstMatch
-        XCTAssertTrue(handle.exists)
-        handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 1,
-                   thenDragTo: first.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.1)),
-                   withVelocity: .slow, thenHoldForDuration: 1)
-        let reorderDeadline = ProcessInfo.processInfo.systemUptime + 5
-        let movedIdentifier = "saved-view-" + id
-        var lastOrder = "not sampled"
-        func reordered() -> Bool {
-            guard ProcessInfo.processInfo.systemUptime < reorderDeadline else { return false }
-            do {
-                let snapshot = try app.collectionViews["views-list"].snapshot()
-                var pending: [(any XCUIElementSnapshot, CGRect?)] = [(snapshot, nil)]
-                var rows: [String: [CGRect]] = [:]
-                while let (item, inheritedRow) = pending.popLast() {
-                    let row = item.elementType == .cell ? item.frame : inheritedRow
-                    if item.elementType == .button,
-                       item.identifier == movedIdentifier || item.identifier == "view-today",
-                       let row, !row.isEmpty {
-                        rows[item.identifier, default: []].append(row)
-                    }
-                    pending.append(contentsOf: item.children.map { ($0, row) })
-                }
-                lastOrder = String(describing: rows)
-                guard ProcessInfo.processInfo.systemUptime < reorderDeadline,
-                      rows[movedIdentifier]?.count == 1, rows["view-today"]?.count == 1,
-                      let moved = rows[movedIdentifier]?.first, let today = rows["view-today"]?.first else { return false }
-                return moved.minY < today.minY
-            } catch {
-                lastOrder = String(describing: error)
-                return false
-            }
-        }
-        var orderAcknowledged = reordered()
-        let remaining = reorderDeadline - ProcessInfo.processInfo.systemUptime
-        if !orderAcknowledged, remaining > 0 {
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reordered() }, object: nil)
-            orderAcknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < reorderDeadline
-        }
-        XCTAssertTrue(orderAcknowledged, "Native reorder did not put the saved view before Today within five seconds: \(lastOrder)")
-        capture("Views reordered custom tab first")
-        tapTaskControl(app.buttons["close-views"], app: app)
-        app.terminate()
-        app.launch()
-        let custom = app.tabBars.buttons["All local tasks"]
-        XCTAssertTrue(custom.waitForExistence(timeout: 15))
-        XCTAssertTrue(custom.isSelected)
-        XCTAssertEqual(app.tabBars.buttons.element(boundBy: 0).label, "All local tasks")
-        XCTAssertEqual(app.tabBars.buttons.count, 5)
-        XCTAssertFalse(app.tabBars.buttons["Done"].exists)
-        capture("First active custom tab after relaunch")
-        openWorkspaceSetting("custom-views", app: app)
-        for identifier in ["today", "upcoming", "projects"] {
-            let button = app.buttons["deactivate-" + identifier]
-            XCTAssertTrue(revealTaskElement(button, in: "views-list", app: app, initialScrollUp: false))
-            tapTaskControl(button, app: app)
-        }
-        XCTAssertFalse(app.buttons["deactivate-custom-" + id].isEnabled)
-        capture("Views keeps one active tab")
-        openSavedViewOptions(app)
-        tapTaskMenuItem(app.buttons["Delete"], app: app)
-        XCTAssertTrue(saved.waitForNonExistence(timeout: 5))
-        tapTaskControl(app.buttons["close-views"], app: app)
-        XCTAssertEqual(app.tabBars.buttons.count, 2)
         XCTAssertTrue(app.buttons["New task"].isHittable)
     }
 
@@ -160,7 +58,7 @@ final class WorkspaceSettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sync-connection-saved"].waitForExistence(timeout: 5))
         tapTaskControl(app.navigationBars["Synchronization"].buttons["Done"], app: app)
         for title in ["Today", "Projects"] {
-            tapTaskControl(app.tabBars.buttons[title], app: app, beforeSample: dismissPassword)
+            openWorkspaceView(title, app: app, beforeSample: dismissPassword)
             let progress = app.navigationBars.activityIndicators["workspace-sync-progress"].firstMatch
             XCTAssertTrue(progress.waitForExistence(timeout: 5))
             XCTAssertEqual(app.navigationBars.activityIndicators.matching(identifier: "workspace-sync-progress").count, 1)

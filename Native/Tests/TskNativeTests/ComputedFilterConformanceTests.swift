@@ -58,15 +58,12 @@ func computedUrgencyAndArithmeticAgreeWithActualPinnedClientAcrossRawReplica() a
         #expect((0...300).contains(elapsed), "Live urgency conformance exceeded its bounded clock window: \(elapsed)s")
     }
     try writeComputedFilterEvidence("computed-urgency", epoch: epoch, records: records, comparisons: comparisons, clockBudgetSeconds: 300)
-    let saved = try await manager.saveView(name: "Computed default urgency", expression: "project:Blocked and urgency < 0")
+    let expression = "project:Blocked and urgency < 0"
     let reopened = TaskChampionSession.makeManager(directory: fixture.directory)
-    #expect(try await reopened.savedViews() == [saved])
-    await #expect(throws: TaskFilterError.self) { try await reopened.saveView(id: saved.id, name: saved.name, expression: "urgency / 0 > 0") }
-    #expect(try await manager.savedViews() == [saved])
-    #expect(try await reopened.tasks(filter: saved.expression).count == 1)
+    #expect(try await reopened.tasks(filter: expression).count == 1)
     _ = try await reopened.complete(id: prerequisite)
-    #expect(try await manager.tasks(filter: saved.expression).isEmpty)
-    try await fixture.compare(saved.expression, manager: manager)
+    #expect(try await manager.tasks(filter: expression).isEmpty)
+    try await fixture.compare(expression, manager: manager)
     for expression in ["urgency / 0 > 0", "urgency ^ 2.0 > 0", "false and urgency / 0 > 0", "urgency > (3.0 + 1.0)", "score / 2 == 1", "score % 2 == 0", "score ^ 2 == 4", "effort / 1h == 1", "effort - 30min == 30min"] {
         _ = try fixture.task([expression, "_uuids"], expectedFailure: true)
         await #expect(throws: TaskFilterError.self) { try await manager.tasks(filter: expression) }

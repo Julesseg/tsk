@@ -36,20 +36,16 @@ public enum TaskActionURL: Equatable, Sendable {
             let view: TaskNavigationView
             switch values["view"]?.first {
             case "today": view = .today
-            case "upcoming": view = .upcoming
+            case "inbox": view = .inbox
             case "unfinished": view = .unfinished
             case "done": view = .done
             case "projects": view = .projects
             case "project":
                 guard let name = values["project"]?.first, !name.isEmpty else { throw TaskActionError.invalidInput("Open View requires an exact project name.") }
                 view = .project(name)
-            case "saved":
-                guard let raw = values["id"]?.first, raw.count == 36, let id = UUID(uuidString: raw) else { throw TaskActionError.invalidInput("Open View requires a full saved-view UUID.") }
-                view = .saved(id)
-            default: throw TaskActionError.invalidInput("Choose today, upcoming, unfinished, done, projects, project, or saved.")
+            default: throw TaskActionError.invalidInput("Choose today, inbox, projects, or an exact project.")
             }
-            guard (values["project"] == nil || { if case .project = view { return true }; return false }()),
-                  (values["id"] == nil || { if case .saved = view { return true }; return false }()) else { throw TaskActionError.invalidInput("Arguments do not belong to this view.") }
+            guard (values["project"] == nil || { if case .project = view { return true }; return false }()), values["id"] == nil else { throw TaskActionError.invalidInput("Arguments do not belong to this view.") }
             self = .openView(view)
         } else if components.host == "open-task" || components.host == "complete" || components.host == "delete" {
             let id = try Self.taskID(values["id"]?.first)

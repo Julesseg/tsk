@@ -1,7 +1,20 @@
 import Foundation
 
+public enum TaskCaptureContext: Equatable, Sendable {
+    case day(Date), project(String), inbox, external
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.day(let left), .day(let right)): left == right
+        case (.project(let left), .project(let right)): left.matchesBytes(right)
+        case (.inbox, .inbox), (.external, .external): true
+        default: false
+        }
+    }
+}
+
 public struct TaskRowDraft: Equatable, Sendable {
-    private static let editableAttributes = ["project", "priority", "scheduled", "due", "wait"]
+    private static let editableAttributes = ["project", "priority", "scheduled", "due", "wait", TaskScheduledDate.attribute]
     public enum Plan: Sendable { case today, tomorrow, remove }
     public private(set) var original: TaskRecord
     public var taskDraft: TaskDraft
@@ -14,9 +27,21 @@ public struct TaskRowDraft: Equatable, Sendable {
     }
 
     public init(capturing query: TaskQuery, project: TaskProjectSelection = .all, now: Date, calendar: Calendar = .autoupdatingCurrent) {
+        let context: TaskCaptureContext
+        if query == .today { context = .day(now) }
+        else if let name = project.projectName { context = .project(name) }
+        else { context = .inbox }
+        self.init(capturing: context, calendar: calendar)
+        if let name = project.projectName { taskDraft.project = name }
+    }
+
+    public init(capturing context: TaskCaptureContext, calendar: Calendar = .autoupdatingCurrent) {
         var draft = TaskDraft()
-        if query == .today { draft.schedule(on: now, calendar: calendar) }
-        if let project = project.projectName { draft.project = project }
+        switch context {
+        case .day(let day): draft.schedule(on: day, calendar: calendar)
+        case .project(let name): draft.project = name
+        case .inbox, .external: break
+        }
         original = TaskRecord(id: UUID(), attributes: ["description": "", "status": "pending"])
         taskDraft = draft
     }
@@ -37,6 +62,9 @@ public struct TaskRowDraft: Equatable, Sendable {
         let title = taskDraft.description
         let titleChanged = !title.matchesBytes(original.description)
         let edits = taskDraft.attributes.changes(comparedTo: original.attributes)
+        let scheduledKeys = ["scheduled", TaskScheduledDate.attribute]
+        let scheduledEdited = scheduledKeys.contains { edits.keys.contains($0) }
+        let scheduledAttributes = taskDraft.attributes
         original = task
         taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
         if titleChanged { taskDraft.description = title }
@@ -45,6 +73,9 @@ public struct TaskRowDraft: Equatable, Sendable {
         }
         for key in editedKeys {
             if let value = edits[key] { taskDraft.attributes[key] = value }
+        }
+        if scheduledEdited {
+            for key in scheduledKeys { taskDraft.attributes[key] = scheduledAttributes[key] }
         }
     }
 

@@ -26,19 +26,14 @@ public struct UpcomingDay: Identifiable, Equatable, Sendable {
         guard let boundary = calendar.dateInterval(of: .day, for: now)?.end else { return [] }
         var days: [Date: [UpcomingTaskEntry]] = [:]
         for task in tasks where task.status == "pending" {
-            let dates: [(TaskDateRole, Date?)] = [(.planned, task.plannedDate), (.deadline, task.deadline)]
-            for (role, date) in dates {
-                guard let date, date >= boundary else { continue }
-                let day = calendar.startOfDay(for: date)
-                days[day, default: []].append(UpcomingTaskEntry(task: task, role: role, date: date))
-            }
+            guard let date = task.plannerDate(calendar: calendar)?.date, date >= boundary else { continue }
+            let day = calendar.startOfDay(for: date)
+            let role: TaskDateRole = task.plannedDate == nil ? .deadline : .planned
+            days[day, default: []].append(UpcomingTaskEntry(task: task, role: role, date: date))
         }
         return days.keys.sorted().map { day in
             UpcomingDay(day: day, entries: days[day, default: []].sorted {
-                if $0.date != $1.date { return $0.date < $1.date }
-                if $0.role != $1.role { return $0.role == .planned }
-                if $0.task.description != $1.task.description { return $0.task.description < $1.task.description }
-                return $0.task.id.uuidString < $1.task.id.uuidString
+                TaskPlannerOrder.precedes($0.task, $1.task, on: day, calendar: calendar)
             })
         }
     }
@@ -47,6 +42,6 @@ public struct UpcomingDay: Identifiable, Equatable, Sendable {
 public extension TaskRecord {
     func isInUpcoming(at now: Date, calendar: Calendar) -> Bool {
         guard status == "pending", let boundary = calendar.dateInterval(of: .day, for: now)?.end else { return false }
-        return [plannedDate, deadline].compactMap { $0 }.contains { $0 >= boundary }
+        return plannerDate(calendar: calendar).map { $0.date >= boundary } ?? false
     }
 }

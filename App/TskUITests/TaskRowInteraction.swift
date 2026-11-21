@@ -19,33 +19,66 @@ extension XCTestCase {
         return app
     }
 
-    @MainActor func selectDoneTasks(_ app: XCUIApplication) {
-        let done = app.tabBars.buttons["Done"]
-        if done.exists { tapTaskControl(done, app: app); return }
-        if !app.collectionViews["views-list"].exists { openWorkspaceSetting("custom-views", app: app) }
-        let add = app.buttons["activate-completed"]
-        XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app))
-        if !add.isEnabled {
-            let remove = app.buttons["deactivate-projects"]
-            XCTAssertTrue(revealTaskElement(remove, in: "views-list", app: app))
-            tapTaskControl(remove, app: app)
-            XCTAssertTrue(revealTaskElement(add, in: "views-list", app: app, initialScrollUp: false))
+    @MainActor func assertPlannerDay(_ day: String, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", day), object: app.buttons["planner-date-pill"])
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, "Paging must snap to the expected day", file: file, line: line)
+    }
+
+    @MainActor func expandPlannerCalendar(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let pill = app.buttons["planner-date-pill"]
+        let start = pill.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -180)), withVelocity: .slow, thenHoldForDuration: 0)
+        XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForExistence(timeout: 5), file: file, line: line)
+    }
+
+    @MainActor func openWorkspaceView(_ title: String, app: XCUIApplication, beforeSample: ((TimeInterval) -> Void)? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        let heading = app.staticTexts["workspace-title-text"]
+        let identifiers = ["Today": "open-today", "Inbox": "open-inbox", "Projects": "open-projects"]
+        if !(heading.exists && heading.label == title) {
+            guard let identifier = identifiers[title] else { XCTFail("Unknown workspace: " + title, file: file, line: line); return }
+            if app.buttons["back-from-task-action"].exists {
+                tapTaskControl(app.buttons["back-from-task-action"], app: app, beforeSample: beforeSample, file: file, line: line)
+            }
+            if !(heading.exists && heading.label == title) {
+                tapTaskControl(app.buttons[identifier], app: app, beforeSample: beforeSample, file: file, line: line)
+            }
         }
-        tapTaskControl(add, app: app)
-        let row = app.buttons["view-completed"]
-        XCTAssertTrue(revealTaskElement(row, in: "views-list", app: app))
-        tapTaskControl(row, app: app)
-        XCTAssertTrue(app.collectionViews["views-list"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(done.isSelected)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in heading.exists && heading.label == title }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed, file: file, line: line)
+    }
+
+    @MainActor func taskContentBottom(_ app: XCUIApplication) -> CGFloat {
+        var bottom = app.frame.maxY
+        for element in [app.buttons["new-task"], app.buttons["planner-date-pill"]] {
+            if element.exists, !element.frame.isEmpty { bottom = min(bottom, element.frame.minY) }
+        }
+        return bottom
+    }
+
+    @MainActor func selectDoneTasks(_ app: XCUIApplication) {
+        openLegacyTaskList("done", title: "Done", app: app)
     }
 
     @MainActor func selectAllTasks(_ app: XCUIApplication) {
-        let tab = app.tabBars.buttons["All"]
-        guard tab.waitForExistence(timeout: 20) else {
-            XCTFail("The All tab must be available before reviewing unfinished tasks")
-            return
-        }
-        tapTaskControl(tab, app: app)
+        openLegacyTaskList("unfinished", title: "All unfinished", app: app)
+    }
+
+    @MainActor private func openLegacyTaskList(_ view: String, title: String, app: XCUIApplication) {
+        let heading = app.staticTexts["workspace-title-text"]
+        if heading.exists && heading.label == title { return }
+        app.open(URL(string: "tsk://open-view?view=" + view)!)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in heading.exists && heading.label == title }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed)
+    }
+
+    @MainActor func scheduledSlot(_ id: String, app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["planner-leading-" + id].firstMatch
+    }
+
+    @MainActor func touchScheduledSlot(_ id: String, app: XCUIApplication) {
+        let slot = scheduledSlot(id, app: app)
+        XCTAssertTrue(slot.waitForExistence(timeout: 5))
+        slot.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     func taskRow(named description: String, app: XCUIApplication) -> XCUIElement {

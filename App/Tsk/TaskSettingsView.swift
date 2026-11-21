@@ -9,8 +9,6 @@ struct TaskSettingsView: View {
         NavigationStack {
             List {
                 Section("Tasks") {
-                    Button("Views", systemImage: "square.grid.2x2") { choose(.customViews) }
-                        .accessibilityIdentifier("custom-views")
                     Button("Recurring templates", systemImage: "repeat") { choose(.recurring) }
                         .accessibilityIdentifier("recurring-templates")
                 }

@@ -2,6 +2,33 @@ import Foundation
 import Testing
 import TskCore
 
+@Test func explicitBulkDatesClearExistingTimesAndRejectPastUntimedScheduledDates() async throws {
+    let calendar = Calendar(identifier: .iso8601)
+    let now = Date(timeIntervalSince1970: 1792144800)
+    let today = calendar.startOfDay(for: now)
+    let yesterday = try #require(calendar.date(byAdding: .day, value: -1, to: today))
+    let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "1792144800", "due": "1792238400", "wait": "1792100000"])
+    let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "due": "1792238400"])
+    let replica = OccurrenceReplica(records: [first, second])
+    let manager = TaskManager(replica: replica, now: { now }, calendar: calendar)
+    let ids = [first.id, second.id]
+    let past = TaskScheduledDate(date: yesterday, hasTime: false)
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.schedule(ids: ids, change: .intent(past)) }
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.applySelection(ids: ids, changes: .init(scheduled: .exact(past), deadline: .remove)) }
+    var draft = TaskDraft(description: "Past")
+    draft.setScheduled(past)
+    let pastDraft = draft
+    await #expect(throws: TaskReschedulingError.pastUntimedScheduledDate) { try await manager.create(pastDraft) }
+    #expect(await replica.records == [first, second])
+
+    let ready = try await manager.schedule(ids: ids, change: .intent(.init(date: now, hasTime: false)))
+    #expect(ready.count == 2 && ready.allSatisfy { $0.scheduled(calendar: calendar) == .init(date: today, hasTime: false) && $0.deadline == first.deadline })
+    let midnight = TaskScheduledDate(date: yesterday, hasTime: true)
+    let saved = try await manager.applySelection(ids: ids, changes: .init(scheduled: .exact(midnight), deadline: .exact(past)))
+    #expect(saved.count == 2 && saved.allSatisfy { $0.scheduled(calendar: calendar) == midnight && $0.dateIntent(for: .deadline, calendar: calendar) == past })
+    #expect(saved.first { $0.id == first.id }?.waitUntil == first.waitUntil)
+}
+
 @Test func bulkScheduledDateChangesOnlyTheChosenFieldAndDeduplicatesMixedTasks() async throws {
     let first = TaskRecord(id: UUID(), attributes: ["description": "First", "status": "pending", "scheduled": "200", "due": "400", "wait": "50", "opaque": "e\u{301}"])
     let second = TaskRecord(id: UUID(), attributes: ["description": "Second", "status": "pending", "due": "600", "project": "work"])
@@ -33,17 +60,34 @@ import TskCore
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "1792231200", "due": "1792238400"])
     let second = TaskRecord(id: UUID(), attributes: ["status": "pending"])
-    let manager = TaskManager(replica: OccurrenceReplica(records: [first, second]), now: { Date(timeIntervalSince1970: 1792144800) }, calendar: calendar)
+    let midnight = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "1792195200", "tsk_scheduled_precision": "v1:1792195200:timed", "opaque": "keep"])
+    let untimed = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "1792231200", "tsk_scheduled_precision": "v1:1792231200:untimed"])
+    let replica = OccurrenceReplica(records: [first, second, midnight, untimed])
+    let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 1792144800) }, calendar: calendar)
     #expect(try await manager.tasks(query: .today).isEmpty)
-    _ = try await manager.changeDate(ids: [first.id, second.id], field: .scheduled, change: .day(Date(timeIntervalSince1970: 1792144800)))
+    _ = try await manager.changeDate(ids: [first.id, second.id, midnight.id, untimed.id], field: .scheduled, change: .day(Date(timeIntervalSince1970: 1792144800)))
     #expect(try await manager.task(id: first.id).attributes["scheduled"] == "1792144800")
     #expect(try await manager.task(id: second.id).attributes["scheduled"] == "1792108800")
-    #expect(try await manager.tasks(query: .today).count == 2)
-    let upcoming = try await manager.upcomingDays().flatMap(\.entries)
-    #expect(upcoming.count == 1)
-    #expect(upcoming.first?.task.id == first.id)
+    #expect(try await manager.task(id: midnight.id).scheduled(calendar: calendar) == .init(date: Date(timeIntervalSince1970: 1792108800), hasTime: true))
+    #expect(try await manager.task(id: untimed.id).scheduled(calendar: calendar) == .init(date: Date(timeIntervalSince1970: 1792144800), hasTime: false))
+    #expect(try await manager.tasks(query: .today).count == 4)
+    #expect(try await manager.upcomingDays().flatMap(\.entries).isEmpty)
+    #expect(try await manager.task(id: first.id).deadline == Date(timeIntervalSince1970: 1792238400))
     _ = try await manager.changeDate(ids: [first.id], field: .deadline, change: .remove)
     #expect(try await manager.upcomingDays().isEmpty)
+    _ = try await manager.changeDate(ids: [midnight.id, untimed.id], field: .deadline, change: .set(Date(timeIntervalSince1970: 1792400000)))
+    #expect(try await manager.task(id: midnight.id).scheduled(calendar: calendar)?.hasTime == true)
+    #expect(try await manager.task(id: untimed.id).scheduled(calendar: calendar)?.hasTime == false)
+    await replica.rejectNextUpdate()
+    let before = try await manager.tasks()
+    let combined = TaskSelectionChanges(scheduled: .day(Date(timeIntervalSince1970: 1792231200)), deadline: .remove, complete: true)
+    await #expect(throws: (any Error).self) { try await manager.applySelection(ids: [midnight.id, untimed.id], changes: combined) }
+    #expect(try await manager.tasks() == before)
+    let saved = try await manager.applySelection(ids: [midnight.id, untimed.id], changes: combined)
+    #expect(saved.allSatisfy { $0.status == "completed" && $0.deadline == nil })
+    #expect(try await manager.task(id: midnight.id).scheduled(calendar: calendar) == .init(date: Date(timeIntervalSince1970: 1792195200), hasTime: true))
+    #expect(try await manager.task(id: untimed.id).scheduled(calendar: calendar) == .init(date: Date(timeIntervalSince1970: 1792231200), hasTime: false))
+    #expect(try await manager.task(id: midnight.id).attributes["opaque"] == "keep")
 }
 
 @Test func bulkDateEditsPreserveOccurrenceBookkeepingAndRejectTheWholeInvalidSelection() async throws {
@@ -92,7 +136,7 @@ import TskCore
 
 @Test func selectionCommitCombinesBothDatesAndCompletionInOneTransaction() async throws {
     let parent = TaskRecord(id: UUID(), attributes: ["status": "recurring", "mask": "-W", "opaque": "series"])
-    let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "200", "due": "400", "parent": parent.id.uuidString, "imask": "0.0", "start": "20"])
+    let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "scheduled": "200", "tsk_scheduled_precision": "v1:200:untimed", "due": "400", "parent": parent.id.uuidString, "imask": "0.0", "start": "20"])
     let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "due": "500", "wait": "300", "parent": parent.id.uuidString, "imask": "1", "opaque": "keep"])
     let replica = OccurrenceReplica(records: [parent, first, second])
     let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
@@ -100,7 +144,7 @@ import TskCore
     #expect(await replica.batches == 0)
     let saved = try await manager.applySelection(ids: [first.id, second.id, first.id], changes: changes)
     #expect(saved.count == 2)
-    #expect(saved.allSatisfy { $0.status == "completed" && $0.attributes["due"] == "800" && $0.attributes["scheduled"] == nil && $0.attributes["end"] == "100" && $0.attributes["start"] == nil })
+    #expect(saved.allSatisfy { $0.status == "completed" && $0.attributes["due"] == "800" && $0.attributes["scheduled"] == nil && $0.attributes["tsk_scheduled_precision"] == nil && $0.attributes["end"] == "100" && $0.attributes["start"] == nil })
     #expect(try await manager.task(id: parent.id).attributes["mask"] == "++")
     #expect(try await manager.task(id: second.id).attributes["opaque"] == "keep")
     #expect(try await manager.task(id: second.id).attributes["wait"] == "300")

@@ -8,7 +8,14 @@ import TskNative
     let manager: TaskManager
     let source: any CalendarEventSource
     private var unfilteredSnapshot: TodayCalendarSnapshot?
-    var snapshot: TodayCalendarSnapshot? { unfilteredSnapshot?.showing(preferences.visibility) }
+    var displayedDay: Date? {
+        didSet { if displayedDay != oldValue { generation = UUID() } }
+    }
+    var snapshot: TodayCalendarSnapshot? {
+        guard let value = unfilteredSnapshot,
+              displayedDay.map({ date in value.day.map { $0.start <= date && date < $0.end } ?? false }) ?? true else { return nil }
+        return value.showing(preferences.visibility)
+    }
     private(set) var isLoading = false
     private(set) var fixtureError: String?
     private(set) var fixtureVerified = false
@@ -83,14 +90,17 @@ import TskNative
     private func refreshSnapshot(requestingAccess: Bool = false) async {
         let request = UUID(); generation = request; isLoading = true; fixtureVerified = false
         TaskUIBoundaryDiagnostics.event("calendar.refresh.begin", details: ["request": request.uuidString, "requestingAccess": String(requestingAccess)])
-        var value = await manager.todayCalendar(from: source, requestingAccess: requestingAccess)
+        let day = displayedDay
+        var value: TodayCalendarSnapshot
+        if let day { value = await manager.dayCalendar(on: day, from: source, requestingAccess: requestingAccess) }
+        else { value = await manager.todayCalendar(from: source, requestingAccess: requestingAccess) }
         TaskUIBoundaryDiagnostics.event("calendar.refresh.snapshot", details: ["request": request.uuidString, "generation": generation.uuidString, "authorization": String(describing: value.authorization), "hasReadError": String(value.readError != nil)])
         #if DEBUG && targetEnvironment(simulator)
         if value.authorization == .fullAccess, !preparedFixture,
            let token = ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_FIXTURE"],
            ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1", let day = value.day {
             preparedFixture = true
-            do { try await EventKitCalendarFixture.prepare(token: token, day: day); value = await manager.todayCalendar(from: source) }
+            do { try await EventKitCalendarFixture.prepare(token: token, day: day); value = await manager.dayCalendar(on: day.start, from: source) }
             catch { fixtureError = error.localizedDescription }
         }
         if value.authorization == .fullAccess, let token = ProcessInfo.processInfo.environment["TSK_TEST_CALENDAR_FIXTURE"],

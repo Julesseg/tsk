@@ -14,16 +14,20 @@ public struct TaskRecord: Identifiable, Codable, Equatable, Sendable {
     public var isOccurrence: Bool { attributes["parent"] != nil }
     public var canEdit: Bool { (isOccurrence && UUID(uuidString: attributes["parent"] ?? "") != nil && occurrenceIndex != nil && status == "pending") || (!isRecurring && (status == "pending" || status == "completed")) }
     public var canComplete: Bool { canEdit && status == "pending" }
+    public var canReopen: Bool {
+        status == "completed" && (isOccurrence ? UUID(uuidString: attributes["parent"] ?? "") != nil && occurrenceIndex != nil : !isRecurring)
+    }
     public var isRecurring: Bool { status == "recurring" || attributes["parent"] != nil || attributes["recur"] != nil || attributes["mask"] != nil || attributes["imask"] != nil || attributes["rtype"] != nil || attributes["template"] != nil || attributes["last"] != nil }
 }
 
 public enum TaskQuery: String, CaseIterable, Sendable {
-    case all, unfinished, completed, today, upcoming
+    case all, unfinished, completed, today, upcoming, inbox
 
     public func includes(_ task: TaskRecord, now: Date = Date(), calendar: Calendar = .autoupdatingCurrent) -> Bool {
         switch self {
         case .all: true
         case .unfinished: task.status == "pending"
+        case .inbox: task.status == "pending" && task.plannedDate == nil && task.project.isEmpty
         case .completed: task.status == "completed"
         case .today: task.isInToday(at: now, calendar: calendar)
         case .upcoming: task.isInUpcoming(at: now, calendar: calendar)
@@ -83,7 +87,6 @@ public enum TaskManagementError: Error, Equatable, LocalizedError, Sendable {
 
 public actor TaskManager {
     let replica: any TaskReplica
-    let viewDefinitions: (any TaskViewDefinitionsStore)?
     let now: @Sendable () -> Date
     var synchronizationConfiguration: SyncConfiguration?
     var synchronizationState: SynchronizationState = .localOnly
@@ -101,9 +104,8 @@ public actor TaskManager {
     var changePublicationError: String?
     let calendar: Calendar
 
-    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, viewDefinitions: (any TaskViewDefinitionsStore)? = nil, changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
+    public init(replica: any TaskReplica, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, changeTracking: any TaskChangeTracking = TaskChangeLedger(), postCommitEffects: any TaskPostCommitEffect = TaskPostCommitEffects()) {
         self.replica = replica
-        self.viewDefinitions = viewDefinitions
         self.postCommitEffects = postCommitEffects
         self.changeTracking = changeTracking
         self.now = now
@@ -112,11 +114,16 @@ public actor TaskManager {
 
     public func tasks(query: TaskQuery = .all, project: TaskProjectSelection = .all) async throws -> [TaskRecord] {
         let instant = now()
-        return try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) && project.includes($0) }.sorted {
-            if $0.attributes["entry"] != $1.attributes["entry"] {
-                return ($0.attributes["entry"] ?? "") > ($1.attributes["entry"] ?? "")
-            }
-            return $0.id.uuidString < $1.id.uuidString
+        let records = try await replica.tasks().filter { query.includes($0, now: instant, calendar: calendar) && project.includes($0) }
+        return sortedTasks(records, query: query, project: project, at: instant)
+    }
+
+    func sortedTasks(_ records: [TaskRecord], query: TaskQuery, project: TaskProjectSelection, at instant: Date) -> [TaskRecord] {
+        let day = calendar.startOfDay(for: instant)
+        return records.sorted {
+            if query == .today { return TaskPlannerOrder.precedes($0, $1, on: day, calendar: calendar) }
+            if case .project(let name) = project, let result = TaskManualOrder.precedes($0, $1, attribute: TaskManualOrder.projectAttribute, group: name) { return result }
+            return TaskPlannerOrder.entryPrecedes($0, $1)
         }
     }
 
@@ -124,6 +131,19 @@ public actor TaskManager {
         let records = try await tasks()
         guard let record = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
         return record.availability(at: now())
+    }
+
+    public func dayPage(on day: Date) async throws -> [TaskRecord] {
+        try await dayPageSnapshot(on: day).tasks
+    }
+
+    public func dayPageSnapshot(on day: Date) async throws -> TaskViewSnapshot {
+        let records = try await tasks()
+        let instant = now()
+        let dayStart = calendar.startOfDay(for: day)
+        let visible = records.filter { $0.isOnDay(dayStart, at: instant, calendar: calendar) }
+            .sorted { TaskPlannerOrder.precedes($0, $1, on: dayStart, calendar: calendar) }
+        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
     }
 
     public func upcomingDays() async throws -> [UpcomingDay] {
@@ -151,12 +171,21 @@ public actor TaskManager {
             throw TaskManagementError.unsupportedTaskKind
         }
         var attributes = try TaskOrganization.normalizedAttributes(draft.attributes)
-        let timestamp = String(Int(now().timeIntervalSince1970))
+        let instant = now()
+        try validateScheduled(TaskScheduledDate.read(from: attributes, calendar: calendar), at: instant)
+        let timestamp = String(Int(instant.timeIntervalSince1970))
         attributes["description"] = description
         attributes["status"] = "pending"
         attributes["entry"] = timestamp
         attributes["modified"] = timestamp
-        let saved = try await replica.create(id: UUID(), attributes: attributes)
+        let task = TaskRecord(id: UUID(), attributes: attributes)
+        if TaskManualOrder.plannerGroup(task, calendar: calendar) != nil {
+            let records = try await replica.tasks()
+            let saved = try await saveOrder(appendingIncoming([task], to: records), context: .day(instant), records: records, creating: task)
+            guard let created = saved.first(where: { $0.id == task.id }) else { throw TaskManagementError.storage("The save returned no task.") }
+            return created
+        }
+        let saved = try await replica.create(id: task.id, attributes: attributes)
         await localChangeWasCommitted(tasks: [saved])
         return saved
     }
@@ -182,8 +211,28 @@ public actor TaskManager {
             patch["description"] = description
         }
         patch = try TaskOrganization.normalizedChanges(patch, original: task.attributes)
+        for field in TaskDateField.allCases {
+            if let value = patch[field.attribute], value != task.attributes[field.attribute], patch[field.precisionAttribute] == nil,
+               task.attributes[field.precisionAttribute] != nil {
+                patch.updateValue(nil, forKey: field.precisionAttribute)
+            }
+        }
+        try validateScheduledChange(patch, original: task.attributes, at: now())
         for (key, value) in annotationChanges { patch.updateValue(value, forKey: key) }
         patch["modified"] = String(Int(now().timeIntervalSince1970))
+        var edited = task
+        for (key, value) in patch { edited.attributes[key] = value }
+        if task.status == "pending", let group = TaskManualOrder.plannerGroup(edited, calendar: calendar),
+           group != TaskManualOrder.plannerGroup(task, calendar: calendar) {
+            let records = try await replica.tasks()
+            let ordered = appendingIncoming([edited], to: records)
+            if ordered.count > 1 {
+                let saved = try await saveOrder(ordered, context: .day(now()), records: records)
+                guard let updated = saved.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
+                return updated
+            }
+            patch[TaskManualOrder.plannerAttribute] = TaskManualOrder.value(group: group, rank: 0)
+        }
         if task.isOccurrence { return try await saveOccurrence(task, changes: patch) }
         let saved = try await replica.update(id: id, changes: patch)
         await localChangeWasCommitted(tasks: [saved])
@@ -194,19 +243,28 @@ public actor TaskManager {
         let lease = try await beginMutation()
         defer { endMutation(lease) }
         let task = try await self.task(id: id, includingDeleted: false)
+        let changes = completionChanges(for: task, at: now())
         if task.isOccurrence {
-            let timestamp = String(Int(now().timeIntervalSince1970))
-            return try await saveOccurrence(task, changes: ["status": "completed", "end": task.attributes["end"] ?? timestamp, "modified": timestamp, "start": nil], completing: true)
+            return try await saveOccurrence(task, changes: changes, completing: true)
         }
         guard task.canEdit else { throw TaskManagementError.unsupportedTaskKind }
         if task.status == "completed" { return task }
-        let timestamp = String(Int(now().timeIntervalSince1970))
-        let saved = try await replica.update(id: id, changes: [
-            "status": "completed", "end": task.attributes["end"] ?? timestamp,
-            "modified": timestamp, "start": nil
-        ])
+        let saved = try await replica.update(id: id, changes: changes)
         await localChangeWasCommitted(tasks: [saved])
         return saved
+    }
+
+    public func reopen(id: UUID) async throws -> TaskRecord {
+        let lease = try await beginMutation()
+        defer { endMutation(lease) }
+        let task = try await self.task(id: id, includingDeleted: false)
+        if task.canComplete { return task }
+        guard task.canReopen else { throw TaskManagementError.unsupportedTaskKind }
+        let patch: TaskAttributePatch = [
+            "status": "pending", "end": nil, TaskCompletionPlacement.attribute: nil,
+            "modified": String(Int(now().timeIntervalSince1970))
+        ]
+        return try await saveTaskMutation(task, changes: patch)
     }
 
 }

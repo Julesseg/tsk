@@ -8,13 +8,34 @@ final class TaskStore {
     let manager: TaskManager
     let directory: URL
     var tasks: [TaskRecord] = []
-    var savedViews: [SavedTaskView] = []
-    var workspaceViews = WorkspaceViews(customIDs: [])
-    var selectedWorkspaceView: WorkspaceView = .unfinished
-    private(set) var workspaceViewsLoaded = false
-    var customView: CustomViewSelection?
+    var taskDrag: TaskDragSession?
+    var isTaskDragLifted = false
+    #if DEBUG
+    var taskDragProof = ""
+    #endif
+    var selectedWorkspaceView: WorkspaceView = .today
     var allTasks: [TaskRecord] = []
-    var query: TaskQuery = .unfinished
+    var query: TaskQuery = .today
+    var plannerDay: Date?
+    var displayedDay: Date { Calendar.autoupdatingCurrent.startOfDay(for: plannerDay ?? currentDate) }
+    var isDayPage: Bool { query == .today }
+
+    func browseDay(_ day: Date, cachedTasks: [TaskRecord]? = nil) {
+        guard taskDrag == nil, selectedTaskIDs.isEmpty, !isSelectionPressActive, rowEditing == nil, !isSaving else { return }
+        if !isDayPage { selectWorkspaceView(.today) }
+        let nextDay = Calendar.autoupdatingCurrent.startOfDay(for: day)
+        if displayedDay != nextDay { tasks = cachedTasks ?? [] }
+        plannerDay = Calendar.autoupdatingCurrent.isDate(nextDay, inSameDayAs: currentDate) ? nil : nextDay
+        captureConfirmation = nil
+        Task { await reload() }
+    }
+
+    func moveDay(by offset: Int) {
+        guard isDayPage, !isSelectingTasks,
+              let day = Calendar.autoupdatingCurrent.date(byAdding: .day, value: offset, to: displayedDay) else { return }
+        browseDay(day)
+    }
+
     var projectSelection: TaskProjectSelection = .all
     var availableProjects: [String] = []
     var error: String?
@@ -42,20 +63,20 @@ final class TaskStore {
         let workspace: WorkspaceView
         let query: TaskQuery
         let project: TaskProjectSelection
-        let custom: CustomViewSelection?
+        let plannerDay: Date?
     }
     var navigationReturn: NavigationLocation?
     var navigationTitle: String?
 
     func openNavigation(_ destination: TaskNavigationDestination) async throws {
         if navigationReturn == nil {
-            navigationReturn = NavigationLocation(workspace: selectedWorkspaceView, query: query, project: projectSelection, custom: customView)
+            navigationReturn = NavigationLocation(workspace: selectedWorkspaceView, query: query, project: projectSelection, plannerDay: plannerDay)
         }
         endTaskSelection()
         captureConfirmation = nil
         selectWorkspaceView(destination.view.workspace)
+        query = destination.view.query
         if case .project(let name) = destination.view { projectSelection = .project(name) }
-        if let saved = destination.savedView { openView(saved) }
         navigationTitle = destination.title
         tasks = destination.snapshot.listTasks
         allTasks = destination.snapshot.allTasks
@@ -76,7 +97,7 @@ final class TaskStore {
         selectedWorkspaceView = location.workspace
         query = location.query
         projectSelection = location.project
-        customView = location.custom
+        plannerDay = location.plannerDay
         navigationReturn = nil
         navigationTitle = nil
         await reload()
@@ -112,6 +133,7 @@ final class TaskStore {
     var isLoading = false
     private let fixedDate: Date?
     var currentDate: Date { fixedDate ?? Date() }
+    var nextDayBoundary: Date? { fixedDate == nil ? Calendar.autoupdatingCurrent.dateInterval(of: .day, for: currentDate)?.end : nil }
     let completionFeedback = TaskCompletionFeedback()
     #if DEBUG
     var selectionGestureProof = ""
@@ -132,7 +154,6 @@ final class TaskStore {
     var selectionDateField: TaskDateField?
     var isSelectionGestureActive = false
     var selectionGestureTasks: [TaskRecord]?
-    var selectionGestureDays: [UpcomingDay]?
     var rowEditing: TaskRowEditing?
     var captureConfirmation: TaskRecord?
     var captureTask: TaskRecord? {
@@ -140,10 +161,23 @@ final class TaskStore {
         return editing.draft.original
     }
 
+    func activateSelectionGesture() -> Bool {
+        guard !isSaving, !isSelectionGestureActive, rowEditing == nil, taskDrag == nil, selectionDateField == nil else { return false }
+        selectionGestureTasks = visibleTasks
+        isSelectionGestureActive = true
+        return true
+    }
+
+    func applySelectionGesture(startingAt initial: UUID, from selection: Set<UUID>, entering path: [TaskSelectionVisit]) -> Bool {
+        let updated = manager.selectedTasks(in: visibleTasks, from: selection, startingAt: initial, entering: path)
+        guard updated != selectedTaskIDs else { return false }
+        selectedTaskIDs = updated
+        return true
+    }
+
     func endSelectionGesture() {
         isSelectionGestureActive = false
         selectionGestureTasks = nil
-        selectionGestureDays = nil
     }
 
     func endTaskSelection() {
@@ -156,6 +190,24 @@ final class TaskStore {
         endSelectionGesture()
     }
 
+    func scheduleSelection(on day: Date) async -> Bool {
+        guard !isSaving, !isSelectionGestureActive, !isSelectionPressActive, !selectedTaskIDs.isEmpty else { return false }
+        let ordered = visibleTasks.filter { selectedTaskIDs.contains($0.id) }.map(\.id)
+        let remaining = selectedTaskIDs.subtracting(ordered).sorted { $0.uuidString < $1.uuidString }
+        let generation = taskSelectionGeneration
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await manager.schedule(ids: ordered + remaining, change: .intent(.init(date: day, hasTime: false)))
+            if generation == taskSelectionGeneration { endTaskSelection() }
+            await reload()
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
+    }
+
     func beginCapture(reduceMotion: Bool) async {
         guard !isSaving else { return }
         if let editing = rowEditing {
@@ -164,8 +216,11 @@ final class TaskStore {
         guard rowEditing == nil else { return }
         endTaskSelection()
         captureConfirmation = nil
-        let draft = TaskRowDraft(capturing: customView == nil ? query : .unfinished,
-                                 project: customView == nil ? projectSelection : .all, now: currentDate)
+        let context: TaskCaptureContext
+        if isDayPage { context = displayedDay < Calendar.autoupdatingCurrent.startOfDay(for: currentDate) ? .inbox : .day(displayedDay) }
+        else if let name = projectSelection.projectName { context = .project(name) }
+        else { context = .inbox }
+        let draft = TaskRowDraft(capturing: context)
         rowEditing = TaskRowEditing(capturing: draft, context: completionContext, tasks: visibleTasks, now: currentDate)
     }
 
@@ -177,58 +232,30 @@ final class TaskStore {
         }
     }
     var completionContext: TaskCompletionFeedback.Context {
-        .init(query: query, project: projectSelection, customViewID: customView?.id, filter: customView.map { UTF8String($0.expression) })
+        .init(query: query, project: projectSelection, plannerDay: isDayPage ? displayedDay : nil)
     }
     var visibleTasks: [TaskRecord] {
+        if let taskDrag { return taskDrag.tasks }
         if let selectionGestureTasks { return selectionGestureTasks }
         if let rowEditing, rowEditing.context == completionContext { return rowEditing.tasks }
         return completionFeedback.visibleTasks(tasks, context: completionContext)
     }
-    var upcomingDays: [UpcomingDay] {
-        if let selectionGestureDays { return selectionGestureDays }
-        if let rowEditing, rowEditing.context == completionContext { return rowEditing.upcomingDays }
-        return UpcomingDay.groups(tasks: visibleTasks, at: currentDate)
-    }
-
     func expandRow(_ task: TaskRecord, rowID: String? = nil) {
         guard !isSelectionPressActive, !isSelectingTasks, rowEditing == nil, !isSaving, task.canOpenInWorkspace, visibleTasks.contains(where: { $0.id == task.id }) else { return }
-        let upcomingID = customView == nil && query == .upcoming ? upcomingDays.flatMap(\.entries).first { $0.task.id == task.id }?.rowIdentifier : nil
-        guard customView != nil || query != .upcoming || upcomingID != nil else { return }
-        rowEditing = TaskRowEditing(task: task, rowID: rowID ?? upcomingID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
+        rowEditing = TaskRowEditing(task: task, rowID: rowID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
     }
     private var reloadGeneration = 0
     var nextFilterEvaluation: Date?
     var filterRefreshGeneration = 0
 
-    func loadWorkspaceViews() throws {
-        if workspaceViewsLoaded {
-            workspaceViews.reconcile(customIDs: savedViews.map(\.id))
-        } else {
-            workspaceViews = try LocalWorkspaceViewStore(directory: directory).load(customIDs: savedViews.map(\.id))
-        }
-        if navigationReturn == nil && (!workspaceViewsLoaded || !workspaceViews.active.contains(selectedWorkspaceView)) {
-            selectWorkspaceView(workspaceViews.active[0])
-        }
-        workspaceViewsLoaded = true
-    }
-
-    func updateWorkspaceViews(_ change: (inout WorkspaceViews) throws -> Void) throws {
-        var updated = workspaceViews
-        try change(&updated)
-        try LocalWorkspaceViewStore(directory: directory).save(updated)
-        workspaceViews = updated
-        if !updated.active.contains(selectedWorkspaceView) { selectWorkspaceView(updated.active[0]) }
-    }
-
     func selectWorkspaceView(_ view: WorkspaceView) {
         navigationTitle = nil
         endTaskSelection()
         selectedWorkspaceView = view
+        plannerDay = nil
         projectSelection = .all
-        customView = nil
-        if let query = view.query { self.query = query }
-        else if case .custom(let id) = view, let saved = savedViews.first(where: { $0.id == id }) { openView(saved) }
-        else { query = .unfinished }
+        query = view.query
+
     }
 
     init() throws {
@@ -258,23 +285,11 @@ final class TaskStore {
         return store
     }
 
-    func observeParticipantChanges(reconcileWorkspace: Bool = true) async {
+    func observeParticipantChanges() async {
         do {
             var prior: TaskChangeVersion?
             for try await version in await manager.changeUpdates() {
                 if Task.isCancelled { return }
-                if reconcileWorkspace {
-                    try await loadSavedViews()
-                    if let selection = customView, let id = selection.id {
-                        guard let current = savedViews.first(where: { $0.id == id }) else {
-                            tasks = []
-                            error = TaskViewError.missingView(id).localizedDescription
-                            prior = version
-                            continue
-                        }
-                        openView(current)
-                    }
-                }
                 await reload()
                 if let prior, prior.tasks != version.tasks, version.taskOrigin == .local { await manager.requestSynchronization(trigger: .backgroundOpportunity) }
                 prior = version
@@ -293,26 +308,27 @@ final class TaskStore {
         reloadGeneration += 1
         let generation = reloadGeneration
         let requestedQuery = query
+        let requestedDay = isDayPage ? displayedDay : nil
         let requestedProject = projectSelection
-        let requestedCustom = customView
         isLoading = true
         defer { if generation == reloadGeneration { isLoading = false } }
+        var rolloverError: String?
+        do { try await manager.rollOverUntimedScheduledTasks() }
+        catch { rolloverError = error.localizedDescription }
+        guard !Task.isCancelled else { return }
         do {
             let snapshot: TaskViewSnapshot
-            if let requestedCustom {
-                if let id = requestedCustom.id { snapshot = try await manager.viewSnapshot(reference: .custom(id)) }
-                else { snapshot = try await manager.viewSnapshot(filter: requestedCustom.expression) }
-            }
+            if let requestedDay { snapshot = try await manager.dayPageSnapshot(on: requestedDay) }
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
-            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, (isDayPage ? displayedDay : nil) == requestedDay else { return }
             tasks = snapshot.listTasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil
             filterRefreshGeneration += 1
-            error = nil
+            error = rolloverError
         } catch {
-            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, customView == requestedCustom else { return }
+            guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, (isDayPage ? displayedDay : nil) == requestedDay else { return }
             self.error = error.localizedDescription
         }
     }
@@ -345,6 +361,10 @@ final class TaskStore {
         await perform { try await $0.complete(id: id) }
     }
 
+    func reopen(id: UUID) async -> TaskRecord? {
+        await perform { try await $0.reopen(id: id) }
+    }
+
     func completeFromList(id: UUID, animated: Bool = true) async -> TaskRecord? {
         guard !isSelectionPressActive, !isSaving, let task = visibleTasks.first(where: { $0.id == id }), task.canComplete else { return nil }
         let context = completionContext
@@ -372,7 +392,7 @@ final class TaskStore {
             allTasks.append(saved)
             let index = tasks.firstIndex { $0.id == saved.id } ?? 0
             tasks.removeAll { $0.id == saved.id }
-            if customView == nil && query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
+            if query.includes(saved, now: currentDate) && projectSelection.includes(saved) { tasks.insert(saved, at: min(index, tasks.count)) }
             if !saved.project.isEmpty, !availableProjects.contains(where: { UTF8String($0) == UTF8String(saved.project) }) {
                 availableProjects.append(saved.project)
                 availableProjects.sort { UTF8String($0) < UTF8String($1) }
@@ -386,5 +406,34 @@ final class TaskStore {
             self.error = error.localizedDescription
             return nil
         }
+    }
+}
+
+extension TaskStore {
+    var taskDragContext: TaskDragContext? {
+        if isDayPage { return .day(displayedDay) }
+        if case .project(let name) = projectSelection, query == .unfinished { return .project(name) }
+        return nil
+    }
+
+    var canDragTasks: Bool { taskDragContext != nil && taskDrag == nil && (!isSelectingTasks || !selectedTaskIDs.isEmpty) && !isSelectionGestureActive && !isSelectionPressActive && selectionDateField == nil && !isSaving && rowEditing == nil }
+
+    func beginTaskDrag(id: UUID) -> Bool {
+        guard canDragTasks, let context = taskDragContext, !isSelectingTasks || selectedTaskIDs.contains(id) else { return false }
+        do {
+            taskDrag = try TaskDragSession(tasks: visibleTasks, ids: isSelectingTasks ? Array(selectedTaskIDs) : [id], context: context)
+            return true
+        } catch { self.error = error.localizedDescription; return false }
+    }
+
+    func finishTaskDrop() async {
+        guard let drag = taskDrag, !isSaving else { return }
+        isSaving = true
+        defer { isTaskDragLifted = false; taskDrag = nil; isSaving = false }
+        do {
+            _ = try await manager.drop(drag)
+            error = nil
+            await reload()
+        } catch { self.error = error.localizedDescription }
     }
 }

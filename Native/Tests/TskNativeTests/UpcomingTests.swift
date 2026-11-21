@@ -4,7 +4,7 @@ import TskCore
 import TskNative
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"] != nil))
-func upcomingDatesReopenAsTwoEntriesForOneTaskwarriorIdentityAndCompleteTogether() async throws {
+func upcomingDatesReopenAsOnePlannerEntryForOneTaskwarriorIdentity() async throws {
     let binary = try #require(ProcessInfo.processInfo.environment["TSK_TASKWARRIOR_BINARY"])
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -15,13 +15,15 @@ func upcomingDatesReopenAsTwoEntriesForOneTaskwarriorIdentityAndCompleteTogether
     let task = try await manager.create(TaskDraft(description: "Upcoming persistent task", attributes: ["scheduled": "1792015200", "due": "1792101600", "opaque": "retain"]))
     let reopened = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1791972000) }, calendar: calendar)
     let groups = try await reopened.upcomingDays()
-    #expect(groups.map(\.day) == [Date(timeIntervalSince1970: 1792015200), Date(timeIntervalSince1970: 1792101600)])
-    #expect(groups.flatMap(\.entries).map(\.role) == [.planned, .deadline])
+    #expect(groups.map(\.day) == [Date(timeIntervalSince1970: 1792015200)])
+    #expect(groups.flatMap(\.entries).map(\.role) == [.planned])
     #expect(Set(groups.flatMap(\.entries).map { $0.task.id }) == [task.id])
     #expect(try await reopened.tasks().count == 1)
     _ = try await reopened.update(id: task.id, changes: ["scheduled": "1792188000", "description": "Replanned persistent task"])
     let final = TaskManager(replica: TaskChampionReplica(directory: directory), now: { Date(timeIntervalSince1970: 1791972000) }, calendar: calendar)
-    #expect(try await final.upcomingDays().flatMap(\.entries).map(\.role) == [.deadline, .planned])
+    let replanned = try await final.upcomingDays()
+    #expect(replanned.map(\.day) == [Date(timeIntervalSince1970: 1792188000)])
+    #expect(replanned.flatMap(\.entries).map(\.role) == [.planned])
     let config = directory.appendingPathComponent("taskrc")
     try "data.location=\(directory.path)\nuda.opaque.type=string\nconfirmation=no\n".write(to: config, atomically: true, encoding: .utf8)
     let process = Process()

@@ -37,7 +37,7 @@ private actor CaptureReplica: TaskReplica {
     let replica = CaptureReplica()
     let manager = TaskManager(replica: replica)
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
-    store.query = .upcoming
+    store.query = .completed
     await store.beginCapture(reduceMotion: true)
     let editing = try #require(store.rowEditing)
     await editing.setExpanded(true, reduceMotion: true)
@@ -59,6 +59,7 @@ private actor CaptureReplica: TaskReplica {
     let manager = TaskManager(replica: CaptureReplica())
     let original = try await manager.create(TaskDraft(description: "Original"))
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.inbox)
     await store.reload()
     store.expandRow(original)
     let editing = try #require(store.rowEditing)
@@ -74,6 +75,7 @@ private actor CaptureReplica: TaskReplica {
     let manager = TaskManager(replica: CaptureReplica())
     let original = try await manager.create(TaskDraft(description: "Original"))
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.inbox)
     await store.reload()
     store.expandRow(original)
     let editing = try #require(store.rowEditing)
@@ -94,11 +96,11 @@ private actor CaptureReplica: TaskReplica {
     let manager = TaskManager(replica: CaptureReplica())
     let task = try await manager.create(TaskDraft(description: "Existing task"))
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.inbox)
     await store.reload()
     store.selectedTaskIDs = [task.id]
     store.isSelectionGestureActive = true
     store.selectionGestureTasks = []
-    store.selectionGestureDays = []
     await store.beginCapture(reduceMotion: true)
     #expect(store.rowEditing?.isCapture == true)
     #expect(!store.isSelectingTasks)
@@ -154,13 +156,12 @@ private actor CaptureReplica: TaskReplica {
     #expect(await store.prepareForTaskActionNavigation())
 }
 
-@MainActor @Test func navigationSavesValidDraftAndRestoresOriginalWorkspaceWithoutChangingFavorites() async throws {
+@MainActor @Test func navigationSavesValidDraftAndRestoresOriginalWorkspace() async throws {
     let replica = CaptureReplica()
     let manager = TaskManager(replica: replica)
     let original = try await manager.create(TaskDraft(description: "Original"))
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
     store.selectWorkspaceView(.today)
-    let favorites = store.workspaceViews
     await store.beginCapture(reduceMotion: true)
     let editing = try #require(store.rowEditing)
     await editing.setExpanded(true, reduceMotion: true)
@@ -169,8 +170,7 @@ private actor CaptureReplica: TaskReplica {
     try await store.openNavigation(manager.navigationDestination(taskID: original.id))
     #expect(store.rowEditing?.draft.original.id == original.id)
     #expect(store.rowEditing?.isExpanded == true)
-    #expect(store.selectedWorkspaceView == .unfinished)
-    #expect(store.workspaceViews == favorites)
+    #expect(store.query == .unfinished)
     #expect(await store.returnFromNavigation())
     #expect(store.selectedWorkspaceView == .today)
     #expect(store.rowEditing == nil)
@@ -221,4 +221,102 @@ private actor CaptureReplica: TaskReplica {
     #expect(await store.returnFromNavigation())
     #expect(try await manager.task(id: id).description == "Completed occurrence")
     #expect(store.rowEditing == nil)
+}
+
+@MainActor @Test func workspaceCaptureDefaultsStaySeparateFromExternalActions() async throws {
+    let manager = TaskManager(replica: CaptureReplica())
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    let day = try #require(Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())))
+    for (view, project, scheduled) in [(WorkspaceView.today, "", Optional(day)), (.projects, "Work", nil), (.inbox, "", nil)] {
+        store.selectWorkspaceView(view)
+        if view == .today { store.plannerDay = day }
+        if view == .projects { store.projectSelection = .project("Work") }
+        #expect(store.selectedWorkspaceView == view)
+        await store.beginCapture(reduceMotion: true)
+        let editing = try #require(store.rowEditing)
+        await editing.setExpanded(true, reduceMotion: true)
+        #expect(editing.draft.taskDraft.plannedDate == scheduled)
+        #expect(editing.draft.taskDraft.project == project)
+        #expect(editing.draft.taskDraft.scheduled()?.hasTime != true)
+        #expect(await editing.saveAndCollapse(in: store, reduceMotion: true))
+        let external = try await manager.addTask(AddTaskInput(description: "External from " + view.title))
+        #expect(external.plannedDate == nil && external.project.isEmpty)
+        let supplied = try await manager.addTask(AddTaskInput(description: "Explicit from " + view.title, project: "Home", scheduled: day))
+        #expect(supplied.plannedDate == day && supplied.project == "Home")
+    }
+}
+
+@MainActor @Test func calendarSelectionBlocksDaySwipesAndRetainsSelectionWhenSchedulingFails() async throws {
+    let manager = TaskManager(replica: CaptureReplica())
+    let task = try await manager.create(TaskDraft(description: "Keep selected"))
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.today)
+    await store.reload()
+    let original = store.displayedDay
+    let next = Calendar.current.date(byAdding: .day, value: 1, to: original)!
+    store.browseDay(next)
+    #expect(store.displayedDay == next)
+    store.selectedTaskIDs = [task.id]
+    store.moveDay(by: -1)
+    #expect(store.displayedDay == next)
+    #expect(!(await store.scheduleSelection(on: original)))
+    #expect(store.selectedTaskIDs == [task.id])
+    #expect(store.isSelectingTasks)
+    #expect(store.error != nil)
+    #expect(try await manager.task(id: task.id).plannedDate == nil)
+    store.endTaskSelection()
+    #expect(!store.isSelectingTasks)
+}
+
+@MainActor @Test func nativeDraggingAdmitsOnlySelectedMembersAndKeepsSelectionNavigationLocked() async throws {
+    let day = Calendar.autoupdatingCurrent.startOfDay(for: Date())
+    let first = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "First", "scheduled": String(Int(day.timeIntervalSince1970))])
+    let external = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "External", "scheduled": String(Int(day.timeIntervalSince1970) + 3600)])
+    let second = TaskRecord(id: UUID(), attributes: ["status": "pending", "description": "Second", "scheduled": String(Int(day.timeIntervalSince1970))])
+    let history = TaskRecord(id: UUID(), attributes: ["status": "completed", "description": "History", "scheduled": String(Int(day.timeIntervalSince1970))])
+    let store = TaskStore(manager: TaskManager(replica: CaptureReplica()), directory: FileManager.default.temporaryDirectory)
+    store.query = .today
+    store.plannerDay = day
+    store.tasks = [first, external, second, history]
+    #expect(store.activateSelectionGesture())
+    #expect(store.applySelectionGesture(startingAt: first.id, from: [], entering: []))
+    #expect(!store.beginTaskDrag(id: first.id))
+    store.endSelectionGesture()
+    #expect(store.isSelectingTasks)
+    store.moveDay(by: 1)
+    #expect(store.displayedDay == day)
+    store.selectedTaskIDs = [second.id, first.id]
+    #expect(!store.beginTaskDrag(id: external.id))
+    #expect(!store.beginTaskDrag(id: history.id))
+    #expect(store.selectedTaskIDs == [first.id, second.id])
+    #expect(store.beginTaskDrag(id: second.id))
+    #expect(store.taskDrag?.ids == [first.id, second.id])
+    store.taskDrag?.cross(external.id)
+    #expect(store.tasks == [first, external, second, history])
+    #expect(store.selectedTaskIDs == [first.id, second.id])
+    store.moveDay(by: 1)
+    #expect(store.displayedDay == day)
+    store.taskDrag = nil
+    store.endTaskSelection()
+    #expect(!store.beginTaskDrag(id: history.id))
+    #expect(store.beginTaskDrag(id: first.id))
+    #expect(store.taskDrag?.ids == [first.id])
+}
+
+@MainActor @Test func browsingWithAPrefetchedPagePublishesItsRowsWithItsDate() async throws {
+    let day = Calendar.autoupdatingCurrent.startOfDay(for: Date())
+    let next = Calendar.autoupdatingCurrent.date(byAdding: .day, value: 1, to: day)!
+    let manager = TaskManager(replica: CaptureReplica())
+    let today = try await manager.create(TaskDraft(description: "Today", attributes: ["scheduled": String(Int(day.timeIntervalSince1970))]))
+    let tomorrow = try await manager.create(TaskDraft(description: "Tomorrow", attributes: ["scheduled": String(Int(next.timeIntervalSince1970))]))
+    let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
+    store.selectWorkspaceView(.today)
+    await store.reload()
+    #expect(store.visibleTasks.contains(where: { $0.id == today.id }))
+    let cachedTasks = try await manager.dayPage(on: next)
+    store.browseDay(next, cachedTasks: cachedTasks)
+    #expect(store.displayedDay == next)
+    #expect(store.visibleTasks.map(\.id) == [tomorrow.id])
+    store.browseDay(day)
+    #expect(store.visibleTasks.isEmpty)
 }

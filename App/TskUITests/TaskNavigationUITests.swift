@@ -10,7 +10,8 @@ import XCTest
         let row = taskRow(named: "Navigation task", app: app)
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         let id = String(row.identifier.dropFirst(5))
-        app.tabBars.buttons["Today"].tap()
+        app.buttons["back-from-task-action"].tap()
+        XCTAssertTrue(app.buttons["planner-date-pill"].waitForExistence(timeout: 10))
         capture("Before external task navigation in Today", app)
         _ = try send("tsk://find?description=Navigation%20task&status=unfinished")
         XCTAssertTrue(app.navigationBars["Find Tasks"].waitForExistence(timeout: 15))
@@ -24,8 +25,8 @@ import XCTest
         capture("After warm URL containing list with exactly one expanded task", app)
         replaceTaskText(title, with: "Fresh navigation task", app: app)
         app.buttons["back-from-task-action"].tap()
-        XCTAssertTrue(app.tabBars.buttons["Today"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertTrue(app.buttons["planner-date-pill"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["workspace-title-text"].label, "Today")
         _ = try send("tsk://open-task?id=" + id)
         XCTAssertTrue(title.waitForExistence(timeout: 15))
         XCTAssertEqual(title.value as? String, "Fresh navigation task")
@@ -47,22 +48,19 @@ import XCTest
         XCTAssertFalse(app.buttons["back-from-task-action"].exists)
     }
 
-    func testInstalledOpenViewURLsReachHiddenViewsExactProjectAndRenamedSavedViewWithoutChangingFavorites() throws {
+    func testInstalledOpenViewURLsReachPlannerInboxAndExactProjects() throws {
         let app = fixture()
         app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        let originalTabs = app.tabBars.buttons.allElementsBoundByIndex.map(\.label)
-        capture("Before navigation favorite tabs", app)
-        for (argument, title) in [("today", "Today"), ("upcoming", "Upcoming"), ("unfinished", "All unfinished"), ("done", "Done"), ("projects", "Projects"), ("project&project=Work.Travel", "Work.Travel")] {
+        for (argument, title) in [("today", "Today"), ("inbox", "Inbox"), ("projects", "Projects"), ("project&project=Work.Travel", "Work.Travel")] {
             _ = try send("tsk://open-view?view=" + argument)
             XCTAssertTrue(app.buttons["back-from-task-action"].waitForExistence(timeout: 15))
             XCTAssertTrue(app.navigationBars[title].exists)
             capture("Open view " + title, app)
             app.buttons["back-from-task-action"].tap()
             XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
-            XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), originalTabs)
         }
-        app.tabBars.buttons["Projects"].tap()
+        openWorkspaceView("Projects", app: app)
         app.buttons["project-Work.Travel"].tap()
         XCTAssertTrue(app.navigationBars["Work.Travel"].waitForExistence(timeout: 10))
         _ = try send("tsk://open-view?view=done")
@@ -71,30 +69,6 @@ import XCTest
         XCTAssertTrue(app.navigationBars["Work.Travel"].waitForExistence(timeout: 10))
         XCTAssertTrue(taskRow(named: "Navigation task", app: app).exists)
         capture("Back restores originating project breadcrumb", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        openWorkspaceSetting("custom-views", app: app)
-        let saved = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "saved-view-")).firstMatch
-        XCTAssertTrue(saved.waitForExistence(timeout: 10))
-        let id = String(saved.identifier.dropFirst("saved-view-".count))
-        app.terminate()
-        app.launchEnvironment["TSK_TEST_NAVIGATION_VIEW_NAME"] = "Renamed navigation view"
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        _ = try send("tsk://open-view?view=saved&id=" + id)
-        XCTAssertTrue(app.navigationBars["Renamed navigation view"].waitForExistence(timeout: 15))
-        XCTAssertTrue(taskRow(named: "Navigation task", app: app).exists)
-        capture("Stable UUID opens renamed hidden saved view", app)
-        app.buttons["back-from-task-action"].tap()
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), originalTabs)
-        app.terminate()
-        app.launchEnvironment["TSK_TEST_NAVIGATION_DELETE_VIEW"] = "1"
-        app.launch()
-        XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 15))
-        _ = try send("tsk://open-view?view=saved&id=" + id)
-        XCTAssertTrue(app.alerts["Task action"].waitForExistence(timeout: 15))
-        capture("Missing saved view preserves workspace and favorites", app)
-        app.alerts.buttons["OK"].tap()
-        XCTAssertEqual(app.tabBars.buttons.allElementsBoundByIndex.map(\.label), originalTabs)
         app.terminate()
     }
 

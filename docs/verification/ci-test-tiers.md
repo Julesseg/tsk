@@ -9,15 +9,15 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 22 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 23 on-demand methods | `diagnostic_only=true` |
+| Full | 21 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
-| Regression | 4 methods | Explicit dispatch |
+| Regression | 3 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 45 retained methods has exactly one primary
+methods for every suite. Each of the 46 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -27,11 +27,8 @@ Smoke covers inline capture/cancellation/save/relaunch, row validation/native
 pickers/outside-save/durable completion.
 Smoke needs no synchronization server or independent peer.
 
-Nightly keeps bulk failed Apply;
-row notes and tag validation; saved views/native
-reordering; occurrence success/failure; series metadata preview/cancel/save; external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage
-adds fresh/completed/missing task identities, all view categories, stable saved-view
-renames/deletion, unchanged favorites, project return paths and actual callbacks. Full coverage is
+Nightly keeps Scheduled slot touch-down and sweep selection, bulk failed Apply,
+row notes and tag validation, occurrence success/failure, series metadata preview/cancel/save, external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage adds fresh/completed/missing task identities, planner, Inbox and exact projects, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
 certify on-demand scenarios. Run the relevant focused/on-demand suite when a
 change touches those contracts. Moving frequency does not establish acceptance.
@@ -39,7 +36,8 @@ change touches those contracts. Moving frequency does not establish acceptance.
 On-demand coverage retains genuine lower-priority UI contracts: appearance and
 large text, exact row geometry and animation drift, native Project-menu stress,
 focus and retained-open scroll, Calendar display settings, detail activity/annotation
-controls, recurring authoring/copy and undeliverable callbacks. These do not run automatically at
+controls, recurring authoring/copy, undeliverable callbacks, Scheduled precision,
+native task dragging and retained completion history. These do not run automatically at
 night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
 baseline and accepted gaps.
@@ -70,7 +68,7 @@ tests, settings, services, fixtures and entitlement, were also removed explicitl
 Task dates, ordinary task search, sync, Calendar and seven Shortcuts remain.
 A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
 items; it requests no authorization and creates no new alerts or index records.
-Full now selects 16 workspace and six row methods.
+Full selects 14 workspace and seven row methods.
 Apple Reminders import was removed on 2026-11-18: one-time copy, continuous
 move, recurring conversion, settings, permission requests, background import,
 Core/Native APIs and dedicated fixtures/tests are retired. Calendar and tasks

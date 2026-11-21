@@ -7,8 +7,7 @@ final class TaskCompletionFeedback {
     struct Context: Equatable {
         var query: TaskQuery = .unfinished
         var project: TaskProjectSelection = .all
-        var customViewID: UUID?
-        var filter: UTF8String?
+        var plannerDay: Date?
     }
     enum Phase { case saving, checked, covering, collapsing }
     private struct Entry {
