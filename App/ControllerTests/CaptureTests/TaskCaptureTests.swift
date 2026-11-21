@@ -278,8 +278,8 @@ private actor CaptureReplica: TaskReplica {
     store.query = .today
     store.plannerDay = day
     store.tasks = [first, external, second, history]
-    #expect(store.activateSelectionGesture())
-    #expect(store.applySelectionGesture(startingAt: first.id, from: [], entering: []))
+    #expect(store.activateSelectionGesture(startingAt: first.id))
+    #expect(store.selectedTaskIDs == [first.id])
     #expect(!store.beginTaskDrag(id: first.id))
     store.endSelectionGesture()
     #expect(store.isSelectingTasks)
@@ -319,4 +319,41 @@ private actor CaptureReplica: TaskReplica {
     #expect(store.visibleTasks.map(\.id) == [tomorrow.id])
     store.browseDay(day)
     #expect(store.visibleTasks.isEmpty)
+}
+
+@MainActor @Test func plannerRetargetsUnfinishedSnapsAndBoundsDistantJumpsToOnePage() throws {
+    let store = TaskStore(manager: TaskManager(replica: CaptureReplica()), directory: FileManager.default.temporaryDirectory)
+    var completions: [() -> Void] = []
+    let paging = TaskDayPaging { move, finish in
+        move()
+        completions.append(finish)
+    }
+    let today = store.displayedDay
+    func day(_ distance: Int) throws -> Date {
+        try #require(Calendar.current.date(byAdding: .day, value: distance, to: today))
+    }
+
+    for distance in 1...3 {
+        paging.drag(distance: -80, width: 400, store: store)
+        paging.settle(distance: -150, velocity: -600, width: 400, store: store, reduceMotion: false, cancelled: false)
+        #expect(paging.preview?.day == (try day(distance)))
+        #expect(store.displayedDay == (try day(distance - 1)))
+    }
+    for distance in [-10, 14] {
+        paging.navigate(to: try day(distance), store: store, reduceMotion: false)
+        let snap = try #require(paging.snap)
+        #expect(paging.preview?.day == (try day(distance)))
+        #expect(snap.to == (distance < 0 ? 1 : -1))
+        #expect(paging.preview?.side == -snap.to)
+        for step in 0...20 {
+            let position = snap.position(at: snap.start + Double(step) * 0.02)
+            #expect((min(snap.from, snap.to)...max(snap.from, snap.to)).contains(position))
+        }
+    }
+    paging.drag(distance: 90, width: 400, store: store)
+    paging.settle(distance: 155, velocity: 500, width: 400, store: store, reduceMotion: true, cancelled: false)
+    for finish in completions.reversed() { finish() }
+    #expect(store.displayedDay == (try day(13)))
+    #expect(paging.preview == nil)
+    #expect(paging.offset == 0)
 }

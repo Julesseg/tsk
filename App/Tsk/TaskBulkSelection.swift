@@ -18,14 +18,19 @@ extension TaskStore {
         }
     }
 
-    var selectionTasks: [TaskRecord] { allTasks.filter { selectedTaskIDs.contains($0.id) } }
+    var selectionTasks: [TaskRecord] {
+        let ids = selectedTaskIDs
+        return allTasks.filter { ids.contains($0.id) }
+    }
 
     func selectionDateIsModified(_ field: TaskDateField) -> Bool {
-        (try? selectionChanges.modifies(field, tasks: selectionTasks)) ?? true
+        guard selectionChanges[field] != nil else { return false }
+        return (try? selectionChanges.modifies(field, tasks: selectionTasks)) ?? true
     }
 
     var hasSelectionChanges: Bool {
-        (try? selectionChanges.modifies(tasks: selectionTasks)) ?? true
+        guard selectionChanges != TaskSelectionChanges() else { return false }
+        return (try? selectionChanges.modifies(tasks: selectionTasks)) ?? true
     }
 
     func resetSelectionDate(_ field: TaskDateField) {
@@ -68,7 +73,7 @@ struct TaskSelectionBar: View {
     let store: TaskStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var glass
-    @StateObject private var calendars = TaskSelectionCalendars()
+    let calendars: TaskSelectionCalendars
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
@@ -97,12 +102,6 @@ struct TaskSelectionBar: View {
         .padding(.horizontal, 12).padding(.vertical, 4)
         .disabled(store.isSaving)
         .allowsHitTesting(!store.isSelectionGestureActive)
-        .task(id: store.isSelectionGestureActive) {
-            guard !store.isSelectionGestureActive else { return }
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            calendars.prepare(at: store.currentDate)
-        }
     }
 
     @ViewBuilder private func dateControl(_ field: TaskDateField) -> some View {
@@ -165,18 +164,19 @@ struct TaskSelectionBar: View {
     }
 
     private var applyButton: some View {
-        Button { Task { await store.commitTaskSelection() } } label: {
-            Text(store.hasSelectionChanges ? "Apply to \(store.selectedTaskIDs.count)" : "\(store.selectedTaskIDs.count) selected")
+        let modified = store.hasSelectionChanges
+        return Button { Task { await store.commitTaskSelection() } } label: {
+            Text(modified ? "Apply to \(store.selectedTaskIDs.count)" : "\(store.selectedTaskIDs.count) selected")
                 .contentTransition(reduceMotion ? .identity : .numericText(value: Double(store.selectedTaskIDs.count)))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 16).padding(.vertical, 12)
         }
         .buttonStyle(TaskSelectionApplyStyle())
-        .glassEffect(.regular.tint(store.hasSelectionChanges ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Capsule())
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: store.hasSelectionChanges)
+        .glassEffect(.regular.tint(modified ? Color.accentColor.opacity(0.15) : .clear).interactive(), in: Capsule())
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: modified)
         .animation(reduceMotion ? nil : .smooth(duration: 0.18), value: store.selectedTaskIDs.count)
-        .disabled(!store.hasSelectionChanges)
+        .disabled(!modified)
         .accessibilityIdentifier("task-selection-apply")
         #if DEBUG
         .accessibilityValue(store.selectionGestureProof)

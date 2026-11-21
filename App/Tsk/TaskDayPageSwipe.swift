@@ -2,53 +2,6 @@ import SwiftUI
 import UIKit
 import TskCore
 
-@MainActor @Observable
-final class TaskDayPaging {
-    private let snapFeedback = UISelectionFeedbackGenerator()
-    var offset: CGFloat = 0
-    var isSettling = false
-    var expanded = false
-    static let pillHeight: CGFloat = 44
-    var calendarPullDistance: CGFloat?
-    var isCalendarVisible: Bool { expanded || (calendarPullDistance ?? 0) < 0 }
-    var navigatorBounds = CGRect.zero
-    var pages: [Date: [TaskRecord]] = [:]
-    var calendars: [Date: TodayCalendarSnapshot] = [:]
-
-    func settleCalendar(distance: CGFloat, velocity: CGFloat, reduceMotion: Bool, cancelled: Bool) {
-        let projected = distance + velocity * 0.15
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.32)) {
-            if !cancelled, abs(projected) >= 75 { expanded = projected < 0 }
-            calendarPullDistance = nil
-        }
-    }
-
-    func settle(distance: CGFloat, velocity: CGFloat, width: CGFloat, store: TaskStore, reduceMotion: Bool, cancelled: Bool) {
-        guard !isSettling else { return }
-        let day = store.displayedDay
-        let projected = distance + velocity * 0.15
-        let move = !cancelled && abs(distance) > 20 && abs(projected) > max(60, width * 0.22)
-        let direction = move ? (projected < 0 ? 1 : -1) : 0
-        isSettling = true
-        if move { snapFeedback.prepare() }
-        withAnimation(reduceMotion ? nil : .snappy(duration: 0.28), completionCriteria: .logicallyComplete) {
-            offset = -CGFloat(direction) * width
-        } completion: {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                if direction != 0, store.isDayPage, store.displayedDay == day, !store.isSelectingTasks,
-                   let target = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: day) {
-                    store.browseDay(target, cachedTasks: self.pages[target])
-                    if store.displayedDay == target { self.snapFeedback.selectionChanged() }
-                }
-                self.offset = 0
-                self.isSettling = false
-            }
-        }
-    }
-}
-
 struct TaskDayPageSwipe: UIViewRepresentable {
     let store: TaskStore
     let paging: TaskDayPaging
@@ -98,7 +51,7 @@ struct TaskDayPageSwipe: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard let store, let paging, !paging.isSettling, store.taskDrag == nil, !store.isSelectionPressActive,
+            guard let store, let paging, store.taskDrag == nil, !store.isSelectionPressActive,
                   !store.isSelectionGestureActive, store.rowEditing == nil, !store.isSaving,
                   store.presentedTaskPanels.isEmpty, !paging.isCalendarVisible, canPage else { return false }
             origin = touch.location(in: nil)
@@ -124,15 +77,14 @@ struct TaskDayPageSwipe: UIViewRepresentable {
             let phase = state
             let speed = velocity(in: nil)
             let width = max(1, viewport.width)
-            let reduceMotion = reduceMotion
-            Task { @MainActor in
-                switch phase {
-                case .began, .changed:
-                    paging.offset = min(width, max(-width, distance.x))
-                case .ended, .cancelled, .failed:
-                    paging.settle(distance: distance.x, velocity: speed.x, width: width, store: store, reduceMotion: reduceMotion, cancelled: phase != .ended)
-                default: break
-                }
+            switch phase {
+            case .began, .changed:
+                paging.drag(distance: distance.x, width: width, store: store)
+            case .ended:
+                paging.settle(distance: distance.x, velocity: speed.x, width: width, store: store, reduceMotion: reduceMotion, cancelled: false)
+            case .cancelled, .failed:
+                paging.cancelDrag(store: store, reduceMotion: reduceMotion)
+            default: break
             }
         }
     }
@@ -149,39 +101,56 @@ struct TaskDayPagingPages: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let neighbors = Neighbors(day: store.displayedDay, tasks: store.allTasks, calendar: calendar.snapshot)
         GeometryReader { geometry in
-            ZStack(alignment: .topLeading) {
-                content.offset(x: paging.offset)
-                if paging.offset != 0 {
-                    ForEach([-1, 1], id: \.self) { direction in
-                        if let day = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: store.displayedDay) {
-                            preview(day: day)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .offset(x: CGFloat(direction) * geometry.size.width + paging.offset)
-                        }
+            content
+                .overlay {
+                    ForEach([paging.trailingPreview, paging.preview].compactMap { $0 }, id: \.day) { preview in
+                        TaskDayPreview(day: preview.day, store: store, paging: paging, calendar: calendar)
+                            .offset(x: preview.side * geometry.size.width)
+                            .transition(.identity)
                     }
                 }
-            }
-            .clipped()
+                .modifier(DayPageTranslation(paging: paging, width: geometry.size.width))
+                .clipped()
         }
-        .task(id: Neighbors(day: store.displayedDay, tasks: store.allTasks, calendar: calendar.snapshot)) { await loadNeighbors() }
+        .task(id: neighbors) { await loadNeighbors(neighbors) }
+        .sensoryFeedback(.selection, trigger: store.displayedDay)
+        .onDisappear { paging.reset() }
     }
 
-    private func loadNeighbors() async {
-        let day = store.displayedDay
-        var pages: [Date: [TaskRecord]] = [:]
+    private func loadNeighbors(_ neighbors: Neighbors) async {
+        let day = neighbors.day
+        var pages = paging.pages.filter { $0.key == day }
         var calendars = paging.calendars.filter { $0.key == day }
         for direction in [-1, 1] {
             guard !Task.isCancelled, let date = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: day) else { return }
-            if let value = try? await store.manager.dayPage(on: date) { pages[date] = value }
+            pages[date] = await store.manager.dayPage(on: date, in: neighbors.tasks)
             calendars[date] = await store.manager.dayCalendar(on: date, from: calendar.source)
         }
         guard !Task.isCancelled, store.displayedDay == day else { return }
+        if let target = paging.preview?.day, let warm = paging.pages[target], pages[target] == nil { pages[target] = warm }
         paging.pages = pages
         paging.calendars = calendars
     }
+}
 
-    private func preview(day: Date) -> some View {
+private struct DayPageTranslation: ViewModifier {
+    let paging: TaskDayPaging
+    let width: CGFloat
+
+    func body(content: Content) -> some View {
+        content.offset(x: width * paging.offset)
+    }
+}
+
+private struct TaskDayPreview: View {
+    let day: Date
+    let store: TaskStore
+    let paging: TaskDayPaging
+    let calendar: TodayCalendarController
+
+    var body: some View {
         let snapshot = paging.calendars[day]?.showing(calendar.preferences.visibility)
         let tasks = paging.pages[day] ?? []
         let rows = snapshot?.plannerRows(tasks: tasks) ?? tasks.map(DayPageItem.task)
@@ -189,8 +158,7 @@ struct TaskDayPagingPages: ViewModifier {
             TodayCalendarSection(snapshot: snapshot)
             List {
                 Section {
-                    if paging.pages[day] == nil { ProgressView() }
-                    else if tasks.isEmpty { Text("Nothing planned for this day").foregroundStyle(.secondary) }
+                    if paging.pages[day] != nil && tasks.isEmpty { Text("Nothing planned for this day").foregroundStyle(.secondary) }
                     ForEach(rows) { item in
                         switch item {
                         case .task(let task): TaskListRow(task: task, store: store, edit: { _ in }, previewDay: day)
@@ -201,6 +169,12 @@ struct TaskDayPagingPages: ViewModifier {
                 .listSectionSeparator(.hidden)
                 .listRowBackground(Color.clear)
             }
+        }
+        .task(id: day) {
+            guard paging.pages[day] == nil else { return }
+            let tasks = await store.manager.dayPage(on: day, in: store.allTasks)
+            guard !Task.isCancelled else { return }
+            paging.pages[day] = tasks
         }
         .transformPreference(TaskSelectionRowsKey.self) { $0 = [:] }
         .transformPreference(TaskCalendarDragRowsKey.self) { $0 = [:] }

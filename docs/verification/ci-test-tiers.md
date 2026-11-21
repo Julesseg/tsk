@@ -10,14 +10,14 @@ The manual form defaults to smoke.
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
 | Full | 21 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
+| Diagnostic | 26 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 3 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 46 retained methods has exactly one primary
+methods for every suite. Each of the 47 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -41,6 +41,33 @@ native task dragging and retained completion history. These do not run automatic
 night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
 baseline and accepted gaps.
+
+### Measuring planner interactions
+
+Use the same simulator, runtime, build settings and test source in both checkouts.
+Build the simulator bridge once per revision and supply the reserved simulator's
+UDID through `SIMULATOR_UDID`. Use a fresh result bundle path for each run.
+
+```sh
+bash scripts/build-native.sh simulator
+bash scripts/run-ui-tests.sh "$SIMULATOR_UDID" -project App/Tsk.xcodeproj -scheme Tsk \
+  -derivedDataPath .build/planner-profile -resultBundlePath .build/planner-profile.xcresult \
+  -only-testing:TskUITests/TaskBulkSelectionUITests/testPlannerInteractionFrameIntervals \
+  TSK_APP_DEBUG_DYLIB=NO SWIFT_OPTIMIZATION_LEVEL=-O
+```
+
+The test seeds 27 tasks, enables animations and repeats six interactions three
+times. Set `TEST_RUNNER_TSK_PLANNER_NAVIGATION_BENCHMARK=1` to measure only
+page swipes and the date pill, with five repetitions each. Its Debug-only
+display link requests 60 Hz on the app's main thread.
+For each interaction, `PLANNER-FRAMES` prints the elapsed time, count of
+intervals longer than 25 ms, sum of their time beyond 17 ms (`excessMs`), and
+longest such interval. The full windows include XCTest input, accessibility
+queries and settling. `touchExcessMs` counts the same excess time within UIKit
+touch intervals and the 350 ms following each release. Overlapping windows
+count once. Compare medians per interaction. After timing, the test selects a
+date eight days ahead and returns to Today through the calendar. Use a physical-device
+Animation Hitches trace to evaluate frames presented on a ProMotion display.
 
 The Menu suite retains three native Project-menu journeys plus touch-based annotation
 editing. Its stress case still opens and dismisses New

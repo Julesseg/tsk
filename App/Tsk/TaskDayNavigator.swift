@@ -6,35 +6,31 @@ struct TaskDayNavigator: View {
     let paging: TaskDayPaging
     let availableWidth: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var touchingPill = false
-    @State private var dragAxis: Axis?
-    @State private var todayPress: Task<Void, Never>?
-    @State private var didReturnToToday = false
-    @State private var browsedMonth: Date?
     @State private var calendarHeight: CGFloat = 0
+    @State private var retainingCalendar = false
+    @State private var monthGrid = TaskDayMonthGrid.Cache()
 
     private var expanded: Bool { paging.expanded }
-    private var month: Date { browsedMonth ?? store.displayedDay }
     private var calendar: Calendar { .autoupdatingCurrent }
     private var canChooseDate: Bool { !store.isSelectionPressActive && !store.isSelectionGestureActive && store.rowEditing == nil && !store.isSaving }
     private var canPage: Bool { store.isDayPage && !store.isSelectingTasks && store.taskDrag == nil && !expanded }
     private var today: Date { calendar.startOfDay(for: store.currentDate) }
-    private var canReturnToToday: Bool { canChooseDate && canPage && !paging.isSettling && store.displayedDay != today }
+    private var canReturnToToday: Bool { canChooseDate && canPage && store.displayedDay != today }
     private var isScheduling: Bool { !store.selectedTaskIDs.isEmpty }
     private var openWidth: CGFloat { min(336, max(0, availableWidth - 32)) }
     private var visibleHeight: CGFloat { min(calendarHeight, max(0, (expanded ? calendarHeight : 0) - (paging.calendarPullDistance ?? 0))) }
     private var openness: CGFloat { calendarHeight > 0 ? visibleHeight / calendarHeight : 0 }
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22 + 6 * openness) }
-    private var settleAnimation: Animation? { reduceMotion ? nil : .snappy(duration: 0.32) }
+    private var settleAnimation: Animation? { reduceMotion ? nil : .easeOut(duration: 0.18) }
 
     var body: some View {
         TaskDayPillWidth(expandedWidth: openWidth, openness: openness) {
-            dateButton
+            dateLabel.accessibilityHidden(true)
         }
         .padding(.top, visibleHeight)
         .overlay(alignment: .top) {
-            if paging.isCalendarVisible {
-                monthCalendar
+            if paging.isCalendarVisible || retainingCalendar {
+                TaskDayMonthCalendar(store: store, paging: paging, grid: monthGrid, canChooseDate: canChooseDate, expanded: expanded)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .frame(width: openWidth)
@@ -52,31 +48,32 @@ struct TaskDayNavigator: View {
             Color.clear.contentShape(shape).onTapGesture {}
         }
         .glassEffect(.regular, in: shape)
+        .overlay(alignment: .bottom) {
+            TaskDayPillInput(day: store.displayedDay, hint: pillHint, canReturnToToday: canReturnToToday,
+                             activate: { if canChooseDate { setExpanded(!expanded) } },
+                             returnToToday: returnToToday, pan: pan)
+                .frame(height: TaskDayPaging.pillHeight)
+        }
         .accessibilityElement(children: .contain)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { paging.navigatorBounds = $0 }
         .animation(paging.calendarPullDistance == nil ? settleAnimation : nil, value: openness)
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, TaskDayPaging.verticalPadding)
         .frame(maxWidth: .infinity)
-        .onChange(of: paging.isCalendarVisible) { _, visible in
-            if visible { browsedMonth = store.displayedDay }
-        }
-        .onChange(of: store.completionContext) { _, _ in setExpanded(false) }
-        .onChange(of: touchingPill) { _, touching in
-            if !touching {
-                Task { @MainActor in
-                    guard !touchingPill else { return }
-                    finishDrag(distance: .zero, velocity: .zero, cancelled: true)
+        .task(id: paging.isCalendarVisible) {
+            if paging.isCalendarVisible { retainingCalendar = true }
+            else if retainingCalendar {
+                if !reduceMotion {
+                    do { try await Task.sleep(for: .milliseconds(180)) } catch { return }
                 }
+                retainingCalendar = false
             }
         }
-        .onDisappear {
-            todayPress?.cancel()
-            paging.calendarPullDistance = nil
-        }
+        .onChange(of: store.completionContext) { _, _ in setExpanded(false) }
+        .onDisappear { paging.calendarPullDistance = nil }
     }
 
-    private var dateButton: some View {
+    private var dateLabel: some View {
         HStack(spacing: 7) {
             Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
                 .monospacedDigit()
@@ -88,82 +85,120 @@ struct TaskDayNavigator: View {
         .lineLimit(1)
         .padding(.horizontal, 16)
         .frame(height: TaskDayPaging.pillHeight)
-        .contentShape(Rectangle())
-        .gesture(pillDrag)
-        .accessibilityElement(children: .ignore)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { setExpanded(!expanded) }
-        .accessibilityActions {
-            if canReturnToToday { Button("Go to Today", action: returnToToday) }
-        }
-        .accessibilityLabel("Browse date")
-        .accessibilityValue(String(Int(store.displayedDay.timeIntervalSince1970)))
-        .accessibilityHint(expanded ? "Tap or swipe down to close the month calendar" : isScheduling ? "Tap to schedule selected tasks" : canReturnToToday ? "Swipe up to open the calendar. Hold to go to Today." : "Swipe up or tap to open the month calendar")
-        .accessibilityIdentifier("planner-date-pill")
     }
 
-    private var pillDrag: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-            .updating($touchingPill) { _, touching, _ in touching = true }
-            .onChanged { finger in
-                guard canChooseDate, !paging.isSettling, !didReturnToToday else { return }
-                let x = finger.translation.width
-                let y = finger.translation.height
-                if dragAxis == nil, max(abs(x), abs(y)) > 8 {
-                    todayPress?.cancel()
-                    todayPress = nil
-                    dragAxis = abs(y) > abs(x) ? .vertical : .horizontal
-                }
-                if dragAxis == nil, canReturnToToday, todayPress == nil {
-                    todayPress = Task {
-                        do { try await Task.sleep(for: .milliseconds(500)) }
-                        catch { return }
-                        guard canReturnToToday, touchingPill, dragAxis == nil else { return }
-                        didReturnToToday = true
-                        returnToToday()
-                    }
-                }
-                switch dragAxis {
-                case .vertical: paging.calendarPullDistance = y
-                case .horizontal where canPage: paging.offset = min(availableWidth, max(-availableWidth, x))
-                default: break
-                }
-            }
-            .onEnded { finger in
-                finishDrag(distance: finger.translation, velocity: finger.velocity, cancelled: !canChooseDate || paging.isSettling)
-            }
+    private var pillHint: String {
+        if expanded { return "Tap or swipe down to close the month calendar" }
+        if isScheduling { return "Tap to schedule selected tasks" }
+        return canReturnToToday ? "Swipe up to open the calendar. Hold to go to Today." : "Swipe up or tap to open the month calendar"
     }
 
-    private func finishDrag(distance: CGSize, velocity: CGSize, cancelled: Bool) {
-        todayPress?.cancel()
-        todayPress = nil
-        let axis = dragAxis
-        dragAxis = nil
-        if didReturnToToday {
-            didReturnToToday = false
-            return
-        }
-        switch axis {
-        case .vertical:
-            paging.settleCalendar(distance: distance.height, velocity: velocity.height, reduceMotion: reduceMotion, cancelled: cancelled)
-        case .horizontal where canPage || paging.offset != 0:
-            paging.settle(distance: distance.width, velocity: velocity.width, width: availableWidth, store: store,
-                          reduceMotion: reduceMotion, cancelled: cancelled || !canPage)
-        case nil where !cancelled && max(abs(distance.width), abs(distance.height)) <= 8:
-            setExpanded(!expanded)
+    private func pan(axis: Axis, distance: CGPoint, velocity: CGPoint, state: UIGestureRecognizer.State) {
+        switch state {
+        case .began, .changed:
+            guard canChooseDate else { return }
+            if axis == .vertical { paging.calendarPullDistance = distance.y }
+            else if canPage { paging.drag(distance: distance.x, width: availableWidth, store: store) }
+        case .ended, .cancelled:
+            let cancelled = state == .cancelled || !canChooseDate
+            if axis == .vertical {
+                paging.settleCalendar(distance: distance.y, velocity: velocity.y, reduceMotion: reduceMotion, cancelled: cancelled)
+            } else if canPage && !cancelled {
+                paging.settle(distance: distance.x, velocity: velocity.x, width: availableWidth, store: store, reduceMotion: reduceMotion, cancelled: false)
+            } else { paging.cancelDrag(store: store, reduceMotion: reduceMotion) }
         default: break
         }
     }
 
     private func setExpanded(_ value: Bool) {
+        guard expanded != value else { return }
         withAnimation(settleAnimation) { paging.expanded = value }
     }
 
     private func returnToToday() {
-        store.browseDay(today, cachedTasks: paging.pages[today])
+        paging.navigate(to: today, store: store, reduceMotion: reduceMotion)
+    }
+}
+
+private struct TaskDayPillInput: UIViewRepresentable {
+    let day: Date
+    let hint: String
+    let canReturnToToday: Bool
+    let activate: () -> Void
+    let returnToToday: () -> Void
+    let pan: (Axis, CGPoint, CGPoint, UIGestureRecognizer.State) -> Void
+
+    func makeUIView(context: Context) -> Input { Input() }
+
+    func updateUIView(_ input: Input, context: Context) {
+        input.actions = self
+        input.hold.isEnabled = canReturnToToday
+        input.accessibilityValue = String(Int(day.timeIntervalSince1970))
+        input.accessibilityHint = hint
+        input.accessibilityCustomActions = canReturnToToday ? [input.todayAction] : nil
     }
 
-    private var monthCalendar: some View {
+    final class Input: UIView {
+        var actions: TaskDayPillInput?
+        private var axis: Axis?
+        let hold = UILongPressGestureRecognizer()
+        lazy var todayAction = UIAccessibilityCustomAction(name: "Go to Today") { [weak self] _ in
+            guard let actions = self?.actions, actions.canReturnToToday else { return false }
+            actions.returnToToday()
+            return true
+        }
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isAccessibilityElement = true
+            accessibilityIdentifier = "planner-date-pill"
+            accessibilityLabel = "Browse date"
+            accessibilityTraits = .button
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(panned))
+            pan.maximumNumberOfTouches = 1
+            hold.addTarget(self, action: #selector(held))
+            hold.allowableMovement = 8
+            let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
+            tap.require(toFail: pan)
+            tap.require(toFail: hold)
+            for recognizer in [pan, hold, tap] { addGestureRecognizer(recognizer) }
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func accessibilityActivate() -> Bool { tapped(); return true }
+        @objc private func tapped() { actions?.activate() }
+        @objc private func held() { if hold.state == .began { actions?.returnToToday() } }
+
+        @objc private func panned(_ recognizer: UIPanGestureRecognizer) {
+            let distance = recognizer.translation(in: window)
+            let velocity = recognizer.velocity(in: window)
+            if axis == nil {
+                let direction = distance == .zero ? velocity : distance
+                axis = abs(direction.y) > abs(direction.x) ? .vertical : .horizontal
+            }
+            if let axis { actions?.pan(axis, distance, velocity, recognizer.state) }
+            if recognizer.state == .ended || recognizer.state == .cancelled { axis = nil }
+        }
+    }
+}
+
+private struct TaskDayMonthCalendar: View {
+    let store: TaskStore
+    let paging: TaskDayPaging
+    let grid: TaskDayMonthGrid.Cache
+    let canChooseDate: Bool
+    let expanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var browsedMonth: Date?
+
+    private var calendar: Calendar { .autoupdatingCurrent }
+    private var month: Date { browsedMonth ?? store.displayedDay }
+
+    var body: some View {
+        let displayedDay = store.displayedDay
+        let isScheduling = store.isSelectingTasks
+        let today = calendar.startOfDay(for: store.currentDate)
         VStack(spacing: 4) {
             if isScheduling {
                 Text("Schedule \(store.selectedTaskIDs.count) selected").font(.subheadline.weight(.semibold))
@@ -177,33 +212,9 @@ struct TaskDayNavigator: View {
                 Button("Next month", systemImage: "chevron.right") { moveMonth(1) }
                     .labelStyle(.iconOnly).frame(width: 44, height: 44)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 0) {
-                ForEach(0..<7, id: \.self) { index in
-                    Text(calendar.veryShortStandaloneWeekdaySymbols[(calendar.firstWeekday - 1 + index) % 7])
-                        .font(.caption).foregroundStyle(.secondary).frame(height: 24)
-                        .accessibilityHidden(true)
-                }
-                ForEach(Array(monthDays.enumerated()), id: \.offset) { _, date in
-                    if let date {
-                        let selected = calendar.isDate(date, inSameDayAs: store.displayedDay)
-                        Button {
-                            chooseDate(date)
-                        } label: {
-                            Text(date, format: .dateTime.day())
-                                .font(.body.weight(selected ? .semibold : .regular))
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(selected ? Color.accentColor.opacity(0.2) : Color.clear, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isScheduling && date < today)
-                        .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                        .accessibilityIdentifier("planner-date-\(Int(date.timeIntervalSince1970))")
-                    } else {
-                        Color.clear.frame(height: 40).accessibilityHidden(true)
-                    }
-                }
-            }
+            TaskDayMonthGrid(grid: grid, month: month, selected: displayedDay, minimum: isScheduling ? today : nil,
+                             expanded: expanded, choose: chooseDate)
+                .fixedSize(horizontal: false, vertical: true)
             if store.isSaving { ProgressView("Saving selected tasks") }
         }
         .contentShape(Rectangle())
@@ -214,29 +225,27 @@ struct TaskDayNavigator: View {
         })
         .disabled(!canChooseDate)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("planner-month-calendar")
+        .accessibilityIdentifier(expanded ? "planner-month-calendar" : "")
+        .onChange(of: expanded) { _, open in
+            if !open { browsedMonth = nil }
+        }
     }
 
     private func chooseDate(_ date: Date) {
-        guard canChooseDate, !isScheduling || date >= today else { return }
-        if isScheduling {
+        guard canChooseDate else { return }
+        if store.isSelectingTasks {
+            guard date >= calendar.startOfDay(for: store.currentDate) else { return }
             Task {
-                guard await store.scheduleSelection(on: date) else { return }
-                setExpanded(false)
+                if await store.scheduleSelection(on: date) { close() }
             }
         } else {
-            store.browseDay(date)
-            setExpanded(false)
+            close()
+            paging.navigate(to: date, store: store, reduceMotion: reduceMotion)
         }
     }
 
-    private var monthDays: [Date?] {
-        guard let interval = calendar.dateInterval(of: .month, for: month),
-              let range = calendar.range(of: .day, in: .month, for: month) else { return [] }
-        let padding = (calendar.component(.weekday, from: interval.start) - calendar.firstWeekday + 7) % 7
-        return Array(repeating: nil, count: padding) + range.map {
-            calendar.date(byAdding: .day, value: $0 - 1, to: interval.start)
-        }
+    private func close() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { paging.expanded = false }
     }
 
     private func moveMonth(_ offset: Int) {
@@ -253,14 +262,15 @@ private struct TaskDayPillWidth: Layout {
         set { openness = newValue }
     }
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let label = subviews[0].sizeThatFits(.unspecified)
+    func makeCache(subviews: Subviews) -> CGSize { subviews[0].sizeThatFits(.unspecified) }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache label: inout CGSize) -> CGSize {
         let closed = min(label.width, expandedWidth)
         let progress = min(1, max(0, openness))
         return CGSize(width: closed + (expandedWidth - closed) * progress, height: label.height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout CGSize) {
         subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
                           proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
     }

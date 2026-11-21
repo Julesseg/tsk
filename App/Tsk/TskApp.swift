@@ -19,6 +19,13 @@ struct TskApp: App {
     var body: some Scene {
         WindowGroup {
             TaskStorageRootView().ignoresSafeArea()
+                #if DEBUG
+                .background {
+                    if ProcessInfo.processInfo.environment["TSK_TEST_PLANNER_FRAMES"] == "1" {
+                        PlannerFrameProbe().frame(width: 1, height: 1)
+                    }
+                }
+                #endif
         }
     }
 }

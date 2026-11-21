@@ -38,6 +38,7 @@ final class TaskCompletionFeedback {
         let retained = entries.values.filter { $0.context == context && $0.phase != .collapsing }.sorted {
             $0.index == $1.index ? $0.task.id.uuidString < $1.task.id.uuidString : $0.index < $1.index
         }
+        guard !retained.isEmpty else { return latest }
         let ids = Set(retained.map { $0.task.id })
         var result = latest.filter { !ids.contains($0.id) }
         for entry in retained {
