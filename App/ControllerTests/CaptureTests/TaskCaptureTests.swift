@@ -278,8 +278,8 @@ private actor CaptureReplica: TaskReplica {
     store.query = .today
     store.plannerDay = day
     store.tasks = [first, external, second, history]
-    #expect(store.activateSelectionGesture())
-    #expect(store.applySelectionGesture(startingAt: first.id, from: [], entering: []))
+    #expect(store.activateSelectionGesture(startingAt: first.id))
+    #expect(store.selectedTaskIDs == [first.id])
     #expect(!store.beginTaskDrag(id: first.id))
     store.endSelectionGesture()
     #expect(store.isSelectingTasks)

@@ -49,13 +49,14 @@ struct TaskNativeDrag: UIViewRepresentable {
         var reduceMotion = false
         private var previousY: CGFloat?
         private var previousCenters: [DayPageItem.ID: CGFloat] = [:]
-        private var initialRows: [TaskSelectionRow] = []
         private var dropping = false
-        private var originalTasks: [TaskRecord] = []
         private weak var previousDragDelegate: (any UICollectionViewDragDelegate)?
         private weak var previousDropDelegate: (any UICollectionViewDropDelegate)?
         private var wasDragEnabled = false
         #if DEBUG
+        private let recordsProof = ProcessInfo.processInfo.environment["TSK_TEST_NATIVE_DRAG"] == "1"
+        private var initialCenters: [DayPageItem.ID: CGFloat] = [:]
+        private var originalTasks: [TaskRecord] = []
         private var proof = Proof()
         private var reads: [Task<Void, Never>] = []
         #endif
@@ -90,10 +91,11 @@ struct TaskNativeDrag: UIViewRepresentable {
         func updateRows(_ rows: [TaskSelectionRow]) {
             self.rows = rows
             #if DEBUG
-            guard let drag = store?.taskDrag, !dropping else { return }
-            for row in rows where !drag.ids.contains(row.id) {
-                if let initial = initialRows.first(where: { $0.id == row.id }), abs(row.bounds.midY - initial.bounds.midY) > 4 {
-                    proof.displaced.insert(row.id.uuidString)
+            guard recordsProof, let drag = store?.taskDrag, !dropping, let list, let window = list.window else { return }
+            for (target, y) in crossingCenters(in: list, window: window) {
+                if case .task(let id) = target, drag.ids.contains(id) { continue }
+                if let initial = initialCenters[target.id], abs(y - initial) > 4 {
+                    proof.displaced.insert(target.proofID)
                 }
             }
             #endif
@@ -106,13 +108,15 @@ struct TaskNativeDrag: UIViewRepresentable {
                   point.x >= row.dragStartX,
                   store.beginTaskDrag(id: row.id) else { return [] }
             guard let drag = store.taskDrag else { return [] }
-            originalTasks = store.tasks.filter { drag.ids.contains($0.id) }
-            initialRows = rows
             previousY = session.location(in: collectionView).y
             previousCenters = Dictionary(uniqueKeysWithValues: crossingCenters(in: collectionView, window: window).map { ($0.target.id, $0.y) })
             dropping = false
             session.localContext = self
             #if DEBUG
+            if recordsProof {
+                originalTasks = store.tasks.filter { drag.ids.contains($0.id) }
+                initialCenters = previousCenters
+            }
             proof = Proof()
             proof.nativeSessions = 1
             reads = []
@@ -182,7 +186,7 @@ struct TaskNativeDrag: UIViewRepresentable {
                     }
                 }
                 #if DEBUG
-                if ProcessInfo.processInfo.environment["TSK_TEST_NATIVE_DRAG"] == "1" {
+                if recordsProof {
                     proof.crossed.append(target.proofID)
                     publishProof("cross")
                     let originals = originalTasks
@@ -271,7 +275,7 @@ struct TaskNativeDrag: UIViewRepresentable {
 
         #if DEBUG
         private func publishProof(_ phase: String) {
-            guard ProcessInfo.processInfo.environment["TSK_TEST_NATIVE_DRAG"] == "1" else { return }
+            guard recordsProof else { return }
             proof.phase = phase
             if let data = try? JSONEncoder().encode(proof) { store?.taskDragProof = String(decoding: data, as: UTF8.self) }
         }

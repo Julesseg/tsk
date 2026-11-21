@@ -134,16 +134,20 @@ public actor TaskManager {
     }
 
     public func dayPage(on day: Date) async throws -> [TaskRecord] {
-        try await dayPageSnapshot(on: day).tasks
+        let records = try await tasks()
+        return dayPage(on: day, in: records)
+    }
+
+    public func dayPage(on day: Date, in records: [TaskRecord]) -> [TaskRecord] {
+        let instant = now()
+        let dayStart = calendar.startOfDay(for: day)
+        return records.filter { $0.isOnDay(dayStart, at: instant, calendar: calendar) }
+            .sorted { TaskPlannerOrder.precedes($0, $1, on: dayStart, calendar: calendar) }
     }
 
     public func dayPageSnapshot(on day: Date) async throws -> TaskViewSnapshot {
         let records = try await tasks()
-        let instant = now()
-        let dayStart = calendar.startOfDay(for: day)
-        let visible = records.filter { $0.isOnDay(dayStart, at: instant, calendar: calendar) }
-            .sorted { TaskPlannerOrder.precedes($0, $1, on: dayStart, calendar: calendar) }
-        return TaskViewSnapshot(tasks: visible, allTasks: records, projects: TaskProjectSelection.names(in: records))
+        return TaskViewSnapshot(tasks: dayPage(on: day, in: records), allTasks: records, projects: TaskProjectSelection.names(in: records))
     }
 
     public func upcomingDays() async throws -> [UpcomingDay] {

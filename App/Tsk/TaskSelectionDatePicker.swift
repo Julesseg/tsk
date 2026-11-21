@@ -6,6 +6,9 @@ struct TaskSelectionDatePicker: View {
     let store: TaskStore
     let field: TaskDateField
     let calendars: TaskSelectionCalendars
+    private let commonDateValue: String?
+    private let originalDate: Date?
+    private let selectionHasTime: Bool
     @State private var referenceDay: Date
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -13,6 +16,12 @@ struct TaskSelectionDatePicker: View {
         self.store = store
         self.field = field
         self.calendars = calendars
+        let tasks = store.selectionTasks
+        let attribute = (field == .scheduled ? TaskRowParameter.scheduled : .deadline).attribute
+        let first = tasks.first?.attributes[attribute]
+        commonDateValue = tasks.allSatisfy { $0.attributes[attribute] == first } ? first : nil
+        originalDate = field == .scheduled ? tasks.first?.plannedDate : tasks.first?.deadline
+        selectionHasTime = tasks.contains { $0.dateIntent(for: field)?.hasTime == true }
         let day = Calendar.autoupdatingCurrent.startOfDay(for: store.currentDate)
         _referenceDay = State(initialValue: day)
     }
@@ -20,19 +29,15 @@ struct TaskSelectionDatePicker: View {
     private var parameter: TaskRowParameter { field == .scheduled ? .scheduled : .deadline }
     private var includesTime: Bool {
         if case .exact(let intent) = store.selectionChanges[field] { return intent.hasTime }
-        return store.selectionTasks.contains { $0.dateIntent(for: field)?.hasTime == true }
+        return selectionHasTime
     }
 
     private var minimumDate: Date? { field == .scheduled && !includesTime ? referenceDay : nil }
 
     private var selectedDate: Binding<Date> {
         Binding(get: {
-            let values = store.selectionTasks.map { $0.attributes[parameter.attribute] }
-            let first = values.first ?? nil
-            let common = values.allSatisfy { $0 == first } ? first : nil
-            let original = field == .scheduled ? store.selectionTasks.first?.plannedDate : store.selectionTasks.first?.deadline
-            let edited = store.selectionChanges[field].flatMap { try? $0.resolvedDate(replacing: common) }
-            let date = edited ?? (common == nil ? referenceDay : original ?? referenceDay)
+            let edited = store.selectionChanges[field].flatMap { try? $0.resolvedDate(replacing: commonDateValue) }
+            let date = edited ?? (commonDateValue == nil ? referenceDay : originalDate ?? referenceDay)
             return minimumDate.map { max($0, date) } ?? date
         }, set: { date in
             setDate(date, hasTime: includesTime)

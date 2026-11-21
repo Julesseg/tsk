@@ -28,7 +28,7 @@ class SelectionTests(unittest.TestCase):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
         self.assertEqual(len(nightly), 21)
-        self.assertEqual(len(diagnostic), 25)
+        self.assertEqual(len(diagnostic), 26)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
             "TskUITests/TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity",

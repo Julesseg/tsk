@@ -223,6 +223,75 @@ import XCTest
         XCTAssertTrue(app.buttons["task-selection-apply"].waitForNonExistence(timeout: 5))
     }
 
+    func testPlannerInteractionFrameIntervals() throws {
+        let app = try launch(animationsEnabled: true, plannerSlots: true, frameProbe: true)
+        let pill = app.buttons["planner-date-pill"]
+        let list = app.collectionViews["task-list"]
+        let count = app.buttons["task-selection-apply"]
+        let picker = app.otherElements["selection-date-picker"]
+        let calendar = app.otherElements["planner-month-calendar"]
+        let day = try XCTUnwrap(pill.value as? String)
+        let today = Date(timeIntervalSince1970: try XCTUnwrap(TimeInterval(day)))
+        let nextDay = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 1, to: today))
+        let probe = app.descendants(matching: .any)["planner-frame-probe"].firstMatch
+        XCTAssertTrue(probe.exists)
+        func now() -> Int { Int((CACurrentMediaTime() * 1000).rounded()) }
+        func record(_ name: String, _ action: () -> Void) throws {
+            let start = now()
+            action()
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+            let end = now()
+            let raw = try XCTUnwrap(probe.value as? String)
+            let samples = raw.split(separator: " ").compactMap { Int($0) }
+            XCTAssertGreaterThan(try XCTUnwrap(samples.first), start)
+            XCTAssertEqual(samples.count % 2, 1)
+            let gaps = stride(from: 1, to: samples.count, by: 2).compactMap { index in
+                (start...end).contains(samples[index]) ? samples[index + 1] : nil
+            }
+            let excess = gaps.reduce(0) { $0 + $1 - 17 }
+            print("PLANNER-FRAMES \(name) elapsed=\(end - start) gaps=\(gaps.count) excessMs=\(excess) maxMs=\(gaps.max() ?? 0)")
+        }
+
+        let settings = app.buttons["workspace-settings"].frame
+        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY))
+        let firstRow = app.buttons["task-" + first]
+        for _ in 0..<3 {
+            let top = firstRow.frame.minY
+            try record("scroll") {
+                list.swipeUp()
+                XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < top - 4, "The scroll sample must move the list")
+                list.swipeDown()
+            }
+            XCTAssertTrue(scheduledSlot(first, app: app).isHittable)
+            try record("pages") {
+                let center = pill.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: -155, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
+                assertPlannerDay(String(Int(nextDay.timeIntervalSince1970)), app: app)
+                center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 155, dy: 0)), withVelocity: .fast, thenHoldForDuration: 0)
+                assertPlannerDay(day, app: app)
+            }
+            try record("pill") {
+                expandPlannerCalendar(app)
+                outside.tap()
+            }
+            XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
+            assertPlannerDay(day, app: app)
+            let start = scheduledSlot(first, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let end = scheduledSlot(third, app: app).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            try record("selection") { start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2) }
+            XCTAssertEqual(count.label, "2 selected")
+            for field in ["scheduled", "deadline"] {
+                try record(field) {
+                    app.buttons["selection-" + field].tap()
+                    XCTAssertTrue(picker.waitForExistence(timeout: 5))
+                    app.buttons["close-selection-date"].tap()
+                }
+                XCTAssertTrue(picker.waitForNonExistence(timeout: 5))
+            }
+            app.buttons["cancel-task-selection"].tap()
+        }
+    }
+
     private func turnOffTime(_ toggle: XCUIElement, app: XCUIApplication) {
         XCTAssertTrue(toggle.exists)
         let thumb = toggle.switches.firstMatch
@@ -313,13 +382,17 @@ import XCTest
         add(attachment)
     }
 
-    private func launch(invalidOccurrence: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false, plannerSlots: Bool = false) throws -> XCUIApplication {
+    private func launch(invalidOccurrence: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false, plannerSlots: Bool = false, frameProbe: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
         app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
         app.launchEnvironment["TSK_TEST_CALENDAR_PRESENTATION"] = "empty"
-        if plannerSlots { app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1" }
+        if frameProbe {
+            app.launchEnvironment["TSK_TEST_PLANNER_FRAMES"] = "1"
+            app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        }
+        if plannerSlots && !frameProbe { app.launchEnvironment["TSK_TEST_SELECTION_GESTURE"] = "1" }
         if motionProbe { app.launchEnvironment["TSK_TEST_SELECTION_MOTION"] = "1" }
         if animationsEnabled { app.launchEnvironment["TSK_UI_DISABLE_ANIMATIONS"] = "0" }
         var records: [[String: Any]] = []

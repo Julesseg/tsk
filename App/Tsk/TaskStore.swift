@@ -27,7 +27,6 @@ final class TaskStore {
         if displayedDay != nextDay { tasks = cachedTasks ?? [] }
         plannerDay = Calendar.autoupdatingCurrent.isDate(nextDay, inSameDayAs: currentDate) ? nil : nextDay
         captureConfirmation = nil
-        Task { await reload() }
     }
 
     func moveDay(by offset: Int) {
@@ -140,10 +139,12 @@ final class TaskStore {
     #endif
     var isSelectionPressActive = false
     var taskSelectionGeneration = 0
-    var isSelectingTasks: Bool { !selectedTaskIDs.isEmpty }
+    private(set) var isSelectingTasks = false
     var selectedTaskIDs: Set<UUID> = [] {
         didSet {
-            if selectedTaskIDs.isEmpty {
+            let selecting = !selectedTaskIDs.isEmpty
+            if isSelectingTasks != selecting { isSelectingTasks = selecting }
+            if !selecting {
                 selectionChanges = TaskSelectionChanges()
                 selectionDateField = nil
                 error = nil
@@ -153,6 +154,7 @@ final class TaskStore {
     var selectionChanges = TaskSelectionChanges()
     var selectionDateField: TaskDateField?
     var isSelectionGestureActive = false
+    @ObservationIgnored private var selectionSweep: TaskSelectionSweep?
     var selectionGestureTasks: [TaskRecord]?
     var rowEditing: TaskRowEditing?
     var captureConfirmation: TaskRecord?
@@ -161,22 +163,27 @@ final class TaskStore {
         return editing.draft.original
     }
 
-    func activateSelectionGesture() -> Bool {
+    func activateSelectionGesture(startingAt initial: UUID) -> Bool {
         guard !isSaving, !isSelectionGestureActive, rowEditing == nil, taskDrag == nil, selectionDateField == nil else { return false }
-        selectionGestureTasks = visibleTasks
+        let tasks = visibleTasks
+        guard let sweep = TaskSelectionSweep(in: tasks, from: selectedTaskIDs, startingAt: initial) else { return false }
+        selectionGestureTasks = tasks
+        selectionSweep = sweep
         isSelectionGestureActive = true
+        selectedTaskIDs = sweep.selection
         return true
     }
 
-    func applySelectionGesture(startingAt initial: UUID, from selection: Set<UUID>, entering path: [TaskSelectionVisit]) -> Bool {
-        let updated = manager.selectedTasks(in: visibleTasks, from: selection, startingAt: initial, entering: path)
-        guard updated != selectedTaskIDs else { return false }
+    func enterSelectionRows(_ visits: [TaskSelectionVisit]) -> Bool {
+        for visit in visits { selectionSweep?.enter(visit) }
+        guard let updated = selectionSweep?.selection, updated != selectedTaskIDs else { return false }
         selectedTaskIDs = updated
         return true
     }
 
     func endSelectionGesture() {
         isSelectionGestureActive = false
+        selectionSweep = nil
         selectionGestureTasks = nil
     }
 

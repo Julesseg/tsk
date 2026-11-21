@@ -46,6 +46,7 @@ ON_DEMAND = (
     'TaskActivityUITests/testOrdinaryTaskInformationStartStopPersistentReopenAndCompletionClearActiveState',
     'TaskActionURLUITests/testOversizedResultAndFailedDeliveryKeepExactlyOneDurableTaskPerAdd',
     'TaskAnnotationUITests/testAddValidateEditAndReopenTimestampedAnnotations',
+    'TaskBulkSelectionUITests/testPlannerInteractionFrameIntervals',
     'TaskBulkSelectionUITests/testSelectionPickerValueChangesKeepQuickActionsStationary',
     'TaskPresentationUITests/testMatchedPopulatedTaskListsAcrossAppearanceAndAccessibilityText',
     'TaskRowEditingUITests/testAppearanceAndAccessibilityOverflow',

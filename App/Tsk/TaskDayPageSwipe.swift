@@ -9,6 +9,8 @@ final class TaskDayPaging {
     var isSettling = false
     var expanded = false
     static let pillHeight: CGFloat = 44
+    static let verticalPadding: CGFloat = 8
+    static var collapsedNavigatorHeight: CGFloat { pillHeight + 2 * verticalPadding }
     var calendarPullDistance: CGFloat?
     var isCalendarVisible: Bool { expanded || (calendarPullDistance ?? 0) < 0 }
     var navigatorBounds = CGRect.zero
@@ -149,39 +151,45 @@ struct TaskDayPagingPages: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let neighbors = Neighbors(day: store.displayedDay, tasks: store.allTasks, calendar: calendar.snapshot)
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
                 content.offset(x: paging.offset)
-                if paging.offset != 0 {
-                    ForEach([-1, 1], id: \.self) { direction in
-                        if let day = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: store.displayedDay) {
-                            preview(day: day)
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .offset(x: CGFloat(direction) * geometry.size.width + paging.offset)
-                        }
-                    }
+                let direction = paging.offset < 0 ? 1 : -1
+                if paging.offset != 0, let day = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: store.displayedDay) {
+                    TaskDayPreview(day: day, store: store, paging: paging, calendar: calendar)
+                        .id(day)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .offset(x: CGFloat(direction) * geometry.size.width + paging.offset)
                 }
             }
             .clipped()
         }
-        .task(id: Neighbors(day: store.displayedDay, tasks: store.allTasks, calendar: calendar.snapshot)) { await loadNeighbors() }
+        .task(id: neighbors) { await loadNeighbors(neighbors) }
     }
 
-    private func loadNeighbors() async {
-        let day = store.displayedDay
+    private func loadNeighbors(_ neighbors: Neighbors) async {
+        let day = neighbors.day
         var pages: [Date: [TaskRecord]] = [:]
         var calendars = paging.calendars.filter { $0.key == day }
         for direction in [-1, 1] {
             guard !Task.isCancelled, let date = Calendar.autoupdatingCurrent.date(byAdding: .day, value: direction, to: day) else { return }
-            if let value = try? await store.manager.dayPage(on: date) { pages[date] = value }
+            pages[date] = await store.manager.dayPage(on: date, in: neighbors.tasks)
             calendars[date] = await store.manager.dayCalendar(on: date, from: calendar.source)
         }
         guard !Task.isCancelled, store.displayedDay == day else { return }
         paging.pages = pages
         paging.calendars = calendars
     }
+}
 
-    private func preview(day: Date) -> some View {
+private struct TaskDayPreview: View {
+    let day: Date
+    let store: TaskStore
+    let paging: TaskDayPaging
+    let calendar: TodayCalendarController
+
+    var body: some View {
         let snapshot = paging.calendars[day]?.showing(calendar.preferences.visibility)
         let tasks = paging.pages[day] ?? []
         let rows = snapshot?.plannerRows(tasks: tasks) ?? tasks.map(DayPageItem.task)

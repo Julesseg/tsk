@@ -10,11 +10,9 @@ struct TaskDayNavigator: View {
     @State private var dragAxis: Axis?
     @State private var todayPress: Task<Void, Never>?
     @State private var didReturnToToday = false
-    @State private var browsedMonth: Date?
     @State private var calendarHeight: CGFloat = 0
 
     private var expanded: Bool { paging.expanded }
-    private var month: Date { browsedMonth ?? store.displayedDay }
     private var calendar: Calendar { .autoupdatingCurrent }
     private var canChooseDate: Bool { !store.isSelectionPressActive && !store.isSelectionGestureActive && store.rowEditing == nil && !store.isSaving }
     private var canPage: Bool { store.isDayPage && !store.isSelectingTasks && store.taskDrag == nil && !expanded }
@@ -34,7 +32,7 @@ struct TaskDayNavigator: View {
         .padding(.top, visibleHeight)
         .overlay(alignment: .top) {
             if paging.isCalendarVisible {
-                monthCalendar
+                TaskDayMonthCalendar(store: store, canChooseDate: canChooseDate, chooseDate: chooseDate)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .frame(width: openWidth)
@@ -56,11 +54,8 @@ struct TaskDayNavigator: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { paging.navigatorBounds = $0 }
         .animation(paging.calendarPullDistance == nil ? settleAnimation : nil, value: openness)
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, TaskDayPaging.verticalPadding)
         .frame(maxWidth: .infinity)
-        .onChange(of: paging.isCalendarVisible) { _, visible in
-            if visible { browsedMonth = store.displayedDay }
-        }
         .onChange(of: store.completionContext) { _, _ in setExpanded(false) }
         .onChange(of: touchingPill) { _, touching in
             if !touching {
@@ -109,10 +104,10 @@ struct TaskDayNavigator: View {
                 guard canChooseDate, !paging.isSettling, !didReturnToToday else { return }
                 let x = finger.translation.width
                 let y = finger.translation.height
-                if dragAxis == nil, max(abs(x), abs(y)) > 8 {
+                if dragAxis == nil, let axis = dragAxis(for: finger.translation) {
                     todayPress?.cancel()
                     todayPress = nil
-                    dragAxis = abs(y) > abs(x) ? .vertical : .horizontal
+                    dragAxis = axis
                 }
                 if dragAxis == nil, canReturnToToday, todayPress == nil {
                     todayPress = Task {
@@ -134,10 +129,17 @@ struct TaskDayNavigator: View {
             }
     }
 
+    private func dragAxis(for distance: CGSize) -> Axis? {
+        let x = abs(distance.width)
+        let y = abs(distance.height)
+        guard max(x, y) > 8 else { return nil }
+        return y > x ? .vertical : .horizontal
+    }
+
     private func finishDrag(distance: CGSize, velocity: CGSize, cancelled: Bool) {
         todayPress?.cancel()
         todayPress = nil
-        let axis = dragAxis
+        let axis = dragAxis ?? dragAxis(for: distance)
         dragAxis = nil
         if didReturnToToday {
             didReturnToToday = false
@@ -163,7 +165,33 @@ struct TaskDayNavigator: View {
         store.browseDay(today, cachedTasks: paging.pages[today])
     }
 
-    private var monthCalendar: some View {
+    private func chooseDate(_ date: Date) {
+        guard canChooseDate, !isScheduling || date >= today else { return }
+        if isScheduling {
+            Task {
+                guard await store.scheduleSelection(on: date) else { return }
+                setExpanded(false)
+            }
+        } else {
+            store.browseDay(date)
+            setExpanded(false)
+        }
+    }
+}
+
+private struct TaskDayMonthCalendar: View {
+    let store: TaskStore
+    let canChooseDate: Bool
+    let chooseDate: (Date) -> Void
+    @State private var browsedMonth: Date?
+
+    private var calendar: Calendar { .autoupdatingCurrent }
+    private var month: Date { browsedMonth ?? store.displayedDay }
+
+    var body: some View {
+        let displayedDay = store.displayedDay
+        let isScheduling = store.isSelectingTasks
+        let today = calendar.startOfDay(for: store.currentDate)
         VStack(spacing: 4) {
             if isScheduling {
                 Text("Schedule \(store.selectedTaskIDs.count) selected").font(.subheadline.weight(.semibold))
@@ -185,7 +213,7 @@ struct TaskDayNavigator: View {
                 }
                 ForEach(Array(monthDays.enumerated()), id: \.offset) { _, date in
                     if let date {
-                        let selected = calendar.isDate(date, inSameDayAs: store.displayedDay)
+                        let selected = calendar.isDate(date, inSameDayAs: displayedDay)
                         Button {
                             chooseDate(date)
                         } label: {
@@ -215,19 +243,6 @@ struct TaskDayNavigator: View {
         .disabled(!canChooseDate)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planner-month-calendar")
-    }
-
-    private func chooseDate(_ date: Date) {
-        guard canChooseDate, !isScheduling || date >= today else { return }
-        if isScheduling {
-            Task {
-                guard await store.scheduleSelection(on: date) else { return }
-                setExpanded(false)
-            }
-        } else {
-            store.browseDay(date)
-            setExpanded(false)
-        }
     }
 
     private var monthDays: [Date?] {

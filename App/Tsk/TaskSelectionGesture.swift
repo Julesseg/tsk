@@ -28,7 +28,7 @@ struct TaskSelectionGesture: UIViewRepresentable {
     let store: TaskStore
     let scope: TaskSelectionScope
     let viewport: CGRect
-    let rows: [String: TaskSelectionRow]
+    let rows: [TaskSelectionRow]
 
     func makeUIView(context: Context) -> SelectionAnchor {
         let view = SelectionAnchor()
@@ -40,7 +40,7 @@ struct TaskSelectionGesture: UIViewRepresentable {
 
     func updateUIView(_ view: SelectionAnchor, context: Context) {
         view.recognizer.viewport = viewport
-        view.recognizer.updateRows(Array(rows.values))
+        view.recognizer.rows = rows
     }
 
     static func dismantleUIView(_ view: SelectionAnchor, coordinator: ()) { view.detach() }
@@ -69,17 +69,14 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
     var viewport = CGRect.zero
     var rows: [TaskSelectionRow] = []
     private weak var activeTouch: UITouch?
-    private var startRow: TaskSelectionRow?
     private var frozenRows: [TaskSelectionRow] = []
     private var previousY: CGFloat = 0
-    private var initialSelection: Set<UUID> = []
-    private var rowVisits: [TaskSelectionVisit] = []
     private var currentRowID: String?
     private let feedback = UISelectionFeedbackGenerator()
-    private weak var scroll: UIScrollView?
-    private var wasScrollEnabled = false
     #if DEBUG
+    private weak var scroll: UIScrollView?
     private var originalOffset = CGPoint.zero
+    private let recordsProof = ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1"
     private var proof = TaskSelectionGestureProof()
     #endif
 
@@ -91,31 +88,26 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
         guard activeTouch == nil, touches.count == 1, let touch = touches.first, let store,
-              let row = eligibleRow(at: touch.location(in: nil)), store.activateSelectionGesture() else {
+              let row = eligibleRow(at: touch.location(in: nil)), store.activateSelectionGesture(startingAt: row.id) else {
             state = activeTouch == nil ? .failed : .cancelled
             finish()
             return
         }
         activeTouch = touch
-        startRow = row
         frozenRows = rows
         previousY = touch.location(in: nil).y
-        initialSelection = store.selectedTaskIDs
-        rowVisits = []
         currentRowID = row.rowID
         store.isSelectionPressActive = true
-        scroll = scope?.list
-        wasScrollEnabled = scroll?.isScrollEnabled ?? false
         #if DEBUG
+        scroll = scope?.list
         originalOffset = scroll?.contentOffset ?? .zero
         proof = TaskSelectionGestureProof()
         proof.activationDuration = ProcessInfo.processInfo.systemUptime - touch.timestamp
         proof.columnWidth = row.selectionSlot.width
         #endif
-        scroll?.isScrollEnabled = false
         feedback.prepare()
         state = .began
-        applySelection()
+        selectionChanged()
         #if DEBUG
         recordProof(touch)
         #endif
@@ -147,8 +139,6 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         finish()
     }
 
-    func updateRows(_ rows: [TaskSelectionRow]) { self.rows = rows }
-
     private func visitRows(at y: CGFloat) {
         guard store?.isSelectionGestureActive == true else { return }
         let down = previousY <= y
@@ -156,28 +146,25 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         let high = min(viewport.maxY, max(previousY, y))
         let crossed = frozenRows.filter { $0.bounds.maxY > low && $0.bounds.minY <= high }
             .sorted { down ? $0.bounds.minY < $1.bounds.minY : $0.bounds.minY > $1.bounds.minY }
+        var visits: [TaskSelectionVisit] = []
         for row in crossed where row.rowID != currentRowID {
-            rowVisits.append(TaskSelectionVisit(rowID: row.rowID, taskID: row.id, moving: down ? .next : .previous))
+            visits.append(TaskSelectionVisit(rowID: row.rowID, taskID: row.id, moving: down ? .next : .previous))
             currentRowID = row.rowID
         }
         currentRowID = frozenRows.first { $0.bounds.minY <= y && y < $0.bounds.maxY && viewport.minY <= y && y < viewport.maxY }?.rowID
         previousY = y
-        applySelection()
+        if !visits.isEmpty, store?.enterSelectionRows(visits) == true { selectionChanged() }
     }
 
-    private func applySelection() {
-        guard let startRow, let store,
-              store.applySelectionGesture(startingAt: startRow.id, from: initialSelection, entering: rowVisits) else { return }
+    private func selectionChanged() {
         feedback.selectionChanged()
         feedback.prepare()
     }
 
     func finish() {
-        guard startRow != nil else { return }
+        guard !frozenRows.isEmpty else { return }
         activeTouch = nil
-        startRow = nil
-        scroll?.isScrollEnabled = wasScrollEnabled
-        scroll = nil
+        frozenRows = []
         store?.endSelectionGesture()
         store?.isSelectionPressActive = false
     }
@@ -201,7 +188,7 @@ final class TaskSelectionRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
 
     #if DEBUG
     private func recordProof(_ touch: UITouch) {
-        guard ProcessInfo.processInfo.environment["TSK_TEST_SELECTION_GESTURE"] == "1", let store,
+        guard recordsProof, let store,
               activeTouch === touch, touch.phase != .ended, touch.phase != .cancelled else { return }
         proof.selectedWhileTouchDown = proof.selectedWhileTouchDown || !store.selectedTaskIDs.isEmpty
         proof.maximumSelectedWhileTouchDown = max(proof.maximumSelectedWhileTouchDown, store.selectedTaskIDs.count)

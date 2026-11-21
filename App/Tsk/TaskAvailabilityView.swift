@@ -7,13 +7,15 @@ struct TaskAvailabilityView: View {
     var isDetail = false
 
     var body: some View {
-        TimelineView(.explicit([Date(), task.waitUntil].compactMap { $0 }.sorted())) { _ in
-            let availability = store.availability(for: task, at: Date())
-            if !availability.reasons.isEmpty {
-                if isDetail {
-                    Section("Availability") { reasons(availability) }
-                } else {
-                    reasons(availability).font(.caption).foregroundStyle(.secondary)
+        if task.status == "pending", let until = task.waitUntil {
+            TimelineView(.explicit([Date(), until].sorted())) { _ in
+                let availability = store.availability(for: task, at: Date())
+                if !availability.reasons.isEmpty {
+                    if isDetail {
+                        Section("Availability") { reasons(availability) }
+                    } else {
+                        reasons(availability).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
         }
