@@ -36,8 +36,8 @@ extension XCTestCase {
         tapTaskControl(app.buttons[identifier], app: app, beforeSample: beforeSample, file: file, line: line)
     }
 
-    func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-editor-form", file: StaticString = #filePath, line: UInt = #line) -> Bool {
-        let editor = app.collectionViews[editorID]
+    func waitForTaskSave(_ app: XCUIApplication, row: XCUIElement, timeout: TimeInterval, editorID: String = "task-row-editor", file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let editor = app.descendants(matching: .any)[editorID].firstMatch
         let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !editor.exists && row.exists }, object: nil)
         guard XCTWaiter.wait(for: [finished], timeout: timeout) == .completed else {
             recordTaskInteraction(app, detail: "Task save did not dismiss its editor and reveal the saved row")
@@ -60,7 +60,7 @@ extension XCTestCase {
                 var editorVisible = false
                 var identities: [String] = []
                 while let snapshot = pending.popLast() {
-                    if snapshot.identifier == "task-editor-form" || snapshot.identifier == "task-row-editor" { editorVisible = true }
+                    if snapshot.identifier == "task-row-editor" { editorVisible = true }
                     if snapshot.elementType == .button, snapshot.identifier.hasPrefix("task-"),
                        let identity = TaskRowControlIdentity(snapshot.identifier),
                        snapshot.label == description || snapshot.label.hasPrefix(description + ", ") {
@@ -97,66 +97,6 @@ extension XCTestCase {
             return false
         }
         return true
-    }
-
-    func setDateSwitch(_ identifier: String, to enabled: Bool, app: XCUIApplication, in containerID: String = "task-editor-form", keyboardDismissIdentifier: String = "dismiss-editor-keyboard", file: StaticString = #filePath, line: UInt = #line) {
-        if app.buttons["collapse-task-row"].exists {
-            let parameter = ["planned-day-enabled": "scheduled", "deadline-enabled": "deadline", "waiting-date-enabled": "waiting-date"][identifier]!
-            setCaptureDate(parameter, enabled: enabled, app: app)
-            return
-        }
-        let tutorial = app.buttons["Continue"]
-        if tutorial.exists, app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Speed up your typing")).firstMatch.exists { tutorial.tap() }
-        let keyboardDone = app.buttons[keyboardDismissIdentifier]
-        if keyboardDone.exists || app.keyboards.firstMatch.exists {
-            XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), file: file, line: line)
-            tapTaskControlAtCenter(keyboardDone, app: app, file: file, line: line)
-            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Keyboard still covers task dates", file: file, line: line)
-        }
-        let control = app.collectionViews[containerID].switches[identifier].firstMatch
-        guard revealTaskElement(control, in: containerID, app: app, file: file, line: line) else { return }
-        if !TaskSwitchValue.matches(control.value, enabled: enabled) {
-            let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
-            let thumbs = control.switches.allElementsBoundByAccessibilityElement
-            guard thumbs.count <= 1 else {
-                XCTFail("Date switch has multiple native thumbs: \(identifier)", file: file, line: line)
-                return
-            }
-            let selected = thumbs.first ?? control
-            recordTaskSwitchInteraction(row: control, selected: selected, phase: "before", app: app)
-            tapTaskControlAtCenter(selected, app: app, deadline: deadline, file: file, line: line)
-        }
-        let deadline = ProcessInfo.processInfo.systemUptime + 5
-        var lastSample = "not sampled"
-        func changed() -> Bool {
-            let started = ProcessInfo.processInfo.systemUptime
-            guard started < deadline else { return false }
-            do {
-                let form = try app.collectionViews[containerID].firstMatch.snapshot()
-                guard let snapshot = taskSnapshot(identifier, type: .switch, in: form) else {
-                    lastSample = "Switch absent from form snapshot"
-                    return false
-                }
-                let value = snapshot.value
-                let matches = TaskSwitchValue.matches(value, enabled: enabled)
-                let finished = ProcessInfo.processInfo.systemUptime
-                let accepted = finished < deadline && matches
-                let type = value.map { String(reflecting: Swift.type(of: $0)) } ?? "nil"
-                lastSample = "value=\(String(describing: value)); type=\(type); readSeconds=\(finished - started); remainingSeconds=\(deadline - finished)"
-                return accepted
-            } catch {
-                lastSample = "snapshotError=\(error); readSeconds=\(ProcessInfo.processInfo.systemUptime - started)"
-                return false
-            }
-        }
-        var acknowledged = changed()
-        let remaining = deadline - ProcessInfo.processInfo.systemUptime
-        if !acknowledged, remaining > 0 {
-            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in changed() }, object: nil)
-            acknowledged = XCTWaiter.wait(for: [ready], timeout: remaining) == .completed && ProcessInfo.processInfo.systemUptime < deadline
-        }
-        recordTaskSwitchInteraction(row: control, selected: control.switches.allElementsBoundByAccessibilityElement.first ?? control, phase: "after", app: app, includeHierarchy: !acknowledged)
-        XCTAssertTrue(acknowledged, "Date switch did not become \(enabled ? "enabled" : "disabled"): \(identifier); \(lastSample)", file: file, line: line)
     }
 
     func recordTaskSwitchInteraction(row: XCUIElement, selected: XCUIElement, phase: String, app: XCUIApplication, includeHierarchy: Bool = false) {

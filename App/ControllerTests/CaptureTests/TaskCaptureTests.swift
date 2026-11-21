@@ -4,16 +4,17 @@ import TskCore
 
 private actor CaptureReplica: TaskReplica {
     var records: [TaskRecord] = []
-    var failCreate = false
-    func setFailure(_ failure: Bool) { failCreate = failure }
+    var failWrites = false
+    func setFailure(_ failure: Bool) { failWrites = failure }
     func tasks() async throws -> [TaskRecord] { records }
     func create(id: UUID, attributes: TaskAttributes) async throws -> TaskRecord {
-        if failCreate { throw TaskManagementError.storage("Capture storage unavailable") }
+        if failWrites { throw TaskManagementError.storage("Capture storage unavailable") }
         let task = TaskRecord(id: id, attributes: attributes)
         records.append(task)
         return task
     }
     func update(id: UUID, changes: TaskAttributePatch) async throws -> TaskRecord {
+        if failWrites { throw TaskManagementError.storage("Capture storage unavailable") }
         let index = records.firstIndex { $0.id == id }!
         for (key, value) in changes { records[index].attributes[key] = value }
         return records[index]
@@ -140,7 +141,7 @@ private actor CaptureReplica: TaskReplica {
 @MainActor @Test func nestedLinkedTaskDraftAndPanelGateRemainVisibleToRootURLNavigation() async throws {
     let manager = TaskManager(replica: CaptureReplica())
     let store = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
-    let nested = store.linkedTaskStore().linkedTaskStore()
+    let nested = store.linkedTaskStore(for: UUID()).linkedTaskStore(for: UUID())
     let panel = UUID()
     nested.presentedTaskPanels.insert(panel)
     #expect(await store.prepareForTaskActionNavigation() == false)
@@ -180,9 +181,13 @@ private actor CaptureReplica: TaskReplica {
 @MainActor @Test func navigationFailureRetainsDraftPickerAndNestedGateUntilSuccessfulSave() async throws {
     let replica = CaptureReplica()
     let manager = TaskManager(replica: replica)
+    let original = try await manager.create(TaskDraft(description: "Original"))
+    _ = try await manager.create(TaskDraft(description: "Another task"))
     let root = TaskStore(manager: manager, directory: FileManager.default.temporaryDirectory)
-    let nested = root.linkedTaskStore()
-    await nested.beginCapture(reduceMotion: true)
+    let nested = root.linkedTaskStore(for: original.id)
+    await nested.reload()
+    #expect(nested.tasks.map(\.id) == [original.id])
+    nested.expandRow(original)
     let row = try #require(nested.rowEditing)
     await row.setExpanded(true, reduceMotion: true)
     row.draft.taskDraft.description = "Retained nested draft"
@@ -205,7 +210,7 @@ private actor CaptureReplica: TaskReplica {
     await replica.setFailure(false)
     #expect(await root.prepareForTaskActionNavigation())
     #expect(nested.rowEditing == nil)
-    #expect(try await manager.tasks().map(\.tags) == [["valid"]])
+    #expect(try await manager.task(id: original.id).tags == ["valid"])
 }
 
 @MainActor @Test func completedOccurrenceExpandsReadOnlyAndClosesWithoutMutation() async throws {

@@ -47,7 +47,7 @@ final class SeriesMetadataUITests: XCTestCase {
         capture("Series preview lists two unfinished occurrences and excludes completed history", app)
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["edit-series-metadata"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Generated weekly")
+        XCTAssertEqual(app.staticTexts["series-template-description"].label, "Generated weekly")
         app.buttons["edit-series-metadata"].tap()
         changeDescription(app)
         let project = app.textFields["task-project"]
@@ -69,9 +69,9 @@ final class SeriesMetadataUITests: XCTestCase {
         app.buttons["save-series-metadata"].tap()
         XCTAssertTrue(app.collectionViews["series-metadata-form"].waitForNonExistence(timeout: 15))
         XCTAssertTrue(app.buttons["edit-series-metadata"].exists)
-        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Revised series metadata")
+        XCTAssertEqual(app.staticTexts["series-template-description"].label, "Revised series metadata")
         capture("Series metadata saved through the shared atomic path", app)
-        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "series-template-form", app: app))
         app.buttons["view-series-occurrences"].tap()
         for id in futureIDs {
             XCTAssertTrue(app.buttons["series-history-" + id].waitForExistence(timeout: 10))

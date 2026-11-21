@@ -87,25 +87,3 @@ struct TaskOrganizationSection: View {
         isChoosingPriority = false
     }
 }
-
-struct TaskOrganizationSummary: View {
-    let task: TaskRecord
-
-    var body: some View {
-        Section("Organization") {
-            LabeledContent("Project", value: task.project.isEmpty ? "None" : task.project)
-            LabeledContent("Priority", value: priorityName)
-            if !task.tags.isEmpty { LabeledContent("Tags", value: task.tags.joined(separator: ", ")) }
-        }
-    }
-
-    private var priorityName: String {
-        switch task.priority {
-        case "": "None"
-        case "H": "High"
-        case "M": "Medium"
-        case "L": "Low"
-        default: task.priority
-        }
-    }
-}

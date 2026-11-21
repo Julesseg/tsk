@@ -69,8 +69,6 @@ import Testing
     #expect(try await manager.tasks(query: .today).map(\.id) == today.map(\.id))
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1791885600)).isEmpty)
     #expect(try await manager.dayPage(on: Date(timeIntervalSince1970: 1792015200)).map(\.description) == ["Tomorrow overrides overdue Deadline"])
-    let waiting = try #require(today.last)
-    #expect(try await manager.availability(id: waiting.id).reasons.count == 1)
     #expect(try await manager.task(id: today[0].id).plannedDate == Date(timeIntervalSince1970: 1791842400))
 }
 

@@ -4,7 +4,6 @@ import TskCore
 struct TaskSeriesMetadataEditor: View {
     let store: TaskStore
     let template: TaskRecord
-    let onSave: (TaskRecord) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft: TaskDraft
     @State private var annotation = ""
@@ -17,10 +16,9 @@ struct TaskSeriesMetadataEditor: View {
     @FocusState private var field: TaskEditorField?
     @FocusState private var textField: UTF8String?
 
-    init(store: TaskStore, template: TaskRecord, onSave: @escaping (TaskRecord) -> Void) {
+    init(store: TaskStore, template: TaskRecord) {
         self.store = store
         self.template = template
-        self.onSave = onSave
         _draft = State(initialValue: TaskDraft(description: template.description, attributes: template.attributes))
     }
 
@@ -150,7 +148,7 @@ struct TaskSeriesMetadataEditor: View {
         guard !isChoosingPriority else { return }
         endTyping()
         Task {
-            if let saved = await store.perform({ try await $0.applySeriesMetadata(preview) }) { onSave(saved); dismiss() }
+            if await store.perform({ try await $0.applySeriesMetadata(preview) }) != nil { dismiss() }
             else { error = store.error }
         }
     }

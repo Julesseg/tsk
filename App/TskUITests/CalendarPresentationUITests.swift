@@ -35,10 +35,10 @@ import XCTest
             XCTAssertGreaterThan(task.frame.minY, spanning.frame.minY)
             XCTAssertLessThan(task.frame.minY, timed.frame.minY)
             capture("Tasks among timed Calendar events \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
-            openTaskInformation(task, app: app)
-            XCTAssertTrue(app.staticTexts["task-detail-description"].waitForExistence(timeout: 10))
-            XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Prepare the release")
-            capture("Task detail regression \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
+            expandTaskRow(task, app: app)
+            XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 10))
+            XCTAssertEqual(app.textFields["task-description"].value as? String, "Prepare the release")
+            capture("Expanded task \(appearance)\(largeText ? " accessibility XXXL" : "")", app)
             app.terminate()
         }
     }
@@ -70,10 +70,10 @@ import XCTest
         let task = taskRow(named: "Prepare the release", app: app)
         XCTAssertTrue(revealTaskElement(task, in: "task-list", app: app, initialScrollUp: true))
         capture("Many events tasks remain reachable", app)
-        openTaskInformation(task, app: app)
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
-        tapTaskControl(app.buttons["complete-task"], app: app)
-        XCTAssertTrue(task.waitForNonExistence(timeout: 10))
+        let complete = app.buttons["complete-task-row-" + String(task.identifier.dropFirst("task-".count))]
+        XCTAssertTrue(revealTaskElement(complete, in: "task-list", app: app))
+        tapTaskControl(complete, app: app)
+        XCTAssertTrue(complete.waitForNonExistence(timeout: 10))
     }
 
     func testDisplayedDayCalendarReadsEventsWithoutChangingTasks() throws {

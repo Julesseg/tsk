@@ -12,20 +12,19 @@ Add Task in Shortcuts and `tsk://add` save one task immediately to durable local
 | Priority | `priority` | `H`, `M`, `L`; omit for no priority |
 | Scheduled | `scheduled` | Intended work timestamp |
 | Deadline | `deadline` | Independent deadline timestamp |
-| Waiting until | `waiting-until` | Independent waiting constraint |
 
 Shortcuts uses native dates. URLs require ISO 8601 timestamps with an explicit timezone: `2026-11-05T10:30:00+02:00` or `2026-11-05T08:30:00Z`. Percent-encode each query value, including the `+` in a timezone as `%2B`. Storage has whole-second precision; fractional seconds are discarded. Omitted dates remain unset. Description and project are ordinary text, never Taskwarrior command syntax. Tags follow task tag validation; names containing spaces and all-uppercase reserved tags are rejected.
 
 ```text
 tsk://add?description=Buy%20milk
-tsk://add?description=Book%20train&project=Travel&tags=trip&tags=rail&priority=H&scheduled=2026-11-05T10%3A30%3A00%2B02%3A00&deadline=2026-11-06T08%3A00%3A00Z&waiting-until=2026-11-04T09%3A00%3A00Z
+tsk://add?description=Book%20train&project=Travel&tags=trip&tags=rail&priority=H&scheduled=2026-11-05T10%3A30%3A00%2B02%3A00&deadline=2026-11-06T08%3A00%3A00Z
 ```
 
 Routes are deliberately unversioned. Future additions must preserve these meanings. Unknown arguments, duplicate arguments (except repeated `tags`), missing values, unsupported priority/tags, malformed timestamps, paths, fragments and credentials are rejected before creation. Custom attributes, annotations, dependencies and recurrence are outside this action.
 
 ## Results and navigation
 
-Shortcuts returns a Task entity with Full UUID, Description, Project, Tags, Priority, Scheduled, Deadline, Waiting until, Status and Open Task URL. Entity resolution uses the durable UUID. The Open Task URL is `tsk://open-task?id=<full UUID>`; working-set numbers and partial UUIDs are rejected.
+Shortcuts returns a Task entity with Full UUID, Description, Project, Tags, Priority, Scheduled, Deadline, Status and Open Task URL. Entity resolution uses the durable UUID. The Open Task URL is `tsk://open-task?id=<full UUID>`; working-set numbers and partial UUIDs are rejected.
 
 Without callbacks, Add Task refreshes the current workspace. The saved task appears as an ordinary row wherever it matches the current view and filters; no destination page or editor is opened. Explicit Open Task links resolve the current saved record, reveal All unfinished or Done, and expand one task in place with a Back route. Completed recurring occurrences expand read-only. Deleted and missing records report an error. Existing valid task edits are saved before executing the URL; validation or save failure keeps the draft and reports the error. A URL received while another unsupported editing panel is open reports an error rather than discarding that panel.
 
@@ -40,7 +39,7 @@ tsk://add?description=Buy%20milk&x-success=myapp%3A%2F%2Fdone%3Frequest%3D42&x-e
 Success JSON (unset properties are `null`, tags an array, dates UTC timestamps):
 
 ```json
-{"success":true,"savedLocally":true,"task":{"uuid":"12345678-1234-1234-1234-123456789ABC","description":"Buy milk","project":null,"tags":[],"priority":null,"scheduled":null,"deadline":null,"waitingUntil":null,"status":"pending","openTaskURL":"tsk://open-task?id=12345678-1234-1234-1234-123456789ABC"}}
+{"success":true,"savedLocally":true,"task":{"uuid":"12345678-1234-1234-1234-123456789ABC","description":"Buy milk","project":null,"tags":[],"priority":null,"scheduled":null,"deadline":null,"status":"pending","openTaskURL":"tsk://open-task?id=12345678-1234-1234-1234-123456789ABC"}}
 ```
 
 Failure JSON uses `success:false`, `savedLocally:false`, and `error:{"code":"invalid_input","message":"…"}`. Storage, navigation and unsupported-route failures are reported with a descriptive code/message. An invalid callback itself is reported in tsk, since an unvalidated destination cannot receive errors.
@@ -53,7 +52,7 @@ A successful OS URL-open acknowledgement means the system accepted delivery; it 
 
 Modify Task in Shortcuts and `tsk://modify?id=<full UUID>` change exactly one saved task. Select a Task entity in Shortcuts; URLs accept only its full UUID, never a numeric ID, partial UUID, filter or task list. For bulk workflows, use Find followed by explicit iteration. Modify replaces the old standalone Reschedule action; saved shortcuts using Reschedule may break. Delete is tracked separately.
 
-The seven fields use the same names and date formats as Add. All omitted values preserve existing data. Empty optional text or an empty Shortcuts tag list also preserves data, including with Replace selected. Blank Description preserves the saved description. Clear project, Clear priority, Clear Scheduled, Clear Deadline and Clear Waiting until remove those optional fields; URLs use `clear-project=true`, `clear-priority=true`, `clear-scheduled=true`, `clear-deadline=true`, and `clear-waiting-until=true`. Clear arguments accept only `true` or `false`. Supplying a nonempty value and its Clear control together is an error.
+The six fields use the same names and date formats as Add. All omitted values preserve existing data. Empty optional text or an empty Shortcuts tag list also preserves data, including with Replace selected. Blank Description preserves the saved description. Clear project, Clear priority, Clear Scheduled and Clear Deadline remove those optional fields; URLs use `clear-project=true`, `clear-priority=true`, `clear-scheduled=true` and `clear-deadline=true`. Clear arguments accept only `true` or `false`. Supplying a nonempty value and its Clear control together is an error.
 
 Tag operation (`tag-operation` in URLs) offers Add, Remove, Replace and Clear. Add is the default. Repeat `tags` for individual tags. Add and Remove act on byte-exact names; Replace replaces all tags when values are supplied. Omitted/empty tag lists preserve tags in these three modes. Clear explicitly removes all tags and rejects supplied tag values. Canonically equivalent Unicode spellings remain distinct.
 
@@ -65,6 +64,10 @@ tsk://modify?id=12345678-1234-1234-1234-123456789ABC&tag-operation=clear&clear-p
 All fields validate and save together under the shared mutation lease. A failed validation or persistence operation leaves the saved task unchanged. Completed tasks remain editable; deleted and missing tasks report errors. Identity, completion state, unknown attributes, annotations and unrelated fields are preserved. Recurring templates remain guarded; generated occurrences use the existing atomic occurrence bookkeeping and cannot clear their required Deadline. No raw recurrence attributes are accepted.
 
 Modify uses the same durable offline acknowledgement, rich Task entity and JSON callbacks described above. Callback encoding/delivery failure after saving does not undo or replay the operation. Without callbacks it reveals the saved task in its normal containing list with a Back route, even when its changed dates or project no longer match the current view. The existing draft gate saves valid edits before modifying and retains invalid drafts without applying the action.
+
+## Retired waiting date inputs
+
+Add, Modify, and Find no longer accept waiting date arguments or sort by waiting date. Shortcuts task entities and callback JSON omit the waiting date. Existing Taskwarrior `wait` values remain in saved records. Update automation that used the retired inputs or read the field from action results.
 
 ## Open Task and Open View
 

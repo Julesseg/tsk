@@ -15,7 +15,6 @@ public struct AddTaskIntent: AppIntent {
     @Parameter(title: "Priority") public var priority: IntentTaskPriority?
     @Parameter(title: "Scheduled") public var scheduled: Date?
     @Parameter(title: "Deadline") public var deadline: Date?
-    @Parameter(title: "Waiting until") public var waitingUntil: Date?
     private var directory: URL?
 
     public static var parameterSummary: some ParameterSummary {
@@ -25,24 +24,22 @@ public struct AddTaskIntent: AppIntent {
             \.$priority
             \.$scheduled
             \.$deadline
-            \.$waitingUntil
         }
     }
 
     public init() {}
-    public init(description: String, project: String? = nil, tags: [String] = [], priority: IntentTaskPriority? = nil, scheduled: Date? = nil, deadline: Date? = nil, waitingUntil: Date? = nil, directory: URL? = nil) {
+    public init(description: String, project: String? = nil, tags: [String] = [], priority: IntentTaskPriority? = nil, scheduled: Date? = nil, deadline: Date? = nil, directory: URL? = nil) {
         taskDescription = description
         self.project = project
         self.tags = tags
         self.priority = priority
         self.scheduled = scheduled
         self.deadline = deadline
-        self.waitingUntil = waitingUntil
         self.directory = directory
     }
 
     public func perform() async throws -> some IntentResult & ReturnsValue<IntentTaskEntity> & ProvidesDialog {
-        let input = AddTaskInput(description: taskDescription, project: project, tags: tags ?? [], priority: priority?.rawValue, scheduled: scheduled, deadline: deadline, waitingUntil: waitingUntil)
+        let input = AddTaskInput(description: taskDescription, project: project, tags: tags ?? [], priority: priority?.rawValue, scheduled: scheduled, deadline: deadline)
         _ = try input.validatedDraft()
         let location = try directory ?? TaskChampionSession.directory(testName: ProcessInfo.processInfo.environment["TSK_TEST_REPLICA_NAME"])
         let manager = try await TaskChampionSession.open(directory: location)

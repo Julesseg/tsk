@@ -12,14 +12,12 @@ public struct ModifyTaskInput: Equatable, Sendable {
     public var priority: String?
     public var scheduled: Date?
     public var deadline: Date?
-    public var waitingUntil: Date?
     public var clearProject: Bool
     public var clearPriority: Bool
     public var clearScheduled: Bool
     public var clearDeadline: Bool
-    public var clearWaitingUntil: Bool
 
-    public init(description: String? = nil, project: String? = nil, tags: [String]? = nil, tagOperation: TaskTagOperation = .add, priority: String? = nil, scheduled: Date? = nil, deadline: Date? = nil, waitingUntil: Date? = nil, clearProject: Bool = false, clearPriority: Bool = false, clearScheduled: Bool = false, clearDeadline: Bool = false, clearWaitingUntil: Bool = false) {
+    public init(description: String? = nil, project: String? = nil, tags: [String]? = nil, tagOperation: TaskTagOperation = .add, priority: String? = nil, scheduled: Date? = nil, deadline: Date? = nil, clearProject: Bool = false, clearPriority: Bool = false, clearScheduled: Bool = false, clearDeadline: Bool = false) {
         self.description = description
         self.project = project
         self.tags = tags
@@ -27,12 +25,10 @@ public struct ModifyTaskInput: Equatable, Sendable {
         self.priority = priority
         self.scheduled = scheduled
         self.deadline = deadline
-        self.waitingUntil = waitingUntil
         self.clearProject = clearProject
         self.clearPriority = clearPriority
         self.clearScheduled = clearScheduled
         self.clearDeadline = clearDeadline
-        self.clearWaitingUntil = clearWaitingUntil
     }
 
     public func validatedChanges(for task: TaskRecord) throws -> TaskAttributePatch {
@@ -46,7 +42,7 @@ public struct ModifyTaskInput: Equatable, Sendable {
             if clear { changes.updateValue(nil, forKey: key) }
             else if let value { changes[key] = value }
         }
-        for (key, date, clear) in [("scheduled", scheduled, clearScheduled), ("due", deadline, clearDeadline), ("wait", waitingUntil, clearWaitingUntil)] {
+        for (key, date, clear) in [("scheduled", scheduled, clearScheduled), ("due", deadline, clearDeadline)] {
             guard date == nil || !clear else { throw TaskActionError.invalidInput("Choose either a new \(key) date or Clear, not both.") }
             if clear { changes.updateValue(nil, forKey: key) }
             else if let date {

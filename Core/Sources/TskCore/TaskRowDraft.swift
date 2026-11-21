@@ -14,9 +14,9 @@ public enum TaskCaptureContext: Equatable, Sendable {
 }
 
 public struct TaskRowDraft: Equatable, Sendable {
-    private static let editableAttributes = ["project", "priority", "scheduled", "due", "wait", TaskScheduledDate.attribute]
+    private static let editableAttributes = ["project", "priority", "scheduled", "due", TaskScheduledDate.attribute]
     public enum Plan: Sendable { case today, tomorrow, remove }
-    public private(set) var original: TaskRecord
+    public let original: TaskRecord
     public var taskDraft: TaskDraft
     public var tagInput = ""
     public var noteInput = ""
@@ -55,28 +55,6 @@ public struct TaskRowDraft: Equatable, Sendable {
             draft.taskDraft.attributes[try task.nextAnnotationReference(at: date)] = noteInput
         }
         return draft.taskDraft
-    }
-
-    public mutating func rebase(on task: TaskRecord) {
-        guard task.id == original.id else { return }
-        let title = taskDraft.description
-        let titleChanged = !title.matchesBytes(original.description)
-        let edits = taskDraft.attributes.changes(comparedTo: original.attributes)
-        let scheduledKeys = ["scheduled", TaskScheduledDate.attribute]
-        let scheduledEdited = scheduledKeys.contains { edits.keys.contains($0) }
-        let scheduledAttributes = taskDraft.attributes
-        original = task
-        taskDraft = TaskDraft(description: task.description, attributes: task.attributes)
-        if titleChanged { taskDraft.description = title }
-        let editedKeys = Self.editableAttributes + edits.keys.filter {
-            $0.utf8.starts(with: "tag_".utf8) || $0.utf8.starts(with: "annotation_".utf8)
-        }
-        for key in editedKeys {
-            if let value = edits[key] { taskDraft.attributes[key] = value }
-        }
-        if scheduledEdited {
-            for key in scheduledKeys { taskDraft.attributes[key] = scheduledAttributes[key] }
-        }
     }
 
     public mutating func plan(_ plan: Plan, now: Date, calendar: Calendar = .autoupdatingCurrent) {

@@ -6,7 +6,7 @@ import Testing
 func wholeNumberOccurrencePositionsRemainActionable(raw: String) throws {
     let task = TaskRecord(id: UUID(), attributes: ["status": "pending", "parent": UUID().uuidString, "imask": raw, "recur": "monthly", "due": "200"])
     let expected = try #require(Int(raw.split(separator: ".")[0]))
-    #expect(task.canEdit && task.canComplete && task.canChangeActivity)
+    #expect(task.canEdit && task.canComplete)
     #expect(task.recurrenceInspection?.index == expected)
     #expect(task.recurrenceInspection?.issues.isEmpty == true)
     #expect(task.attributes["imask"] == raw)
@@ -16,7 +16,7 @@ func wholeNumberOccurrencePositionsRemainActionable(raw: String) throws {
 func invalidOccurrencePositionsStayUnavailable(raw: String) async throws {
     let parent = TaskRecord(id: UUID(), attributes: ["status": "recurring", "mask": "--"])
     let task = TaskRecord(id: UUID(), attributes: ["status": "pending", "parent": parent.id.uuidString, "imask": raw, "recur": "monthly", "due": "200"])
-    #expect(!task.canEdit && !task.canComplete && !task.canChangeActivity)
+    #expect(!task.canEdit && !task.canComplete)
     #expect(task.recurrenceInspection?.index == nil)
     let records = [parent, task]
     let replica = OccurrenceReplica(records: records)
@@ -26,7 +26,7 @@ func invalidOccurrencePositionsStayUnavailable(raw: String) async throws {
     #expect(await replica.batches == 0)
 }
 
-@Test func decimalOccurrenceSupportsEditingActivityAndAtomicCompletionWithoutRewritingItsIndex() async throws {
+@Test func decimalOccurrenceSupportsEditingAndAtomicCompletionWithoutRewritingItsIndex() async throws {
     let parent = UUID(), child = UUID(), historyID = UUID()
     let template = TaskRecord(id: parent, attributes: ["status": "recurring", "description": "Series", "recur": "monthly", "due": "200", "mask": "+-"])
     let history = TaskRecord(id: historyID, attributes: ["status": "completed", "parent": parent.uuidString, "imask": "0", "due": "50"])
@@ -35,10 +35,6 @@ func invalidOccurrencePositionsStayUnavailable(raw: String) async throws {
     let manager = TaskManager(replica: replica, now: { Date(timeIntervalSince1970: 100) })
     _ = try await manager.update(id: child, changes: ["description": "Edited occurrence", "wait": "150"])
     #expect(try await manager.task(id: parent).attributes["mask"] == "+W")
-    _ = try await manager.start(id: child)
-    #expect(try await manager.task(id: child).isActive)
-    _ = try await manager.stop(id: child)
-    #expect(try await !manager.task(id: child).isActive)
     let completed = try await manager.complete(id: child)
     #expect(completed.status == "completed")
     #expect(completed.attributes["imask"] == "1.000000")
@@ -46,7 +42,7 @@ func invalidOccurrencePositionsStayUnavailable(raw: String) async throws {
     #expect(try await manager.task(id: parent).attributes["mask"] == "++")
     #expect(try await manager.task(id: historyID) == history)
     #expect(try await manager.complete(id: child) == completed)
-    #expect(await replica.batches == 4)
+    #expect(await replica.batches == 2)
 }
 
 @Test func equivalentIntegerAndDecimalSiblingPositionsCannotBeCompletedOrEditedAsASeries() async throws {

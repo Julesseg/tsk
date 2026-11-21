@@ -10,14 +10,14 @@ The manual form defaults to smoke.
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
 | Full | 21 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 26 on-demand methods | `diagnostic_only=true` |
+| Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 3 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 47 retained methods has exactly one primary
+methods for every suite. Each of the 46 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -35,8 +35,7 @@ change touches those contracts. Moving frequency does not establish acceptance.
 
 On-demand coverage retains genuine lower-priority UI contracts: appearance and
 large text, exact row geometry and animation drift, native Project-menu stress,
-focus and retained-open scroll, Calendar display settings, detail activity/annotation
-controls, recurring authoring/copy, undeliverable callbacks, Scheduled precision,
+focus and retained-open scroll, Calendar display settings, inline annotation editing, recurring authoring/copy, undeliverable callbacks, Scheduled precision,
 native task dragging and retained completion history. These do not run automatically at
 night or on PRs. Their original assertions and deadlines remain. See the
 [consolidation record](test-suite-consolidation.md) for the deletion rationale,
@@ -79,7 +78,7 @@ stability. These contracts moved out of scheduled coverage without relaxed bars.
 
 Hardware keyboard commands, their dedicated UI suite and native HID tooling,
 and all widgets were removed by the user on 2026-11-17. The remaining annotation
-journey uses visible Save controls and native touch text selection. The user
+journey uses outside-tap saving and native touch text selection. The user
 also retired the combined real-Calendar permission/revocation/Settings-handoff
 journey after checking that scenario on a physical device. Calendar remains in
 the product, with its controller, Native EventKit and on-demand display tests.

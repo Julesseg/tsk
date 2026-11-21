@@ -4,7 +4,7 @@ import Testing
 
 @Test func addActionValidatesAllNamedInputsBeforeSavingAndLeavesOmittedDatesUnset() async throws {
     let manager = TaskManager(replica: TestReplica())
-    let input = AddTaskInput(description: "  Train tickets  ", project: "Travel", tags: ["trip", "café"], priority: "H", scheduled: Date(timeIntervalSince1970: 1792224000), deadline: Date(timeIntervalSince1970: 1792314000), waitingUntil: Date(timeIntervalSince1970: 1792137600))
+    let input = AddTaskInput(description: "  Train tickets  ", project: "Travel", tags: ["trip", "café"], priority: "H", scheduled: Date(timeIntervalSince1970: 1792224000), deadline: Date(timeIntervalSince1970: 1792314000))
     let saved = try await manager.addTask(input)
     #expect(saved.description == "Train tickets")
     #expect(saved.project == "Travel")
@@ -12,9 +12,8 @@ import Testing
     #expect(saved.priority == "H")
     #expect(saved.plannedDate == input.scheduled)
     #expect(saved.deadline == input.deadline)
-    #expect(saved.waitUntil == input.waitingUntil)
     let plain = try await manager.addTask(AddTaskInput(description: "Plain"))
-    #expect(plain.plannedDate == nil && plain.deadline == nil && plain.waitUntil == nil)
+    #expect(plain.plannedDate == nil && plain.deadline == nil)
     for invalid in [AddTaskInput(description: " "), AddTaskInput(description: "Bad tag", tags: ["two words"]), AddTaskInput(description: "Bad priority", priority: "urgent"), AddTaskInput(description: "Bad date", scheduled: Date(timeIntervalSince1970: .infinity))] {
         await #expect(throws: (any Error).self) { try await manager.addTask(invalid) }
     }
@@ -22,12 +21,12 @@ import Testing
 }
 
 @Test func addURLUsesEncodedNamedFieldsAndRequiresExplicitTimezones() throws {
-    let request = try TaskActionURL(url: #require(URL(string: "tsk://add?description=Caf%C3%A9%20%26%20train%2Bbus&project=Travel&tags=trip&tags=errand&priority=M&scheduled=2026-11-05T10:30:00%2B02:00&deadline=2026-11-06T08:00:00Z&waiting-until=2026-11-04T09:00:00Z")))
+    let request = try TaskActionURL(url: #require(URL(string: "tsk://add?description=Caf%C3%A9%20%26%20train%2Bbus&project=Travel&tags=trip&tags=errand&priority=M&scheduled=2026-11-05T10:30:00%2B02:00&deadline=2026-11-06T08:00:00Z")))
     guard case .add(let input) = request else { Issue.record("Expected Add Task"); return }
     #expect(input.description == "Café & train+bus")
     #expect(input.tags == ["trip", "errand"])
     #expect(input.scheduled?.timeIntervalSince1970 == 1793867400)
-    for query in ["description=One&description=Two", "description=One&scheduled=2026-11-05", "description=One&scheduled=2026-11-05T10:30:00", "description=One&unknown=value", "description=One&priority=urgent", "description=One&tags=two%20words", "project=Home"] {
+    for query in ["description=One&description=Two", "description=One&scheduled=2026-11-05", "description=One&scheduled=2026-11-05T10:30:00", "description=One&waiting-until=2026-11-04T09:00:00Z", "description=One&unknown=value", "description=One&priority=urgent", "description=One&tags=two%20words", "project=Home"] {
         #expect(throws: (any Error).self) { try TaskActionURL(url: #require(URL(string: "tsk://add?" + query))) }
     }
     #expect(throws: (any Error).self) { try TaskActionURL(url: #require(URL(string: "tsk://add/path?description=One"))) }
@@ -51,7 +50,7 @@ import Testing
     #expect(task["description"] as? String == "Café & + = ?")
     #expect(task["scheduled"] as? String == "2026-11-05T08:30:00Z")
     #expect(task["deadline"] is NSNull)
-    #expect(task["waitingUntil"] is NSNull)
+    #expect(task["waitingUntil"] == nil)
     #expect(task["openTaskURL"] as? String == "tsk://open-task?id=" + id.uuidString)
     var huge = record
     huge.attributes["description"] = String(repeating: "é", count: 5000)
