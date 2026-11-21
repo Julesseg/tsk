@@ -16,10 +16,9 @@ def plan(suite):
     workers = []
     for family in families:
         for partition in partitions:
-            filters = selection.selection(suite, family, partition)
-            workers.append(dict(family=family, partition=partition, server=selection.requires_sync_server(filters), peer=selection.requires_sync_peer(filters)))
-    return dict(matrix=dict(include=workers), families=families, partitions=partitions, suite=suite,
-                server=any(worker['server'] for worker in workers), peer=any(worker['peer'] for worker in workers))
+            selection.selection(suite, family, partition)
+            workers.append(dict(family=family, partition=partition))
+    return dict(matrix=dict(include=workers), families=families, partitions=partitions, suite=suite)
 
 
 def validate_source(expected, actual):

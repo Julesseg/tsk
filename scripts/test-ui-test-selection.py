@@ -23,13 +23,11 @@ class SelectionTests(unittest.TestCase):
             "TskUITests/TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion",
         })
         self.assertTrue(all(item.count("/") == 2 for item in filters))
-        self.assertFalse(selection.requires_sync_server(filters))
-        self.assertFalse(selection.requires_sync_peer(filters))
 
     def test_nightly_and_on_demand_classify_every_method_once(self):
         nightly = selection.selected_methods(selection.selection("full", "iPhone"))
         diagnostic = selection.selected_methods(selection.selection("diagnostic", "iPhone"))
-        self.assertEqual(len(nightly), 23)
+        self.assertEqual(len(nightly), 22)
         self.assertEqual(len(diagnostic), 23)
         self.assertFalse(nightly & diagnostic)
         self.assertEqual({method for method in nightly if "/TaskNavigationUITests/" in method}, {
@@ -91,10 +89,7 @@ class SelectionTests(unittest.TestCase):
         rows = selection.selected_methods(groups["row-editing"])
         self.assertEqual(workspace | rows, nightly)
         self.assertFalse(workspace & rows)
-        self.assertEqual((len(workspace), len(rows)), (17, 6))
-        for partition, filters in groups.items():
-            self.assertEqual(selection.requires_sync_server(filters), partition == "workspace")
-            self.assertEqual(selection.requires_sync_peer(filters), partition == "workspace")
+        self.assertEqual((len(workspace), len(rows)), (16, 6))
         self.assertFalse(any("/TaskRowEditingUITests/" in case for case in workspace))
         result = subprocess.run(["python3", str(ROOT / "scripts/ui-test-selection.py"), "select", "full", "iPhone", "--partition", "row-editing"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -110,13 +105,8 @@ class SelectionTests(unittest.TestCase):
         })
         text = selection.selection("text", "iPhone")
         self.assertEqual(len(selection.selected_methods(text)), 1)
-        self.assertFalse(selection.requires_sync_server(text))
-        for suite in ("text", "menu", "diagnostic"):
-            self.assertFalse(selection.requires_sync_server(selection.selection(suite, "iPhone")))
         regression = selection.selection("regression", "iPhone")
         self.assertEqual(len(selection.selected_methods(regression)), 4)
-        self.assertFalse(selection.requires_sync_server(regression))
-        self.assertFalse(selection.requires_sync_peer(regression))
 
     def test_renamed_and_unknown_selectors_fail_instead_of_disappearing(self):
         with patch.object(selection, "test_methods", return_value=set()):
@@ -128,21 +118,12 @@ class SelectionTests(unittest.TestCase):
                 selection.requires_action_fixture(filters)
 
 
-    def test_filters_control_sync_and_action_fixture_requirements(self):
+    def test_filters_control_action_fixture_requirements(self):
         self.assertFalse(selection.requires_action_fixture([PHONE]))
         with self.assertRaisesRegex(ValueError, "contains no UI tests"):
             selection.requires_action_fixture([PHONE, PHONE.replace("-only-testing:", "-skip-testing:")])
         for cls in ("TaskActionURLUITests", "TaskNavigationUITests"):
             self.assertTrue(selection.requires_action_fixture(["-only-testing:TskUITests/" + cls]))
-        full = selection.selection("full", "iPhone")
-        self.assertTrue(selection.requires_sync_peer(full))
-        self.assertFalse(selection.requires_sync_peer(full + ["-skip-testing:TskUITests/SynchronizationUITests"]))
-        for case in selection.NIGHTLY + selection.ON_DEMAND:
-            filters = ["-only-testing:TskUITests/" + case]
-            expected = case in {
-                "SynchronizationUITests/testSuccessfulManualSynchronizationUsesRealConfiguredServer",
-            }
-            self.assertEqual(selection.requires_sync_server(filters), expected, case)
 
 
 RUNNER_CASE = "-only-testing:TskUITests/TaskPresentationUITests/testOccurrenceCircleCompletionAndGenuineFailureKeepSeriesScope"
