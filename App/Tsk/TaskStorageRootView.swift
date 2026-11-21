@@ -35,7 +35,8 @@ struct TaskStorageRootView: View {
         }
         .modifier(TaskActionMessage(controller: automation, isActive: store?.presentedTaskPanels.isEmpty != false && store?.rowEditing?.parameter == nil))
         .sheet(item: $automation.findResults) { results in
-            if let store { TaskFindResultsView(results: results, store: store).modifier(TaskActionMessage(controller: automation)) }
+            if let store { TaskFindResultsView(results: results, store: store)
+                    .modifier(TaskActionMessage(controller: automation, isActive: store.presentedTaskPanels.isEmpty)) }
         }
         .environment(automation)
     }

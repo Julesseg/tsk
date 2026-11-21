@@ -16,7 +16,7 @@ import TskNative
     let manager = try await TaskChampionSession.open(directory: directory)
     let all = try await manager.findTasks(FindTasksInput(status: .all))
     #expect(all.map(\.id) == [a, b])
-    let input = FindTasksInput(description: "train", project: "café", tags: ["rail", "cafe\u{301}"], priority: "H", scheduled: TaskDateRange(from: Date(timeIntervalSince1970: 1000), through: Date(timeIntervalSince1970: 1000)), deadline: TaskDateRange(through: Date(timeIntervalSince1970: 2000)), waitingUntil: TaskDateRange(from: Date(timeIntervalSince1970: 500)))
+    let input = FindTasksInput(description: "train", project: "café", tags: ["rail", "cafe\u{301}"], priority: "H", scheduled: TaskDateRange(from: Date(timeIntervalSince1970: 1000), through: Date(timeIntervalSince1970: 1000)), deadline: TaskDateRange(through: Date(timeIntervalSince1970: 2000)))
     #expect(try await manager.findTasks(input).map(\.id) == [a])
     #expect(try await manager.findTasks(FindTasksInput(project: "cafe\u{301}")).isEmpty)
     #expect(try await manager.findTasks(FindTasksInput(tags: ["café"])).isEmpty)

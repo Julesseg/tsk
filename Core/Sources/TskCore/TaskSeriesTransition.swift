@@ -20,12 +20,11 @@ public struct TaskSeriesTransitionDraft: Sendable {
     public var recurrence: String
     public var generatorTimeZone: String
     public var planned: TaskSeriesOffsetChange
-    public var wait: TaskSeriesOffsetChange
     public var until: Date?
 
-    public init(effectiveDate: Date, firstDue: Date, recurrence: String, generatorTimeZone: String, planned: TaskSeriesOffsetChange = .preserve, wait: TaskSeriesOffsetChange = .preserve, until: Date? = nil) {
+    public init(effectiveDate: Date, firstDue: Date, recurrence: String, generatorTimeZone: String, planned: TaskSeriesOffsetChange = .preserve, until: Date? = nil) {
         self.effectiveDate = effectiveDate; self.firstDue = firstDue; self.recurrence = recurrence; self.generatorTimeZone = generatorTimeZone
-        self.planned = planned; self.wait = wait; self.until = until
+        self.planned = planned; self.until = until
     }
 }
 
@@ -68,7 +67,7 @@ extension TaskManager {
         attributes["due"] = String(firstSeconds); attributes["recur"] = schedule.rule.rawValue; attributes["rtype"] = "periodic"
         attributes["until"] = draft.until.map { String(Int($0.timeIntervalSince1970)) }
         attributes["scheduled"] = try shifted("scheduled", change: draft.planned, record: series.template, due: first)
-        attributes["wait"] = try shifted("wait", change: draft.wait, record: series.template, due: first)
+        attributes["wait"] = try shifted("wait", change: .preserve, record: series.template, due: first)
         var moved: [TaskRecord] = []
         var updates: [TaskAtomicUpdate] = []
         var oldMask = Array((series.template.attributes["mask"] ?? "").utf8)
@@ -76,14 +75,14 @@ extension TaskManager {
         for (position, original) in series.affected.enumerated() {
             var patch: TaskAttributePatch = ["parent": successorID.uuidString.lowercased(), "imask": String(position), "due": String(Int(dates[position].timeIntervalSince1970)), "recur": schedule.rule.rawValue, "rtype": "periodic", "modified": timestamp]
             patch.updateValue(try shifted("scheduled", change: draft.planned, record: original, due: dates[position]), forKey: "scheduled")
-            patch.updateValue(try shifted("wait", change: draft.wait, record: original, due: dates[position]), forKey: "wait")
+            patch.updateValue(try shifted("wait", change: .preserve, record: original, due: dates[position]), forKey: "wait")
             patch.updateValue(attributes["until"], forKey: "until")
             var record = original
             for (key, value) in patch { record.attributes[key] = value }
             moved.append(record)
             updates.append(TaskAtomicUpdate(id: original.id, expected: original.attributes, changes: patch))
             oldMask[original.occurrenceIndex!] = 88
-            newMask.append((record.waitUntil ?? .distantPast) > instant ? 87 : 45)
+            newMask.append(FilterVirtualTag.isWaiting(record, at: instant) ? 87 : 45)
         }
         if !newMask.isEmpty { attributes["mask"] = String(decoding: newMask, as: UTF8.self) }
         var retirement: TaskAttributePatch = ["status": "deleted", "end": timestamp, "modified": timestamp]

@@ -7,16 +7,14 @@ public struct AddTaskInput: Equatable, Sendable {
     public var priority: String?
     public var scheduled: Date?
     public var deadline: Date?
-    public var waitingUntil: Date?
 
-    public init(description: String, project: String? = nil, tags: [String] = [], priority: String? = nil, scheduled: Date? = nil, deadline: Date? = nil, waitingUntil: Date? = nil) {
+    public init(description: String, project: String? = nil, tags: [String] = [], priority: String? = nil, scheduled: Date? = nil, deadline: Date? = nil) {
         self.description = description
         self.project = project
         self.tags = tags
         self.priority = priority
         self.scheduled = scheduled
         self.deadline = deadline
-        self.waitingUntil = waitingUntil
     }
 
     public func validatedDraft() throws -> TaskDraft {
@@ -26,7 +24,7 @@ public struct AddTaskInput: Equatable, Sendable {
         draft.priority = priority ?? ""
         if let priority, !["", "H", "M", "L"].contains(priority) { throw TaskManagementError.invalidPriority(priority) }
         for tag in tags { try draft.addTag(tag) }
-        for (key, date) in [("scheduled", scheduled), ("due", deadline), ("wait", waitingUntil)] {
+        for (key, date) in [("scheduled", scheduled), ("due", deadline)] {
             if let date {
                 let seconds = date.timeIntervalSince1970
                 guard seconds.isFinite, abs(seconds) <= 253402300799 else { throw TaskActionError.invalidInput("Invalid \(key) timestamp.") }

@@ -1,5 +1,7 @@
 # Task activity
 
+Historical evidence for the retired Start work and Stop work actions.
+
 Start work and Stop work are dedicated actions for pending ordinary tasks and valid generated occurrences. Native list context menus, leading swipe actions, Upcoming rows and task detail all use TaskManager.start/stop through TaskStore's existing durable mutation/projection path. Active captions display the saved start timestamp independently of planned day, deadline and waiting reason. A raw start marker with an unrecognized timestamp remains visible honestly; unsupported terminal records display a saved marker without offering a reopen action.
 
 Core stores Taskwarrior's decimal Unix-second start field and modified timestamp. Stop removes start. Repeated start/stop returns the unchanged task, preserving its original start and modified values; this is idempotent app behavior, while the CLI reports an unchanged action with a nonzero exit code. Multiple tasks can be active. Planned, due, wait, annotations, UUID and unfamiliar fields are preserved. Generic task update reserves start for the dedicated action; compatible initial/imported attributes remain accepted when creating a draft. These controls never implicitly reopen a completed or deleted task.

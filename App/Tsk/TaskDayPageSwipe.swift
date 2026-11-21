@@ -161,7 +161,7 @@ private struct TaskDayPreview: View {
                         TaskDayEmptyRow().taskDayRowInsets()
                     }
                     ForEach(tasks) { task in
-                        TaskListRow(task: task, store: store, edit: { _ in }, previewDay: day)
+                        TaskListRow(task: task, store: store, previewDay: day)
                     }
                 }
                 .listSectionSeparator(.hidden)

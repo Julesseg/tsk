@@ -28,7 +28,6 @@ import TskNative
     #expect(completed.value?.priority == "H")
     #expect(completed.value?.scheduled == Date(timeIntervalSince1970: 1792224000))
     #expect(completed.value?.deadline == Date(timeIntervalSince1970: 1792314000))
-    #expect(completed.value?.waitingUntil == Date(timeIntervalSince1970: 1792000000))
     #expect(completed.value?.status == "completed")
     #expect(completed.value?.openTaskURL.absoluteString == "tsk://open-task?id=" + original.id.uuidString)
     let record = try await reopened.task(id: original.id)

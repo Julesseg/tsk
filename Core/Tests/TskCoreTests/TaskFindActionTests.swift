@@ -23,7 +23,7 @@ private struct FindActionReplica: TaskReplica {
 }
 
 @Test func findURLParsesNamedRangesAndPaginationAndReturnsListCallbacks() throws {
-    let request = try TaskActionURL(url: #require(URL(string: "tsk://find?description=TRAIN&project=Travel&tags=rail&tags=trip&status=all&priority=H&scheduled-from=2026-11-05T08:30:00Z&scheduled-through=2026-11-05T10:30:00%2B02:00&deadline-through=2026-11-06T08:30:00Z&waiting-until-from=2026-11-04T08:30:00Z&sort=deadline-asc&limit=2&offset=1")))
+    let request = try TaskActionURL(url: #require(URL(string: "tsk://find?description=TRAIN&project=Travel&tags=rail&tags=trip&status=all&priority=H&scheduled-from=2026-11-05T08:30:00Z&scheduled-through=2026-11-05T10:30:00%2B02:00&deadline-through=2026-11-06T08:30:00Z&sort=deadline-asc&limit=2&offset=1")))
     guard case .find(let input) = request else { Issue.record("Expected Find"); return }
     #expect(input.description == "TRAIN" && input.project == "Travel" && input.tags == ["rail", "trip"])
     #expect(input.status == .all && input.priority == "H" && input.sort == .deadline)
@@ -39,7 +39,7 @@ private struct FindActionReplica: TaskReplica {
     #expect(tasks.first?["uuid"] as? String == record.id.uuidString)
     #expect(try callbacks.successURL(for: [TaskRecord]()) != nil)
     #expect(throws: TaskActionError.resultTooLarge) { try callbacks.successURL(for: Array(repeating: record, count: 100)) }
-    for query in ["filter=status:pending", "status=deleted", "sort=unknown", "offset=-1", "offset=1.5", "limit=0", "limit=-1", "limit=99999999999999999999999999999", "limit=", "limit=1&limit=2", "scheduled-from=2026-11-05", "scheduled-from=2026-11-06T00:00:00Z&scheduled-through=2026-11-05T00:00:00Z", "priority=urgent"] {
+    for query in ["filter=status:pending", "status=deleted", "sort=waiting-until-asc", "waiting-until-from=2026-11-04T09:00:00Z", "sort=unknown", "offset=-1", "offset=1.5", "limit=0", "limit=-1", "limit=99999999999999999999999999999", "limit=", "limit=1&limit=2", "scheduled-from=2026-11-05", "scheduled-from=2026-11-06T00:00:00Z&scheduled-through=2026-11-05T00:00:00Z", "priority=urgent"] {
         #expect(throws: (any Error).self) { try TaskActionURL(url: #require(URL(string: "tsk://find?" + query))) }
     }
 }
@@ -59,12 +59,11 @@ private struct FindActionReplica: TaskReplica {
     let instant = Date(timeIntervalSince1970: 1000)
     let record = TaskRecord(id: UUID(), attributes: ["description": "Dates", "status": "pending", "scheduled": "1000", "due": "2000", "wait": "500"])
     let manager = TaskManager(replica: FindActionReplica(records: [record, TaskRecord(id: UUID(), attributes: ["description": "Undated", "status": "pending"])]))
-    let matching = FindTasksInput(scheduled: TaskDateRange(from: instant, through: instant), deadline: TaskDateRange(from: Date(timeIntervalSince1970: 2000)), waitingUntil: TaskDateRange(through: Date(timeIntervalSince1970: 500)))
+    let matching = FindTasksInput(scheduled: TaskDateRange(from: instant, through: instant), deadline: TaskDateRange(from: Date(timeIntervalSince1970: 2000)))
     #expect(try await manager.findTasks(matching).map(\.id) == [record.id])
     #expect(try await manager.findTasks(FindTasksInput(scheduled: TaskDateRange(from: Date(timeIntervalSince1970: 1001)))).isEmpty)
     #expect(try await manager.findTasks(FindTasksInput(deadline: TaskDateRange(through: instant))).isEmpty)
-    #expect(try await manager.findTasks(FindTasksInput(waitingUntil: TaskDateRange(from: instant))).isEmpty)
-    for invalid in [FindTasksInput(scheduled: TaskDateRange(from: instant, through: .distantPast)), FindTasksInput(deadline: TaskDateRange(from: Date(timeIntervalSince1970: .infinity))), FindTasksInput(waitingUntil: TaskDateRange(through: Date(timeIntervalSince1970: .nan))), FindTasksInput(limit: 0), FindTasksInput(limit: -1), FindTasksInput(offset: -1)] {
+    for invalid in [FindTasksInput(scheduled: TaskDateRange(from: instant, through: .distantPast)), FindTasksInput(deadline: TaskDateRange(from: Date(timeIntervalSince1970: .infinity))), FindTasksInput(limit: 0), FindTasksInput(limit: -1), FindTasksInput(offset: -1)] {
         await #expect(throws: (any Error).self) { try await manager.findTasks(invalid) }
     }
 }
@@ -76,7 +75,7 @@ private struct FindActionReplica: TaskReplica {
     let manager = TaskManager(replica: FindActionReplica(records: [c, a, b]))
     #expect(try await manager.findTasks().map(\.id) == [c.id, a.id])
     #expect(try await manager.findTasks(FindTasksInput(status: .completed)).map(\.id) == [b.id])
-    for (sort, expected) in [(FindTaskSort.newest, [b.id, c.id, a.id]), (.oldest, [a.id, b.id, c.id]), (.description, [a.id, b.id, c.id]), (.scheduled, [b.id, a.id, c.id]), (.deadline, [b.id, a.id, c.id]), (.waitingUntil, [b.id, a.id, c.id]), (.priority, [a.id, b.id, c.id])] {
+    for (sort, expected) in [(FindTaskSort.newest, [b.id, c.id, a.id]), (.oldest, [a.id, b.id, c.id]), (.description, [a.id, b.id, c.id]), (.scheduled, [b.id, a.id, c.id]), (.deadline, [b.id, a.id, c.id]), (.priority, [a.id, b.id, c.id])] {
         #expect(try await manager.findTasks(FindTasksInput(status: .all, sort: sort)).map(\.id) == expected)
     }
     #expect(try await manager.findTasks(FindTasksInput(status: .all, limit: 1, offset: 1)).map(\.id) == [c.id])

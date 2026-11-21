@@ -39,6 +39,7 @@ final class TaskStore {
         browseDay(day)
     }
 
+    private var linkedTaskID: UUID?
     var projectSelection: TaskProjectSelection = .all
     var availableProjects: [String] = []
     var error: String?
@@ -252,7 +253,7 @@ final class TaskStore {
         return completionFeedback.visibleTasks(tasks, context: completionContext)
     }
     func expandRow(_ task: TaskRecord, rowID: String? = nil) {
-        guard !isSelectionPressActive, !isSelectingTasks, rowEditing == nil, !isSaving, task.canOpenInWorkspace, visibleTasks.contains(where: { $0.id == task.id }) else { return }
+        guard !isSelectionPressActive, !isSelectingTasks, rowEditing == nil, !isSaving, visibleTasks.contains(where: { $0.id == task.id }) else { return }
         rowEditing = TaskRowEditing(task: task, rowID: rowID ?? "task-" + task.id.uuidString, context: completionContext, tasks: visibleTasks, now: currentDate)
     }
     private var reloadGeneration = 0
@@ -290,8 +291,9 @@ final class TaskStore {
         query = .all
     }
 
-    func linkedTaskStore() -> TaskStore {
+    func linkedTaskStore(for taskID: UUID) -> TaskStore {
         let store = TaskStore(manager: manager, directory: directory, fixedDate: fixedDate)
+        store.linkedTaskID = taskID
         store.taskActionSource = taskActionSource ?? self
         return store
     }
@@ -309,10 +311,6 @@ final class TaskStore {
             await reload()
             self.error = "Participant refresh failed: " + error.localizedDescription
         }
-    }
-
-    func availability(for task: TaskRecord, at date: Date) -> TaskAvailability {
-        task.availability(at: fixedDate ?? date)
     }
 
     func reload() async {
@@ -337,7 +335,7 @@ final class TaskStore {
             if let requestedDay { snapshot = try await manager.dayPageSnapshot(on: requestedDay) }
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, (isDayPage ? displayedDay : nil) == requestedDay else { return }
-            tasks = snapshot.listTasks
+            tasks = linkedTaskID.map { id in snapshot.listTasks.filter { $0.id == id } } ?? snapshot.listTasks
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil
@@ -349,29 +347,9 @@ final class TaskStore {
         }
     }
 
-    func save(_ draft: TaskDraft) async -> Bool {
-        await perform { try await $0.create(draft) } != nil
-    }
-
-    func update(id: UUID, changes: TaskAttributePatch) async -> TaskRecord? {
-        await perform { try await $0.update(id: id, changes: changes) }
-    }
-
     func updateRow(_ draft: TaskRowDraft) async -> TaskRecord? {
         await perform { try await $0.updateRow(draft) }
     }
-
-    func addAnnotation(id: UUID, text: String) async -> TaskRecord? {
-        await perform { try await $0.addAnnotation(id: id, text: text) }
-    }
-
-    func editAnnotation(id: UUID, reference: String, text: String) async -> TaskRecord? {
-        await perform { try await $0.editAnnotation(id: id, reference: reference, text: text) }
-    }
-
-    func start(id: UUID) async -> TaskRecord? { await perform { try await $0.start(id: id) } }
-
-    func stop(id: UUID) async -> TaskRecord? { await perform { try await $0.stop(id: id) } }
 
     func complete(id: UUID) async -> TaskRecord? {
         await perform { try await $0.complete(id: id) }

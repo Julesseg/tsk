@@ -88,7 +88,7 @@ extension XCTestCase {
 }
 
 extension XCTestCase {
-    @MainActor func openTaskInformation(_ row: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+    @MainActor func expandTaskRow(_ row: XCUIElement, app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let started = ProcessInfo.processInfo.systemUptime
         let deadline = started + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         let identity: TaskRowControlIdentity
@@ -96,7 +96,7 @@ extension XCTestCase {
             let snapshot = try row.snapshot()
             guard snapshot.elementType == .button, let selected = TaskRowControlIdentity(snapshot.identifier),
                   ProcessInfo.processInfo.systemUptime < deadline else {
-                XCTFail("Task information requires an observed row identity within its readiness deadline", file: file, line: line)
+                XCTFail("Expansion requires an observed row identity within its readiness deadline", file: file, line: line)
                 return
             }
             identity = selected
@@ -106,20 +106,8 @@ extension XCTestCase {
         }
         print("Task row identity admission: \(identity.rawValue); readSeconds=\(ProcessInfo.processInfo.systemUptime - started)")
         tapTaskControl(app.buttons[identity.rawValue], app: app, deadline: deadline, file: file, line: line)
-        let informationQuery = app.buttons.matching(identifier: "task-row-information")
-        if informationQuery.firstMatch.waitForExistence(timeout: 2) {
-            let informationDeadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
-            let controls = informationQuery.allElementsBoundByAccessibilityElement
-            guard controls.count == 1, let information = controls.first,
-                  ProcessInfo.processInfo.systemUptime < informationDeadline else {
-                XCTFail("Task information requires one native control within its readiness deadline", file: file, line: line)
-                return
-            }
-            let editor = app.scrollViews["task-row-supporting-scroll"]
-            if !information.isHittable { editor.swipeUp() }
-            tapTaskControl(information, app: app, deadline: informationDeadline, file: file, line: line)
-            XCTAssertTrue(app.collectionViews["task-detail-form"].waitForExistence(timeout: 10))
-        }
+        let editor = app.descendants(matching: .any)["task-row-editor"].firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), file: file, line: line)
     }
 }
 
@@ -267,41 +255,5 @@ extension XCTestCase {
             return
         }
         coordinate.tap()
-    }
-}
-
-@MainActor extension XCTestCase {
-    func taskEditorSaveButton(_ app: XCUIApplication) -> XCUIElement {
-        app.buttons[app.otherElements["task-row-editor"].exists || app.buttons["collapse-task-row"].exists ? "collapse-task-row" : "save-task"]
-    }
-
-    func taskEditorKeyboardDismissIdentifier(_ app: XCUIApplication) -> String {
-        app.buttons["collapse-task-row"].exists ? "dismiss-row-keyboard" : "dismiss-editor-keyboard"
-    }
-
-    func setCaptureProject(_ project: String, app: XCUIApplication) {
-        openTaskRowParameter("project", app: app)
-        tapTaskControl(app.buttons["row-new-project"], app: app)
-        let field = app.textFields["row-project-input"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
-        field.typeText(project)
-        tapTaskControl(app.buttons["close-row-parameter"], app: app)
-    }
-
-    func setCaptureDate(_ parameter: String, enabled: Bool, app: XCUIApplication) {
-        if app.buttons["dismiss-row-keyboard"].exists {
-            tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        }
-        openTaskRowParameter(parameter, app: app)
-        if enabled, parameter == "waiting-date" {
-            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date(timeIntervalSince1970: Double(app.launchEnvironment["TSK_TEST_NOW"] ?? "") ?? Date().timeIntervalSince1970))!
-            let label = tomorrow.formatted(.dateTime.weekday(.wide).month(.wide).day().locale(Locale(identifier: "en_US")))
-            let day = app.datePickers["waiting-date-picker"].buttons[label]
-            XCTAssertTrue(day.waitForExistence(timeout: 5))
-            day.tap()
-        }
-        let action = app.buttons[enabled ? "close-row-parameter" : "remove-" + parameter]
-        tapTaskControl(action, app: app)
     }
 }

@@ -14,9 +14,9 @@ public enum TaskActionURL: Equatable, Sendable {
         let items = components.queryItems ?? []
         let allowed: Set<String>
         switch components.host {
-        case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "waiting-until", "x-success", "x-error"]
-        case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "waiting-until-from", "waiting-until-through", "sort", "limit", "offset", "x-success", "x-error"]
-        case "modify": allowed = ["id", "description", "project", "tags", "tag-operation", "priority", "scheduled", "deadline", "waiting-until", "clear-project", "clear-priority", "clear-scheduled", "clear-deadline", "clear-waiting-until", "x-success", "x-error"]
+        case "add": allowed = ["description", "project", "tags", "priority", "scheduled", "deadline", "x-success", "x-error"]
+        case "find": allowed = ["description", "project", "tags", "status", "priority", "scheduled-from", "scheduled-through", "deadline-from", "deadline-through", "sort", "limit", "offset", "x-success", "x-error"]
+        case "modify": allowed = ["id", "description", "project", "tags", "tag-operation", "priority", "scheduled", "deadline", "clear-project", "clear-priority", "clear-scheduled", "clear-deadline", "x-success", "x-error"]
         case "delete": allowed = ["id", "x-success", "x-error"]
         case "complete": allowed = ["id", "x-success", "x-error"]
         case "open-task": allowed = ["id", "x-success", "x-error"]
@@ -69,7 +69,7 @@ public enum TaskActionURL: Equatable, Sendable {
             }
             let input = try FindTasksInput(description: values["description"]?.first ?? "", project: values["project"]?.first,
                                            tags: values["tags"] ?? [], status: status, priority: values["priority"]?.first,
-                                           scheduled: range("scheduled"), deadline: range("deadline"), waitingUntil: range("waiting-until"),
+                                           scheduled: range("scheduled"), deadline: range("deadline"),
                                            sort: sort, limit: integer("limit"), offset: integer("offset") ?? 0)
             try input.validate()
             self = .find(input)
@@ -77,13 +77,13 @@ public enum TaskActionURL: Equatable, Sendable {
             let id = try Self.taskID(values["id"]?.first)
             guard let operation = TaskTagOperation(rawValue: values["tag-operation"]?.first ?? "add") else { throw TaskActionError.invalidInput("Tag operation must be add, remove, replace, or clear.") }
             let input = ModifyTaskInput(description: values["description"]?.first, project: values["project"]?.first, tags: values["tags"], tagOperation: operation, priority: values["priority"]?.first,
-                                        scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first), waitingUntil: try Self.date(values["waiting-until"]?.first),
-                                        clearProject: try Self.clear(values["clear-project"]?.first), clearPriority: try Self.clear(values["clear-priority"]?.first), clearScheduled: try Self.clear(values["clear-scheduled"]?.first), clearDeadline: try Self.clear(values["clear-deadline"]?.first), clearWaitingUntil: try Self.clear(values["clear-waiting-until"]?.first))
+                                        scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first),
+                                        clearProject: try Self.clear(values["clear-project"]?.first), clearPriority: try Self.clear(values["clear-priority"]?.first), clearScheduled: try Self.clear(values["clear-scheduled"]?.first), clearDeadline: try Self.clear(values["clear-deadline"]?.first))
             _ = try input.validatedChanges(for: TaskRecord(id: id, attributes: [:]))
             self = .modify(id, input)
         } else {
             let input = AddTaskInput(description: values["description"]?.first ?? "", project: values["project"]?.first, tags: values["tags"] ?? [], priority: values["priority"]?.first,
-                                     scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first), waitingUntil: try Self.date(values["waiting-until"]?.first))
+                                     scheduled: try Self.date(values["scheduled"]?.first), deadline: try Self.date(values["deadline"]?.first))
             _ = try input.validatedDraft()
             self = .add(input)
         }

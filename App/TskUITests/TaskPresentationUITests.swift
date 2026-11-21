@@ -30,7 +30,7 @@ import XCTest
             XCTAssertTrue(row.label.contains("Deadline Today"))
             XCTAssertFalse(row.label.contains("Scheduled Today"))
             XCTAssertFalse(app.staticTexts["Tasks · Today"].exists)
-            XCTAssertTrue(row.label.contains("Waiting until"))
+            XCTAssertFalse(row.label.contains("Waiting until"))
             for hidden in ["Active", "Generated occurrence"] {
                 XCTAssertFalse(row.label.contains(hidden))
             }
@@ -40,7 +40,7 @@ import XCTest
             XCTAssertTrue(leading.exists)
             XCTAssertLessThan(leading.frame.minX, circle.frame.minX)
             capture("Today " + mode, app)
-            openTaskInformation(row, app: app)
+            expandTaskRow(row, app: app)
             app.terminate()
             app.launchEnvironment["TSK_TEST_NOW"] = "1792144800"
             app.launch()

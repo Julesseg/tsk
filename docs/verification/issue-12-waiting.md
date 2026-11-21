@@ -1,5 +1,7 @@
 # Waiting verification
 
+Historical evidence for the retired Waiting date editor. Raw Taskwarrior filter conformance still applies.
+
 Waiting is a virtual state: a raw pending task with a valid `wait` timestamp strictly later than the current instant. The stored status remains pending. Exactly at the wait timestamp, the waiting reason expires without mutating the persisted record. Matching Today tasks remain visible based on planned dates/deadlines, including when waiting; wait alone does not change planning, deadline, or start state.
 
 `TaskManager.availability(id:)` reads the task through the common interface and projects `TaskAvailability`. The reusable pure `TaskRecord.availability(at:)` supports local clock updates. Availability carries an array of reasons for later waiting-plus-blocked integration. `isAvailable` expresses ordinary pending state without these reasons, not Taskwarrior's full `+READY` predicate; scheduled/blocked filter semantics belong to their own slices. UI displays reasons, without a Ready badge.

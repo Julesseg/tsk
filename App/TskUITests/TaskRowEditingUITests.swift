@@ -16,7 +16,7 @@ import XCTest
     func testSupportingInformationEditsKeepTheExpandedDraftAndPersist() async throws {
         let app = try launch(supporting: true)
         let title = expandTask(app)
-        let editor = app.scrollViews["task-row-supporting-scroll"]
+        let editor = app.scrollViews["task-row-editor"]
         let annotation = app.descendants(matching: .any)["row-note-annotation_1792144800"].firstMatch
         XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
         XCTAssertEqual(annotation.value as? String, "Review the accessibility findings\nKeep the release checklist nearby")
@@ -33,14 +33,10 @@ import XCTest
         XCTAssertTrue(revealTaskElement(note, in: editor, app: app))
         replaceTaskText(note, with: "New supporting note", app: app)
         tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        tapTaskRowPill("stop-task", app: app)
-        XCTAssertTrue(app.buttons["start-task"].waitForExistence(timeout: 10))
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
         XCTAssertEqual(note.value as? String, "New supporting note")
-        XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
-        XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(taskRow(named: "Unsaved supporting draft", app: app).waitForExistence(timeout: 10))
         app.terminate()
         let saved = try await storedTasks(app, checkpoint: "saved")
@@ -48,19 +44,18 @@ import XCTest
         XCTAssertEqual(attributes["description"], "Unsaved supporting draft")
         XCTAssertEqual(attributes["annotation_1792144800"], "Edited supporting note")
         XCTAssertEqual(attributes["annotation_1792144801"], "New supporting note")
-        XCTAssertNil(attributes["start"])
+        XCTAssertEqual(attributes["start"], "1792141200")
 
     }
 
     func testSupportingInformationOverflowAndEmptyActionsAtAccessibilitySize() throws {
         let app = try launch(largeText: true, supporting: true)
         _ = expandTask(app)
-        let editor = app.scrollViews["task-row-supporting-scroll"]
+        let editor = app.scrollViews["task-row-editor"]
         XCTAssertTrue(revealTaskElement(app.descendants(matching: .any)["row-note-input"].firstMatch, in: editor, app: app))
         XCTAssertFalse(app.buttons["advanced-attributes"].exists)
         capture("Populated supporting information at accessibility XXXL", app)
-        XCTAssertTrue(app.buttons["collapse-task-row"].isHittable)
-        app.buttons["collapse-task-row"].tap()
+        closeTaskRow(app)
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
         app.buttons["task-A0000000-0000-0000-0000-000000000002"].tap()
         XCTAssertTrue(app.textFields["task-description"].waitForExistence(timeout: 5))
@@ -103,6 +98,9 @@ import XCTest
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "task-row-editor").count, 1)
+        for id in ["task-row-information", "collapse-task-row", "row-waiting-date", "start-task", "stop-task"] {
+            XCTAssertFalse(app.buttons[id].exists)
+        }
         capture("Expanded without keyboard", app)
         XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
         selectHighPriorityAndVerifyReselection(app)
@@ -180,12 +178,6 @@ import XCTest
         app.buttons["close-row-parameter"].tap()
         XCTAssertTrue(app.datePickers["deadline-picker"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(title.exists)
-        openTaskRowParameter("waiting-date", app: app)
-        XCTAssertTrue(app.datePickers["waiting-date-picker"].waitForExistence(timeout: 5))
-        capture("Focused waiting-date control", app)
-        app.buttons["close-row-parameter"].tap()
-        XCTAssertTrue(app.datePickers["waiting-date-picker"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(title.exists)
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         let plainID = "A0000000-0000-0000-0000-000000000002"
@@ -196,11 +188,10 @@ import XCTest
         capture("Plain task expands with anchored completion circle", app)
         closeTaskRow(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
-        openTaskInformation(taskRow(named: "Release revised", app: app), app: app)
-        XCTAssertTrue(app.buttons["complete-task"].waitForExistence(timeout: 5))
-        app.buttons["complete-task"].tap()
-        XCTAssertTrue(app.buttons["complete-task"].waitForNonExistence(timeout: 5))
-        capture("Completed detail", app)
+        let complete = app.buttons["complete-task-row-" + taskID]
+        XCTAssertTrue(revealTaskElement(complete, in: "task-list", app: app))
+        tapTaskControl(complete, app: app)
+        XCTAssertTrue(complete.waitForNonExistence(timeout: 10))
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
         XCTAssertFalse(taskRow(named: "Release revised", app: app).exists)
@@ -344,7 +335,7 @@ import XCTest
             }
         }
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
-        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-editor"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Draft note survives menu")
         verifyProjectMenuPresentation(app, dismissingKeyboard: true)
@@ -365,7 +356,7 @@ import XCTest
         focusTaskText(title, app: app)
         verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
-        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-supporting-scroll"], app: app))
+        XCTAssertTrue(revealTaskElement(note, in: app.scrollViews["task-row-editor"], app: app))
         focusTaskText(note, app: app)
         note.typeText("Focused note survives menu")
         verifyProjectMenuPresentation(app, dismissingKeyboard: true)
@@ -520,10 +511,9 @@ import XCTest
         row.tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
-        let information = app.buttons["task-row-information"]
-        let visible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in information.isHittable && information.frame.maxY <= self.taskContentBottom(app) }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [visible], timeout: 5), .completed)
-        XCTAssertLessThanOrEqual(information.frame.maxY, taskContentBottom(app))
+        let notes = app.descendants(matching: .any)["row-note-input"].firstMatch
+        XCTAssertTrue(revealTaskElement(notes, in: app.scrollViews["task-row-editor"], app: app))
+        XCTAssertLessThanOrEqual(notes.frame.maxY, taskContentBottom(app))
         capture("Lower-list row expanded within available height", app)
         title.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
@@ -615,7 +605,6 @@ import XCTest
         XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 6)
         XCTAssertGreaterThan(app.buttons["row-project"].frame.minY, notes.frame.minY)
         XCTAssertTrue(checkbox.isEnabled)
-        XCTAssertTrue(app.buttons["collapse-task-row"].exists)
         return title
     }
 

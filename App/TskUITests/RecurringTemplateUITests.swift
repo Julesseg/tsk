@@ -18,12 +18,12 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(description, in: "recurring-editor-form", app: app))
         description.tap()
         description.typeText("Review recurring work")
-        hideKeyboard(app)
+        hideKeyboard("dismiss-recurring-keyboard", app: app)
         let rule = app.textFields["recurring-rule"]
         XCTAssertTrue(revealTaskElement(rule, in: "recurring-editor-form", app: app))
         rule.tap()
         rule.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "0d")
-        hideKeyboard(app)
+        hideKeyboard("dismiss-recurring-keyboard", app: app)
         app.buttons["save-recurring-template"].tap()
         XCTAssertTrue(app.staticTexts["recurring-error"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["recurring-error"].label.contains("positive Taskwarrior recurrence"))
@@ -31,13 +31,12 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(revealTaskElement(rule, in: "recurring-editor-form", app: app))
         rule.tap()
         rule.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + "weekly")
-        hideKeyboard(app)
+        hideKeyboard("dismiss-recurring-keyboard", app: app)
         app.buttons["save-recurring-template"].tap()
-        XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 15, editorID: "recurring-editor-form"))
-        XCTAssertEqual(app.staticTexts["task-detail-description"].label, "Review recurring work")
-        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
-        XCTAssertFalse(app.buttons["complete-task"].exists)
-        XCTAssertFalse(app.buttons["edit-task"].exists)
+        XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["series-template-description"], timeout: 15, editorID: "recurring-editor-form"))
+        XCTAssertEqual(app.staticTexts["series-template-description"].label, "Review recurring work")
+        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "series-template-form", app: app))
+        XCTAssertTrue(app.buttons["edit-series-metadata"].exists)
         capture("Saved recurring template with explicit generator dependency", app)
         app.terminate()
         app.launch()
@@ -47,7 +46,7 @@ final class RecurringTemplateUITests: XCTestCase {
         openTemplates(app)
         XCTAssertTrue(app.staticTexts["Review recurring work"].waitForExistence(timeout: 10))
         app.staticTexts["Review recurring work"].tap()
-        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "series-template-form", app: app))
         capture("Recurring template persists without app-generated occurrences", app)
     }
 
@@ -76,31 +75,32 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         XCTAssertTrue(app.buttons["complete-task-row-" + id].exists)
         capture("Recorded occurrence offers its list completion circle", app)
-        openTaskInformation(row, app: app)
+        expandTaskRow(row, app: app)
         XCTAssertTrue(app.staticTexts["occurrence-only-explanation"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["This occurrence has an invalid template link or position."].exists)
-        XCTAssertEqual(app.buttons["edit-task"].label, "Edit occurrence")
-        capture("Actual generator occurrence offers occurrence-only actions", app)
-        app.buttons["edit-task"].tap()
-        let description = app.textViews["task-description"].exists ? app.textViews["task-description"] : app.textFields["task-description"]
+        capture("Actual generator occurrence expands in its task view", app)
+        let description = app.textFields["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 10))
-        description.tap()
-        description.typeText(" occurrence edit")
-        if app.buttons["dismiss-editor-keyboard"].exists { tapTaskControlAtCenter(app.buttons["dismiss-editor-keyboard"], app: app) }
-        app.buttons["save-task"].tap()
-        XCTAssertTrue(waitForTaskSave(app, row: app.staticTexts["task-detail-description"], timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-detail-description"].label.contains("occurrence edit"))
-        XCTAssertTrue(revealTaskElement(app.buttons["complete-task"], in: "task-detail-form", app: app))
-        XCTAssertEqual(app.buttons["complete-task"].label, "Complete occurrence")
-        app.buttons["complete-task"].tap()
-        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
-        XCTAssertFalse(app.buttons["edit-task"].exists)
-        capture("Occurrence completes while preserving series history", app)
-        XCTAssertTrue(revealTaskElement(app.buttons["occurrence-template"], in: "task-detail-form", app: app))
+        let edited = try XCTUnwrap(description.value as? String) + " occurrence edit"
+        replaceTaskText(description, with: edited, app: app)
+        XCTAssertEqual(description.value as? String, edited)
+        hideKeyboard("dismiss-row-keyboard", app: app)
+        let supporting = app.scrollViews["task-row-editor"]
+        XCTAssertTrue(revealTaskElement(app.buttons["occurrence-template"], in: supporting, app: app))
         app.buttons["occurrence-template"].tap()
-        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.staticTexts["external-generation-explanation"], in: "series-template-form", app: app))
         capture("Recorded generated occurrence links to its distinct template", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(description.waitForExistence(timeout: 10))
+        closeTaskRow(app)
+        XCTAssertTrue(waitForTaskSave(app, named: edited, timeout: 10))
+        let complete = app.buttons["complete-task-row-" + id]
+        XCTAssertTrue(complete.label.hasPrefix("Complete occurrence"))
+        tapTaskControl(complete, app: app)
+        XCTAssertTrue(complete.waitForNonExistence(timeout: 10))
+        selectDoneTasks(app)
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        capture("Occurrence completes while preserving series history", app)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
@@ -108,13 +108,17 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertFalse(row.waitForExistence(timeout: 2))
         openTemplates(app)
         app.collectionViews["recurring-template-list"].buttons["recurring-template-" + parentID].tap()
-        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "task-detail-form", app: app))
+        XCTAssertTrue(revealTaskElement(app.buttons["view-series-occurrences"], in: "series-template-form", app: app))
         app.buttons["view-series-occurrences"].tap()
         let history = app.buttons["series-history-" + id]
         XCTAssertTrue(history.waitForExistence(timeout: 10))
         history.tap()
-        XCTAssertTrue(app.staticTexts["task-detail-status"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["task-detail-status"].label.contains("Completed"))
+        let completed = app.buttons["completed-task-row-" + id]
+        XCTAssertTrue(completed.waitForExistence(timeout: 10))
+        XCTAssertEqual(completed.value as? String, "Completed")
+        let explanation = app.staticTexts["occurrence-only-explanation"]
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        XCTAssertTrue(explanation.label.contains("completed occurrence"))
         XCTAssertFalse(app.descendants(matching: .any)["raw-attribute-mask"].firstMatch.exists)
         capture("Completed occurrence remains in reopened series history", app)
     }
@@ -133,9 +137,16 @@ final class RecurringTemplateUITests: XCTestCase {
         XCTAssertTrue(app.buttons["new-recurring-template"].waitForExistence(timeout: 10))
     }
 
-    private func hideKeyboard(_ app: XCUIApplication) {
-        let hide = app.buttons["dismiss-recurring-keyboard"]
-        if hide.exists { tapTaskControlAtCenter(hide, app: app) }
+    private func hideKeyboard(_ identifier: String, app: XCUIApplication) {
+        let hide = app.buttons[identifier]
+        guard hide.exists else { return }
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.exists, app.frame.intersects(keyboard.frame), !keyboard.frame.isEmpty {
+            tapTaskControlAtCenter(hide, app: app)
+        } else {
+            tapTaskControl(hide, app: app)
+        }
+        XCTAssertTrue(hide.waitForNonExistence(timeout: 5))
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

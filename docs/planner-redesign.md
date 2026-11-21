@@ -16,9 +16,9 @@ Each unfinished task has at most one actionable planner placement:
 - Otherwise, Deadline supplies the fallback placement and appears in the Deadline column.
 - With neither date, the task has no planner placement.
 
-Deadline remains independent and appears in task detail. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
+Deadline remains independent and appears in the expanded row. It does not create a second planner entry when Scheduled exists. Planner scheduling always writes Scheduled and leaves Deadline untouched.
 
-Unfinished untimed Scheduled tasks roll forward to Today when the app refreshes the planner. This writes today as their Scheduled day without a time. Untimed Scheduled dates must be today or later. Timed Scheduled and Deadline-only tasks carry forward in the list with their original timestamps. Waiting tasks that qualify remain visible with their reason.
+Unfinished untimed Scheduled tasks roll forward to Today when the app refreshes the planner. This writes today as their Scheduled day without a time. Untimed Scheduled dates must be today or later. Timed Scheduled and Deadline-only tasks carry forward in the list with their original timestamps.
 
 Scheduled supports a date without a time and a date with an explicit time, including 00:00. These are distinct intentions. For legacy or external timestamps without precision metadata, interpret midnight as untimed and other clock times as timed; preserve the underlying timestamp. Supporting explicit midnight prospectively requires additional task metadata alongside the existing Taskwarrior date field. See [ADR 0008](adr/0008-preserve-planner-date-intent.md).
 
@@ -94,7 +94,7 @@ Notifications were removed from product scope on 2026-11-17. Planner date placem
 
 | Situation | Expected result |
 | --- | --- |
-| Scheduled next Monday, Deadline last Friday | One planner entry on Monday; Deadline stays in detail |
+| Scheduled next Monday, Deadline last Friday | One planner entry on Monday; Deadline remains available in the expanded row |
 | Only Deadline Friday at 14:00; calendar scheduling to Monday | Scheduled becomes Monday without a time. Deadline stays Friday at 14:00 |
 | Drag across a timed task, then an untimed task, and drop | Save the untimed task's day without a time |
 | Drag across an overdue task last | Copy its original overdue Scheduled value; the dragged task can become carried-over |

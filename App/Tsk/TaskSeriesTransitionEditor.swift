@@ -13,9 +13,7 @@ struct TaskSeriesTransitionEditor: View {
     @State private var rule: String
     @State private var timeZone = TimeZone.current.identifier
     @State private var plannedMode = SeriesOffsetMode.preserve
-    @State private var waitMode = SeriesOffsetMode.preserve
     @State private var planned: Date
-    @State private var wait: Date
     @State private var hasUntil: Bool
     @State private var until: Date
     @State private var preview: TaskSeriesTransitionPreview?
@@ -30,7 +28,6 @@ struct TaskSeriesTransitionEditor: View {
         _firstDue = State(initialValue: defaults.firstDue)
         _rule = State(initialValue: defaults.recurrence)
         _planned = State(initialValue: defaults.planned)
-        _wait = State(initialValue: defaults.wait)
         _hasUntil = State(initialValue: defaults.hasUntil)
         _until = State(initialValue: defaults.until)
     }
@@ -61,17 +58,15 @@ struct TaskSeriesTransitionEditor: View {
                         TextField("Taskwarrior recurrence", text: $rule).textInputAutocapitalization(.never).autocorrectionDisabled().focused($typing, equals: "rule").accessibilityIdentifier("transition-rule")
                         Text("Named calendar periods and fixed durations differ. For example, biannual and 2years differ at leap day; P2M resets the clock to midnight after its first date.").font(.footnote)
                     }
-                    Section("Scheduled and waiting dates") {
+                    Section("Scheduled") {
                         Picker("Scheduled", selection: $plannedMode) { ForEach(SeriesOffsetMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("transition-planned-mode")
                         if plannedMode == .set { DatePicker("First planned date", selection: $planned, displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, generatorZone).accessibilityIdentifier("transition-planned-date") }
-                        Picker("Wait until", selection: $waitMode) { ForEach(SeriesOffsetMode.allCases, id: \.self) { Text($0.rawValue).tag($0) } }.accessibilityIdentifier("transition-wait-mode")
-                        if waitMode == .set { DatePicker("First wait date", selection: $wait, displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, generatorZone).accessibilityIdentifier("transition-wait-date") }
                         Text("Keep preserves each task's existing offset from its due date. Choosing a first date applies that new offset to all moved occurrences and the new template.").font(.footnote)
                     }
                     Section("Until") {
                         Toggle("Set Until", isOn: $hasUntil).accessibilityIdentifier("transition-has-until")
                         if hasUntil { DatePicker("Until date", selection: $until, displayedComponents: [.date, .hourAndMinute]).environment(\.timeZone, generatorZone).accessibilityIdentifier("transition-until") }
-                        Text("Until must cover every retained future occurrence. Taskwarrior 3.5 can still generate its first occurrence beyond Until and retire an ended template while waiting tasks remain. Retained tasks stay available.").font(.footnote)
+                        Text("Until must cover every retained future occurrence. Taskwarrior 3.5 can still generate its first occurrence beyond Until and retire a template with unfinished occurrences. Retained tasks stay available.").font(.footnote)
                     }
                 }
                 .disabled(preview != nil || isPreviewing || store.isSaving)
@@ -117,7 +112,6 @@ struct TaskSeriesTransitionEditor: View {
                     Text(old.description)
                     Text("Due: \(date(old.deadline!, zone: generatorZone)) → \(date(moved.deadline!, zone: generatorZone))")
                     Text("Scheduled: \(optionalDate(old.plannedDate)) → \(optionalDate(moved.plannedDate))").font(.caption)
-                    Text("Wait: \(optionalDate(old.waitUntil)) → \(optionalDate(moved.waitUntil))").font(.caption)
                 }
                 .accessibilityIdentifier("transition-preview-\(old.id.uuidString)")
             }
@@ -145,7 +139,7 @@ struct TaskSeriesTransitionEditor: View {
         Task {
             defer { isPreviewing = false }
             do {
-                let draft = try TaskSeriesTransitionDraft(effectiveDate: effective, firstDue: firstDue, recurrence: rule, generatorTimeZone: timeZone, planned: offset(plannedMode, value: planned), wait: offset(waitMode, value: wait), until: hasUntil ? until : nil)
+                let draft = try TaskSeriesTransitionDraft(effectiveDate: effective, firstDue: firstDue, recurrence: rule, generatorTimeZone: timeZone, planned: offset(plannedMode, value: planned), until: hasUntil ? until : nil)
                 preview = try await store.manager.previewSeriesTransition(id: template.id, draft: draft); error = nil }
             catch { self.error = error.localizedDescription }
         }

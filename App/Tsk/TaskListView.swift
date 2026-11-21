@@ -5,7 +5,6 @@ import TskCore
 struct TaskListView: View {
     let store: TaskStore
     let calendar: TodayCalendarController
-    let edit: (TaskRecord) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var gestureRows = TaskListGestureRows()
     @State private var calendars = TaskSelectionCalendars()
@@ -36,7 +35,7 @@ struct TaskListView: View {
                                     TaskDayEmptyRow().taskDayRowInsets()
                                 }
                                 ForEach(store.visibleTasks) { task in
-                                    TaskListRow(task: task, store: store, edit: edit).id(task.id)
+                                    TaskListRow(task: task, store: store).id(task.id)
                                 }
                             }
                             .listSectionSeparator(.hidden)
@@ -67,7 +66,7 @@ struct TaskListView: View {
                     List {
                         captureRow
                         ForEach(store.visibleTasks) { task in
-                            TaskListRow(task: task, store: store, edit: edit)
+                            TaskListRow(task: task, store: store)
                         }
                     }
                     .accessibilityIdentifier("task-list")
@@ -149,7 +148,7 @@ struct TaskListView: View {
 
     @ViewBuilder private var captureRow: some View {
         if let task = store.captureTask {
-            TaskListRow(task: task, store: store, edit: edit, rowIdentifier: store.rowEditing?.rowID)
+            TaskListRow(task: task, store: store, rowIdentifier: store.rowEditing?.rowID)
                 .id(task.id)
         }
     }
@@ -225,11 +224,10 @@ private struct TaskListGestures: View {
 struct TaskListRow: View {
     let task: TaskRecord
     let store: TaskStore
-    let edit: (TaskRecord) -> Void
     var rowIdentifier: String?
     var previewDay: Date?
     var body: some View {
-        TaskListRowContent(task: task, store: store, edit: edit, rowIdentifier: rowIdentifier,
+        TaskListRowContent(task: task, store: store, rowIdentifier: rowIdentifier,
                            previewDay: previewDay, selected: store.selectedTaskIDs.contains(task.id))
     }
 }
@@ -237,7 +235,6 @@ struct TaskListRow: View {
 private struct TaskListRowContent: View {
     let task: TaskRecord
     let store: TaskStore
-    let edit: (TaskRecord) -> Void
     let rowIdentifier: String?
     let previewDay: Date?
     let selected: Bool
@@ -254,7 +251,6 @@ private struct TaskListRowContent: View {
     @ScaledMetric(relativeTo: .caption2) private var metadataSize: CGFloat = 10
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @Environment(\.taskRowViewport) private var viewport
-    @Environment(\.taskRowActions) private var rowActions
     private var identity: String { rowIdentifier ?? "task-" + task.id.uuidString }
     private var editing: TaskRowEditing? { isPreview ? nil : store.rowEditing.flatMap { $0.rowID == identity ? $0 : nil } }
     private var expanded: Bool { editing?.isExpanded == true }
@@ -359,11 +355,6 @@ private struct TaskListRowContent: View {
                                 .modifier(TaskRowFade(editing: editing, disappearing: true))
                                 .accessibilityHidden(true)
                         }
-                        if store.isDayPage {
-                            TaskAvailabilityView(task: displayedTask, store: store)
-                                .accessibilityHidden(true)
-                                .modifier(TaskRowFade(editing: editing, disappearing: true))
-                        }
                     }
                     .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleContentHeight = $0 }
                     .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
@@ -381,8 +372,7 @@ private struct TaskListRowContent: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
                 if let editing {
-                    TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused,
-                                  information: { rowActions.information(task) })
+                    TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused)
                         .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24 + attributesOverlap))
                         .modifier(TaskRowAttributePosition(editing: editing, overlap: attributesOverlap))
                         .modifier(TaskRowFade(editing: editing))
@@ -395,7 +385,7 @@ private struct TaskListRowContent: View {
                 if !expanded && !isPreview {
                     Button {
                         if store.isSelectingTasks { store.toggleSelection(task.id) }
-                        else if task.canEdit { expand() } else { edit(task) }
+                        else { expand() }
                     } label: { Color.clear.contentShape(Rectangle()) }
                         .buttonStyle(TaskRowTapButtonStyle())
                         .disabled(phase != nil || editing != nil)
@@ -403,14 +393,13 @@ private struct TaskListRowContent: View {
                             VStack {
                                 Text(task.description)
                                 if !task.project.isEmpty { Text(task.project) }
-                                if store.isDayPage { TaskAvailabilityView(task: task, store: store) }
                                 TaskPlanningCaption(task: task, today: store.currentDate)
                             }
                             .accessibilityElement(children: .combine)
                         }
                         .accessibilityIdentifier(identity)
-                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? (store.taskDragContext != nil ? "Tap to edit; drag the title to reorder; touch the scheduled time to select" : "Tap to edit title and attributes; touch the scheduled time to select") : task.canEdit ? "Expand to edit title and attributes" : "Show task information")
-                        .accessibilityAction(named: "Edit title and attributes", expand)
+                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? (store.taskDragContext != nil ? "Tap to edit; drag the title to reorder; touch the scheduled time to select" : "Tap to edit title and attributes; touch the scheduled time to select") : task.canEdit ? "Expand to edit title and attributes" : "Expand task")
+                        .accessibilityAction(named: task.canEdit ? "Edit title and attributes" : "Expand task", expand)
                         .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
                 }
             }

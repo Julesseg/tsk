@@ -78,11 +78,6 @@ final class TaskRowEditing {
         if !isAnimating { visibilityBounds = bounds }
     }
 
-    func absorb(_ task: TaskRecord) {
-        draft.rebase(on: task)
-        error = nil
-    }
-
     func saveAndCollapse(in store: TaskStore, reduceMotion: Bool, includingParameter: Bool = false) async -> Bool {
         guard !isSaving, !store.isSaving, isExpanded else { return false }
         if parameter != nil && !includingParameter { parameter = nil; return false }
@@ -129,7 +124,7 @@ final class TaskRowEditing {
 }
 
 enum TaskRowParameter: String, Identifiable, CaseIterable {
-    case project, tags, priority, scheduled, deadline, waiting
+    case project, tags, priority, scheduled, deadline
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -137,12 +132,11 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         case .tags: "Tags"
         case .scheduled: "Scheduled"
         case .deadline: "Deadline"
-        case .waiting: "Waiting date"
         case .priority: "Priority"
         }
     }
     var attribute: String {
-        switch self { case .deadline: "due"; case .waiting: "wait"; default: rawValue }
+        switch self { case .deadline: "due"; default: rawValue }
     }
     var symbol: String {
         switch self {
@@ -150,7 +144,6 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         case .tags: "tag"
         case .scheduled: "calendar"
         case .deadline: "flag"
-        case .waiting: "pause.circle"
         case .priority: "exclamationmark"
         }
     }
@@ -158,7 +151,6 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         switch self {
         case .scheduled: draft.plannedDate
         case .deadline: draft.deadline
-        case .waiting: draft.waitUntil
         default: nil
         }
     }
@@ -166,7 +158,6 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
         switch self {
         case .scheduled: draft.taskDraft.setScheduled(TaskScheduledDate(date: date, hasTime: draft.taskDraft.scheduled()?.hasTime ?? false))
         case .deadline: draft.taskDraft.deadline = date
-        case .waiting: draft.taskDraft.waitUntil = date
         default: break
         }
     }
@@ -190,5 +181,4 @@ enum TaskRowParameter: String, Identifiable, CaseIterable {
     static func priorityTitle(_ value: String) -> String {
         ["": "None", "L": "Low", "M": "Medium", "H": "High"][value] ?? value
     }
-    var identifier: String { self == .waiting ? "waiting-date" : rawValue }
 }

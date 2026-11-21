@@ -31,7 +31,8 @@ final class TskUITests: XCTestCase {
         let captureCell = app.cells.containing(.any, identifier: "task-description").firstMatch
         XCTAssertGreaterThanOrEqual(captureCell.frame.minY, app.navigationBars.firstMatch.frame.maxY, "The draft card must stay below the navigation header")
         XCTAssertEqual(app.staticTexts["workspace-title-text"].label, "Today")
-        tapTaskControl(app.buttons["collapse-task-row"], app: app)
+        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        closeTaskRow(app)
         XCTAssertTrue(description.waitForNonExistence(timeout: 5))
         let pill = app.buttons["planner-date-pill"]
         let today = try XCTUnwrap(pill.value as? String)
@@ -69,7 +70,7 @@ final class TskUITests: XCTestCase {
         XCTAssertEqual(app.switches["scheduled-has-time"].firstMatch.value as? String, "0")
         screenshot("Browsed day capture is untimed with no project", app: app)
         app.buttons["close-row-parameter"].tap()
-        taskEditorSaveButton(app).tap()
+        closeTaskRow(app)
         XCTAssertTrue(taskRow(named: "Buy milk from the market", app: app).waitForExistence(timeout: 10))
         screenshot("Tasks saved on browsed day", app: app)
         openWorkspaceView("Inbox", app: app)
@@ -88,8 +89,10 @@ final class TskUITests: XCTestCase {
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "TSK_TEST_RECORDED_RECURRENCE")
         app.launch()
-        XCTAssertTrue(pill.waitForExistence(timeout: 10))
-        pill.swipeLeft()
+        let relaunchedPill = app.buttons.matching(identifier: "planner-date-pill").firstMatch
+        XCTAssertTrue(relaunchedPill.waitForExistence(timeout: 10))
+        assertPlannerDay(today, app: app)
+        relaunchedPill.swipeLeft()
         assertPlannerDay(String(Int(capturedDay.timeIntervalSince1970)), app: app)
         for (name, project, scheduled) in [("Buy milk from the market", "Not set", scheduledValue), ("Inbox capture", "Not set", "Not set"), ("Project capture", "Work", "Not set")] {
             if name == "Inbox capture" { openWorkspaceView("Inbox", app: app) }
@@ -104,21 +107,21 @@ final class TskUITests: XCTestCase {
             XCTAssertEqual(app.buttons["row-project"].value as? String, project)
             XCTAssertEqual(app.buttons["row-scheduled"].value as? String, scheduled)
             screenshot("Durable " + name, app: app)
-            tapTaskControl(app.buttons["collapse-task-row"], app: app)
+            closeTaskRow(app)
             XCTAssertTrue(app.textFields["task-description"].waitForNonExistence(timeout: 5))
         }
         screenshot("Tasks after relaunch", app: app)
         openWorkspaceView("Today", app: app)
-        pill.swipeLeft()
+        assertPlannerDay(today, app: app)
+        app.buttons["planner-date-pill"].swipeLeft()
         assertPlannerDay(String(Int(capturedDay.timeIntervalSince1970)), app: app)
-        openTaskInformation(taskRow(named: "Buy milk from the market", app: app), app: app)
-        let savedDescription = app.staticTexts["task-detail-description"]
+        expandTaskRow(taskRow(named: "Buy milk from the market", app: app), app: app)
+        let savedDescription = app.textFields["task-description"]
         XCTAssertTrue(savedDescription.waitForExistence(timeout: 5))
-        XCTAssertEqual(savedDescription.label, "Buy milk from the market")
-        XCTAssertTrue(app.descendants(matching: .any)["task-detail-status"].label.contains("Pending"))
+        XCTAssertEqual(savedDescription.value as? String, "Buy milk from the market")
         XCTAssertFalse(app.staticTexts["Identity"].exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
-        screenshot("Saved task information", app: app)
+        screenshot("Saved task expanded in Today", app: app)
         app.terminate()
         let saved = try await storedTasks(app, checkpoint: "saved")
         XCTAssertEqual(saved.count, 6, "Only the three seeded and three saved tasks persist")
@@ -144,7 +147,7 @@ final class TskUITests: XCTestCase {
         XCTAssertEqual(app.buttons["row-project"].value as? String, project)
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, scheduled)
         screenshot(title + " defaults", app: app)
-        tapTaskControlAtCenter(app.buttons["collapse-task-row"], app: app)
+        closeTaskRow(app)
         XCTAssertTrue(description.waitForNonExistence(timeout: 5))
         XCTAssertTrue(taskRow(named: title, app: app).waitForExistence(timeout: 10))
     }
