@@ -35,27 +35,25 @@ struct ContentView: View {
     }
 
     var body: some View {
-        GlassEffectContainer(spacing: 8) {
-            calendarWorkspace
-                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
-                    guard let editing = store.rowEditing, editing.isExpanded,
-                          tap.location.y < editing.viewport.maxY,
-                          !editing.bounds.contains(tap.location) else { return }
-                    closeRow()
-                }, including: store.rowEditing == nil ? .subviews : .all)
-                .overlay {
-                    TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
-                }
-                .overlay {
-                    if dayPaging.expanded {
-                        PlannerCalendarDismissal(paging: dayPaging) {
-                            dayPaging.expanded = false
-                        }
-                        .ignoresSafeArea(.container)
+        calendarWorkspace
+            .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                guard let editing = store.rowEditing, editing.isExpanded,
+                      tap.location.y < editing.viewport.maxY,
+                      !editing.bounds.contains(tap.location) else { return }
+                closeRow()
+            }, including: store.rowEditing == nil ? .subviews : .all)
+            .overlay {
+                TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
+            }
+            .overlay {
+                if dayPaging.expanded {
+                    PlannerCalendarDismissal(paging: dayPaging) {
+                        dayPaging.expanded = false
                     }
+                    .ignoresSafeArea(.container)
                 }
-        }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }))
+            }
+            .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {
@@ -110,7 +108,6 @@ struct ContentView: View {
             taskList()
                 .navigationDestination(for: UUID.self) { id in taskDestination(id) }
         }
-        .accessibilityIdentifier("task-workspace")
     }
 
     private var projectsWorkspace: some View {

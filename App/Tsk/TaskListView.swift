@@ -21,6 +21,8 @@ struct TaskListView: View {
         let isPickerClosed = store.selectionDateField == nil
         let showsNavigator = store.isDayPage || store.isSelectingTasks
         let footerHeight = (showsNavigator || workspaceControls != nil ? TaskDayPaging.collapsedNavigatorHeight : 0) + (store.isSelectingTasks ? selectionBarHeight : 0)
+        let viewport = geometry.frame(in: .global)
+        let rowViewport = viewport.divided(atDistance: footerHeight + keyboardInset, from: .maxYEdge).remainder
         let extendsBehindHomeIndicator = store.isDayPage && store.rowEditing == nil
         Group {
             if store.isDayPage {
@@ -133,7 +135,7 @@ struct TaskListView: View {
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
-        .environment(\.taskRowViewport, geometry.frame(in: .global))
+        .environment(\.taskRowViewport, rowViewport)
         }
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }
