@@ -138,6 +138,31 @@ private struct TaskDayPillInput: UIViewRepresentable {
         input.accessibilityCustomActions = canReturnToToday ? [input.todayAction] : nil
     }
 
+    final class Pan: UIPanGestureRecognizer {
+        private var touchOrigin = CGPoint.zero
+        var didEnd: ((CGPoint, CGPoint) -> Void)?
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            if numberOfTouches == 0, let touch = touches.first {
+                touchOrigin = touch.location(in: view?.window)
+            }
+            super.touchesBegan(touches, with: event)
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+            let point = touches.first?.location(in: view?.window)
+            super.touchesEnded(touches, with: event)
+            // UIKit can coalesce the target callbacks for a fast swipe.
+            if state == .ended, let point {
+                didEnd?(distance(to: point), velocity(in: view?.window))
+            }
+        }
+
+        func distance(to point: CGPoint) -> CGPoint {
+            CGPoint(x: point.x - touchOrigin.x, y: point.y - touchOrigin.y)
+        }
+    }
+
     final class Input: UIView {
         var actions: TaskDayPillInput?
         private var axis: Axis?
@@ -154,8 +179,9 @@ private struct TaskDayPillInput: UIViewRepresentable {
             accessibilityIdentifier = "planner-date-pill"
             accessibilityLabel = "Browse date"
             accessibilityTraits = .button
-            let pan = UIPanGestureRecognizer(target: self, action: #selector(panned))
+            let pan = Pan(target: self, action: #selector(panned))
             pan.maximumNumberOfTouches = 1
+            pan.didEnd = { [weak self] distance, velocity in self?.pan(distance: distance, velocity: velocity, state: .ended) }
             hold.addTarget(self, action: #selector(held))
             hold.allowableMovement = 8
             let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
@@ -170,15 +196,18 @@ private struct TaskDayPillInput: UIViewRepresentable {
         @objc private func tapped() { actions?.activate() }
         @objc private func held() { if hold.state == .began { actions?.returnToToday() } }
 
-        @objc private func panned(_ recognizer: UIPanGestureRecognizer) {
-            let distance = recognizer.translation(in: window)
-            let velocity = recognizer.velocity(in: window)
+        @objc private func panned(_ recognizer: Pan) {
+            guard recognizer.state != .ended else { return }
+            pan(distance: recognizer.distance(to: recognizer.location(in: window)), velocity: recognizer.velocity(in: window), state: recognizer.state)
+        }
+
+        private func pan(distance: CGPoint, velocity: CGPoint, state: UIGestureRecognizer.State) {
             if axis == nil {
                 let direction = distance == .zero ? velocity : distance
                 axis = abs(direction.y) > abs(direction.x) ? .vertical : .horizontal
             }
-            if let axis { actions?.pan(axis, distance, velocity, recognizer.state) }
-            if recognizer.state == .ended || recognizer.state == .cancelled { axis = nil }
+            if let axis { actions?.pan(axis, distance, velocity, state) }
+            if state == .ended || state == .cancelled { axis = nil }
         }
     }
 }
