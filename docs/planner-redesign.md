@@ -88,7 +88,7 @@ Completed tasks stay checked and dimmed, preserving order on the planner page th
 
 ## Retired notifications
 
-Notifications were removed from product scope on 2026-11-17. Planner date placement and stored task dates remain independent of alerts.
+An actionable task can alert at its future timed Scheduled and Deadline values. Untimed dates do not alert. When both fields share an instant, the task alerts once. The iPhone presents a Time Sensitive notification with the task title as its sole app-supplied text. Alerts are independent of planner placement.
 
 ## Acceptance examples
 

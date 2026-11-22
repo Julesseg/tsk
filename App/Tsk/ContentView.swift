@@ -221,7 +221,10 @@ struct ContentView: View {
             await automation.executePending(in: store)
         }
         .task(id: scenePhase) {
-            if scenePhase == .active { await store.observeParticipantChanges() }
+            if scenePhase == .active {
+                await TaskNotificationScheduler.shared.refresh(from: store.manager)
+                await store.observeParticipantChanges()
+            }
         }
         .onChange(of: automation.deletedTaskID) { _, id in
             if let id, selectedTaskID == id {
@@ -245,7 +248,13 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in calendar.sourceChanged() }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in calendar.sourceChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in Task { await store.reload(); calendar.sourceChanged() } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            Task {
+                await TaskNotificationScheduler.shared.refresh(from: store.manager)
+                await store.reload()
+                calendar.sourceChanged()
+            }
+        }
     }
 
     private var calendarWorkspace: some View {

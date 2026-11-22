@@ -91,9 +91,9 @@ other retained UI coverage. Their removed UI scenarios are no longer acceptance
 gates. The owned URL/callback host remains as TskActionFixture.
 Notifications and Spotlight indexing, including their dedicated UI/Core/Native
 tests, settings, services, fixtures and entitlement, were also removed explicitly.
-Task dates, ordinary task search, sync, Calendar and seven Shortcuts remain.
-A one-time upgrade cleanup removes this app’s pending/delivered alerts and indexed
-items; it requests no authorization and creates no new alerts or index records.
+Timed task notifications now use Core date-eligibility tests and Apple Native
+request tests. The isolated XCUITest replicas never prompt for notification access.
+The upgrade cleanup removes retired alerts and Spotlight items by ownership.
 Full selects 14 workspace and seven row methods.
 Apple Reminders import was removed on 2026-11-18: one-time copy, continuous
 move, recurring conversion, settings, permission requests, background import,

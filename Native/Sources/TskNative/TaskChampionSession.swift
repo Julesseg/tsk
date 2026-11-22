@@ -56,7 +56,14 @@ public enum TaskChampionSession {
     }
 
     public static func makeManager(directory: URL, library: String? = nil, now: @escaping @Sendable () -> Date = { Date() }, calendar: Calendar = .autoupdatingCurrent, postCommitEffects: (any TaskPostCommitEffect)? = nil) -> TaskManager {
-        return TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, changeTracking: LocalTaskChangeStore(directory: directory), postCommitEffects: postCommitEffects ?? TaskPostCommitEffects())
+        let defaultEffects: any TaskPostCommitEffect
+        #if os(iOS)
+        if #available(iOS 15, *) { defaultEffects = TaskNotificationScheduler.shared }
+        else { defaultEffects = TaskPostCommitEffects() }
+        #else
+        defaultEffects = TaskPostCommitEffects()
+        #endif
+        return TaskManager(replica: TaskChampionReplica(directory: directory, library: library), now: now, calendar: calendar, changeTracking: LocalTaskChangeStore(directory: directory), postCommitEffects: postCommitEffects ?? defaultEffects)
     }
 
     public static func open(directory: URL, library: String? = nil) async throws -> TaskManager {
