@@ -78,9 +78,9 @@ Explicit capture inputs override these defaults. External capture must not inher
 
 ## Calendar events
 
-Display calendar events for the chosen day. Timed events appear chronologically among timed tasks at the bottom of the continuous list and can provide their start time when crossed during a task drag. Events remain read-only.
+Display calendar events for the chosen day in a compact strip above the tasks in the same scrolling list. All-day events appear first, followed by timed events on a horizontal hour ruler and compact rows for events outside the configured hours. Calendar Settings controls the hour range and calendar visibility.
 
-All-day events occupy a compact area below the toolbar and above the task list. They are outside the drag interaction and are not scheduling targets. tsk does not write calendar events or create time blocks.
+Dragging a task onto a timed event uses the event’s start as Scheduled. All-day events are display-only. Calendar access remains read-only.
 
 ## Completion history
 

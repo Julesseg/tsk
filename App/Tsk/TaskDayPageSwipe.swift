@@ -153,17 +153,15 @@ private struct TaskDayPreview: View {
     var body: some View {
         let snapshot = paging.calendars[day]?.showing(calendar.preferences.visibility)
         let tasks = paging.pages[day] ?? []
-        let rows = snapshot?.plannerRows(tasks: tasks) ?? tasks.map(DayPageItem.task)
         return VStack(spacing: 0) {
-            TodayCalendarSection(snapshot: snapshot)
             List {
+                TodayCalendarSection(snapshot: snapshot, hours: calendar.preferences.hours)
                 Section {
-                    if paging.pages[day] != nil && tasks.isEmpty { Text("Nothing planned for this day").foregroundStyle(.secondary) }
-                    ForEach(rows) { item in
-                        switch item {
-                        case .task(let task): TaskListRow(task: task, store: store, previewDay: day)
-                        case .event(let value): TodayCalendarRow(value: value, timeZone: snapshot?.timeZone ?? .autoupdatingCurrent).padding(.vertical, 10)
-                        }
+                    if paging.pages[day] != nil && tasks.isEmpty {
+                        TaskDayEmptyRow().taskDayRowInsets()
+                    }
+                    ForEach(tasks) { task in
+                        TaskListRow(task: task, store: store, previewDay: day)
                     }
                 }
                 .listSectionSeparator(.hidden)
@@ -177,7 +175,6 @@ private struct TaskDayPreview: View {
             paging.pages[day] = tasks
         }
         .transformPreference(TaskSelectionRowsKey.self) { $0 = [:] }
-        .transformPreference(TaskCalendarDragRowsKey.self) { $0 = [:] }
         .environment(\.taskSelectionScope, nil)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)

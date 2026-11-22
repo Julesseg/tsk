@@ -24,35 +24,31 @@ struct TaskListView: View {
         Group {
             if store.isDayPage {
                 VStack(spacing: 0) {
-                    TodayCalendarSection(snapshot: dayCalendarSnapshot)
                     ScrollViewReader { proxy in
                         List {
+                            TodayCalendarSection(snapshot: dayCalendarSnapshot, hours: calendar.preferences.hours, acceptsTaskDrops: true)
                             Section {
                                 CalendarFixtureControls(calendar: calendar)
                                 captureRow
                                 if let error = store.error, store.visibleTasks.isEmpty, store.captureTask == nil { Text(error); Button("Retry tasks") { Task { await store.reload() } } }
-                                else if store.awaitingDaySnapshot != store.displayedDay && store.visibleTasks.isEmpty && store.captureTask == nil { Text("Nothing planned for this day").foregroundStyle(.secondary) }
-                                ForEach(dayRows) { item in
-                                    switch item {
-                                    case .task(let task): TaskListRow(task: task, store: store).id(task.id)
-                                    case .event(let value):
-                                        TodayCalendarRow(value: value, timeZone: dayCalendarSnapshot?.timeZone ?? .autoupdatingCurrent)
-                                            .padding(.vertical, 10)
-                                            .background {
-                                                GeometryReader { row in
-                                                    Color.clear.preference(key: TaskCalendarDragRowsKey.self, value: [value.id: TaskCalendarDragRow(event: value.event, bounds: row.frame(in: .global))])
-                                                }
-                                            }
-                                    }
+                                else if store.awaitingDaySnapshot != store.displayedDay && store.visibleTasks.isEmpty && store.captureTask == nil {
+                                    TaskDayEmptyRow().taskDayRowInsets()
+                                }
+                                ForEach(store.visibleTasks) { task in
+                                    TaskListRow(task: task, store: store).id(task.id)
                                 }
                             }
                             .listSectionSeparator(.hidden)
                             .listRowBackground(Color.clear)
-                        }.accessibilityIdentifier("task-list")
-                            .refreshable { await store.reload(); await calendar.refresh() }
-                            .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                            .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
-                            .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        }
+                        .accessibilityIdentifier("task-list")
+                        #if DEBUG
+                        .accessibilityValue(store.taskDragProof)
+                        #endif
+                        .refreshable { await store.reload(); await calendar.refresh() }
+                        .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
+                        .task(id: geometry.size.height - keyboardInset) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     }
                 }
                 .modifier(TaskDayPagingPages(store: store, calendar: calendar, paging: dayPaging))
@@ -74,6 +70,9 @@ struct TaskListView: View {
                         }
                     }
                     .accessibilityIdentifier("task-list")
+                    #if DEBUG
+                    .accessibilityValue(store.taskDragProof)
+                    #endif
                     .refreshable { await store.reload() }
                     .task(id: store.rowEditing?.rowID) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
                     .task(id: store.rowEditing?.isAnimating) { await Task.yield(); revealEditor(using: proxy, viewport: geometry.frame(in: .global), keyboardInset: keyboardInset) }
@@ -86,13 +85,10 @@ struct TaskListView: View {
                              viewport: geometry.frame(in: .global), isVisible: isVisible, reduceMotion: reduceMotion)
                 .allowsHitTesting(false)
         }
-        #if DEBUG
-        .accessibilityValue(store.taskDragProof)
-        #endif
         .scrollDisabled(store.isSelectionGestureActive)
         .contentMargins(.bottom, footerHeight + (extendsBehindHomeIndicator ? geometry.safeAreaInsets.bottom : 0), for: .scrollContent)
         .onPreferenceChange(TaskSelectionRowsKey.self) { gestureRows.tasks = Array($0.values) }
-        .onPreferenceChange(TaskCalendarDragRowsKey.self) { gestureRows.events = Array($0.values) }
+        .onPreferenceChange(TaskCalendarDropTargetsKey.self) { gestureRows.events = $0 }
         .overlay(alignment: .top) {
             if store.selectionDateField != nil {
                 Button { store.selectionDateField = nil } label: {
@@ -150,10 +146,6 @@ struct TaskListView: View {
         return dayPaging.calendars[store.displayedDay]?.showing(calendar.preferences.visibility)
     }
 
-    private var dayRows: [DayPageItem] {
-        dayCalendarSnapshot?.plannerRows(tasks: store.visibleTasks) ?? store.visibleTasks.map(DayPageItem.task)
-    }
-
     @ViewBuilder private var captureRow: some View {
         if let task = store.captureTask {
             TaskListRow(task: task, store: store, rowIdentifier: store.rowEditing?.rowID)
@@ -192,9 +184,23 @@ struct TaskListView: View {
     }
 }
 
+struct TaskDayEmptyRow: View {
+    var body: some View {
+        Text("Nothing planned for this day")
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension View {
+    func taskDayRowInsets() -> some View {
+        listRowInsets(.horizontal, 20)
+    }
+}
+
 @MainActor @Observable private final class TaskListGestureRows {
     var tasks: [TaskSelectionRow] = []
-    var events: [TaskCalendarDragRow] = []
+    var events: [TaskCalendarDropTarget] = []
 }
 
 private struct TaskListGestures: View {
@@ -207,7 +213,7 @@ private struct TaskListGestures: View {
     let reduceMotion: Bool
 
     var body: some View {
-        TaskNativeDrag(store: store, scope: scope, rows: rows.tasks, eventRows: rows.events, reduceMotion: reduceMotion)
+        TaskNativeDrag(store: store, scope: scope, rows: rows.tasks, eventTargets: rows.events, reduceMotion: reduceMotion)
         TaskSelectionGesture(store: store, scope: scope, viewport: viewport, rows: rows.tasks)
         if (store.isDayPage || store.isSelectingTasks) && isVisible {
             TaskDayPageSwipe(store: store, paging: paging, viewport: viewport, rows: rows.tasks, reduceMotion: reduceMotion)

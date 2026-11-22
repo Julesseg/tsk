@@ -4,19 +4,17 @@ import TskNative
 
 struct TodayCalendarSection: View {
     let snapshot: TodayCalendarSnapshot?
+    let hours: CalendarDisplayHours
+    var acceptsTaskDrops = false
 
     var body: some View {
         if let snapshot,
-           snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.allDayEvents.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(snapshot.allDayEvents) { value in
-                    TodayCalendarRow(value: value, timeZone: snapshot.timeZone)
-                }
+           snapshot.authorization == .fullAccess, snapshot.readError == nil, !snapshot.events.isEmpty {
+            Section {
+                TodayCalendarOverview(snapshot: snapshot, hours: hours, acceptsTaskDrops: acceptsTaskDrops)
+                    .taskDayRowInsets()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("planner-all-day-events")
+            .listSectionSeparator(.hidden)
         }
     }
 }
