@@ -7,7 +7,7 @@ import sys
 app = pathlib.Path(sys.argv[1])
 
 
-def verify_group(bundle):
+def verify_entitlements(bundle):
     bundle_info = plistlib.loads((bundle / 'Info.plist').read_bytes())
     if any(key.startswith('NSReminders') for key in bundle_info):
         raise SystemExit('The app must not retain retired Reminders access metadata')
@@ -27,13 +27,13 @@ def verify_group(bundle):
                     entitlements = plistlib.loads(binary[section[4]:section[4] + section[3]])
                     groups = entitlements.get('com.apple.security.application-groups', [])
         position += size
-    if 'com.apple.developer.usernotifications.time-sensitive' in entitlements:
-        raise SystemExit('The app must not retain the retired time-sensitive notification entitlement')
+    if entitlements.get('com.apple.developer.usernotifications.time-sensitive') is not True:
+        raise SystemExit(f'{bundle.name} has no Time Sensitive notification entitlement')
     if 'group.com.julesseguin.tsk' not in groups:
         raise SystemExit(f'{bundle.name} has no shared task App Group entitlement')
 
 
-verify_group(app)
+verify_entitlements(app)
 if any((app / "PlugIns").glob("*.appex")):
     raise SystemExit("The app must not embed retired Share or widget extensions")
 
@@ -45,7 +45,7 @@ if not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskInt
 shortcuts = {shortcut['actionIdentifier'] for shortcut in metadata['autoShortcuts']}
 if 'IntentTaskEntity' not in metadata['entities'] or not {'AddTaskIntent', 'FindTasksIntent', 'CompleteTaskIntent', 'ModifyTaskIntent', 'DeleteTaskIntent', 'OpenTaskIntent', 'OpenTaskViewIntent'}.issubset(shortcuts):
     raise SystemExit('The app metadata is missing its task entity or App Shortcuts')
-print('Verified app App Group entitlements and seven App Shortcuts')
+print('Verified App Group and Time Sensitive notification entitlements and seven App Shortcuts')
 
 if {'CreateTaskIntent', 'RescheduleTaskIntent'} & metadata['actions'].keys():
     raise SystemExit('The retired Create Task and Reschedule Task intents must not remain as a compatibility action')
