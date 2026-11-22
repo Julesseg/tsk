@@ -19,10 +19,24 @@ final class TskUITests: XCTestCase {
         XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.tabBars.firstMatch.exists)
         XCTAssertFalse(app.buttons["workspace-views"].exists)
-        XCTAssertTrue(app.buttons["open-inbox"].exists)
-        XCTAssertTrue(app.buttons["open-projects"].exists)
-        XCTAssertTrue(app.buttons["planner-date-pill"].exists)
-        screenshot("Planner toolbar replaces primary tabs", app: app)
+        let menu = app.buttons["workspace-menu"]
+        let captureButton = app.buttons["new-task"]
+        let pill = app.buttons["planner-date-pill"]
+        XCTAssertTrue(menu.exists && pill.exists)
+        for button in [menu, captureButton] {
+            XCTAssertEqual(button.frame.width, pill.frame.height, accuracy: 1)
+            XCTAssertEqual(button.frame.height, pill.frame.height, accuracy: 1)
+            XCTAssertEqual(button.frame.midY, pill.frame.midY, accuracy: 1)
+        }
+        XCTAssertLessThan(menu.frame.maxX, pill.frame.minX)
+        XCTAssertGreaterThan(captureButton.frame.minX, pill.frame.maxX)
+        XCTAssertEqual(menu.frame.minX, app.frame.maxX - captureButton.frame.maxX, accuracy: 1)
+        screenshot("Workspace menu and capture flank the date pill", app: app)
+        menu.tap()
+        XCTAssertTrue(app.buttons["Inbox"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Projects"].exists)
+        screenshot("Workspace destinations in the bottom menu", app: app)
+        app.buttons["Planner"].tap()
         app.buttons["New task"].tap()
         let description = app.descendants(matching: .any).matching(identifier: "task-description").firstMatch
         XCTAssertTrue(description.waitForExistence(timeout: 5))
@@ -34,11 +48,11 @@ final class TskUITests: XCTestCase {
         tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
         closeTaskRow(app)
         XCTAssertTrue(description.waitForNonExistence(timeout: 5))
-        let pill = app.buttons["planner-date-pill"]
         let today = try XCTUnwrap(pill.value as? String)
         XCTAssertLessThan(pill.frame.width, app.frame.width * 0.6)
         XCTAssertFalse(pill.frame.intersects(app.buttons["New task"].frame))
         expandPlannerCalendar(app)
+        XCTAssertFalse(menu.exists || captureButton.exists)
         screenshot("Compact date pill morphs into its calendar", app: app)
         tapTaskControl(app.buttons["planner-date-" + today], app: app)
         XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))

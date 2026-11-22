@@ -13,13 +13,16 @@ struct TaskListView: View {
     @State private var isVisible = false
     @State private var selectionBarHeight: CGFloat = 0
     @State var dayPaging = TaskDayPaging()
+    var workspaceControls: TaskWorkspaceControls? = nil
 
     var body: some View {
         GeometryReader { geometry in
         let keyboardInset = keyboardOverlap(in: geometry.frame(in: .global))
         let isPickerClosed = store.selectionDateField == nil
         let showsNavigator = store.isDayPage || store.isSelectingTasks
-        let footerHeight = (showsNavigator ? TaskDayPaging.collapsedNavigatorHeight : 0) + (store.isSelectingTasks ? selectionBarHeight : 0)
+        let footerHeight = (showsNavigator || workspaceControls != nil ? TaskDayPaging.collapsedNavigatorHeight : 0) + (store.isSelectingTasks ? selectionBarHeight : 0)
+        let viewport = geometry.frame(in: .global)
+        let rowViewport = viewport.divided(atDistance: footerHeight + keyboardInset, from: .maxYEdge).remainder
         let extendsBehindHomeIndicator = store.isDayPage && store.rowEditing == nil
         Group {
             if store.isDayPage {
@@ -112,7 +115,12 @@ struct TaskListView: View {
                         }
                         .transition(.opacity)
                 }
-                if showsNavigator { TaskDayNavigator(store: store, paging: dayPaging, availableWidth: geometry.size.width) }
+                ZStack(alignment: .bottom) {
+                    if showsNavigator {
+                        TaskDayNavigator(store: store, paging: dayPaging, availableWidth: geometry.size.width)
+                    }
+                    if !dayPaging.isCalendarVisible { workspaceControls }
+                }
             }
             .frame(width: geometry.size.width)
             .animation(reduceMotion ? nil : .smooth(duration: 0.22), value: store.selectionDateField)
@@ -123,7 +131,7 @@ struct TaskListView: View {
         .transaction { if store.rowEditing != nil { $0.animation = nil } }
         .safeAreaPadding(.bottom, store.rowEditing == nil ? 0 : keyboardInset)
         .environment(\.taskRowAvailableHeight, max(120, geometry.size.height - keyboardInset - 24))
-        .environment(\.taskRowViewport, geometry.frame(in: .global))
+        .environment(\.taskRowViewport, rowViewport)
         }
         .onAppear { isVisible = true }
         .onDisappear { isVisible = false }

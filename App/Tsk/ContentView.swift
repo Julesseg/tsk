@@ -35,27 +35,25 @@ struct ContentView: View {
     }
 
     var body: some View {
-        GlassEffectContainer(spacing: 8) {
-            calendarWorkspace
-                .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
-                    guard let editing = store.rowEditing, editing.isExpanded,
-                          tap.location.y < editing.viewport.maxY,
-                          !editing.bounds.contains(tap.location) else { return }
-                    closeRow()
-                }, including: store.rowEditing == nil ? .subviews : .all)
-                .overlay {
-                    TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
-                }
-                .overlay {
-                    if dayPaging.expanded {
-                        PlannerCalendarDismissal(paging: dayPaging) {
-                            dayPaging.expanded = false
-                        }
-                        .ignoresSafeArea(.container)
+        calendarWorkspace
+            .simultaneousGesture(SpatialTapGesture(coordinateSpace: .global).onEnded { tap in
+                guard let editing = store.rowEditing, editing.isExpanded,
+                      tap.location.y < editing.viewport.maxY,
+                      !editing.bounds.contains(tap.location) else { return }
+                closeRow()
+            }, including: store.rowEditing == nil ? .subviews : .all)
+            .overlay {
+                TaskRowDismissalOverlay(editing: store.rowEditing, close: { closeRow() })
+            }
+            .overlay {
+                if dayPaging.expanded {
+                    PlannerCalendarDismissal(paging: dayPaging) {
+                        dayPaging.expanded = false
                     }
+                    .ignoresSafeArea(.container)
                 }
-        }
-        .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }))
+            }
+            .environment(\.taskRowActions, TaskRowActions(close: { closeRow() }))
     }
 
     private func closeRow(after: (() -> Void)? = nil) {
@@ -99,26 +97,10 @@ struct ContentView: View {
                 tasksWorkspace
             }
         }
-        .safeAreaInset(edge: .bottom, alignment: .trailing) {
-            if !store.isDayPage {
-                HStack { Spacer(); captureButton }.padding(.horizontal, 16).padding(.vertical, 8)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if store.isDayPage && !dayPaging.expanded { captureButton.padding(.horizontal, 16).padding(.vertical, 8) }
-        }
     }
 
-    private var captureButton: some View {
-        Button(action: capture) {
-            Image(systemName: "plus")
-                .font(.title2)
-                .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .accessibilityLabel("New task")
-        .accessibilityIdentifier("new-task")
+    private var workspaceControls: TaskWorkspaceControls {
+        TaskWorkspaceControls(workspace: store.navigationReturn == nil ? workspaceSelection : nil, capture: capture)
     }
 
     private var tasksWorkspace: some View {
@@ -126,7 +108,6 @@ struct ContentView: View {
             taskList()
                 .navigationDestination(for: UUID.self) { id in taskDestination(id) }
         }
-        .accessibilityIdentifier("task-workspace")
     }
 
     private var projectsWorkspace: some View {
@@ -141,6 +122,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) { workspaceControls }
             .accessibilityIdentifier("projects-list")
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
@@ -171,6 +153,7 @@ struct ContentView: View {
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
         TaskLinkedTaskList(source: store, taskID: id)
             .id(linkedTaskPresentationID)
+            .safeAreaInset(edge: .bottom, spacing: 0) { TaskWorkspaceControls(workspace: nil, capture: capture) }
     }
 
     private var editorSheets: some View {
@@ -294,7 +277,7 @@ struct ContentView: View {
     }
 
     private func taskList(title: String? = nil) -> some View {
-        TaskListView(store: store, calendar: calendar, dayPaging: dayPaging)
+        TaskListView(store: store, calendar: calendar, dayPaging: dayPaging, workspaceControls: workspaceControls)
             .navigationTitle(title ?? dayPageTitle ?? store.navigationTitle ?? store.selectedWorkspaceView.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -330,20 +313,6 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private var settingsToolbar: some ToolbarContent {
-        if store.navigationReturn == nil {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                if !store.isDayPage {
-                    Button("Today", systemImage: "calendar") { workspaceSelection.wrappedValue = .today }
-                        .accessibilityIdentifier("open-today")
-                }
-                Button("Inbox", systemImage: "tray") { workspaceSelection.wrappedValue = .inbox }
-                    .accessibilityIdentifier("open-inbox")
-                    .accessibilityAddTraits(store.selectedWorkspaceView == .inbox ? .isSelected : [])
-                Button("Projects", systemImage: "folder") { workspaceSelection.wrappedValue = .projects }
-                    .accessibilityIdentifier("open-projects")
-                    .accessibilityAddTraits(isProjectWorkspace ? .isSelected : [])
-            }
-        }
         ToolbarItem(placement: .topBarTrailing) {
             if store.isSelectingTasks {
                 Button("Cancel selection", systemImage: "xmark") {
