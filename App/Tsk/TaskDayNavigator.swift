@@ -96,25 +96,15 @@ struct TaskDayNavigator: View {
     }
 
     private var dayLabel: some View {
-        dayText(store.displayedDay)
-            .hidden()
-            .overlay {
-                GeometryReader { geometry in
-                    let width = geometry.size.width
-                    dayText(store.displayedDay)
-                        .frame(width: width, height: geometry.size.height)
-                        .overlay {
-                            ForEach([paging.trailingPreview, paging.preview].compactMap { $0 }, id: \.day) { preview in
-                                dayText(preview.day)
-                                    .frame(width: width, height: geometry.size.height)
-                                    .offset(x: width * preview.side)
-                                    .transition(.identity)
-                            }
-                        }
-                        .offset(x: width * paging.offset)
-                }
+        TaskDayLabelPages(offset: paging.offset) {
+            dayText(store.displayedDay)
+            ForEach([paging.trailingPreview, paging.preview].compactMap { $0 }, id: \.day) { preview in
+                dayText(preview.day)
+                    .layoutValue(key: TaskDayLabelSide.self, value: preview.side)
+                    .transition(.identity)
             }
-            .clipped()
+        }
+        .clipped()
     }
 
     private func dayText(_ day: Date) -> some View {
@@ -399,7 +389,14 @@ private struct TaskMonthPages: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? 300
-        let height = subviews[activeIndex].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+        let pageProposal = ProposedViewSize(width: width, height: nil)
+        let current = subviews[activeIndex].sizeThatFits(pageProposal).height
+        let neighbor = activeIndex + (offset < 0 ? 1 : -1)
+        var height = current
+        if offset != 0, subviews.indices.contains(neighbor) {
+            let adjacent = subviews[neighbor].sizeThatFits(pageProposal).height
+            height += (adjacent - current) * min(1, abs(offset))
+        }
         return CGSize(width: width, height: height)
     }
 
@@ -454,17 +451,47 @@ private struct TaskDayPillWidth: Layout {
         set { openness = newValue }
     }
 
-    func makeCache(subviews: Subviews) -> CGSize { subviews[0].sizeThatFits(.unspecified) }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache label: inout CGSize) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let label = subviews[0].sizeThatFits(.unspecified)
         let closed = min(label.width, expandedWidth)
         let progress = min(1, max(0, openness))
         return CGSize(width: closed + (expandedWidth - closed) * progress, height: label.height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout CGSize) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
                           proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
+private struct TaskDayLabelSide: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
+}
+
+private struct TaskDayLabelPages: Layout {
+    var offset: CGFloat
+
+    var animatableData: CGFloat {
+        get { offset }
+        set { offset = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let current = subviews[0].sizeThatFits(.unspecified)
+        let side: CGFloat = offset < 0 ? 1 : -1
+        var width = current.width
+        if offset != 0, let adjacent = subviews.dropFirst().first(where: { $0[TaskDayLabelSide.self] == side }) {
+            width += (adjacent.sizeThatFits(.unspecified).width - width) * min(1, abs(offset))
+        }
+        return CGSize(width: min(width, proposal.width ?? width), height: current.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let labelProposal = ProposedViewSize(width: bounds.width, height: bounds.height)
+        for label in subviews {
+            let x = bounds.midX + (label[TaskDayLabelSide.self] + offset) * bounds.width
+            label.place(at: CGPoint(x: x, y: bounds.midY), anchor: .center, proposal: labelProposal)
+        }
     }
 }
 
