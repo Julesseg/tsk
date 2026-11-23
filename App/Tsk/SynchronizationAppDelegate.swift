@@ -2,13 +2,15 @@
 import UIKit
 import TskCore
 import TskNative
+import UserNotifications
 
 @MainActor
-final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
+final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     static var schedulingError: String?
     static var refreshIdentifier: String { (Bundle.main.bundleIdentifier ?? "com.julesseguin.tsk") + ".refresh" }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
         Task {
             do { try await RetiredSystemContent.remove() }
             catch { NSLog("Retired system content cleanup will retry: %@", error.localizedDescription) }
@@ -20,6 +22,10 @@ final class SynchronizationAppDelegate: NSObject, UIApplicationDelegate {
         }
         if !registered { Self.schedulingError = "iOS did not register background synchronization. Foreground synchronization remains available." }
         return true
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        TaskNotificationScheduler.owns(notification.request.identifier) ? [.banner, .list] : []
     }
 
     static func scheduleRefresh() {

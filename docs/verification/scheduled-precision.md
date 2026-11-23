@@ -41,12 +41,12 @@ value can reactivate the old hint. A client that intentionally changes precision
 at the same timestamp must update or remove the hint. This is a compatibility
 tradeoff: no external client hooks, generation engine or migration are required.
 
-Untimed Scheduled values produce no individual Scheduled notification. Explicit
-times, including midnight, use their actual timestamp and ignore the midnight
-replacement preference. Deadline retains its independent existing preference;
-coincident effective Scheduled and Deadline alerts combine into one request.
-Completion/deletion cancellation, permission and accepted-event deduplication
-continue through the existing notification reconciliation boundary.
+Untimed Scheduled and Deadline values produce no notification. Explicit times,
+including midnight, use their saved timestamp. Scheduled and Deadline alerts
+at the same instant combine into one request. For legacy Deadline values,
+notifications follow the editor's interpretation of a stored Deadline as timed
+unless it has an untimed precision hint. Completing or deleting a task cancels
+its pending notifications.
 
 The existing persistent-replica/Taskwarrior export test exercises explicit
 midnight and untimed reopening. The existing real encrypted-sync test exercises

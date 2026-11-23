@@ -78,4 +78,4 @@ Optional iOS recurrence generation and file attachment storage are deferred. A d
 
 Before implementation can claim interoperability, select and pin supported Taskwarrior and TaskChampion versions, verify the Swift integration route, and test filter behavior, template editing, occurrence completion bookkeeping. Verify sync reconciliation and background behavior on iOS. Source-based feasibility research is not evidence that those capabilities already work.
 
-Notifications and Spotlight indexing were removed from product scope on 2026-11-17. Task dates, ordinary task search, Shortcuts, Calendar remain.
+The iPhone schedules title-only, Time Sensitive notifications for future timed Scheduled dates and deadlines. Spotlight indexing remains outside product scope.
