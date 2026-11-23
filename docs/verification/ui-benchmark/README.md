@@ -2,7 +2,7 @@
 
 Use this protocol to compare visual designs for tsk. Freeze the screen list, fixture, appearance, device, rubric and number of rounds before looking at ratings. Each reviewer is a fresh same-provider subagent taking the role of an iPhone UI design critic. Give it only the review prompt, a list of opaque image paths and the corresponding user goals. Keep the score key, other reviews and implementation notes private until all ballots are in.
 
-[November 23 baseline, comparison and visual report](2026-11-23/README.md)
+[November 24 detail study, scores and visual report](2026-11-24/README.md)
 
 ## Capture list
 
@@ -21,7 +21,7 @@ Use the same visible records, dates, control states and viewport for every candi
 
 ## Reviewer prompt
 
-Inspect every supplied image visually. Work independently as an iPhone UI design critic. For each image, score the following five criteria with an integer 0, 1 or 2. Give 0 for missing, illegible or misleading evidence, 1 for usable with a concrete ambiguity or friction, and 2 for clear evidence at normal viewing size.
+Inspect every supplied image visually. Work independently as an iPhone UI design critic. For each image, give each criterion 0 for missing or misleading evidence, 0.5 for substantial friction, 1 for a usable result with a specific obstacle, 1.5 for a clear result with minor friction, or 2 for no meaningful visual friction for the stated goal. Consider metadata, alignment, dates and hierarchy where relevant. A sparse screen can score highly. Extra labels or decoration can hurt.
 
 1. Orientation. Can I identify where I am and the active context?
 2. Scanability. Can I find the content named in the goal and distinguish its hierarchy?
@@ -35,11 +35,11 @@ Return the image ID, five integers in that order, one visible strength and one s
 
 1. Obtain three independent ballots on the current screenshots, changing presentation order per reviewer. Freeze and aggregate those ballots before prototyping. Use recurring concrete feedback to define alternatives.
 2. Run three fresh independent ballots under the same prompt. Include an unannounced copy of the baseline as a control. Mix all designs under anonymous image IDs, rotate presentation order and keep each screen equally weighted. Avoid sequential conversations with a reviewer who has seen earlier scores.
-3. Sum the five integers to get each screenshot score out of ten. Average across screens for each ballot, then across the three ballots for each design. Report the three ballot means, screen means, and each candidate's difference from the same-round control. Show the difference between the first baseline and the control as a check on reviewer drift. Keep unrounded values through aggregation.
+3. Sum the five marks to get each screenshot score out of ten. Average across screens for each ballot, then across the three ballots for each design. Report the three ballot means, screen means, and each candidate's difference from the same-round control. Show the difference between the first baseline and the control as a check on reviewer drift. Keep unrounded values through aggregation.
 4. Archive the image-to-screen key, ordered packets, raw ballots and exact images with the report. Show regressions, disagreements and tradeoffs alongside the means. These scores are subjective visual judgments from one model family. Interactions, accessibility, Dynamic Type and user preference require separate evidence.
 
 Run `python3 score.py <evidence-directory>` from this directory to reproduce the means. Supply a key.csv with image,phase,design,screen columns and a ballots.csv with reviewer,image,orientation,scanability,affordance,legibility,composition columns. Additional columns can record the reviewers' comments. Use globally unique image IDs for phase-specific packets. Each phase and design needs one score per screen from each of three reviewers.
 
-With Pillow 10.1+ installed, place the six PNGs named planner, inbox, workspaces, project, editor and calendar in a directory per design. Prepare a phase with `python3 packets.py baseline run/baseline --seed 1221 --design Current <png-directory>`. For the second phase use `comparison`, a new output path and seed, and one `--design NAME DIRECTORY` per design including Current. Give each subagent only its R1, R2 or R3 directory and the reviewer prompt above. Join both key.csv files with a single header before scoring.
+With Pillow 10.1+ installed, place the six PNGs named planner, inbox, workspaces, project, editor and calendar in a directory per design. Prepare a phase with `python3 packets.py baseline run/baseline --seed 2411 --design Current <png-directory>`. For the second phase use `comparison`, a new output path and seed, and one `--design NAME DIRECTORY` per design including Current. Give each subagent only its R1, R2 or R3 directory and the reviewer prompt above. Join both key.csv files with a single header before scoring.
 
 If alternatives reach the scoring ceiling, retain the original ballots. A supplemental panel can judge each pair for the same screen goal. Shuffle screen order, balance the left and right positions, allow a tie, and record both the visible reason and the tradeoff. Report pair preferences separately from scores and identify whether the follow-up was planned before scoring.

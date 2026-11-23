@@ -22,8 +22,8 @@ def summarize(directory):
         item = key[row["image"]]
         reviewer = row["reviewer"]
         group = (item["phase"], item["design"], item["screen"])
-        values = [int(row[name]) for name in criteria]
-        if reviewer in scores[group] or any(v not in (0, 1, 2) for v in values):
+        values = [float(row[name]) for name in criteria]
+        if reviewer in scores[group] or any(v not in (0, 0.5, 1, 1.5, 2) for v in values):
             raise ValueError(f"Invalid or duplicate ballot: {row}")
         scores[group][reviewer] = sum(values)
 
