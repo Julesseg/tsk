@@ -1,0 +1,50 @@
+{
+  "planner": {
+    "attachment": "Workspace menu and capture flank the date pill",
+    "test": "TskUITests/testCaptureReviewCancelSaveAndRelaunch()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  },
+  "inbox": {
+    "attachment": "Inbox keeps Deadline-only orphan",
+    "test": "TskUITests/testCaptureReviewCancelSaveAndRelaunch()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  },
+  "project": {
+    "attachment": "Project includes scheduled and unscheduled work",
+    "test": "TskUITests/testCaptureReviewCancelSaveAndRelaunch()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  },
+  "editor": {
+    "attachment": "Row editor Expanded without keyboard",
+    "test": "TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  },
+  "calendar": {
+    "attachment": "Compact date pill morphs into its calendar",
+    "test": "TskUITests/testCaptureReviewCancelSaveAndRelaunch()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  },
+  "workspaces": {
+    "attachment": "Workspace destinations in the bottom menu",
+    "test": "TskUITests/testCaptureReviewCancelSaveAndRelaunch()",
+    "pixels": [
+      1320,
+      2868
+    ]
+  }
+}
