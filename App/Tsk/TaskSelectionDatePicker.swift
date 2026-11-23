@@ -8,7 +8,6 @@ struct TaskSelectionDatePicker: View {
     let calendars: TaskSelectionCalendars
     private let commonDateValue: String?
     private let originalDate: Date?
-    private let selectionHasTime: Bool
     @State private var referenceDay: Date
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -21,7 +20,6 @@ struct TaskSelectionDatePicker: View {
         let first = tasks.first?.attributes[attribute]
         commonDateValue = tasks.allSatisfy { $0.attributes[attribute] == first } ? first : nil
         originalDate = field == .scheduled ? tasks.first?.plannedDate : tasks.first?.deadline
-        selectionHasTime = tasks.contains { $0.dateIntent(for: field)?.hasTime == true }
         let day = Calendar.autoupdatingCurrent.startOfDay(for: store.currentDate)
         _referenceDay = State(initialValue: day)
     }
@@ -29,7 +27,7 @@ struct TaskSelectionDatePicker: View {
     private var parameter: TaskRowParameter { field == .scheduled ? .scheduled : .deadline }
     private var includesTime: Bool {
         if case .exact(let intent) = store.selectionChanges[field] { return intent.hasTime }
-        return selectionHasTime
+        return false
     }
 
     private var minimumDate: Date? { field == .scheduled && !includesTime ? referenceDay : nil }
@@ -52,10 +50,8 @@ struct TaskSelectionDatePicker: View {
     }
 
     private func shortcut(to day: Date) -> TaskDateChange {
-        if case .exact(let intent) = store.selectionChanges[field], !intent.hasTime {
-            return .exact(.init(date: day, hasTime: false))
-        }
-        return .day(day)
+        let date = includesTime ? Calendar.autoupdatingCurrent.date(on: day, keepingTimeFrom: selectedDate.wrappedValue) : nil
+        return .exact(.init(date: date ?? day, hasTime: includesTime))
     }
 
     var body: some View {

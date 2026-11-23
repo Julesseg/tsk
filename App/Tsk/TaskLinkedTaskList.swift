@@ -4,25 +4,45 @@ struct TaskLinkedTaskList: View {
     private let source: TaskStore
     @State private var store: TaskStore
     @State private var calendar: TodayCalendarController
+    @State private var dayPaging: TaskDayPaging
     @State private var taskActionDraftID = UUID()
+    private let workspaceControls: TaskWorkspaceControls?
+    private let openPlannerDay: ((Date) -> Void)?
     @Environment(TaskURLController.self) private var automation
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(source: TaskStore, taskID: UUID) {
+    init(source: TaskStore, taskID: UUID, dayPaging: TaskDayPaging? = nil, workspaceControls: TaskWorkspaceControls? = nil,
+         openPlannerDay: ((Date) -> Void)? = nil) {
         self.source = source
+        self.workspaceControls = workspaceControls
+        self.openPlannerDay = openPlannerDay
         _store = State(initialValue: source.linkedTaskStore(for: taskID))
         _calendar = State(initialValue: TodayCalendarController(manager: source.manager))
+        _dayPaging = State(initialValue: dayPaging ?? TaskDayPaging())
     }
+
+    private var showsTaskList: Bool { !store.tasks.isEmpty || (!store.isLoading && store.error != nil) }
 
     var body: some View {
         Group {
-            if store.isLoading && store.tasks.isEmpty {
+            if showsTaskList {
+                TaskListView(store: store, calendar: calendar, dayPaging: dayPaging,
+                             workspaceControls: workspaceControls, openPlannerDay: openPlannerDay)
+            } else if store.isLoading {
                 ProgressView()
-            } else if store.tasks.isEmpty, store.error == nil {
-                ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
             } else {
-                TaskListView(store: store, calendar: calendar)
+                ContentUnavailableView("Task unavailable", systemImage: "questionmark.folder")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay {
+            if !showsTaskList, let workspaceControls {
+                GeometryReader { geometry in
+                    TaskWorkspaceFooter(store: store, paging: dayPaging, availableWidth: geometry.size.width,
+                                        controls: workspaceControls, openPlannerDay: openPlannerDay)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
             }
         }
         .navigationTitle("Linked task")

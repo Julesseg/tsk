@@ -5,6 +5,7 @@ struct TaskDayNavigator: View {
     let store: TaskStore
     let paging: TaskDayPaging
     let availableWidth: CGFloat
+    var openPlannerDay: ((Date) -> Void)? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var calendarHeight: CGFloat = 0
     @State private var retainingCalendar = false
@@ -15,12 +16,14 @@ struct TaskDayNavigator: View {
     private var canChooseDate: Bool { !store.isSelectionPressActive && !store.isSelectionGestureActive && store.rowEditing == nil && !store.isSaving }
     private var canPage: Bool { store.isDayPage && !store.isSelectingTasks && store.taskDrag == nil && !expanded }
     private var today: Date { calendar.startOfDay(for: store.currentDate) }
-    private var canReturnToToday: Bool { canChooseDate && canPage && store.displayedDay != today }
+    private var canReturnToToday: Bool {
+        canChooseDate && !store.isSelectingTasks && store.taskDrag == nil && (!store.isDayPage || store.displayedDay != today)
+    }
     private var isScheduling: Bool { !store.selectedTaskIDs.isEmpty }
     private var openWidth: CGFloat { min(336, max(0, availableWidth - 32)) }
     private var visibleHeight: CGFloat { min(calendarHeight, max(0, (expanded ? calendarHeight : 0) - (paging.calendarPullDistance ?? 0))) }
     private var openness: CGFloat { calendarHeight > 0 ? visibleHeight / calendarHeight : 0 }
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22 + 6 * openness) }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 22 + 14 * openness) }
     private var settleAnimation: Animation? { reduceMotion ? nil : .easeOut(duration: 0.18) }
 
     var body: some View {
@@ -30,7 +33,8 @@ struct TaskDayNavigator: View {
         .padding(.top, visibleHeight)
         .overlay(alignment: .top) {
             if paging.isCalendarVisible || retainingCalendar {
-                TaskDayMonthCalendar(store: store, paging: paging, grid: monthGrid, canChooseDate: canChooseDate, expanded: expanded)
+                TaskDayMonthCalendar(store: store, grid: monthGrid, width: max(0, openWidth - 24),
+                                     canChooseDate: canChooseDate, expanded: expanded, choose: chooseDate)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .frame(width: openWidth)
@@ -49,7 +53,7 @@ struct TaskDayNavigator: View {
         }
         .glassEffect(.regular, in: shape)
         .overlay(alignment: .bottom) {
-            TaskDayPillInput(day: store.displayedDay, hint: pillHint, canReturnToToday: canReturnToToday,
+            TaskDayPillInput(day: store.isDayPage ? store.displayedDay : nil, hint: pillHint, canReturnToToday: canReturnToToday,
                              activate: { if canChooseDate { setExpanded(!expanded) } },
                              returnToToday: returnToToday, pan: pan)
                 .frame(height: TaskDayPaging.pillHeight)
@@ -74,23 +78,47 @@ struct TaskDayNavigator: View {
     }
 
     private var dateLabel: some View {
-        HStack(spacing: 7) {
-            Text(store.displayedDay, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                .monospacedDigit()
-            Image(systemName: "chevron.up")
-                .font(.caption2.weight(.semibold))
-                .rotationEffect(.degrees(180 * openness))
+        Group {
+            if store.isDayPage {
+                HStack(spacing: 7) {
+                    Image(systemName: "chevron.left").font(.caption2.weight(.semibold))
+                    dayLabel
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                }
+                .padding(.horizontal, 16)
+            } else {
+                Text("-").frame(minWidth: TaskDayPaging.pillHeight)
+            }
         }
         .font(.subheadline.weight(.semibold))
         .lineLimit(1)
-        .padding(.horizontal, 16)
         .frame(height: TaskDayPaging.pillHeight)
+    }
+
+    private var dayLabel: some View {
+        TaskDayLabelPages(offset: paging.offset) {
+            dayText(store.displayedDay)
+            ForEach([paging.trailingPreview, paging.preview].compactMap { $0 }, id: \.day) { preview in
+                dayText(preview.day)
+                    .layoutValue(key: TaskDayLabelSide.self, value: preview.side)
+                    .transition(.identity)
+            }
+        }
+        .clipped()
+    }
+
+    private func dayText(_ day: Date) -> some View {
+        Text(day, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+            .monospacedDigit()
+            .minimumScaleFactor(0.8)
     }
 
     private var pillHint: String {
         if expanded { return "Tap or swipe down to close the month calendar" }
         if isScheduling { return "Tap to schedule selected tasks" }
-        return canReturnToToday ? "Swipe up to open the calendar. Hold to go to Today." : "Swipe up or tap to open the month calendar"
+        let browse = store.isDayPage ? "Swipe left or right to browse days. " : ""
+        let hold = canReturnToToday ? " Hold to go to Today." : ""
+        return browse + "Swipe up or tap to open the month calendar." + hold
     }
 
     private func pan(axis: Axis, distance: CGPoint, velocity: CGPoint, state: UIGestureRecognizer.State) {
@@ -116,12 +144,36 @@ struct TaskDayNavigator: View {
     }
 
     private func returnToToday() {
-        paging.navigate(to: today, store: store, reduceMotion: reduceMotion)
+        setExpanded(false)
+        navigate(to: today)
+    }
+
+    private func chooseDate(_ date: Date) {
+        guard canChooseDate else { return }
+        if store.isSelectingTasks {
+            guard date >= today else { return }
+            Task {
+                if await store.scheduleSelection(on: date) { setExpanded(false) }
+            }
+        } else {
+            setExpanded(false)
+            navigate(to: date)
+        }
+    }
+
+    private func navigate(to day: Date) {
+        if store.isDayPage {
+            paging.navigate(to: day, store: store, reduceMotion: reduceMotion)
+        } else if let openPlannerDay {
+            openPlannerDay(day)
+        } else {
+            store.browseDay(day)
+        }
     }
 }
 
 private struct TaskDayPillInput: UIViewRepresentable {
-    let day: Date
+    let day: Date?
     let hint: String
     let canReturnToToday: Bool
     let activate: () -> Void
@@ -133,7 +185,7 @@ private struct TaskDayPillInput: UIViewRepresentable {
     func updateUIView(_ input: Input, context: Context) {
         input.actions = self
         input.hold.isEnabled = canReturnToToday
-        input.accessibilityValue = String(Int(day.timeIntervalSince1970))
+        input.accessibilityValue = day.map { String(Int($0.timeIntervalSince1970)) } ?? "-"
         input.accessibilityHint = hint
         input.accessibilityCustomActions = canReturnToToday ? [input.todayAction] : nil
     }
@@ -214,71 +266,179 @@ private struct TaskDayPillInput: UIViewRepresentable {
 
 private struct TaskDayMonthCalendar: View {
     let store: TaskStore
-    let paging: TaskDayPaging
     let grid: TaskDayMonthGrid.Cache
+    let width: CGFloat
     let canChooseDate: Bool
     let expanded: Bool
+    let choose: (Date) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var browsedMonth: Date?
+    @State private var offset: CGFloat = 0
+    @State private var settling: UUID?
 
     private var calendar: Calendar { .autoupdatingCurrent }
-    private var month: Date { browsedMonth ?? store.displayedDay }
+    private var month: Date { browsedMonth ?? calendar.dateInterval(of: .month, for: store.displayedDay)?.start ?? store.displayedDay }
 
     var body: some View {
-        let displayedDay = store.displayedDay
+        let activeMonth = month
+        let previous = calendar.date(byAdding: .month, value: -1, to: activeMonth)
+        let next = calendar.date(byAdding: .month, value: 1, to: activeMonth)
+        let months = [previous, activeMonth, next].compactMap { $0 }
+        let pages = Array(zip(months, grid.views(for: months)))
         let isScheduling = store.isSelectingTasks
-        let today = calendar.startOfDay(for: store.currentDate)
         VStack(spacing: 4) {
             if isScheduling {
                 Text("Schedule \(store.selectedTaskIDs.count) selected").font(.subheadline.weight(.semibold))
             }
-            HStack {
-                Button("Previous month", systemImage: "chevron.left") { moveMonth(-1) }
-                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
-                Spacer()
-                Text(month, format: .dateTime.month(.wide).year()).font(.headline)
-                Spacer()
-                Button("Next month", systemImage: "chevron.right") { moveMonth(1) }
-                    .labelStyle(.iconOnly).frame(width: 44, height: 44)
+            TaskMonthPages(activeIndex: previous == nil ? 0 : 1, offset: offset) {
+                ForEach(pages, id: \.0) { date, view in
+                    let active = date == activeMonth
+                    let side: CGFloat = active ? 0 : date < activeMonth ? -1 : 1
+                    VStack(spacing: 4) {
+                        Text(date, format: .dateTime.month(.wide).year()).font(.headline)
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .padding(.horizontal, 44)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .mask {
+                                Rectangle().frame(width: max(0, width - 88))
+                                    .offset(x: -width * (side + offset))
+                            }
+                        TaskDayMonthGrid(grid: view, month: date, selected: store.displayedDay,
+                                         minimum: isScheduling ? calendar.startOfDay(for: store.currentDate) : nil,
+                                         expanded: expanded && active, choose: choose)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .allowsHitTesting(active && settling == nil)
+                    .accessibilityHidden(!active)
+                    .transition(.identity)
+                }
             }
-            TaskDayMonthGrid(grid: grid, month: month, selected: displayedDay, minimum: isScheduling ? today : nil,
-                             expanded: expanded, choose: chooseDate)
-                .fixedSize(horizontal: false, vertical: true)
+            .clipped()
+            .overlay(alignment: .top) {
+                HStack {
+                    Button("Previous month", systemImage: "chevron.left") { settle(-1) }
+                        .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                    Spacer()
+                    Button("Next month", systemImage: "chevron.right") { settle(1) }
+                        .labelStyle(.iconOnly).frame(width: 44, height: 44)
+                }
+                .disabled(settling != nil)
+            }
             if store.isSaving { ProgressView("Saving selected tasks") }
         }
         .contentShape(Rectangle())
-        .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { swipe in
-            let dx = swipe.translation.width
-            guard canChooseDate, abs(dx) >= 42, abs(dx) > abs(swipe.translation.height) * 1.5 else { return }
-            moveMonth(dx < 0 ? 1 : -1)
-        })
+        .gesture(TaskMonthSwipe(enabled: expanded && canChooseDate, update: pan))
         .disabled(!canChooseDate)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(expanded ? "planner-month-calendar" : "")
         .onChange(of: expanded) { _, open in
-            if !open { browsedMonth = nil }
-        }
-    }
-
-    private func chooseDate(_ date: Date) {
-        guard canChooseDate else { return }
-        if store.isSelectingTasks {
-            guard date >= calendar.startOfDay(for: store.currentDate) else { return }
-            Task {
-                if await store.scheduleSelection(on: date) { close() }
+            if !open {
+                withAnimation(nil) {
+                    settling = nil
+                    offset = 0
+                    browsedMonth = nil
+                }
             }
-        } else {
-            close()
-            paging.navigate(to: date, store: store, reduceMotion: reduceMotion)
         }
     }
 
-    private func close() {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { paging.expanded = false }
+    private func pan(distance: CGFloat, velocity: CGFloat, phase: UIGestureRecognizer.State) {
+        guard settling == nil else { return }
+        switch phase {
+        case .began, .changed:
+            offset = min(1, max(-1, distance / max(1, width)))
+        case .ended:
+            let threshold = max(42, width * 0.24)
+            let travel = abs(distance) >= threshold ? distance : distance + velocity * 0.12
+            settle(abs(distance) >= 20 && abs(travel) >= threshold ? (travel < 0 ? 1 : -1) : 0)
+        case .cancelled, .failed:
+            settle(0)
+        default: break
+        }
     }
 
-    private func moveMonth(_ offset: Int) {
-        if let next = calendar.date(byAdding: .month, value: offset, to: month) { browsedMonth = next }
+    private func settle(_ step: Int) {
+        guard settling == nil else { return }
+        let destination = calendar.date(byAdding: .month, value: step, to: month) ?? month
+        let target = destination == month ? 0 : -CGFloat(step)
+        let id = UUID()
+        settling = id
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22), completionCriteria: .removed) {
+            offset = target
+        } completion: {
+            guard settling == id else { return }
+            withAnimation(nil) {
+                browsedMonth = destination
+                offset = 0
+                settling = nil
+            }
+        }
+    }
+}
+
+private struct TaskMonthPages: Layout {
+    let activeIndex: Int
+    var offset: CGFloat
+
+    var animatableData: CGFloat {
+        get { offset }
+        set { offset = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 300
+        let pageProposal = ProposedViewSize(width: width, height: nil)
+        let current = subviews[activeIndex].sizeThatFits(pageProposal).height
+        let neighbor = activeIndex + (offset < 0 ? 1 : -1)
+        var height = current
+        if offset != 0, subviews.indices.contains(neighbor) {
+            let adjacent = subviews[neighbor].sizeThatFits(pageProposal).height
+            height += (adjacent - current) * min(1, abs(offset))
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (index, subview) in subviews.enumerated() {
+            let x = bounds.minX + (CGFloat(index - activeIndex) + offset) * bounds.width
+            subview.place(at: CGPoint(x: x, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: bounds.width, height: nil))
+        }
+    }
+}
+
+private struct TaskMonthSwipe: UIGestureRecognizerRepresentable {
+    let enabled: Bool
+    let update: (CGFloat, CGFloat, UIGestureRecognizer.State) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Direction { Direction() }
+
+    func makeUIGestureRecognizer(context: Context) -> TaskDayPillInput.Pan {
+        let pan = TaskDayPillInput.Pan()
+        pan.delegate = context.coordinator
+        pan.maximumNumberOfTouches = 1
+        return pan
+    }
+
+    func updateUIGestureRecognizer(_ pan: TaskDayPillInput.Pan, context: Context) {
+        pan.isEnabled = enabled
+        pan.didEnd = { distance, velocity in update(distance.x, velocity.x, .ended) }
+    }
+
+    func handleUIGestureRecognizerAction(_ pan: TaskDayPillInput.Pan, context: Context) {
+        guard pan.state != .ended else { return }
+        let distance = pan.distance(to: pan.location(in: pan.view?.window))
+        update(distance.x, pan.velocity(in: pan.view?.window).x, pan.state)
+    }
+
+    final class Direction: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? TaskDayPillInput.Pan else { return false }
+            let distance = pan.distance(to: pan.location(in: pan.view?.window))
+            return abs(distance.x) > abs(distance.y) * 1.5
+        }
     }
 }
 
@@ -291,17 +451,47 @@ private struct TaskDayPillWidth: Layout {
         set { openness = newValue }
     }
 
-    func makeCache(subviews: Subviews) -> CGSize { subviews[0].sizeThatFits(.unspecified) }
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache label: inout CGSize) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let label = subviews[0].sizeThatFits(.unspecified)
         let closed = min(label.width, expandedWidth)
         let progress = min(1, max(0, openness))
         return CGSize(width: closed + (expandedWidth - closed) * progress, height: label.height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout CGSize) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.midY), anchor: .center,
                           proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
+private struct TaskDayLabelSide: LayoutValueKey {
+    static let defaultValue: CGFloat = 0
+}
+
+private struct TaskDayLabelPages: Layout {
+    var offset: CGFloat
+
+    var animatableData: CGFloat {
+        get { offset }
+        set { offset = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let current = subviews[0].sizeThatFits(.unspecified)
+        let side: CGFloat = offset < 0 ? 1 : -1
+        var width = current.width
+        if offset != 0, let adjacent = subviews.dropFirst().first(where: { $0[TaskDayLabelSide.self] == side }) {
+            width += (adjacent.sizeThatFits(.unspecified).width - width) * min(1, abs(offset))
+        }
+        return CGSize(width: min(width, proposal.width ?? width), height: current.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let labelProposal = ProposedViewSize(width: bounds.width, height: bounds.height)
+        for label in subviews {
+            let x = bounds.midX + (label[TaskDayLabelSide.self] + offset) * bounds.width
+            label.place(at: CGPoint(x: x, y: bounds.midY), anchor: .center, proposal: labelProposal)
+        }
     }
 }
 

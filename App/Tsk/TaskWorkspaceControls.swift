@@ -1,6 +1,21 @@
 import SwiftUI
 import TskCore
 
+struct TaskWorkspaceFooter: View {
+    let store: TaskStore
+    let paging: TaskDayPaging
+    let availableWidth: CGFloat
+    let controls: TaskWorkspaceControls?
+    var openPlannerDay: ((Date) -> Void)? = nil
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            TaskDayNavigator(store: store, paging: paging, availableWidth: availableWidth, openPlannerDay: openPlannerDay)
+            if !paging.isCalendarVisible { controls }
+        }
+    }
+}
+
 struct TaskWorkspaceControls: View {
     let workspace: Binding<WorkspaceView>?
     let capture: () -> Void

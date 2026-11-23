@@ -112,7 +112,9 @@ struct TaskDayPagingPages: ViewModifier {
                     }
                 }
                 .modifier(DayPageTranslation(paging: paging, width: geometry.size.width))
-                .clipped()
+                .mask {
+                    Rectangle().padding(.vertical, -geometry.size.height)
+                }
         }
         .task(id: neighbors) { await loadNeighbors(neighbors) }
         .sensoryFeedback(.selection, trigger: store.displayedDay)

@@ -3,10 +3,19 @@ import UIKit
 
 struct TaskDayMonthGrid: UIViewRepresentable {
     @MainActor final class Cache {
-        lazy var calendarView = Grid()
+        private var months: [Date] = []
+        private var grids: [Date: Grid] = [:]
+
+        func views(for dates: [Date]) -> [Grid] {
+            if months != dates {
+                grids = Dictionary(uniqueKeysWithValues: dates.map { ($0, grids[$0] ?? Grid()) })
+                months = dates
+            }
+            return dates.compactMap { grids[$0] }
+        }
     }
 
-    let grid: Cache
+    let grid: Grid
     let month: Date
     let selected: Date
     let minimum: Date?
@@ -15,14 +24,14 @@ struct TaskDayMonthGrid: UIViewRepresentable {
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
 
-    func makeUIView(context: Context) -> Grid { grid.calendarView }
+    func makeUIView(context: Context) -> Grid { grid }
 
     func updateUIView(_ grid: Grid, context: Context) {
         grid.choose = choose
         grid.accessibilityElementsHidden = !expanded
         grid.isUserInteractionEnabled = expanded
         guard let start = calendar.dateInterval(of: .month, for: month)?.start else { return }
-        grid.display(month: start, calendar: calendar, locale: locale, selected: selected, minimum: minimum)
+        grid.display(month: start, calendar: calendar, locale: locale, selected: selected, minimum: minimum, interactive: expanded)
     }
 
     static func dismantleUIView(_ grid: Grid, coordinator: ()) { grid.choose = nil }
@@ -37,6 +46,7 @@ struct TaskDayMonthGrid: UIViewRepresentable {
         private var locale = Locale.current
         private var selected: Date?
         private var minimum: Date?
+        private var interactive = false
         private var selectedIndex: Int?
         private var padding = 0
         private var dates: [Date] = []
@@ -65,9 +75,10 @@ struct TaskDayMonthGrid: UIViewRepresentable {
 
         required init?(coder: NSCoder) { fatalError() }
 
-        func display(month: Date, calendar: Calendar, locale: Locale, selected: Date, minimum: Date?) {
+        func display(month: Date, calendar: Calendar, locale: Locale, selected: Date, minimum: Date?, interactive: Bool) {
             let changedMonth = self.month != month || self.calendar != calendar || self.locale != locale
-            guard changedMonth || self.selected != selected || self.minimum != minimum else { return }
+            let changedInteraction = self.interactive != interactive
+            guard changedMonth || self.selected != selected || self.minimum != minimum || changedInteraction else { return }
             if changedMonth {
                 self.month = month
                 self.calendar = calendar
@@ -90,6 +101,7 @@ struct TaskDayMonthGrid: UIViewRepresentable {
             }
             self.selected = selected
             self.minimum = minimum
+            self.interactive = interactive
             selectedIndex = dates.firstIndex { calendar.isDate($0, inSameDayAs: selected) }
             let body = UIFont.preferredFont(forTextStyle: .body)
             let number = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).day()
@@ -100,8 +112,11 @@ struct TaskDayMonthGrid: UIViewRepresentable {
                 let date = dates[index]
                 if changedMonth {
                     button.setTitle(date.formatted(number), for: .normal)
-                    button.accessibilityLabel = date.formatted(spoken)
-                    button.accessibilityIdentifier = "planner-date-\(Int(date.timeIntervalSince1970))"
+                }
+                if changedMonth || changedInteraction {
+                    button.isAccessibilityElement = interactive
+                    button.accessibilityLabel = interactive ? date.formatted(spoken) : nil
+                    button.accessibilityIdentifier = interactive ? "planner-date-\(Int(date.timeIntervalSince1970))" : nil
                 }
                 let current = index == selectedIndex
                 button.accessibilityTraits = current ? [.button, .selected] : .button
