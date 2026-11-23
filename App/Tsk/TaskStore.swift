@@ -156,7 +156,9 @@ final class TaskStore {
             }
         }
     }
-    var selectionChanges = TaskSelectionChanges()
+    var selectionChanges = TaskSelectionChanges() {
+        didSet { error = nil }
+    }
     var selectionDateField: TaskDateField?
     var isSelectionGestureActive = false
     @ObservationIgnored private var selectionSweep: TaskSelectionSweep?
@@ -336,6 +338,9 @@ final class TaskStore {
             else { snapshot = try await manager.viewSnapshot(query: requestedQuery, project: requestedProject) }
             guard generation == reloadGeneration, query == requestedQuery, projectSelection == requestedProject, (isDayPage ? displayedDay : nil) == requestedDay else { return }
             tasks = linkedTaskID.map { id in snapshot.listTasks.filter { $0.id == id } } ?? snapshot.listTasks
+            if isSelectingTasks, !isSelectionGestureActive {
+                selectedTaskIDs.formIntersection(tasks.lazy.filter(\.canComplete).map(\.id))
+            }
             allTasks = snapshot.allTasks
             availableProjects = snapshot.projects
             nextFilterEvaluation = fixedDate == nil ? snapshot.nextEvaluation : nil

@@ -127,3 +127,31 @@ enum TaskOrganization {
         return patch
     }
 }
+
+public enum TaskSelectionTagChange: Equatable, Sendable {
+    case add(String)
+    case remove(String)
+}
+
+extension TaskSelectionChanges {
+    func organizationPatch(for task: TaskRecord) throws -> TaskAttributePatch {
+        var patch: TaskAttributePatch = [:]
+        for (key, choice) in [("project", project), ("priority", priority)] {
+            guard let choice else { continue }
+            let value = choice.isEmpty ? nil : choice
+            if !value.matchesBytes(task.attributes[key]) { patch.updateValue(value, forKey: key) }
+        }
+        switch tag {
+        case .add(let name):
+            try TaskOrganization.validateTag(name)
+            let key = "tag_" + name
+            if task.attributes[key] == nil { patch[key] = "" }
+        case .remove(let name):
+            guard !name.isEmpty else { throw TaskManagementError.invalidTag(name) }
+            let key = "tag_" + name
+            if task.attributes[key] != nil { patch.updateValue(nil, forKey: key) }
+        case nil: break
+        }
+        return try TaskOrganization.normalizedChanges(patch, original: task.attributes)
+    }
+}

@@ -10,6 +10,7 @@ import uuid
 
 
 CHECKPOINTS = {
+    'TaskBulkSelectionUITests/testOrganizeSelectedTasksAndRetainVisibleSelection': ['staged', 'organized', 'cleared'],
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask': ['failed-apply'],
     'TaskRowEditingUITests/testOutsideSaveValidationPickersAndDurableCompletion': ['edited', 'completed'],
     'SeriesMetadataUITests/testSeriesMetadataPreviewCancelSaveAndPersistentFutureOccurrences': ['saved'],
