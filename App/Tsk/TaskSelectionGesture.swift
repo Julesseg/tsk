@@ -10,11 +10,12 @@ struct TaskSelectionRow: Equatable {
     let isEditing: Bool
 
     static let slotWidth: CGFloat = 56
+    static let completionControlWidth: CGFloat = 44
     var selectionSlot: CGRect {
         CGRect(x: bounds.minX, y: bounds.minY, width: Self.slotWidth, height: bounds.height)
     }
 
-    var dragStartX: CGFloat { selectionSlot.maxX + 48 }
+    var dragStartX: CGFloat { selectionSlot.maxX + Self.completionControlWidth }
 }
 
 struct TaskSelectionRowsKey: PreferenceKey {

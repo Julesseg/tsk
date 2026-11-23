@@ -268,9 +268,10 @@ private struct TaskListRowContent: View {
     private var phase: TaskCompletionFeedback.Phase? { isPreview ? nil : store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { displayedTask.status == "completed" || phase == .checked || phase == .covering || phase == .collapsing }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
+    private var hasCompletionControl: Bool { task.canComplete || displayedTask.status == "completed" }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 4) {
+        HStack(alignment: .top, spacing: hasCompletionControl && editing?.isCapture != true ? 0 : 4) {
             if editing?.isCapture != true {
                 TaskPlannerLeadingDate(task: displayedTask, day: day, today: store.currentDate)
                     .frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
@@ -290,8 +291,7 @@ private struct TaskListRowContent: View {
                         .font(.body).foregroundStyle(Color.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
-                        .padding(.trailing, 12)
-                        .frame(minWidth: 44, minHeight: 28)
+                        .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
@@ -481,8 +481,7 @@ private struct TaskListRowContent: View {
         Image(systemName: "checkmark.circle.fill")
             .font(.body)
             .foregroundStyle(Color.secondary)
-            .padding(.trailing, 12)
-            .frame(minWidth: 44, minHeight: headerHeight)
+            .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: headerHeight)
             .contentShape(Rectangle())
     }
 

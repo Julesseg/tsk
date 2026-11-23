@@ -124,6 +124,7 @@ import XCTest
             !firstRow.exists || firstRow.frame.minY < rowFrames[0].minY
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [scrolled], timeout: 5), .completed, "Scrolling resumes after release")
+        captureBulkDateEvidence("Planner rows scroll beneath the toolbar", app: app)
 
         openWorkspaceView("Inbox", app: app)
         XCTAssertEqual(pill.value as? String, "-")
