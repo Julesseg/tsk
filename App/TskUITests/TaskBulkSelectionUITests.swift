@@ -64,8 +64,14 @@ import XCTest
         captureBulkDateEvidence("Expanded calendar away from Today", app: app)
         let nextMonth = try XCTUnwrap(Calendar.current.date(byAdding: .month, value: 1, to: tomorrow))
         let nextMonthButton = app.buttons["planner-date-\(Int(nextMonth.timeIntervalSince1970))"]
+        let monthCenter = calendar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        monthCenter.press(forDuration: 0.05, thenDragTo: monthCenter.withOffset(CGVector(dx: -28, dy: 0)),
+                          withVelocity: .slow, thenHoldForDuration: 0.2)
+        XCTAssertFalse(nextMonthButton.exists)
+        XCTAssertTrue(app.buttons["planner-date-" + next].isHittable)
         calendar.swipeLeft()
         XCTAssertTrue(nextMonthButton.waitForExistence(timeout: 5))
+        XCTAssertEqual(pill.value as? String, next)
         captureBulkDateEvidence("Swipe opens the following month", app: app)
         calendar.swipeRight()
         XCTAssertTrue(app.buttons["planner-date-" + next].waitForExistence(timeout: 5))
@@ -111,8 +117,36 @@ import XCTest
             CGRect(x: app.frame.minX, y: app.frame.maxY - 12, width: app.frame.width, height: 12)) },
             "Rows extend into the bottom safe area")
         captureBulkDateEvidence("Task list extends behind the glass date pill", app: app)
-        list.swipeUp()
-        XCTAssertTrue(!firstRow.exists || firstRow.frame.minY < rowFrames[0].minY, "Scrolling resumes after release")
+        let scrollStart = list.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.7))
+        let scrollEnd = scrollStart.withOffset(CGVector(dx: 0, dy: -240))
+        scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd, withVelocity: .slow, thenHoldForDuration: 0)
+        let scrolled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            !firstRow.exists || firstRow.frame.minY < rowFrames[0].minY
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [scrolled], timeout: 5), .completed, "Scrolling resumes after release")
+
+        openWorkspaceView("Inbox", app: app)
+        XCTAssertEqual(pill.value as? String, "-")
+        captureBulkDateEvidence("Inbox shows the compact date pill", app: app)
+        pill.tap()
+        XCTAssertTrue(calendar.waitForExistence(timeout: 5))
+        tapTaskControl(app.buttons["planner-date-" + next], app: app)
+        assertPlannerDay(next, app: app)
+        openWorkspaceView("Projects", app: app)
+        XCTAssertEqual(pill.value as? String, "-")
+        pill.tap()
+        XCTAssertTrue(calendar.waitForExistence(timeout: 5))
+        captureBulkDateEvidence("The date pill opens above the Projects list", app: app)
+        pill.tap()
+        XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
+        app.buttons["project-Work"].tap()
+        let projectOpened = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Work"),
+                                                      object: app.staticTexts["workspace-title-text"])
+        XCTAssertEqual(XCTWaiter.wait(for: [projectOpened], timeout: 5), .completed)
+        XCTAssertEqual(pill.value as? String, "-")
+        pill.press(forDuration: 0.7)
+        assertTodayTaskList(app)
+        assertPlannerDay(day, app: app)
     }
 
     func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() async throws {
@@ -210,12 +244,24 @@ import XCTest
         for field in ["scheduled", "deadline"] {
             if field == "deadline" { app.buttons["selection-deadline"].tap() }
             let calendar = app.datePickers[field + "-picker"]
+            XCTAssertTrue(includeTime.waitForExistence(timeout: 5))
+            XCTAssertEqual(includeTime.value as? String, "0")
+            XCTAssertFalse(time.exists)
+            XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
+            captureBulkDateEvidence("Bulk \(field) opens without time", app: app)
+            app.buttons["selection-date-tomorrow"].tap()
+            XCTAssertEqual(includeTime.value as? String, "0")
+            XCTAssertFalse(time.exists)
+            setTime(true, toggle: includeTime)
             XCTAssertTrue(time.waitForExistence(timeout: 5))
-            XCTAssertEqual(includeTime.value as? String, "1")
             XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
             XCTAssertLessThanOrEqual(includeTime.frame.maxY, time.frame.minY)
             captureBulkDateEvidence("Bulk \(field) date and time separated by the toggle", app: app)
-            turnOffTime(includeTime, app: app)
+            app.buttons["close-selection-date"].tap()
+            app.buttons["selection-" + field].tap()
+            XCTAssertTrue(time.waitForExistence(timeout: 5))
+            XCTAssertEqual(includeTime.value as? String, "1")
+            setTime(false, toggle: includeTime)
             XCTAssertTrue(time.waitForNonExistence(timeout: 5))
             XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
             captureBulkDateEvidence("Bulk \(field) date without time", app: app)
@@ -323,16 +369,16 @@ import XCTest
         }
     }
 
-    private func turnOffTime(_ toggle: XCUIElement, app: XCUIApplication) {
+    private func setTime(_ enabled: Bool, toggle: XCUIElement) {
         XCTAssertTrue(toggle.exists)
         let thumb = toggle.switches.firstMatch
         if thumb.exists {
-            tapTaskControlAtCenter(thumb, app: app)
+            thumb.coordinate(withNormalizedOffset: CGVector(dx: enabled ? 0.28 : 0.72, dy: 0.5)).tap()
         } else {
             toggle.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
                 .withOffset(CGVector(dx: -25, dy: 0)).tap()
         }
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "0"), object: toggle)
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", enabled ? "1" : "0"), object: toggle)
         XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
     }
 

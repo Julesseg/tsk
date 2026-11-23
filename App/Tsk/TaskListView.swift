@@ -14,13 +14,14 @@ struct TaskListView: View {
     @State private var selectionBarHeight: CGFloat = 0
     @State var dayPaging = TaskDayPaging()
     var workspaceControls: TaskWorkspaceControls? = nil
+    var openPlannerDay: ((Date) -> Void)? = nil
 
     var body: some View {
         GeometryReader { geometry in
         let keyboardInset = keyboardOverlap(in: geometry.frame(in: .global))
         let isPickerClosed = store.selectionDateField == nil
-        let showsNavigator = store.isDayPage || store.isSelectingTasks
-        let footerHeight = (showsNavigator || workspaceControls != nil ? TaskDayPaging.collapsedNavigatorHeight : 0) + (store.isSelectingTasks ? selectionBarHeight : 0)
+        let showsNavigator = store.isDayPage || store.isSelectingTasks || workspaceControls != nil
+        let footerHeight = (showsNavigator ? TaskDayPaging.collapsedNavigatorHeight : 0) + (store.isSelectingTasks ? selectionBarHeight : 0)
         let viewport = geometry.frame(in: .global)
         let rowViewport = viewport.divided(atDistance: footerHeight + keyboardInset, from: .maxYEdge).remainder
         let extendsBehindHomeIndicator = store.isDayPage && store.rowEditing == nil
@@ -115,11 +116,9 @@ struct TaskListView: View {
                         }
                         .transition(.opacity)
                 }
-                ZStack(alignment: .bottom) {
-                    if showsNavigator {
-                        TaskDayNavigator(store: store, paging: dayPaging, availableWidth: geometry.size.width)
-                    }
-                    if !dayPaging.isCalendarVisible { workspaceControls }
+                if showsNavigator {
+                    TaskWorkspaceFooter(store: store, paging: dayPaging, availableWidth: geometry.size.width,
+                                        controls: workspaceControls, openPlannerDay: openPlannerDay)
                 }
             }
             .frame(width: geometry.size.width)
@@ -291,6 +290,7 @@ private struct TaskListRowContent: View {
                         .font(.body).foregroundStyle(Color.secondary)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
                         .animation(reduceMotion ? nil : .default, value: checked)
+                        .padding(.trailing, 12)
                         .frame(minWidth: 44, minHeight: 28)
                         .contentShape(Rectangle())
                 }
@@ -481,6 +481,7 @@ private struct TaskListRowContent: View {
         Image(systemName: "checkmark.circle.fill")
             .font(.body)
             .foregroundStyle(Color.secondary)
+            .padding(.trailing, 12)
             .frame(minWidth: 44, minHeight: headerHeight)
             .contentShape(Rectangle())
     }

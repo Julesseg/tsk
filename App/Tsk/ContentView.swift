@@ -122,7 +122,13 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) { workspaceControls }
+            .contentMargins(.bottom, TaskDayPaging.collapsedNavigatorHeight, for: .scrollContent)
+            .overlay {
+                GeometryReader { geometry in
+                    TaskWorkspaceFooter(store: store, paging: dayPaging, availableWidth: geometry.size.width, controls: workspaceControls)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                }
+            }
             .accessibilityIdentifier("projects-list")
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
@@ -151,9 +157,17 @@ struct ContentView: View {
     }
 
     @ViewBuilder private func taskDestination(_ id: UUID) -> some View {
-        TaskLinkedTaskList(source: store, taskID: id)
+        TaskLinkedTaskList(source: store, taskID: id, dayPaging: dayPaging,
+                           workspaceControls: TaskWorkspaceControls(workspace: nil, capture: capture), openPlannerDay: openPlannerDayFromLinkedTask)
             .id(linkedTaskPresentationID)
-            .safeAreaInset(edge: .bottom, spacing: 0) { TaskWorkspaceControls(workspace: nil, capture: capture) }
+    }
+
+    private func openPlannerDayFromLinkedTask(_ day: Date) {
+        Task {
+            guard await store.prepareForTaskActionNavigation() else { return }
+            resetNavigation()
+            store.browseDay(day)
+        }
     }
 
     private var editorSheets: some View {
