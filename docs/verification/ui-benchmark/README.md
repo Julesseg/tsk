@@ -8,6 +8,8 @@ Use this protocol to compare visual designs for tsk. Freeze the screen list, fix
 
 [Expanded task pickers and leading inset](expanded-pickers/README.md) compares single-task uses of the rebased multi-edit pickers.
 
+[Project and deadline](project-deadline/README.md) explores 24 treatments within the selected Time as the picker layout.
+
 ## Capture list
 
 Use standard text size, portrait and light appearance. The first run used the iPhone smoke suite's existing XCUITest attachments. For an exact rerun, download the ui-test-results artifact from [run 45270385965](https://github.com/Julesseg/tsk/actions/runs/45270385965) and run `xcrun xcresulttool export attachments --path App/TestResults.xcresult --output-path shots`. Map its manifest to the six test and attachment names in captures.json. The benchmark archive retains the original PNGs for repeat scoring. For a new revision, capture the same states with those tests. Use the repository simulator lease and device workflow for local runtime work. Record revision, runtime, viewport and capture method.
