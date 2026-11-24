@@ -24,6 +24,7 @@ NIGHTLY = (
     'TaskActionURLUITests/testSystemFindURLShowsCombinedResultsAndEmptyStateWithoutChangingWorkspace',
     'TaskActionURLUITests/testURLSavesValidDraftAndRetainsInvalidDraftWithoutCreatingTask',
     'TaskBulkSelectionUITests/testBulkDateFailureRetainsPendingOperationAndEverySelectedTask',
+    'TaskBulkSelectionUITests/testOrganizeSelectedTasksAndRetainVisibleSelection',
     'TaskBulkSelectionUITests/testScheduledSlotSelectsOnTouchDownAndSweepsWithoutMovingRows',
     'TaskNavigationUITests/testInstalledOpenTaskURLUsesFreshRecordExpandsContainingListAndReturnsWithColdMissingIdentity',
     'TaskNavigationUITests/testInstalledOpenViewURLsReachPlannerInboxAndExactProjects',

@@ -53,7 +53,11 @@ extension TaskStore {
         defer { isSaving = false }
         do {
             _ = try await manager.applySelection(ids: Array(ids), changes: changes)
-            if generation == taskSelectionGeneration { endTaskSelection() }
+            if generation == taskSelectionGeneration {
+                selectionChanges = TaskSelectionChanges()
+                selectionDateField = nil
+                if changes.complete { endTaskSelection() }
+            }
             await reload()
         } catch { self.error = error.localizedDescription }
     }
@@ -87,6 +91,9 @@ struct TaskSelectionBar: View {
             }
             GlassEffectContainer(spacing: 8) {
                 VStack(alignment: .trailing, spacing: 8) {
+                    if store.selectionDateField == nil {
+                        TaskSelectionOrganizationControls(store: store)
+                    }
                     dateControl(.scheduled)
                     dateControl(.deadline)
                     HStack(spacing: 12) {

@@ -16,7 +16,10 @@ struct OccurrenceTests {
         let original = try await manager.tasks()
         let count = try sqlite(directory, "SELECT COUNT(*) FROM operations;")
         try sqlite(directory, "CREATE TRIGGER fail_selection BEFORE INSERT ON operations WHEN (SELECT COUNT(*) FROM operations) > \(count.trimmingCharacters(in: .whitespacesAndNewlines)) BEGIN SELECT RAISE(ABORT, 'selection rollback fixture'); END;")
-        let changes = TaskSelectionChanges(scheduled: .remove, deadline: .set(Date(timeIntervalSince1970: 800)), complete: true)
+        var changes = TaskSelectionChanges(scheduled: .remove, deadline: .set(Date(timeIntervalSince1970: 800)), complete: true)
+        changes.project = "Work"
+        changes.priority = "M"
+        changes.tag = .add("today")
         await #expect(throws: (any Error).self) { try await manager.applySelection(ids: [first.id, second.id], changes: changes) }
         #expect(try await manager.tasks() == original)
         #expect(try sqlite(directory, "SELECT COUNT(*) FROM operations;") == count)
@@ -26,6 +29,8 @@ struct OccurrenceTests {
         #expect(try await reopened.task(id: parent.id).attributes["mask"] == "++")
         for id in [first.id, second.id] {
             let saved = try await reopened.task(id: id)
+            #expect(saved.project == "Work" && saved.priority == "M")
+            #expect(saved.tags == ["today"] && saved.attributes["tags"] == "today")
             #expect(saved.status == "completed" && saved.attributes["end"] == "100")
             #expect(saved.attributes["scheduled"] == nil && saved.attributes["due"] == "800")
         }

@@ -9,7 +9,7 @@ The manual form defaults to smoke.
 | Coverage | iPhone | Trigger |
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
-| Full | 21 methods | Nightly at 02:00 UTC, explicit dispatch |
+| Full | 22 methods | Nightly at 02:00 UTC, explicit dispatch |
 | Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 3 methods | Explicit dispatch |
@@ -17,7 +17,7 @@ The manual form defaults to smoke.
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 46 retained methods has exactly one primary
+methods for every suite. Each of the 47 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes
@@ -27,7 +27,7 @@ Smoke covers inline capture/cancellation/save/relaunch, row validation/native
 pickers/outside-save/durable completion.
 Smoke needs no synchronization server or independent peer.
 
-Nightly keeps Scheduled slot touch-down and sweep selection, bulk failed Apply,
+Nightly keeps Scheduled slot touch-down and sweep selection, bulk failed Apply, staged project/tag/priority edits and selection retention,
 row notes and tag validation, occurrence success/failure, series metadata preview/cancel/save, external add/modify/complete/delete/callback URLs, structured Find results/callbacks and draft-safe navigation. Modify retains its two installed-URL journeys for atomic fields/tag modes/clears and draft safety. Open Task/Open View coverage adds fresh/completed/missing task identities, planner, Inbox and exact projects, project return paths and actual callbacks. Full coverage is
 required for workflow/system changes and behavior outside smoke. It does not
 certify on-demand scenarios. Run the relevant focused/on-demand suite when a
@@ -94,7 +94,7 @@ tests, settings, services, fixtures and entitlement, were also removed explicitl
 Timed task notifications now use Core date-eligibility tests and Apple Native
 request tests. The isolated XCUITest replicas never prompt for notification access.
 The upgrade cleanup removes retired alerts and Spotlight items by ownership.
-Full selects 14 workspace and seven row methods.
+Full selects 14 workspace and eight row methods.
 Apple Reminders import was removed on 2026-11-18: one-time copy, continuous
 move, recurring conversion, settings, permission requests, background import,
 Core/Native APIs and dedicated fixtures/tests are retired. Calendar and tasks
@@ -188,7 +188,7 @@ The retained full partitions are:
 
 | Family | Workspace | Task/row editing |
 | --- | ---: | ---: |
-| iPhone | 16 methods | 6 methods |
+| iPhone | 14 methods | 8 methods |
 
 The partition union is exactly the full selection, with no duplicates or skips.
 Installed system integrations remain in workspace.

@@ -72,6 +72,9 @@ public enum TaskDateChange: Equatable, Sendable {
 public struct TaskSelectionChanges: Equatable, Sendable {
     public var scheduled: TaskDateChange?
     public var deadline: TaskDateChange?
+    public var project: String?
+    public var priority: String?
+    public var tag: TaskSelectionTagChange?
     public var complete: Bool
 
     public init(scheduled: TaskDateChange? = nil, deadline: TaskDateChange? = nil, complete: Bool = false) {
@@ -87,7 +90,7 @@ public struct TaskSelectionChanges: Equatable, Sendable {
 
     public func modifies(tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) throws -> Bool {
         guard !tasks.isEmpty else { return false }
-        return try complete || TaskDateField.allCases.contains { try modifies($0, tasks: tasks, calendar: calendar) }
+        return try complete || tasks.contains { try !organizationPatch(for: $0).isEmpty } || TaskDateField.allCases.contains { try modifies($0, tasks: tasks, calendar: calendar) }
     }
 
     public func modifies(_ field: TaskDateField, tasks: [TaskRecord], calendar: Calendar = .autoupdatingCurrent) throws -> Bool {
@@ -116,7 +119,7 @@ extension TaskManager {
         for id in ids.sorted(by: { $0.uuidString < $1.uuidString }) {
             guard let task = records.first(where: { $0.id == id }) else { throw TaskManagementError.taskNotFound(id) }
             guard task.canComplete else { throw TaskManagementError.unsupportedTaskKind }
-            var patch: TaskAttributePatch = [:]
+            var patch = try changes.organizationPatch(for: task)
             for field in TaskDateField.allCases {
                 if let change = changes[field] {
                     for (key, value) in try change.patch(for: task, field: field, calendar: calendar) {

@@ -41,10 +41,10 @@ import XCTest
         let today: Date = Date(timeIntervalSince1970: 1792144800)
         XCTAssertEqual(scheduledSlot(second, app: app).label, "Scheduled " + today.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Locale(identifier: "en_US"))))
         let rowFrames = [firstRow, thirdRow].map(\.frame)
-        captureBulkDateEvidence("Scheduled times, carryover and separate deadlines", app: app)
+        captureSelectionEvidence("Scheduled times, carryover and separate deadlines", app: app)
         let settings = app.buttons["workspace-settings"].frame
         expandPlannerCalendar(app)
-        captureBulkDateEvidence("Month calendar follows the upward pull", app: app)
+        captureSelectionEvidence("Month calendar follows the upward pull", app: app)
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: settings.midX, dy: settings.midY)).tap()
         XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
         XCTAssertFalse(app.collectionViews["workspace-settings-list"].exists)
@@ -61,7 +61,7 @@ import XCTest
         let calendar = app.otherElements["planner-month-calendar"]
         XCTAssertTrue(calendar.waitForExistence(timeout: 5))
         XCTAssertFalse(calendar.buttons["Today"].exists)
-        captureBulkDateEvidence("Expanded calendar away from Today", app: app)
+        captureSelectionEvidence("Expanded calendar away from Today", app: app)
         let nextMonth = try XCTUnwrap(Calendar.current.date(byAdding: .month, value: 1, to: tomorrow))
         let nextMonthButton = app.buttons["planner-date-\(Int(nextMonth.timeIntervalSince1970))"]
         let monthCenter = calendar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -72,7 +72,7 @@ import XCTest
         calendar.swipeLeft()
         XCTAssertTrue(nextMonthButton.waitForExistence(timeout: 5))
         XCTAssertEqual(pill.value as? String, next)
-        captureBulkDateEvidence("Swipe opens the following month", app: app)
+        captureSelectionEvidence("Swipe opens the following month", app: app)
         calendar.swipeRight()
         XCTAssertTrue(app.buttons["planner-date-" + next].waitForExistence(timeout: 5))
         pill.tap()
@@ -107,7 +107,7 @@ import XCTest
         XCTAssertLessThan(try XCTUnwrap(proof["activationDuration"] as? Double), 0.15)
         XCTAssertEqual(try XCTUnwrap(proof["columnWidth"] as? Double), firstSlot.frame.width, accuracy: 2)
         XCTAssertEqual([firstRow, thirdRow].map(\.frame), rowFrames)
-        captureBulkDateEvidence("Sweep selects three rows in place", app: app)
+        captureSelectionEvidence("Sweep selects three rows in place", app: app)
         end.press(forDuration: 0.02, thenDragTo: start, withVelocity: .slow, thenHoldForDuration: 0)
         XCTAssertTrue(count.waitForNonExistence(timeout: 5))
         XCTAssertEqual([firstRow, thirdRow].map(\.frame), rowFrames)
@@ -116,7 +116,7 @@ import XCTest
         XCTAssertTrue(list.cells.allElementsBoundByIndex.contains { $0.frame.intersects(
             CGRect(x: app.frame.minX, y: app.frame.maxY - 12, width: app.frame.width, height: 12)) },
             "Rows extend into the bottom safe area")
-        captureBulkDateEvidence("Task list extends behind the glass date pill", app: app)
+        captureSelectionEvidence("Task list extends behind the glass date pill", app: app)
         let scrollStart = list.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.7))
         let scrollEnd = scrollStart.withOffset(CGVector(dx: 0, dy: -240))
         scrollStart.press(forDuration: 0.05, thenDragTo: scrollEnd, withVelocity: .slow, thenHoldForDuration: 0)
@@ -124,11 +124,11 @@ import XCTest
             !firstRow.exists || firstRow.frame.minY < rowFrames[0].minY
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [scrolled], timeout: 5), .completed, "Scrolling resumes after release")
-        captureBulkDateEvidence("Planner rows scroll beneath the toolbar", app: app)
+        captureSelectionEvidence("Planner rows scroll beneath the toolbar", app: app)
 
         openWorkspaceView("Inbox", app: app)
         XCTAssertEqual(pill.value as? String, "-")
-        captureBulkDateEvidence("Inbox shows the compact date pill", app: app)
+        captureSelectionEvidence("Inbox shows the compact date pill", app: app)
         pill.tap()
         XCTAssertTrue(calendar.waitForExistence(timeout: 5))
         tapTaskControl(app.buttons["planner-date-" + next], app: app)
@@ -137,7 +137,7 @@ import XCTest
         XCTAssertEqual(pill.value as? String, "-")
         pill.tap()
         XCTAssertTrue(calendar.waitForExistence(timeout: 5))
-        captureBulkDateEvidence("The date pill opens above the Projects list", app: app)
+        captureSelectionEvidence("The date pill opens above the Projects list", app: app)
         pill.tap()
         XCTAssertTrue(calendar.waitForNonExistence(timeout: 5))
         app.buttons["project-Work"].tap()
@@ -148,6 +148,80 @@ import XCTest
         pill.press(forDuration: 0.7)
         assertTodayTaskList(app)
         assertPlannerDay(day, app: app)
+    }
+
+    func testOrganizeSelectedTasksAndRetainVisibleSelection() async throws {
+        let app = try launch(organization: true)
+        selectPair(app)
+        let apply = app.buttons["task-selection-apply"]
+        let project = app.buttons["selection-project"]
+        let tags = app.buttons["selection-tags"]
+        let priority = app.buttons["selection-priority"]
+        let controls = [project, tags, priority, app.buttons["selection-scheduled"], app.buttons["selection-deadline"]].map(\.frame)
+        for (upper, lower) in zip(controls, controls.dropFirst()) {
+            XCTAssertLessThan(upper.maxY, lower.minY)
+            XCTAssertEqual(upper.maxX, lower.maxX, accuracy: 1)
+        }
+        XCTAssertLessThan(app.frame.maxX - priority.frame.maxX, 24)
+        captureSelectionEvidence("Selection action bar", app: app)
+        XCTAssertEqual(tags.label, "Tags for selected tasks")
+        priority.tap()
+        captureSelectionEvidence("Priority choices", app: app)
+        app.buttons["Clear priority"].tap()
+        project.tap()
+        captureSelectionEvidence("Project choices", app: app)
+        app.buttons["New project…"].tap()
+        let name = app.textFields["selection-name"]
+        name.tap()
+        name.typeText("Dispatch\n")
+        tags.tap()
+        let tagSearch = app.textFields["selection-tag-search"]
+        tagSearch.tap()
+        tagSearch.typeText("batch")
+        captureSelectionEvidence("Add tag with the keyboard", app: app)
+        app.buttons["Add tag"].tap()
+        XCTAssertEqual(apply.label, "Apply to 2")
+        let staged = try await storedTasks(app, checkpoint: "staged")
+        XCTAssertEqual(staged[first]?["project"], "Home")
+        XCTAssertEqual(staged[second]?["priority"], "H")
+        XCTAssertNil(staged[first]?["tag_batch"])
+        captureSelectionEvidence("Project, tag and priority staged", app: app)
+        apply.tap()
+        XCTAssertTrue(apply.wait(for: \.label, toEqual: "2 selected", timeout: 5))
+        XCTAssertFalse(apply.isEnabled)
+        let saved = try await storedTasks(app, checkpoint: "organized")
+        for id in [first, second] {
+            XCTAssertEqual(saved[id]?["project"], "Dispatch")
+            XCTAssertNil(saved[id]?["priority"])
+            XCTAssertEqual(saved[id]?["tag_batch"], "")
+        }
+        XCTAssertEqual(saved[first]?["tag_home"], "keep")
+        XCTAssertEqual(saved[second]?["tag_work"], "")
+        tags.tap()
+        app.buttons["Remove"].tap()
+        captureSelectionEvidence("Remove one existing tag", app: app)
+        app.buttons["selection-tag-batch"].tap()
+        XCTAssertEqual(tags.value as? String, "Remove batch")
+        apply.tap()
+        XCTAssertTrue(apply.wait(for: \.label, toEqual: "2 selected", timeout: 5))
+        app.buttons["cancel-task-selection"].tap()
+        XCTAssertTrue(apply.waitForNonExistence(timeout: 5))
+        openWorkspaceView("Projects", app: app)
+        app.buttons["project-Dispatch"].tap()
+        selectPair(app)
+        project.tap()
+        app.buttons["Clear project"].tap()
+        apply.tap()
+        XCTAssertTrue(apply.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["task-" + first].exists)
+        XCTAssertFalse(app.buttons["task-" + second].exists)
+        let cleared = try await storedTasks(app, checkpoint: "cleared")
+        for id in [first, second] {
+            XCTAssertNil(cleared[id]?["project"])
+            XCTAssertNil(cleared[id]?["tag_batch"])
+        }
+        XCTAssertEqual(cleared[first]?["tags"], "home")
+        XCTAssertEqual(cleared[second]?["tags"], "work")
     }
 
     func testBulkDateFailureRetainsPendingOperationAndEverySelectedTask() async throws {
@@ -170,7 +244,7 @@ import XCTest
         for id in [first, second] {
             XCTAssertEqual(app.buttons["complete-task-row-" + id].value as? String, "Selected")
         }
-        captureBulkDateEvidence("Calendar failure retains the calendar and selected tasks", app: app)
+        captureSelectionEvidence("Calendar failure retains the calendar and selected tasks", app: app)
         XCTAssertEqual(pill.frame.height, 44, accuracy: 1)
         pill.tap()
         XCTAssertTrue(app.otherElements["planner-month-calendar"].waitForNonExistence(timeout: 5))
@@ -190,7 +264,7 @@ import XCTest
         for id in ["selection-scheduled", "selection-deadline", "complete-task-selection"] {
             XCTAssertEqual(app.buttons[id].value as? String, "Modified")
         }
-        captureBulkDateEvidence("Apply failure retains every staged change and selected task", app: app)
+        captureSelectionEvidence("Apply failure retains every staged change and selected task", app: app)
         apply.tap()
         XCTAssertTrue(error.exists)
         app.buttons["cancel-task-selection"].tap()
@@ -226,7 +300,7 @@ import XCTest
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in proof()["ready"] as? Bool == true }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
-        captureBulkDateEvidence("Animation-enabled picker before value changes", app: app)
+        captureSelectionEvidence("Animation-enabled picker before value changes", app: app)
         app.datePickers["scheduled-picker"].buttons["Sunday, October 18"].tap()
         app.datePickers["scheduled-picker"].buttons["Tuesday, October 20"].tap()
         for id in ["selection-date-today", "selection-date-tomorrow", "selection-date-remove", "reset-selection-date"] {
@@ -239,7 +313,7 @@ import XCTest
         add(attachment)
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(measurements["changes"] as? Int), 6)
         XCTAssertLessThanOrEqual(try XCTUnwrap(measurements["maximumVerticalDrift"] as? Double), 1, "Value changes must not move the bottom actions during animation")
-        captureBulkDateEvidence("Animation-enabled picker after value changes", app: app)
+        captureSelectionEvidence("Animation-enabled picker after value changes", app: app)
         let includeTime = app.switches["selection-set-time"]
         let time = app.datePickers["selection-time-picker"]
         for field in ["scheduled", "deadline"] {
@@ -249,7 +323,7 @@ import XCTest
             XCTAssertEqual(includeTime.value as? String, "0")
             XCTAssertFalse(time.exists)
             XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
-            captureBulkDateEvidence("Bulk \(field) opens without time", app: app)
+            captureSelectionEvidence("Bulk \(field) opens without time", app: app)
             app.buttons["selection-date-tomorrow"].tap()
             XCTAssertEqual(includeTime.value as? String, "0")
             XCTAssertFalse(time.exists)
@@ -257,7 +331,7 @@ import XCTest
             XCTAssertTrue(time.waitForExistence(timeout: 5))
             XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
             XCTAssertLessThanOrEqual(includeTime.frame.maxY, time.frame.minY)
-            captureBulkDateEvidence("Bulk \(field) date and time separated by the toggle", app: app)
+            captureSelectionEvidence("Bulk \(field) date and time separated by the toggle", app: app)
             app.buttons["close-selection-date"].tap()
             app.buttons["selection-" + field].tap()
             XCTAssertTrue(time.waitForExistence(timeout: 5))
@@ -265,7 +339,7 @@ import XCTest
             setTime(false, toggle: includeTime)
             XCTAssertTrue(time.waitForNonExistence(timeout: 5))
             XCTAssertLessThanOrEqual(calendar.frame.maxY, includeTime.frame.minY)
-            captureBulkDateEvidence("Bulk \(field) date without time", app: app)
+            captureSelectionEvidence("Bulk \(field) date without time", app: app)
             app.buttons["close-selection-date"].tap()
         }
         app.buttons["cancel-task-selection"].tap()
@@ -453,14 +527,14 @@ import XCTest
         XCTAssertEqual(app.buttons["task-selection-apply"].label, "2 selected")
     }
 
-    private func captureBulkDateEvidence(_ name: String, app: XCUIApplication) {
+    private func captureSelectionEvidence(_ name: String, app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
     }
 
-    private func launch(invalidOccurrence: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false, plannerSlots: Bool = false, frameProbe: Bool = false) throws -> XCUIApplication {
+    private func launch(invalidOccurrence: Bool = false, organization: Bool = false, animationsEnabled: Bool = false, motionProbe: Bool = false, plannerSlots: Bool = false, frameProbe: Bool = false) throws -> XCUIApplication {
         let app = taskTestApplication()
         app.launchArguments += ["-AppleLocale", "en_US", "-AppleLanguages", "(en)"]
         app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = UUID().uuidString
@@ -500,8 +574,16 @@ import XCTest
                 ])
             }
         } else {
+            var secondAttributes = ["description": "Second selection task", "status": "pending"]
+            if organization {
+                attributes["project"] = "Home"
+                attributes["priority"] = "L"
+                attributes["tag_home"] = "keep"
+                secondAttributes["priority"] = "H"
+                secondAttributes["tag_work"] = ""
+            }
             add(first, attributes)
-            add(second, ["description": "Second selection task", "status": "pending"])
+            add(second, secondAttributes)
             add(third, ["description": "Third selection task", "status": "pending"])
         }
         app.launchEnvironment["TSK_TEST_RECORDED_RECURRENCE"] = String(decoding: try JSONSerialization.data(withJSONObject: records), as: UTF8.self)
