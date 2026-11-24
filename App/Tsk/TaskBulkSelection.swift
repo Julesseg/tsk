@@ -91,14 +91,11 @@ struct TaskSelectionBar: View {
             }
             GlassEffectContainer(spacing: 8) {
                 VStack(alignment: .trailing, spacing: 8) {
-                    dateControl(.scheduled)
-                    HStack(spacing: 8) {
-                        if store.selectionDateField == nil {
-                            TaskSelectionOrganizationControls(store: store)
-                        }
-                        Spacer(minLength: 0)
-                        dateControl(.deadline)
+                    if store.selectionDateField == nil {
+                        TaskSelectionOrganizationControls(store: store)
                     }
+                    dateControl(.scheduled)
+                    dateControl(.deadline)
                     HStack(spacing: 12) {
                         applyButton
                         Spacer(minLength: 0)

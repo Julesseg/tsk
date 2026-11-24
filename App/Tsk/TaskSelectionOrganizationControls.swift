@@ -3,29 +3,40 @@ import TskCore
 
 struct TaskSelectionOrganizationControls: View {
     let store: TaskStore
-    @State private var input: TaskRowParameter?
+    @State private var isCreatingProject = false
+    @State private var isChoosingTag = false
+    @State private var projectName = ""
 
     var body: some View {
-        HStack(spacing: 4) {
+        let projectValue = store.selectionChanges.project.map { $0.isEmpty ? "None" : $0 }
+        let priorityValue = store.selectionChanges.priority.map(TaskRowParameter.priorityTitle)
+        VStack(alignment: .trailing, spacing: 8) {
             Menu {
                 ForEach(store.availableProjects.map { UTF8String($0) }) { project in
                     Button(project.rawValue) { store.selectionChanges.project = project.rawValue }
                 }
-                Button("New project…", systemImage: "folder.badge.plus") { input = .project }
+                Button("New project…", systemImage: "folder.badge.plus") {
+                    projectName = ""
+                    isCreatingProject = true
+                }
                 Button("Clear project") { store.selectionChanges.project = "" }
                 if store.selectionChanges.project != nil {
                     Button("Leave unchanged") { store.selectionChanges.project = nil }
                 }
             } label: {
-                pill(.project, value: store.selectionChanges.project.map { $0.isEmpty ? "None" : $0 })
+                pill(.project, value: projectValue)
             }
-            .accessibilityIdentifier("selection-project")
+            .selectionControl(.project, value: projectValue)
             Button {
-                input = .tags
+                isChoosingTag = true
             } label: {
                 pill(.tags, value: tagValue)
             }
-            .accessibilityIdentifier("selection-tags")
+            .selectionControl(.tags, value: tagValue)
+            .popover(isPresented: $isChoosingTag, attachmentAnchor: .rect(.bounds)) {
+                TaskSelectionTagPicker(store: store)
+                    .presentationCompactAdaptation(.popover)
+            }
             Menu {
                 ForEach(["H", "M", "L"], id: \.self) { priority in
                     Button(TaskRowParameter.priorityTitle(priority)) { store.selectionChanges.priority = priority }
@@ -35,15 +46,40 @@ struct TaskSelectionOrganizationControls: View {
                     Button("Leave unchanged") { store.selectionChanges.priority = nil }
                 }
             } label: {
-                pill(.priority, value: store.selectionChanges.priority.map(TaskRowParameter.priorityTitle))
+                pill(.priority, value: priorityValue)
             }
-            .accessibilityIdentifier("selection-priority")
+            .selectionControl(.priority, value: priorityValue)
         }
         .buttonStyle(.plain)
-        .sheet(item: $input) { parameter in
-            TaskSelectionOrganizationInput(store: store, parameter: parameter)
-                .presentationDetents([.medium, .large])
+        .sheet(isPresented: $isCreatingProject) {
+            NavigationStack {
+                Form {
+                    TextField("Project name", text: $projectName)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .onSubmit(stageProject)
+                        .accessibilityIdentifier("selection-name")
+                }
+                .navigationTitle("New project")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { isCreatingProject = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Use project", action: stageProject).disabled(projectName.isEmpty)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
         }
+    }
+
+    private func stageProject() {
+        guard !projectName.isEmpty else { return }
+        store.selectionChanges.project = projectName
+        isCreatingProject = false
     }
 
     private var tagValue: String? {
@@ -55,80 +91,133 @@ struct TaskSelectionOrganizationControls: View {
     }
 
     private func pill(_ parameter: TaskRowParameter, value: String?) -> some View {
-        TaskRowParameterLabel(parameter: parameter, value: value)
-            .padding(.horizontal, 8)
-            .frame(minWidth: 44, minHeight: 44)
-            .glassEffect(.regular.tint(value == nil ? .clear : Color.accentColor.opacity(0.15)).interactive(), in: Capsule())
-            .accessibilityLabel(parameter.title + " for selected tasks")
-            .accessibilityValue(value ?? "Unchanged")
+        HStack(spacing: 6) {
+            Image(systemName: parameter.symbol)
+            if let value {
+                Text(value).lineLimit(1).truncationMode(.middle)
+            }
+        }
+        .padding(.horizontal, value == nil ? 0 : 16)
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 
-private struct TaskSelectionOrganizationInput: View {
+private extension View {
+    func selectionControl(_ parameter: TaskRowParameter, value: String?) -> some View {
+        glassEffect(.regular.tint(value == nil ? .clear : Color.accentColor.opacity(0.15)).interactive(), in: Capsule())
+            .accessibilityLabel(parameter.title + " for selected tasks")
+            .accessibilityValue(value ?? "Unchanged")
+            .accessibilityIdentifier("selection-" + parameter.rawValue)
+    }
+}
+
+private struct TaskSelectionTagPicker: View {
     let store: TaskStore
-    let parameter: TaskRowParameter
-    @State private var name = ""
-    @State private var removing = false
     @Environment(\.dismiss) private var dismiss
+    @State private var removing: Bool
+    @State private var query = ""
+
+    init(store: TaskStore) {
+        self.store = store
+        if case .remove = store.selectionChanges.tag { _removing = State(initialValue: true) }
+        else { _removing = State(initialValue: false) }
+    }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                if parameter == .tags {
-                    Picker("Tag operation", selection: $removing) {
-                        Text("Add").tag(false)
-                        Text("Remove").tag(true)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Tags", systemImage: "tag").font(.headline)
+                Spacer()
+                if store.selectionChanges.tag != nil {
+                    Button("Reset") {
+                        store.selectionChanges.tag = nil
+                        dismiss()
                     }
-                    .pickerStyle(.segmented)
                 }
-                TextField(parameter == .tags ? "Tag name" : "Project name", text: $name)
+                Button("Close tags", systemImage: "xmark") { dismiss() }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.circle)
+            }
+            Picker("Tag operation", selection: $removing) {
+                Text("Add").tag(false)
+                Text("Remove").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: removing) { query = "" }
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(removing ? "Find a tag" : "Find or create a tag", text: $query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
-                    .onSubmit(stage)
-                    .accessibilityIdentifier("selection-name")
-                if parameter == .tags {
-                    let tags = Set((removing ? store.selectionTasks : store.allTasks).flatMap(\.tags).map { UTF8String($0) }).sorted()
-                    if !tags.isEmpty {
-                        Section("Existing tags") {
-                            TaskRowTagLayout(spacing: 7) {
-                                ForEach(tags) { tag in
-                                    Button(tag.rawValue) { name = tag.rawValue }
-                                        .buttonStyle(.bordered)
-                                        .buttonBorderShape(.capsule)
-                                        .accessibilityIdentifier("selection-tag-" + tag.rawValue)
-                                }
-                            }
-                        }
+                    .onSubmit(submit)
+                    .accessibilityIdentifier("selection-tag-search")
+                if canSubmit {
+                    Button(action: submit) {
+                        Image(systemName: "arrow.up.circle.fill").font(.title2)
                     }
-                    if store.selectionChanges.tag != nil {
-                        Button("Leave tags unchanged") { store.selectionChanges.tag = nil; dismiss() }
-                    }
+                    .accessibilityLabel(removing ? "Remove tag" : "Add tag")
                 }
             }
-            .navigationTitle(parameter == .tags ? "Tags" : "New project")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(parameter == .project ? "Use project" : removing ? "Remove tag" : "Add tag", action: stage)
-                        .disabled(name.isEmpty)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(.quaternary, in: Capsule())
+
+            if !choices.isEmpty {
+                ViewThatFits(in: .vertical) {
+                    tagButtons.fixedSize(horizontal: false, vertical: true)
+                    ScrollView { tagButtons }
                 }
+                .frame(maxHeight: 160)
+            } else if removing {
+                Text(query.isEmpty ? "No tags on the selected tasks" : "No matching tags")
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
-            .onAppear {
-                switch store.selectionChanges.tag {
-                case .add(let tag) where parameter == .tags: name = tag
-                case .remove(let tag) where parameter == .tags: name = tag; removing = true
-                default: break
+        }
+        .font(.subheadline)
+        .buttonStyle(.plain)
+        .padding(16)
+        .frame(idealWidth: 290, maxWidth: 290)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var tags: [UTF8String] {
+        Set((removing ? store.selectionTasks : store.allTasks).flatMap(\.tags).map { UTF8String($0) }).sorted()
+    }
+
+    private var choices: [UTF8String] {
+        tags.filter { query.isEmpty || $0.rawValue.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var tagButtons: some View {
+        TaskRowTagLayout(spacing: 6) {
+            ForEach(choices) { tag in
+                Button {
+                    stage(tag.rawValue)
+                } label: {
+                    Text(tag.rawValue)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(.quaternary, in: Capsule())
                 }
+                .accessibilityIdentifier("selection-tag-" + tag.rawValue)
             }
         }
     }
 
-    private func stage() {
-        guard !name.isEmpty else { return }
-        if parameter == .project { store.selectionChanges.project = name }
-        else { store.selectionChanges.tag = removing ? .remove(name) : .add(name) }
+    private var canSubmit: Bool {
+        !query.isEmpty && (!removing || tags.contains(UTF8String(query)))
+    }
+
+    private func submit() {
+        if canSubmit { stage(query) }
+    }
+
+    private func stage(_ name: String) {
+        store.selectionChanges.tag = removing ? .remove(name) : .add(name)
         dismiss()
     }
 }

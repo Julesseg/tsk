@@ -157,6 +157,12 @@ import XCTest
         let project = app.buttons["selection-project"]
         let tags = app.buttons["selection-tags"]
         let priority = app.buttons["selection-priority"]
+        let controls = [project, tags, priority, app.buttons["selection-scheduled"], app.buttons["selection-deadline"]].map(\.frame)
+        for (upper, lower) in zip(controls, controls.dropFirst()) {
+            XCTAssertLessThan(upper.maxY, lower.minY)
+            XCTAssertEqual(upper.maxX, lower.maxX, accuracy: 1)
+        }
+        XCTAssertLessThan(app.frame.maxX - priority.frame.maxX, 24)
         captureSelectionEvidence("Selection action bar", app: app)
         XCTAssertEqual(tags.label, "Tags for selected tasks")
         priority.tap()
@@ -169,8 +175,9 @@ import XCTest
         name.tap()
         name.typeText("Dispatch\n")
         tags.tap()
-        name.tap()
-        name.typeText("batch")
+        let tagSearch = app.textFields["selection-tag-search"]
+        tagSearch.tap()
+        tagSearch.typeText("batch")
         captureSelectionEvidence("Add tag with the keyboard", app: app)
         app.buttons["Add tag"].tap()
         XCTAssertEqual(apply.label, "Apply to 2")
@@ -180,7 +187,7 @@ import XCTest
         XCTAssertNil(staged[first]?["tag_batch"])
         captureSelectionEvidence("Project, tag and priority staged", app: app)
         apply.tap()
-        XCTAssertEqual(apply.label, "2 selected")
+        XCTAssertTrue(apply.wait(for: \.label, toEqual: "2 selected", timeout: 5))
         XCTAssertFalse(apply.isEnabled)
         let saved = try await storedTasks(app, checkpoint: "organized")
         for id in [first, second] {
@@ -192,11 +199,11 @@ import XCTest
         XCTAssertEqual(saved[second]?["tag_work"], "")
         tags.tap()
         app.buttons["Remove"].tap()
-        app.buttons["selection-tag-batch"].tap()
         captureSelectionEvidence("Remove one existing tag", app: app)
-        app.buttons["Remove tag"].tap()
+        app.buttons["selection-tag-batch"].tap()
+        XCTAssertEqual(tags.value as? String, "Remove batch")
         apply.tap()
-        XCTAssertEqual(apply.label, "2 selected")
+        XCTAssertTrue(apply.wait(for: \.label, toEqual: "2 selected", timeout: 5))
         app.buttons["cancel-task-selection"].tap()
         XCTAssertTrue(apply.waitForNonExistence(timeout: 5))
         openWorkspaceView("Projects", app: app)
