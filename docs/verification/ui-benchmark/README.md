@@ -4,6 +4,8 @@ Use this protocol to compare visual designs for tsk. Freeze the screen list, fix
 
 [November 24 detail study, scores and visual report](2026-11-24/README.md)
 
+[Workspace switching, expanded controls and row density](workspace-rows/README.md) uses a populated fixture and evaluates each decision separately.
+
 ## Capture list
 
 Use standard text size, portrait and light appearance. The first run used the iPhone smoke suite's existing XCUITest attachments. For an exact rerun, download the ui-test-results artifact from [run 45270385965](https://github.com/Julesseg/tsk/actions/runs/45270385965) and run `xcrun xcresulttool export attachments --path App/TestResults.xcresult --output-path shots`. Map its manifest to the six test and attachment names in captures.json. The benchmark archive retains the original PNGs for repeat scoring. For a new revision, capture the same states with those tests. Use the repository simulator lease and device workflow for local runtime work. Record revision, runtime, viewport and capture method.
@@ -29,7 +31,7 @@ Inspect every supplied image visually. Work independently as an iPhone UI design
 4. Legibility. Are the text and meaningful control or state differences visually legible?
 5. Composition. Do alignment, grouping, spacing and density support this screen's purpose?
 
-Return the image ID, five integers in that order, one visible strength and one specific concern. Score only visible evidence. Do not infer gesture behavior, target sizes, accessibility compliance or performance. Use the whole scale as warranted. Do not examine source files, metadata, previous ratings or the design key.
+Return the image ID, five marks in half-point increments in that order, one visible strength and one specific concern. Score only visible evidence. Do not infer gesture behavior, target sizes, accessibility compliance or performance. Use the whole scale as warranted. Do not examine source files, metadata, previous ratings or the design key.
 
 ## Run and compare
 
