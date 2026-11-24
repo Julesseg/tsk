@@ -1,11 +1,14 @@
 import csv
+import sys
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean
 
 criteria = ("orientation", "scanability", "affordance", "legibility", "composition")
 scores = defaultdict(dict)
-with Path(__file__).with_name("ballots.csv").open(newline="") as stream:
+
+ballots = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).with_name("ballots.csv")
+with ballots.open(newline="") as stream:
     for row in csv.DictReader(stream):
         group = scores[row["axis"], row["phase"], row["variant"]]
         marks = [float(row[name]) for name in criteria]

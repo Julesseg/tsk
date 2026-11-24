@@ -1,0 +1,43 @@
+phase,reviewer,position,id,axis,variant,orientation,scanability,affordance,legibility,composition,score,strength,concern
+baseline,R1,1,23666,layout,reference-1,2.0,1.5,1.5,1.5,1.5,8.0,The raised card ties the controls to the task; calendar and flag distinguish the dates.,The priority dot is hard to identify and long tags move the dates to a third row.
+baseline,R2,1,23666,layout,reference-1,2.0,1.5,1.0,1.5,1.5,7.5,All four long tags remain visible and the card groups the values.,"The dot gives no clear indication of value, empty fields rely on symbols and dates change rows."
+baseline,R3,1,23666,layout,reference-1,2.0,1.0,1.0,1.5,1.5,7.0,Calendar and flag distinguish dates even when both show None.,The dot gives no readable priority value and properties shift as tags grow.
+comparison,R1,1,82722,inset,integrated-16,2.0,2.0,2.0,1.5,1.5,9.0,"Time, tags and project align.",Left margin exceeds the right and the final title word sits alone at 440 pt.
+comparison,R1,2,80429,layout,reference-1,2.0,1.5,1.5,2.0,1.5,8.5,Five fields stay inside the card and long tags read in one line.,"Deadline wraps away from schedule, and the empty priority is just a dot."
+comparison,R1,3,12733,layout,bottom-12,1.0,1.0,2.0,2.0,1.0,7.0,Large legible controls and the tag popover sits above its button.,Unrelated tasks intervene. Empty and long card crops omit the controls.
+comparison,R1,4,25870,layout,integrated-12,2.0,1.0,1.0,1.0,1.5,6.5,The time leads the card and lower corners are predictable.,"Tags split midword, priority resembles a bullet and the schedule shows only time."
+comparison,R1,5,63913,inset,integrated-12,2.0,2.0,2.0,1.5,2.0,9.5,The left margin matches the deadline margin and the circle is distinct.,A title word wraps at 440 pt and long tags still split.
+comparison,R1,6,78928,inset,integrated-8,2.0,2.0,2.0,1.5,1.5,9.0,"Time and circle are distinct, and title and Notes align.",Time sits closer to the edge than the deadline and the extra width does not save a title line.
+comparison,R1,7,82328,layout,pair-12,2.0,1.5,1.5,1.0,1.5,7.5,Adjacent dates have distinct icons in populated and empty cases.,Long tags split and push both dates down; priority is easy to miss.
+comparison,R2,1,12733,layout,bottom-12,1.0,1.5,2.0,2.0,1.0,7.5,Large buttons show both dates and spell out None for priority.,The card is far from the controls and two detail crops omit them.
+comparison,R2,2,82328,layout,pair-12,2.0,1.5,1.5,1.0,1.5,7.5,Project and the two dates stay together along the card bottom.,"The narrow tag column splits words, moves the dates down and the dot is ambiguous."
+comparison,R2,3,25870,layout,integrated-12,1.5,1.5,1.0,1.0,1.5,6.5,Time is beside the circle and the flagged deadline is consistently at right.,Time lacks a date cue; tags split and the dot is easily overlooked.
+comparison,R2,4,78928,inset,integrated-8,2.0,2.0,1.5,2.0,1.5,9.0,"Time, tags and project align as do title and Notes.",The time feels tighter against its edge than the deadline.
+comparison,R2,5,82722,inset,integrated-16,2.0,2.0,1.5,2.0,1.5,9.0,Time has breathing room and titles fit two lines.,The left gutter exceeds the right and shifts the title and Notes.
+comparison,R2,6,63913,inset,integrated-12,2.0,2.0,1.5,2.0,2.0,9.5,The outer margins balance and the two text columns align.,Time looks static.
+comparison,R2,7,80429,layout,reference-1,2.0,1.5,1.5,2.0,1.5,8.5,Five fields stay local and long tags are readable as whole words.,The deadline changes rows with tag length; priority is only a dot.
+comparison,R3,1,80429,layout,reference-1,2.0,1.5,1.5,2.0,1.5,8.5,Fields stay in the card and long tags are readable on one line.,Deadline wraps at 440 pt and the dot is ambiguous.
+comparison,R3,2,78928,inset,integrated-8,2.0,2.0,2.0,1.5,1.5,9.0,"Time, tags and Studio align and the circle separates the columns.",Left margin is tighter than the right and tags break midword.
+comparison,R3,3,63913,inset,integrated-12,2.0,2.0,2.0,1.5,2.0,9.5,Left and right insets match and the circle stays clear.,Long tags still break midword.
+comparison,R3,4,82328,layout,pair-12,2.0,1.5,1.0,1.0,1.5,7.0,Project and dates hold consistent positions in the footer.,Long tags split and push the footer away. The dot is easy to overlook.
+comparison,R3,5,25870,layout,integrated-12,1.5,1.0,1.0,1.0,1.5,6.0,The schedule leads and the deadline is easy to locate.,"Time lacks its date, the empty schedule is icon-only and tags split."
+comparison,R3,6,82722,inset,integrated-16,2.0,1.5,2.0,1.5,1.5,8.5,"Time, tags and Studio align; title and Notes share their edge.",Left inset exceeds deadline inset and long tags split.
+comparison,R3,7,12733,layout,bottom-12,1.0,1.5,2.0,2.0,1.0,7.5,Five buttons are individually readable and priority says None.,The stack is detached from its card and the detail crops omit property values.
+followup,R1,1,23700,layout,pair-12,2.0,1.5,1.0,1.0,1.5,7.0,Calendar and flag sit together with dates and times visible.,"Long tags break midword and push dates down, and priority is easy to miss."
+followup,R1,2,47757,layout,tray-12,1.5,1.5,2.0,2.0,1.0,8.0,"Task title, priority name and all four tags are visible in the tray.",Unrelated tasks intervene and deadline changes rows as values wrap.
+followup,R1,3,23342,layout,reference-1,2.0,1.5,1.5,1.5,1.5,8.0,Five local controls and all tags are readable together.,Empty controls are ambiguous and deadline wraps even at the wider size.
+followup,R1,4,61167,layout,integrated-12,2.0,1.0,1.0,1.0,1.5,6.5,Time aligns with agenda and deadline holds its lower-right position.,"Schedule omits date, empty state is icon-only and tags split midword."
+followup,R1,5,55384,layout,bottom-12,0.5,1.0,2.0,1.0,0.5,5.0,Five prominent buttons keep their order.,"The stack overlays other tasks, lacks a task title and truncates long tags."
+followup,R1,6,31467,layout,cued-12,2.0,1.5,1.5,1.5,2.0,8.5,Schedule shows date and time and all four long tags fit on a full-width line.,Tags move between states and the priority dot is ambiguous.
+followup,R2,1,31467,layout,cued-12,2.0,1.5,1.0,1.5,2.0,8.0,The schedule sits beside the title and all long tags remain legible.,The dot resembles a bullet and tags change position.
+followup,R2,2,61167,layout,integrated-12,1.5,1.0,1.0,1.0,1.0,5.5,Project and deadline hold predictable bottom corners.,Word breaks push the buttons down; populated schedule shows only time.
+followup,R2,3,55384,layout,bottom-12,1.0,1.5,2.0,1.5,1.0,7.0,Five distinct buttons maintain order; priority spells out High or None.,Remote controls feel detached and long tags truncate.
+followup,R2,4,23700,layout,pair-12,2.0,1.5,1.5,1.0,1.0,7.0,Calendar and flag sit together and show both dates and times.,"Long tags split words and push dates down, wasting space next to Notes."
+followup,R2,5,23342,layout,reference-1,2.0,1.5,1.5,1.5,1.5,8.0,Outlined controls share a style and long tags remain visible.,Deadline wraps even at the wider size and empty priority is only a dot.
+followup,R2,6,47757,layout,tray-12,1.5,2.0,2.0,2.0,1.5,9.0,"Panel repeats the title, spells out priority and shows all long tags.",The distance requires matching the task title to confirm which task is being edited.
+followup,R3,1,55384,layout,bottom-12,1.0,1.5,2.0,1.0,0.5,6.0,Consistent ordering and explicit priority names.,Unrelated rows separate the stack from the card and the second long tag truncates.
+followup,R3,2,61167,layout,integrated-12,2.0,1.0,1.0,1.0,1.0,6.0,Project and deadline stay in predictable corners.,"Time lacks date, tags split and priority resembles a bullet."
+followup,R3,3,31467,layout,cued-12,2.0,1.5,1.0,1.5,1.5,7.5,Date and time sit together and four long tags fit below Notes.,Tags change position and the dot is hard to identify or recognize as editable.
+followup,R3,4,23342,layout,reference-1,2.0,1.5,1.5,1.5,1.5,8.0,Five outlined local controls and readable long tags.,The deadline changes rows and empty priority is a dot.
+followup,R3,5,23700,layout,pair-12,2.0,1.5,1.5,1.0,1.0,7.0,Adjacent dates are easy to compare.,Long tags break and push dates down leaving unused space.
+followup,R3,6,47757,layout,tray-12,1.5,2.0,2.0,2.0,1.0,8.5,"Task title, full long tags and priority name are visible.",Reading the note and fields together requires scanning across unrelated rows.
