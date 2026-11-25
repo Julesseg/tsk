@@ -65,7 +65,7 @@ import XCTest
     }
 
     func testMiddleRowOpensSpaceAroundItsFixedHeader() throws {
-        let app = try launch(neighbors: true)
+        let app = try launch(neighbors: true, organized: true)
         let rows = app.collectionViews["task-list"].cells
         XCTAssertEqual(rows.count, 3)
         let before = rows.element(boundBy: 0).frame
@@ -76,6 +76,10 @@ import XCTest
         XCTAssertEqual(before.height, 32, accuracy: 1, "A plain planner row has a 28-point header and two points of padding on each edge")
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
+        let schedule = app.buttons["row-scheduled"].frame
+        let controls = [app.buttons["row-tags"], app.buttons["row-priority"], app.descendants(matching: .any)["row-note-input"].firstMatch]
+        let offsetsWithProject = controls.map { $0.frame.minY - schedule.maxY }
+        for offset in offsetsWithProject { XCTAssertEqual(offset, 8, accuracy: 1) }
         XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY - 12, accuracy: 1)
         XCTAssertGreaterThan(rows.element(boundBy: 2).frame.minY, after.minY + 12)
@@ -88,6 +92,20 @@ import XCTest
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY, accuracy: 1)
         XCTAssertEqual(rows.element(boundBy: 2).frame.minY, after.minY, accuracy: 1)
         capture("Tighter list restored after middle row collapse", app)
+
+        _ = expandTask(app)
+        openTaskRowParameter("project", app: app)
+        tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
+        closeTaskRow(app)
+        XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 5))
+        _ = expandTask(app)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
+        let scheduleWithoutProject = app.buttons["row-scheduled"].frame
+        XCTAssertEqual(scheduleWithoutProject.height, schedule.height, accuracy: 1)
+        for (control, offset) in zip(controls, offsetsWithProject) {
+            XCTAssertEqual(control.frame.minY - scheduleWithoutProject.maxY, offset, accuracy: 1)
+        }
+        capture("First line after reopening without a project", app)
     }
 
     func testOutsideSaveValidationPickersAndDurableCompletion() async throws {
@@ -595,7 +613,7 @@ import XCTest
         let compactTitle = collapsedTitle.frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
         let circle = checkbox.frame
-        XCTAssertEqual(circle.midY, compact.midY, accuracy: 1)
+        XCTAssertEqual(circle.midY, compactTitle.midY, accuracy: 1)
         row.tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
@@ -607,7 +625,7 @@ import XCTest
         let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
         XCTAssertTrue(notes.exists)
         XCTAssertGreaterThanOrEqual(notes.frame.minY, title.frame.maxY)
-        XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 6)
+        XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 8 + max(0, (28 - title.frame.height) / 2) + 1)
         XCTAssertGreaterThan(app.buttons["row-project"].frame.minY, notes.frame.minY)
         XCTAssertTrue(checkbox.isEnabled)
         return title
