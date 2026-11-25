@@ -77,6 +77,9 @@ import XCTest
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
         let schedule = app.buttons["row-scheduled"].frame
+        let deadline = app.buttons["row-deadline"].frame
+        XCTAssertEqual(schedule.minX - app.frame.minX, 20, accuracy: 1)
+        XCTAssertEqual(app.frame.maxX - deadline.maxX, 20, accuracy: 1)
         let controls = [app.buttons["row-tags"], app.buttons["row-priority"], app.descendants(matching: .any)["row-note-input"].firstMatch]
         let offsetsWithProject = controls.map { $0.frame.minY - schedule.maxY }
         for offset in offsetsWithProject { XCTAssertEqual(offset, 8, accuracy: 1) }

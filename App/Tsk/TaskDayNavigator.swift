@@ -510,7 +510,7 @@ struct TaskPlannerLeadingDate: View {
         } ?? false
         let isCarried = task.status == "pending" && day == calendar.startOfDay(for: today)
             && scheduled.map { $0.hasTime && $0.date < calendar.startOfDay(for: today) } == true
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(spacing: 1) {
             if let scheduled, showsDate {
                 Text(scheduled.date, format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: scheduled.hasTime ? dateSize : dateSize + 2, weight: scheduled.hasTime ? .regular : .semibold))
@@ -519,13 +519,13 @@ struct TaskPlannerLeadingDate: View {
                 Text(scheduled.date, style: .time)
                     .font(.caption.bold().monospacedDigit())
             } else if !showsDate {
-                Text("-").font(.body.bold())
+                Image(systemName: "minus").font(.title.weight(.medium))
             }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.75)
         .foregroundStyle(isCarried ? Color.red : Color.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(scheduled.map {
             "Scheduled " + $0.date.formatted(date: .abbreviated, time: $0.hasTime ? .shortened : .omitted)

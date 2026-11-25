@@ -348,7 +348,7 @@ private struct TaskListRowContent: View {
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.42), value: visibility)
         .accessibilityHidden(phase == .collapsing || store.rowEditing != nil && editing == nil)
-        .listRowInsets(EdgeInsets(top: 0, leading: 7, bottom: 0, trailing: 9))
+        .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .tag(task.id)
