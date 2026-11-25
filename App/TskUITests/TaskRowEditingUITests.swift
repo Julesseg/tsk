@@ -71,9 +71,11 @@ import XCTest
         let before = rows.element(boundBy: 0).frame
         let after = rows.element(boundBy: 2).frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
-        let header = checkbox.frame
+        let collapsedCheck = checkbox.frame
+        let leadingDate = app.descendants(matching: .any)["planner-leading-" + taskID].firstMatch
         let compact = app.buttons["task-" + taskID].frame
         XCTAssertEqual(before.height, 32, accuracy: 1, "A plain planner row has a 28-point header and two points of padding on each edge")
+        XCTAssertEqual(leadingDate.frame.midY, compact.midY, accuracy: 1)
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
         let schedule = app.buttons["row-scheduled"].frame
@@ -83,13 +85,15 @@ import XCTest
         let controls = [app.buttons["row-tags"], app.buttons["row-priority"], app.descendants(matching: .any)["row-note-input"].firstMatch]
         let offsetsWithProject = controls.map { $0.frame.minY - schedule.maxY }
         for offset in offsetsWithProject { XCTAssertEqual(offset, 8, accuracy: 1) }
-        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, schedule.midY, accuracy: 1)
+        XCTAssertLessThan(schedule.midY, collapsedCheck.midY - 1)
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY - 12, accuracy: 1)
         XCTAssertGreaterThan(rows.element(boundBy: 2).frame.minY, after.minY + 12)
         capture("Middle row opens space above and below its fixed header", app)
         try tapOutside(app)
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
-        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, collapsedCheck.midY, accuracy: 1)
+        XCTAssertEqual(leadingDate.frame.midY, collapsedCheck.midY, accuracy: 1)
         XCTAssertEqual(app.buttons["task-" + taskID].frame.minX, compact.minX, accuracy: 1)
         XCTAssertEqual(app.buttons["task-" + taskID].frame.minY, compact.minY, accuracy: 1)
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY, accuracy: 1)
@@ -615,8 +619,7 @@ import XCTest
         XCTAssertTrue(collapsedTitle.waitForExistence(timeout: 5))
         let compactTitle = collapsedTitle.frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
-        let circle = checkbox.frame
-        XCTAssertEqual(circle.midY, compactTitle.midY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, compact.midY, accuracy: 1)
         row.tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
@@ -624,7 +627,7 @@ import XCTest
         XCTAssertEqual(title.frame.minY, compactTitle.minY, accuracy: 1)
         XCTAssertEqual(title.frame.width, compactTitle.width, accuracy: 1)
         XCTAssertEqual(title.frame.height, compactTitle.height, accuracy: 1)
-        XCTAssertEqual(checkbox.frame.minY, circle.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, title.frame.midY, accuracy: 1)
         let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
         XCTAssertTrue(notes.exists)
         XCTAssertGreaterThanOrEqual(notes.frame.minY, title.frame.maxY)

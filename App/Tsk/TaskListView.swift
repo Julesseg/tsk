@@ -359,7 +359,7 @@ private struct TaskListRowContent: View {
         }
     }
     private var header: some View {
-        HStack(alignment: .top, spacing: 0) {
+        HStack(spacing: 0) {
             if let editing {
                 TaskRowPickerButton(editing: editing, parameter: .scheduled, onActivate: activateRowControl) {
                     scheduledLabel.frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
