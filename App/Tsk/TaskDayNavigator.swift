@@ -511,17 +511,15 @@ struct TaskPlannerLeadingDate: View {
         let isCarried = task.status == "pending" && day == calendar.startOfDay(for: today)
             && scheduled.map { $0.hasTime && $0.date < calendar.startOfDay(for: today) } == true
         VStack(alignment: .leading, spacing: 1) {
-            if let scheduled {
-                if showsDate || !scheduled.hasTime {
-                    Text(scheduled.date, format: .dateTime.month(.abbreviated).day())
-                        .font(.system(size: scheduled.hasTime ? dateSize : dateSize + 2, weight: scheduled.hasTime ? .regular : .semibold))
-                }
-                if scheduled.hasTime {
-                    Text(scheduled.date, style: .time)
-                        .font(.caption.bold().monospacedDigit())
-                }
-            } else {
-                Text("–").font(.caption.bold())
+            if let scheduled, showsDate {
+                Text(scheduled.date, format: .dateTime.month(.abbreviated).day())
+                    .font(.system(size: scheduled.hasTime ? dateSize : dateSize + 2, weight: scheduled.hasTime ? .regular : .semibold))
+            }
+            if let scheduled, scheduled.hasTime {
+                Text(scheduled.date, style: .time)
+                    .font(.caption.bold().monospacedDigit())
+            } else if !showsDate {
+                Text("-").font(.body.bold())
             }
         }
         .lineLimit(1)
