@@ -24,12 +24,15 @@ struct TaskWorkspaceControls: View {
         HStack {
             if let workspace {
                 Menu {
-                    Button("Planner", systemImage: "calendar") { workspace.wrappedValue = .today }
-                        .accessibilityIdentifier("open-today")
-                    Button("Inbox", systemImage: "tray") { workspace.wrappedValue = .inbox }
-                        .accessibilityIdentifier("open-inbox")
-                    Button("Projects", systemImage: "folder") { workspace.wrappedValue = .projects }
-                        .accessibilityIdentifier("open-projects")
+                    Picker("Workspace", selection: workspace) {
+                        Label("Planner", systemImage: "calendar").tag(WorkspaceView.today)
+                            .accessibilityIdentifier("open-today")
+                        Label("Inbox", systemImage: "tray").tag(WorkspaceView.inbox)
+                            .accessibilityIdentifier("open-inbox")
+                        Label("Projects", systemImage: "folder").tag(WorkspaceView.projects)
+                            .accessibilityIdentifier("open-projects")
+                    }
+                    .pickerStyle(.inline)
                 } label: {
                     circle("line.3.horizontal")
                 }

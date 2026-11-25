@@ -6,15 +6,28 @@ struct TaskRowTagsEditor: View {
     let availableTags: [String]
     @Binding var error: String?
 
+    @State private var removing = false
+    @State private var removeQuery = ""
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Picker("Tag operation", selection: $removing) {
+                Text("Add").tag(false)
+                Text("Remove").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: removing) {
+                draft.tagInput = ""
+                removeQuery = ""
+                error = nil
+            }
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Find or create a tag", text: $draft.tagInput)
+                TextField(removing ? "Find a tag" : "Find or create a tag", text: removing ? $removeQuery : $draft.tagInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
-                    .onSubmit(addTag)
+                    .onSubmit { if !removing { addTag() } }
                     .accessibilityIdentifier("row-tag-input")
             }
             .font(.subheadline)
@@ -26,12 +39,17 @@ struct TaskRowTagsEditor: View {
                     .accessibilityIdentifier("row-tag-error")
                     .accessibilityAddTraits(.updatesFrequently)
             }
+            if removing && choices.isEmpty {
+                Text(removeQuery.isEmpty ? "No tags on this task" : "No matching tags")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
             TaskRowTagLayout(spacing: 7) {
                 ForEach(choices) { identity in
                     let tag = identity.rawValue
                     let selected = draft.taskDraft.tags.contains { UTF8String($0) == identity }
                     Button {
                         if selected {
+                            removeQuery = ""
                             draft.taskDraft.removeTag(tag)
                             draft.tagInput = ""
                             error = nil
@@ -59,7 +77,7 @@ struct TaskRowTagsEditor: View {
                     .accessibilityHint(selected ? "Remove tag" : "Add tag")
                     .accessibilityIdentifier("row-tag-" + tag)
                 }
-                if !draft.tagInput.isEmpty && !allChoices.contains(UTF8String(draft.tagInput)) {
+                if !removing && !draft.tagInput.isEmpty && !allChoices.contains(UTF8String(draft.tagInput)) {
                     Button("Create “\(draft.tagInput)”", systemImage: "plus", action: addTag)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("row-add-tag")
@@ -74,7 +92,11 @@ struct TaskRowTagsEditor: View {
     }
 
     private var choices: [UTF8String] {
-        allChoices.filter { draft.tagInput.isEmpty || $0.rawValue.localizedCaseInsensitiveContains(draft.tagInput) }
+        let current = Set(draft.taskDraft.tags.map { UTF8String($0) })
+        let query = removing ? removeQuery : draft.tagInput
+        return allChoices.filter {
+            current.contains($0) == removing && (query.isEmpty || $0.rawValue.localizedCaseInsensitiveContains(query))
+        }
     }
 
     private func addTag() {

@@ -73,7 +73,7 @@ import XCTest
         let checkbox = app.buttons["complete-task-row-" + taskID]
         let header = checkbox.frame
         let compact = app.buttons["task-" + taskID].frame
-        XCTAssertEqual(before.height, 36, accuracy: 1, "A plain planner row has a 32-point header and two points of padding on each edge")
+        XCTAssertEqual(before.height, 32, accuracy: 1, "A plain planner row has a 28-point header and two points of padding on each edge")
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
         XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
@@ -102,8 +102,11 @@ import XCTest
             XCTAssertFalse(app.buttons[id].exists)
         }
         capture("Expanded without keyboard", app)
-        XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
-        selectHighPriorityAndVerifyReselection(app)
+        XCTAssertEqual(app.buttons["row-project"].frame.minX, title.frame.minX, accuracy: 1)
+        XCTAssertEqual(app.buttons["row-tags"].frame.minX, app.buttons["row-scheduled"].frame.minX, accuracy: 1)
+        XCTAssertEqual(app.buttons["row-priority"].frame.midX, app.buttons["complete-task-row-" + taskID].frame.midX, accuracy: 1)
+        XCTAssertGreaterThan(app.buttons["row-deadline"].frame.minX, title.frame.maxX)
+        cyclePriorityToHigh(app)
         openTaskRowParameter("project", app: app)
         capture("Native project menu", app)
         tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
@@ -327,7 +330,7 @@ import XCTest
         let app = try launch(isolated: true)
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
-        selectHighPriorityAndVerifyReselection(app)
+        cyclePriorityToHigh(app)
         for cycle in 1...20 {
             XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
                 if cycle == 20 { focusTaskText(title, app: app) }
@@ -407,9 +410,10 @@ import XCTest
         openTaskRowParameter("tags", app: app)
         let input = app.textFields["row-tag-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
+        app.buttons["Remove"].tap()
         XCTAssertEqual(app.buttons["row-tag-review"].value as? String, "Selected")
-        XCTAssertEqual(app.buttons["row-tag-accessibility"].value as? String, "Not selected")
         app.buttons["row-tag-review"].tap()
+        app.buttons["Add"].tap()
         replaceTaskText(input, with: "access", app: app)
         app.buttons["row-tag-accessibility"].tap()
         XCTAssertFalse(app.buttons["row-add-tag"].exists, "Choosing a search result must clear its unfinished query")
@@ -452,8 +456,11 @@ import XCTest
         tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
         XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
         openTaskRowParameter("priority", app: app)
-        tapTaskPickerOption("None", options: ["None", "Low", "Medium", "High"], app: app)
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+        app.buttons["row-priority"].tap()
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "None")
         openTaskRowParameter("tags", app: app)
+        app.buttons["Remove"].tap()
         app.buttons["row-tag-accessibility"].tap()
         app.buttons["row-tag-next"].tap()
         app.buttons["close-row-parameter"].tap()
@@ -542,16 +549,14 @@ import XCTest
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
-    private func selectHighPriorityAndVerifyReselection(_ app: XCUIApplication) {
-        openTaskRowParameter("priority", app: app)
-        capture("Native priority menu", app)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        openTaskRowParameter("priority", app: app)
-        let selectedHigh = app.buttons.matching(NSPredicate(format: "label == %@", "High")).firstMatch
-        XCTAssertTrue(selectedHigh.waitForExistence(timeout: 5))
-        XCTAssertTrue(selectedHigh.isSelected)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+    private func cyclePriorityToHigh(_ app: XCUIApplication) {
+        let button = app.buttons["row-priority"]
+        XCTAssertEqual(button.value as? String, "None")
+        for value in ["Low", "Medium", "High"] {
+            button.tap()
+            XCTAssertEqual(button.value as? String, value)
+        }
+        capture("High priority under the completion circle", app)
     }
 
     private func visibleCompletionCircleFrame(_ id: String, app: XCUIApplication) throws -> CGRect {

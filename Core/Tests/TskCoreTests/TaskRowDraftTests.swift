@@ -56,6 +56,26 @@ import Testing
     #expect(saved.attributes["opaque"] == "retain")
 }
 
+@Test func rowDeadlineKeepsPrecisionAndResetRestoresImportedAttributes() async throws {
+    let manager = TaskManager(replica: TestReplica())
+    let task = try await manager.create(TaskDraft(description: "Proof", attributes: ["due": "1792238400"]))
+    var draft = TaskRowDraft(task: task)
+    let original = draft.taskDraft
+    let deadline = TaskScheduledDate(date: Date(timeIntervalSince1970: 1792195200), hasTime: false)
+    draft.taskDraft.setDateIntent(deadline, for: .deadline)
+    draft.taskDraft.project = "Studio"
+    draft.taskDraft.restoreDate(.deadline, from: original)
+    #expect(try draft.changes() == ["project": "Studio"])
+    draft.taskDraft.setDateIntent(deadline, for: .deadline)
+    let saved = try await manager.update(id: task.id, changes: draft.changes())
+    #expect(saved.dateIntent(for: .deadline) == deadline)
+    var reopened = TaskRowDraft(task: saved)
+    reopened.taskDraft.setDateIntent(nil, for: .deadline)
+    let cleared = try await manager.update(id: task.id, changes: reopened.changes())
+    #expect(cleared.attributes["due"] == nil)
+    #expect(cleared.attributes[TaskScheduledDate.deadlineAttribute] == nil)
+}
+
 @Test func failedRowPersistenceLeavesStoredTaskAndEditableDraftIntact() async throws {
     let task = TaskRecord(id: UUID(), attributes: ["description": "Original", "status": "pending", "opaque": "retain"])
     let manager = TaskManager(replica: RowUnwritableReplica(task: task))
