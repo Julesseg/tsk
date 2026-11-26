@@ -519,7 +519,7 @@ struct TaskPlannerLeadingDate: View {
                 Text(scheduled.date, style: .time)
                     .font(.caption.bold().monospacedDigit())
             } else if !showsDate {
-                Image(systemName: "minus").font(.title.weight(.medium))
+                Image(systemName: "minus").font(.title2.bold())
             }
         }
         .lineLimit(1)
