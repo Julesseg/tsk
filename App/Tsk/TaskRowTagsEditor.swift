@@ -5,29 +5,33 @@ struct TaskRowTagsEditor: View {
     @Binding var draft: TaskRowDraft
     let availableTags: [String]
     @Binding var error: String?
-
-    @State private var removing = false
-    @State private var removeQuery = ""
+    @State private var removedTags: Set<UTF8String> = []
 
     var body: some View {
+        let active = draft.taskDraft.tags.map { UTF8String($0) }
+        let inactive = Set(availableTags.map { UTF8String($0) }).union(removedTags).subtracting(active)
+        let query = draft.tagInput
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Tag operation", selection: $removing) {
-                Text("Add").tag(false)
-                Text("Remove").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: removing) {
-                draft.tagInput = ""
-                removeQuery = ""
-                error = nil
+            if !active.isEmpty {
+                TaskRowTagLayout(spacing: 7) {
+                    ForEach(active) { tag in
+                        TaskPickerTag(name: tag.rawValue, active: true) {
+                            removedTags.insert(tag)
+                            draft.taskDraft.removeTag(tag.rawValue)
+                            draft.tagInput = ""
+                            error = nil
+                        }
+                        .accessibilityIdentifier("row-tag-" + tag.rawValue)
+                    }
+                }
             }
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(removing ? "Find a tag" : "Find or create a tag", text: removing ? $removeQuery : $draft.tagInput)
+                TextField("Find or create a tag", text: $draft.tagInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
-                    .onSubmit { if !removing { addTag() } }
+                    .onSubmit(addTag)
                     .accessibilityIdentifier("row-tag-input")
             }
             .font(.subheadline)
@@ -39,46 +43,16 @@ struct TaskRowTagsEditor: View {
                     .accessibilityIdentifier("row-tag-error")
                     .accessibilityAddTraits(.updatesFrequently)
             }
-            if removing && choices.isEmpty {
-                Text(removeQuery.isEmpty ? "No tags on this task" : "No matching tags")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
             TaskRowTagLayout(spacing: 7) {
-                ForEach(choices) { identity in
-                    let tag = identity.rawValue
-                    let selected = draft.taskDraft.tags.contains { UTF8String($0) == identity }
-                    Button {
-                        if selected {
-                            removeQuery = ""
-                            draft.taskDraft.removeTag(tag)
-                            draft.tagInput = ""
-                            error = nil
-                        } else {
-                            do {
-                                try draft.taskDraft.addTag(tag)
-                                draft.tagInput = ""
-                                error = nil
-                            } catch { self.error = error.localizedDescription }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            if selected { Image(systemName: "checkmark").fontWeight(.semibold) }
-                            Text(tag)
-                        }
-                        .font(.subheadline)
-                        .padding(.horizontal, 11)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .foregroundStyle(selected ? Color.blue : Color.primary)
-                        .background(selected ? Color.blue.opacity(0.12) : Color.secondary.opacity(0.09), in: .capsule)
-                        .contentShape(Capsule())
+                ForEach(inactive.sorted().filter { query.isEmpty || $0.rawValue.localizedCaseInsensitiveContains(query) }) { tag in
+                    TaskPickerTag(name: tag.rawValue, active: false) {
+                        draft.tagInput = tag.rawValue
+                        addTag()
                     }
-                    .accessibilityLabel(tag)
-                    .accessibilityValue(selected ? "Selected" : "Not selected")
-                    .accessibilityHint(selected ? "Remove tag" : "Add tag")
-                    .accessibilityIdentifier("row-tag-" + tag)
+                    .accessibilityIdentifier("row-tag-" + tag.rawValue)
                 }
-                if !removing && !draft.tagInput.isEmpty && !allChoices.contains(UTF8String(draft.tagInput)) {
-                    Button("Create “\(draft.tagInput)”", systemImage: "plus", action: addTag)
+                if !query.isEmpty && !active.contains(UTF8String(query)) && !inactive.contains(UTF8String(query)) {
+                    Button("Create “\(query)”", systemImage: "plus", action: addTag)
                         .frame(minHeight: 44)
                         .accessibilityIdentifier("row-add-tag")
                 }
@@ -87,20 +61,34 @@ struct TaskRowTagsEditor: View {
         .onChange(of: UTF8String(draft.tagInput)) { _, _ in error = nil }
     }
 
-    private var allChoices: [UTF8String] {
-        Set((availableTags + draft.taskDraft.tags).map { UTF8String($0) }).sorted()
-    }
-
-    private var choices: [UTF8String] {
-        let current = Set(draft.taskDraft.tags.map { UTF8String($0) })
-        let query = removing ? removeQuery : draft.tagInput
-        return allChoices.filter {
-            current.contains($0) == removing && (query.isEmpty || $0.rawValue.localizedCaseInsensitiveContains(query))
-        }
-    }
-
     private func addTag() {
         do { try draft.addTagInput(); error = nil }
         catch { self.error = error.localizedDescription }
+    }
+}
+
+struct TaskPickerTag: View {
+    let name: String
+    let active: Bool
+    var detail: String?
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if active { Image(systemName: "checkmark").fontWeight(.semibold) }
+                Text(name)
+                if let detail { Text(detail).font(.caption) }
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 11)
+            .frame(minWidth: 44, minHeight: 44)
+            .foregroundStyle(active ? Color.accentColor : Color.primary)
+            .background(active ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.09), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .accessibilityLabel(name)
+        .accessibilityValue(detail ?? (active ? "Selected" : "Not selected"))
+        .accessibilityHint(active ? "Remove tag" : "Add tag")
     }
 }
