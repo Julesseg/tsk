@@ -87,7 +87,7 @@ struct TaskDayNavigator: View {
                 }
                 .padding(.horizontal, 16)
             } else {
-                Text("-").frame(minWidth: TaskDayPaging.pillHeight)
+                Text("-").frame(minWidth: 2 * TaskDayPaging.pillHeight)
             }
         }
         .font(.subheadline.weight(.semibold))

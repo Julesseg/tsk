@@ -10,14 +10,14 @@ The manual form defaults to smoke.
 | --- | --- | --- |
 | Smoke | 2 methods | PR, main push, explicit dispatch |
 | Full | 22 methods | Nightly at 02:00 UTC, explicit dispatch |
-| Diagnostic | 25 on-demand methods | `diagnostic_only=true` |
+| Diagnostic | 26 on-demand methods | `diagnostic_only=true` |
 | Text | 1 method | Explicit dispatch |
 | Regression | 3 methods | Explicit dispatch |
 | Menu | 4 methods | Explicit dispatch |
 
 `full` means the reviewed nightly selection, not every UI test in the target.
 [scripts/ui-test-selection.py](../../scripts/ui-test-selection.py) lists exact
-methods for every suite. Each of the 47 retained methods has exactly one primary
+methods for every suite. Each of the 48 retained methods has exactly one primary
 cadence: nightly or on demand. Smoke is a subset of nightly; focused suites may
 combine both. An unregistered, duplicated or missing method fails routing, so a
 new test cannot silently expand PR or nightly coverage. Inline actor attributes

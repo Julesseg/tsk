@@ -26,13 +26,13 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         capture("Supporting information is available inside the expanded row", app)
         replaceTaskText(title, with: "Unsaved supporting draft", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        dismissTaskRowKeyboard(app)
         XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
         replaceTaskText(annotation, with: "Edited supporting note", app: app)
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
         XCTAssertTrue(revealTaskElement(note, in: editor, app: app))
         replaceTaskText(note, with: "New supporting note", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        dismissTaskRowKeyboard(app)
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
         XCTAssertEqual(note.value as? String, "New supporting note")
@@ -176,8 +176,7 @@ import XCTest
         replaceTaskText(title, with: "Release revised", app: app)
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
         capture("Focused title above keyboard", app)
-        app.buttons["dismiss-row-keyboard"].tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         try tapOutside(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
@@ -369,12 +368,10 @@ import XCTest
         verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         XCTAssertEqual(note.value as? String, "Draft note survives menu")
         focusTaskText(title, app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         focusTaskText(note, app: app)
         XCTAssertEqual(note.value as? String, "Draft note survives menu")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
     }
 
     func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
@@ -394,15 +391,13 @@ import XCTest
         let editedTitle = try XCTUnwrap(title.value as? String)
         XCTAssertEqual(editedTitle.components(separatedBy: " title retained").count, 2)
         XCTAssertEqual(editedTitle.replacingOccurrences(of: " title retained", with: ""), originalTitle)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         focusTaskText(note, app: app)
         note.typeText(" and editable")
         let editedNote = try XCTUnwrap(note.value as? String)
         XCTAssertEqual(editedNote.components(separatedBy: " and editable").count, 2)
         XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Focused note survives menu")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
     }
 
     private func verifyProjectMenuPresentation(_ app: XCUIApplication, dismissingKeyboard: Bool, file: StaticString = #filePath, line: UInt = #line) {
@@ -554,12 +549,7 @@ import XCTest
         XCTAssertLessThan(title.frame.height, app.frame.height / 2)
         title.typeText(" scroll retained")
         XCTAssertTrue((title.value as? String ?? "").contains("scroll retained"))
-        if app.keyboards.firstMatch.exists && app.keyboards.firstMatch.frame.height > 0 {
-            tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app, requiresVisibleKeyboard: true)
-        } else {
-            tapTaskControl(app.buttons["dismiss-row-keyboard"], app: app)
-        }
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         let list = app.collectionViews["task-list"]
         let originalY = title.frame.minY
         let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))

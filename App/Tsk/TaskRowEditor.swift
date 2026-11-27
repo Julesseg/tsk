@@ -4,7 +4,6 @@ import TskCore
 struct TaskRowEditor: View {
     let store: TaskStore
     @Bindable var editing: TaskRowEditing
-    @FocusState.Binding var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
@@ -30,13 +29,6 @@ struct TaskRowEditor: View {
                     Text(error).font(.callout).foregroundStyle(.red)
                         .accessibilityIdentifier("draft-error")
                         .accessibilityAddTraits(.updatesFrequently)
-                }
-                if titleFocused || focusedNote != nil {
-                    Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false; focusedNote = nil }
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .accessibilityIdentifier("dismiss-row-keyboard")
                 }
             }
             .font(.subheadline)

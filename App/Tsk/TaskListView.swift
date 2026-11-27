@@ -223,7 +223,7 @@ private struct TaskListGestures: View {
         TaskNativeDrag(store: store, scope: scope, rows: rows.tasks, eventTargets: rows.events, reduceMotion: reduceMotion)
         TaskSelectionGesture(store: store, scope: scope, viewport: viewport, rows: rows.tasks)
         if (store.isDayPage || store.isSelectingTasks) && isVisible {
-            TaskDayPageSwipe(store: store, paging: paging, viewport: viewport, rows: rows.tasks, reduceMotion: reduceMotion)
+            TaskDayPageSwipe(store: store, paging: paging, viewport: viewport, reduceMotion: reduceMotion)
         }
     }
 }
@@ -283,7 +283,7 @@ private struct TaskListRowContent: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             if let editing {
-                TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused, focusedNote: $focusedNote,
+                TaskRowEditor(store: store, editing: editing, focusedNote: $focusedNote,
                               onActivate: activateRowControl)
                     .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 32))
                     .padding(.top, 8 * editing.revealProgress)
@@ -352,11 +352,6 @@ private struct TaskListRowContent: View {
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .tag(task.id)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if task.canEdit && !expanded && !store.isSelectingTasks {
-                Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil)
-            }
-        }
     }
     private var header: some View {
         HStack(spacing: 0) {
@@ -429,7 +424,7 @@ private struct TaskListRowContent: View {
                             .focused($titleFocused)
                             .disabled(!expanded || editing.isSaving || !task.canEdit)
                         } else {
-                            Text(verbatim: task.description)
+                            collapsedTitle
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                                 .accessibilityElement(children: .ignore)
@@ -480,6 +475,7 @@ private struct TaskListRowContent: View {
                         .accessibilityLabel { _ in
                             VStack {
                                 Text(task.description)
+                                if task.hasAnnotations { Text("Has annotations") }
                                 if !task.project.isEmpty { Text(task.project) }
                                 TaskPlanningCaption(task: task, today: store.currentDate)
                             }
@@ -492,6 +488,13 @@ private struct TaskListRowContent: View {
                 }
             }
         }
+    }
+
+    private var collapsedTitle: Text {
+        let title = Text(verbatim: task.description)
+        guard task.hasAnnotations else { return title }
+        let marker = Text(Image(systemName: "book.pages")).font(.caption2).foregroundStyle(.secondary)
+        return Text("\(title) \(marker)")
     }
 
     private var scheduledLabel: some View {

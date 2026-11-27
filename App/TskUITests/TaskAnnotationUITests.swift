@@ -15,7 +15,7 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5))
         focusTaskText(title, app: app)
         title.typeText(name)
-        hideKeyboard(app)
+        dismissTaskRowKeyboard(app)
         closeTaskRow(app)
         XCTAssertTrue(waitForTaskSave(app, named: name, timeout: 10))
 
@@ -26,17 +26,18 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertFalse(first.exists)
         focusTaskText(note, app: app)
         note.typeText("First supporting note\nAnother line")
-        hideKeyboard(app)
+        dismissTaskRowKeyboard(app)
         closeTaskRow(app)
         XCTAssertTrue(waitForTaskSave(app, named: name, timeout: 10))
 
+        XCTAssertTrue(row.label.contains("Has annotations"))
         expandTaskRow(row, app: app)
         XCTAssertEqual(first.value as? String, "First supporting note\nAnother line")
         let revised = "First supporting note\nAnother line revised"
         replaceTaskText(first, with: revised, app: app)
         focusTaskText(note, app: app)
         note.typeText("Second independent note")
-        hideKeyboard(app)
+        dismissTaskRowKeyboard(app)
         closeTaskRow(app)
         XCTAssertTrue(waitForTaskSave(app, named: name, timeout: 10))
 
@@ -55,8 +56,4 @@ final class TaskAnnotationUITests: XCTestCase {
         XCTAssertEqual(attributes.keys.filter { $0.hasPrefix("annotation_") }.count, 2)
     }
 
-    private func hideKeyboard(_ app: XCUIApplication) {
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-    }
 }

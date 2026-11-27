@@ -6,7 +6,6 @@ struct TaskDayPageSwipe: UIViewRepresentable {
     let store: TaskStore
     let paging: TaskDayPaging
     let viewport: CGRect
-    let rows: [TaskSelectionRow]
     let reduceMotion: Bool
 
     func makeUIView(context: Context) -> Anchor { Anchor() }
@@ -15,7 +14,6 @@ struct TaskDayPageSwipe: UIViewRepresentable {
         view.pan.store = store
         view.pan.paging = paging
         view.pan.viewport = viewport
-        view.pan.rows = rows
         view.pan.reduceMotion = reduceMotion
     }
 
@@ -34,7 +32,6 @@ struct TaskDayPageSwipe: UIViewRepresentable {
         weak var store: TaskStore?
         var paging: TaskDayPaging?
         var viewport = CGRect.zero
-        var rows: [TaskSelectionRow] = []
         var reduceMotion = false
         private var origin = CGPoint.zero
 
@@ -55,15 +52,19 @@ struct TaskDayPageSwipe: UIViewRepresentable {
                   !store.isSelectionGestureActive, store.rowEditing == nil, !store.isSaving,
                   store.presentedTaskPanels.isEmpty, !paging.isCalendarVisible, canPage else { return false }
             origin = touch.location(in: nil)
-            guard !paging.navigatorBounds.contains(origin), viewport.contains(origin) else { return false }
-            return !rows.contains { $0.bounds.contains(origin) }
+            return viewport.contains(origin) && !paging.navigatorBounds.contains(origin)
         }
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             let speed = velocity(in: nil)
             let point = location(in: nil)
             let movement = abs(speed.x) + abs(speed.y) > 1 ? speed : CGPoint(x: point.x - origin.x, y: point.y - origin.y)
-            return paging?.isCalendarVisible == false && canPage && abs(movement.x) > abs(movement.y) * 1.5
+            guard let store, store.isDayPage, store.taskDrag == nil, paging?.isCalendarVisible == false else { return false }
+            return (canPage || store.isSelectionGestureActive) && abs(movement.x) > abs(movement.y) * 1.5
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            other is TaskSelectionRecognizer
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -79,6 +80,7 @@ struct TaskDayPageSwipe: UIViewRepresentable {
             let width = max(1, viewport.width)
             switch phase {
             case .began, .changed:
+                if phase == .began && store.isSelectionGestureActive { store.endTaskSelection() }
                 paging.drag(distance: distance.x, width: width, store: store)
             case .ended:
                 paging.settle(distance: distance.x, velocity: speed.x, width: width, store: store, reduceMotion: reduceMotion, cancelled: false)

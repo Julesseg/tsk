@@ -119,6 +119,12 @@ extension XCTestCase {
 }
 
 extension XCTestCase {
+    @MainActor func dismissTaskRowKeyboard(_ app: XCUIApplication) {
+        openTaskRowParameter("tags", app: app)
+        tapTaskControl(app.buttons["close-row-parameter"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
     @MainActor func closeTaskRow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         var previous: TaskRowOutsideGeometry?

@@ -128,6 +128,7 @@ import XCTest
 
         openWorkspaceView("Inbox", app: app)
         XCTAssertEqual(pill.value as? String, "-")
+        XCTAssertEqual(pill.frame.width, 2 * pill.frame.height, accuracy: 1)
         captureSelectionEvidence("Inbox shows the compact date pill", app: app)
         pill.tap()
         XCTAssertTrue(calendar.waitForExistence(timeout: 5))
