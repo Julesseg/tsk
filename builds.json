@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 125,
+    "title": "feat(tasks): edit dates and organization in place on expanded rows",
+    "sha": "193a4da",
+    "time": "2026-11-28T09:45:13.434Z"
+  },
+  {
+    "pr": 123,
+    "title": "docs(design): benchmark task layouts and project and deadline controls",
+    "sha": "4dde235",
+    "time": "2026-11-25T16:47:34.637Z"
+  },
+  {
+    "pr": 124,
+    "title": "feat(selection): organize selected tasks in one apply",
+    "sha": "93e0189",
+    "time": "2026-11-24T09:44:25.634Z"
+  },
+  {
+    "pr": 122,
+    "title": "fix(planner): refine date navigation and bulk pickers",
+    "sha": "0d30804",
+    "time": "2026-11-23T15:59:00.028Z"
+  },
+  {
+    "pr": 121,
+    "title": "feat(notifications): alert for timed task dates",
+    "sha": "c5e79c3",
+    "time": "2026-11-22T22:57:26.124Z"
+  }
+]
