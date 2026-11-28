@@ -55,7 +55,7 @@ Dragging within a project changes manual order only and does not inherit Schedul
 
 ## Navigation and calendar scheduling
 
-A bottom-left workspace menu opens Planner, Inbox, or Projects. Its glass circle and the bottom-right capture circle match the collapsed date pill’s height. Both disappear as the calendar expands. A compact glass date pill overlays the planner list and expands into a month calendar. Saved and favorite views and the Views menu are retired. The pill always offers a reliable swipe area for moving between days, including when task rows fill the page. Day-page swipes can also move between dates while preserving row swipe actions. Disable day-to-day swiping on both the pill and page during selection mode.
+A bottom-left workspace menu opens Planner, Inbox, or Projects. Its glass circle and the bottom-right capture circle match the collapsed date pill’s height. Both disappear as the calendar expands. A compact glass date pill overlays the planner list and expands into a month calendar. Saved and favorite views and the Views menu are retired. The pill always offers a reliable swipe area for moving between days, including when task rows fill the page. Horizontal swipes across the page, including task rows, move between dates. Tap a row to edit it. Disable day-to-day swiping on both the pill and page during selection mode.
 
 Swipe across the expanded calendar to browse months. Hold the collapsed date pill to return to Today. With no tasks selected, tapping a calendar date navigates to that day. With tasks selected, tapping today or a later date immediately sets Scheduled to that day without a time. The separate bulk Scheduled and Deadline pickers can each set a date with or without a time.
 

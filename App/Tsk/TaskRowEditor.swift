@@ -4,18 +4,19 @@ import TskCore
 struct TaskRowEditor: View {
     let store: TaskStore
     @Bindable var editing: TaskRowEditing
-    @FocusState.Binding var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.taskRowAvailableHeight) private var availableHeight
     @State private var measuredContentHeight: CGFloat = 0
     @State private var measuredActionsHeight: CGFloat = 0
-    @FocusState private var focusedNote: UTF8String?
+    @FocusState.Binding var focusedNote: UTF8String?
+    let onActivate: () -> Void
     @Environment(\.taskRowActions) private var rowActions
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                TaskRowEditorContent(store: store, editing: editing, titleFocused: $titleFocused, focusedNote: $focusedNote)
+                TaskRowEditorContent(store: store, editing: editing, focusedNote: $focusedNote,
+                                     onActivate: onActivate)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredContentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -29,18 +30,11 @@ struct TaskRowEditor: View {
                         .accessibilityIdentifier("draft-error")
                         .accessibilityAddTraits(.updatesFrequently)
                 }
-                if titleFocused || focusedNote != nil {
-                    Button("Hide keyboard", systemImage: "keyboard.chevron.compact.down") { titleFocused = false; focusedNote = nil }
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .accessibilityIdentifier("dismiss-row-keyboard")
-                }
             }
             .font(.subheadline)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredActionsHeight = $0 }
         }
-        .frame(height: editing.revealProgress * min(measuredContentHeight + measuredActionsHeight + 8, availableHeight), alignment: .top)
+        .frame(height: editing.revealProgress * min(measuredContentHeight + measuredActionsHeight, availableHeight), alignment: .top)
         .disabled(editing.isSaving || store.isSaving)
         .clipped()
         .buttonStyle(.borderless)
@@ -56,149 +50,205 @@ struct TaskRowEditor: View {
 private struct TaskRowEditorContent: View {
     let store: TaskStore
     @Bindable var editing: TaskRowEditing
-    @FocusState.Binding var titleFocused: Bool
     @FocusState.Binding var focusedNote: UTF8String?
+    let onActivate: () -> Void
 
     private var task: TaskRecord { editing.draft.original }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(task.annotations) { annotation in
-                    TextField("Notes", text: Binding(
-                        get: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] ?? "" },
-                        set: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] = $0 }
-                    ), axis: .vertical)
-                    .focused($focusedNote, equals: annotation.reference)
-                    .accessibilityLabel("Notes")
-                    .accessibilityIdentifier("row-note-\(annotation.reference.rawValue)")
-                }
-                TextField("Notes", text: $editing.draft.noteInput, axis: .vertical)
-                    .focused($focusedNote, equals: UTF8String("new"))
-                    .accessibilityLabel("Notes")
-                    .accessibilityIdentifier("row-note-input")
-            }
-            .textFieldStyle(.plain)
-            .disabled(!editing.isCapture && !task.canEdit)
-            .font(.subheadline)
-            .lineLimit(1...5)
-            .padding(.bottom, 4)
-            ScrollView(.horizontal) {
-                GlassEffectContainer(spacing: 6) {
-                    HStack(spacing: 6) {
-                        ForEach(TaskRowParameter.allCases) { parameter in
-                            TaskRowParameterPill(editing: editing, parameter: parameter,
-                                                 projects: store.availableProjects,
-                                                 tags: store.allTasks.flatMap(\.tags), now: editing.referenceDate) {
-                                titleFocused = false
-                                focusedNote = nil
+            HStack(alignment: .top, spacing: 0) {
+                TaskRowPickerButton(editing: editing, parameter: .tags, tags: store.allTasks.flatMap(\.tags), onActivate: onActivate) {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        firstLineReference.frame(width: 0)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if editing.draft.taskDraft.tags.isEmpty {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "tag")
+                                    Text("Tags")
+                                }
+                            } else {
+                                ForEach(editing.draft.taskDraft.tags.map { UTF8String($0) }) { tag in
+                                    Text(tag.rawValue)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(.quaternary, in: .rect(cornerRadius: 4))
+                                }
                             }
                         }
-                    }.padding(.horizontal, 4)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    .frame(width: TaskSelectionRow.slotWidth, alignment: .leading)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
                 }
+                TaskRowPriorityButton(editing: editing, onActivate: onActivate)
+                VStack(alignment: .leading, spacing: 2) {
+                    notes
+                    project
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .scrollIndicators(.hidden)
-            .clipped()
-            .accessibilityIdentifier("row-date-parameters")
-            .transition(.opacity)
+            .fixedSize(horizontal: false, vertical: true)
             .disabled(!editing.isCapture && !task.canEdit)
             if task.recurrenceInspection != nil {
                 TaskRecurrenceSection(task: task, store: store)
                     .padding(.vertical, 8)
             }
         }
-        .padding(.bottom, 8)
         .disabled(editing.isSaving || store.isSaving)
     }
+
+    private var firstLineReference: some View {
+        Text(verbatim: " ").font(.subheadline).hidden().accessibilityHidden(true)
+    }
+
+    private var notes: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(task.annotations) { annotation in
+                TextField("Notes", text: Binding(
+                    get: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] ?? "" },
+                    set: { editing.draft.taskDraft.attributes[annotation.reference.rawValue] = $0 }
+                ), axis: .vertical)
+                .focused($focusedNote, equals: annotation.reference)
+                .accessibilityLabel("Notes")
+                .accessibilityIdentifier("row-note-\(annotation.reference.rawValue)")
+            }
+            TextField("Notes", text: $editing.draft.noteInput, axis: .vertical)
+                .focused($focusedNote, equals: UTF8String("new"))
+                .accessibilityLabel("Notes")
+                .accessibilityIdentifier("row-note-input")
+        }
+        .textFieldStyle(.plain)
+        .font(.subheadline)
+        .lineLimit(1...5)
+    }
+
+    private var project: some View {
+        let name = editing.draft.taskDraft.project
+        let choices = Set((store.availableProjects + [name]).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted()
+        return Menu {
+            Picker("Project", selection: Binding(
+                get: { UTF8String(editing.draft.taskDraft.project) },
+                set: { editing.draft.taskDraft.project = $0.rawValue }
+            )) {
+                Text("No project").tag(UTF8String(""))
+                ForEach(choices) { Text($0.rawValue).tag($0) }
+            }
+            Button("New project…", systemImage: "folder.badge.plus") {
+                onActivate()
+                editing.parameter = .project
+            }
+            .accessibilityIdentifier("row-new-project")
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "folder")
+                Text(name.isEmpty ? "Choose project" : name)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
+            .frame(minHeight: 32, alignment: .leading)
+            .contentShape(Rectangle())
+            .background { TaskMenuActivation(action: onActivate).allowsHitTesting(false).accessibilityHidden(true) }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
+        .modifier(TaskRowPickerPresentation(editing: editing, parameter: .project))
+    }
 }
 
-private struct TaskRowParameterPill: View {
+private struct TaskRowPriorityButton: View {
     @Bindable var editing: TaskRowEditing
-    let parameter: TaskRowParameter
-    let projects: [String]
-    let tags: [String]
-    let now: Date
-    let unfocus: () -> Void
-    @Namespace private var presentationNamespace
+    let onActivate: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let value = parameter.value(in: editing.draft.taskDraft)
-        Group {
-            if parameter == .project || parameter == .priority {
-                Menu {
-                    if parameter == .project {
-                        Picker("Project", selection: Binding(
-                            get: { UTF8String(editing.draft.taskDraft.project) },
-                            set: { editing.draft.taskDraft.project = $0.rawValue }
-                        )) {
-                            Text("No project").tag(UTF8String(""))
-                            ForEach(Set((projects + [editing.draft.taskDraft.project]).filter { !$0.isEmpty }.map { UTF8String($0) }).sorted(), id: \.self) { project in
-                                Text(project.rawValue).tag(project)
-                            }
-                        }
-                        Button("New project…", systemImage: "folder.badge.plus", action: openPicker)
-                            .accessibilityIdentifier("row-new-project")
-                    } else {
-                        Picker("Priority", selection: $editing.draft.taskDraft.priority) {
-                            ForEach(["", "L", "M", "H"], id: \.self) { priority in
-                                Text(TaskRowParameter.priorityTitle(priority)).tag(priority)
-                            }
-                            if !["", "L", "M", "H"].contains(editing.draft.taskDraft.priority) {
-                                Text(editing.draft.taskDraft.priority).tag(editing.draft.taskDraft.priority)
-                            }
-                        }
-                    }
-                } label: {
-                    if parameter == .project {
-                        label.background {
-                            TaskMenuActivation(action: unfocus)
-                                .allowsHitTesting(false)
-                                .accessibilityHidden(true)
-                        }
-                    } else {
-                        label
-                    }
+        let value = editing.draft.taskDraft.priority
+        Button {
+            onActivate()
+            editing.draft.taskDraft.priority = switch value {
+            case "": "L"
+            case "L": "M"
+            case "M": "H"
+            default: ""
+            }
+        } label: {
+            Text(verbatim: " ")
+                .font(.subheadline)
+                .hidden()
+                .frame(width: TaskSelectionRow.completionControlWidth)
+                .overlay {
+                    prioritySymbol(value)
                 }
-                .modifier(TaskRowMenuUnfocusGesture(parameter: parameter, unfocus: unfocus))
-            } else {
-                Button(action: openPicker) { label }
+                .frame(width: TaskSelectionRow.completionControlWidth, height: 32, alignment: .top)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Priority")
+        .accessibilityValue(TaskRowParameter.priorityTitle(value))
+        .accessibilityHint("Cycles through Low, Medium, High and None")
+        .accessibilityIdentifier("row-priority")
+    }
+
+    private func prioritySymbol(_ value: String) -> some View {
+        Group {
+            switch value {
+            case "": Image(systemName: "circle.fill").font(.system(size: 5))
+            case "L": Image(systemName: "exclamationmark")
+            case "M": Image(systemName: "exclamationmark.2")
+            case "H": Image(systemName: "exclamationmark.3")
+            default: Text(value).lineLimit(1)
             }
         }
-        .buttonStyle(TaskRowParameterButtonStyle())
-        .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
-        .popover(isPresented: Binding(
-            get: { editing.parameter == parameter },
-            set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
-        ), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-            TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: now) { editing.parameter = nil }
-                .frame(width: 340)
-                .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
-                .presentationCompactAdaptation(.popover)
-        }
-        .frame(minWidth: 44, minHeight: 44, alignment: .top)
-        .contentShape(Rectangle())
-        .accessibilityLabel(parameter.title)
-        .accessibilityValue(value ?? "Not set")
-        .accessibilityIdentifier("row-" + parameter.rawValue)
-    }
-
-    private var label: some View {
-        TaskRowParameterLabel(parameter: parameter, value: parameter.value(in: editing.draft.taskDraft))
-    }
-
-    private func openPicker() {
-        unfocus()
-        editing.parameter = parameter
+        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: value)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
     }
 }
 
-private struct TaskRowMenuUnfocusGesture: ViewModifier {
+struct TaskRowPickerButton<Label: View>: View {
+    let editing: TaskRowEditing
     let parameter: TaskRowParameter
-    let unfocus: () -> Void
+    var tags: [String] = []
+    let onActivate: () -> Void
+    @ViewBuilder let label: () -> Label
+
+    var body: some View {
+        Button {
+            onActivate()
+            editing.parameter = parameter
+        } label: {
+            label().contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .modifier(TaskRowPickerPresentation(editing: editing, parameter: parameter, tags: tags))
+        .disabled(editing.isSaving || !editing.isExpanded || !editing.isCapture && !editing.draft.original.canEdit)
+    }
+}
+
+private struct TaskRowPickerPresentation: ViewModifier {
+    let editing: TaskRowEditing
+    let parameter: TaskRowParameter
+    var tags: [String] = []
+    @Namespace private var presentationNamespace
 
     func body(content: Content) -> some View {
-        if parameter == .project { content }
-        else { content.simultaneousGesture(TapGesture().onEnded { unfocus() }) }
+        content
+            .matchedTransitionSource(id: parameter.id, in: presentationNamespace)
+            .popover(isPresented: Binding(
+                get: { editing.parameter == parameter },
+                set: { if !$0 && editing.parameter == parameter { editing.parameter = nil } }
+            ), attachmentAnchor: .rect(.bounds)) {
+                TaskRowParameterPicker(editing: editing, parameter: parameter, tags: tags, now: editing.referenceDate) { editing.parameter = nil }
+                    .frame(idealWidth: 340, maxWidth: 340)
+                    .navigationTransition(.zoom(sourceID: parameter.id, in: presentationNamespace))
+                    .presentationCompactAdaptation(.popover)
+            }
+            .accessibilityLabel(parameter.title)
+            .accessibilityValue(parameter.value(in: editing.draft.taskDraft) ?? "Not set")
+            .accessibilityIdentifier("row-" + parameter.rawValue)
     }
 }
 
@@ -209,7 +259,7 @@ struct TaskRowParameterPicker: View {
     let tags: [String]
     let dismiss: () -> Void
     private let today: Date
-    @State private var selectedDate: Date
+    @State private var original: TaskDraft
     @State private var contentHeight: CGFloat = 400
     @State private var tagError: String?
 
@@ -219,9 +269,7 @@ struct TaskRowParameterPicker: View {
         self.tags = tags
         self.dismiss = dismiss
         today = Calendar.current.startOfDay(for: now)
-        var initial = parameter.date(in: editing.draft.taskDraft) ?? (parameter == .scheduled ? today : now)
-        if parameter == .scheduled, editing.draft.taskDraft.scheduled()?.hasTime != true { initial = max(today, initial) }
-        _selectedDate = State(initialValue: initial)
+        _original = State(initialValue: editing.draft.taskDraft)
     }
 
     var body: some View {
@@ -261,40 +309,67 @@ struct TaskRowParameterPicker: View {
                 EmptyView()
             case .tags:
                 TaskRowTagsEditor(draft: $editing.draft, availableTags: tags, error: $tagError)
-            default:
-                let isScheduled = parameter == .scheduled
-                let hasTime = editing.draft.taskDraft.scheduled()?.hasTime == true
-                TaskParameterDatePicker(parameter: parameter,
-                                        selection: isScheduled ? $selectedDate.calendarDay(includesTime: hasTime) : $selectedDate,
-                                        includesTime: !isScheduled, minimumDate: isScheduled && !hasTime ? today : nil)
-                    .onChange(of: selectedDate) { _, date in parameter.setDate(date, in: &editing.draft) }
-                if isScheduled {
-                    Toggle("Include time", isOn: Binding(
-                        get: { editing.draft.taskDraft.scheduled()?.hasTime ?? false },
-                        set: { hasTime in
-                            if !hasTime { selectedDate = max(today, Calendar.current.startOfDay(for: selectedDate)) }
-                            editing.draft.taskDraft.setScheduled(TaskScheduledDate(date: selectedDate, hasTime: hasTime))
-                        }
-                    ))
-                    .accessibilityIdentifier("scheduled-has-time")
-                    if hasTime {
-                        DatePicker("Time", selection: $selectedDate, displayedComponents: .hourAndMinute)
-                            .datePickerStyle(.compact)
-                            .accessibilityIdentifier("scheduled-time-picker")
-                    }
-                }
-            }
-            if parameter != .tags && editing.draft.taskDraft.attributes[parameter.attribute] != nil {
-                Button("Remove " + parameter.title.lowercased(), role: .destructive) {
-                    if parameter == .scheduled { editing.draft.taskDraft.setScheduled(nil) }
-                    else { editing.draft.taskDraft.attributes[parameter.attribute] = nil }
-                    dismiss()
-                }
-                .accessibilityIdentifier("remove-" + parameter.rawValue)
+            case .scheduled, .deadline:
+                dateControls
             }
         }
         .buttonStyle(.borderless)
         .padding(16)
+    }
+
+    private var field: TaskDateField { parameter == .scheduled ? .scheduled : .deadline }
+    private var intent: TaskScheduledDate? { editing.draft.taskDraft.dateIntent(for: field) }
+    private var hasTime: Bool { intent?.hasTime == true }
+
+    private var selectedDate: Binding<Date> {
+        Binding(get: {
+            let date = intent?.date ?? today
+            return field == .scheduled && !hasTime ? max(date, today) : date
+        }, set: { setDate($0, hasTime: hasTime) })
+    }
+
+    private func setDate(_ date: Date, hasTime: Bool) {
+        let day = Calendar.autoupdatingCurrent.startOfDay(for: date)
+        let value = hasTime ? date : field == .scheduled ? max(day, today) : day
+        editing.draft.taskDraft.setDateIntent(.init(date: value, hasTime: hasTime), for: field)
+    }
+
+    @ViewBuilder private var dateControls: some View {
+        let day = selectedDate.calendarDay(includesTime: hasTime)
+        DatePicker(parameter.title, selection: day, in: (field == .scheduled && !hasTime ? today : .distantPast)..., displayedComponents: .date)
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .accessibilityLabel(parameter.title)
+            .accessibilityIdentifier(parameter.rawValue + "-picker")
+        Toggle("Set time", isOn: Binding(get: { hasTime }, set: { setDate(selectedDate.wrappedValue, hasTime: $0) }))
+            .accessibilityIdentifier(parameter.rawValue + "-has-time")
+        if hasTime {
+            DatePicker("Time", selection: selectedDate, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.compact)
+                .accessibilityIdentifier(parameter.rawValue + "-time-picker")
+        }
+        HStack {
+            Button("Reset", systemImage: "arrow.counterclockwise") {
+                editing.draft.taskDraft.restoreDate(field, from: original)
+                dismiss()
+            }
+            .labelStyle(.iconOnly)
+            .disabled(original.dateIntent(for: field) == intent)
+            Button("Remove " + parameter.title.lowercased(), systemImage: "trash", role: .destructive) {
+                editing.draft.taskDraft.setDateIntent(nil, for: field)
+                dismiss()
+            }
+            .labelStyle(.iconOnly)
+            .disabled(editing.draft.taskDraft.attributes[parameter.attribute] == nil)
+            .accessibilityIdentifier("remove-" + parameter.rawValue)
+            Spacer()
+            Button("Today") { day.wrappedValue = today }
+            if let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today) {
+                Button("Tomorrow") { day.wrappedValue = tomorrow }
+            }
+        }
+        .font(.subheadline)
+        .buttonStyle(.bordered)
     }
 
     private var heading: some View {
@@ -308,55 +383,10 @@ struct TaskRowParameterPicker: View {
                 do { try editing.draft.addTagInput() }
                 catch { tagError = error.localizedDescription; return }
             } else if parameter != .project && parameter != .priority && parameter.date(in: editing.draft.taskDraft) == nil {
-                parameter.setDate(selectedDate, in: &editing.draft)
+                setDate(selectedDate.wrappedValue, hasTime: hasTime)
             }
             dismiss()
         }
         .accessibilityIdentifier("close-row-parameter")
-    }
-}
-
-struct TaskParameterDatePicker: View {
-    let parameter: TaskRowParameter
-    @Binding var selection: Date
-    var includesTime = true
-    var minimumDate: Date?
-
-    var body: some View {
-        DatePicker(parameter.title, selection: $selection, in: (minimumDate ?? .distantPast)..., displayedComponents: includesTime ? [.date, .hourAndMinute] : [.date])
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            .accessibilityLabel(parameter.title)
-            .accessibilityIdentifier(parameter.rawValue + "-picker")
-    }
-}
-
-struct TaskRowParameterLabel: View {
-    let parameter: TaskRowParameter
-    let value: String?
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: parameter.symbol).font(.caption)
-            if let value {
-                Text(value).lineLimit(1).frame(maxWidth: 220)
-            }
-        }
-        .font(.caption2)
-        .lineLimit(1)
-    }
-}
-
-struct TaskRowParameterButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 9)
-            .frame(minHeight: 26)
-            .background(.background, in: Capsule())
-            .overlay { Capsule().strokeBorder(Color(uiColor: .separator).opacity(0.5), lineWidth: 1) }
-            .opacity(configuration.isPressed ? 0.65 : 1)
-            .frame(minWidth: 44, minHeight: 44, alignment: .top)
-            .contentShape(Rectangle())
     }
 }

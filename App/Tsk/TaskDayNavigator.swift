@@ -87,7 +87,7 @@ struct TaskDayNavigator: View {
                 }
                 .padding(.horizontal, 16)
             } else {
-                Text("-").frame(minWidth: TaskDayPaging.pillHeight)
+                TaskDateDash().frame(minWidth: 2 * TaskDayPaging.pillHeight)
             }
         }
         .font(.subheadline.weight(.semibold))
@@ -495,6 +495,12 @@ private struct TaskDayLabelPages: Layout {
     }
 }
 
+private struct TaskDateDash: View {
+    var body: some View {
+        Image(systemName: "minus").font(.title2.bold())
+    }
+}
+
 struct TaskPlannerLeadingDate: View {
     let task: TaskRecord
     let day: Date?
@@ -512,18 +518,18 @@ struct TaskPlannerLeadingDate: View {
             && scheduled.map { $0.hasTime && $0.date < calendar.startOfDay(for: today) } == true
         VStack(spacing: 1) {
             if let scheduled, showsDate {
-                Text(scheduled.date, format: .dateTime.day().month(.abbreviated))
-                    .font(.system(size: dateSize))
+                Text(scheduled.date, format: .dateTime.month(.abbreviated).day())
+                    .font(.system(size: scheduled.hasTime ? dateSize : dateSize + 2, weight: scheduled.hasTime ? .regular : .semibold))
             }
             if let scheduled, scheduled.hasTime {
                 Text(scheduled.date, style: .time)
                     .font(.caption.bold().monospacedDigit())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
             } else if !showsDate {
-                Text("-").font(.caption.bold())
+                TaskDateDash()
             }
         }
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
         .foregroundStyle(isCarried ? Color.red : Color.secondary)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)

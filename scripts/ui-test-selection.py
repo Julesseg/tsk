@@ -37,6 +37,7 @@ NIGHTLY = (
 )
 
 ON_DEMAND = (
+    'CalendarPresentationUITests/testLocalCalendarEventHandoff',
     'CalendarPresentationUITests/testCalendarVisibilityTogglesFilterIndependentlyAndPersistAcrossLaunches',
     'CalendarPresentationUITests/testDisplayedDayCalendarReadsEventsWithoutChangingTasks',
     'CalendarPresentationUITests/testPopulatedCalendarShowsEventsAboveTasksAcrossAppearances',

@@ -223,7 +223,7 @@ private struct TaskListGestures: View {
         TaskNativeDrag(store: store, scope: scope, rows: rows.tasks, eventTargets: rows.events, reduceMotion: reduceMotion)
         TaskSelectionGesture(store: store, scope: scope, viewport: viewport, rows: rows.tasks)
         if (store.isDayPage || store.isSelectingTasks) && isVisible {
-            TaskDayPageSwipe(store: store, paging: paging, viewport: viewport, rows: rows.tasks, reduceMotion: reduceMotion)
+            TaskDayPageSwipe(store: store, paging: paging, viewport: viewport, reduceMotion: reduceMotion)
         }
     }
 }
@@ -250,9 +250,9 @@ private struct TaskListRowContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
     @FocusState private var titleFocused: Bool
+    @FocusState private var focusedNote: UTF8String?
     @State private var headerHeight: CGFloat = 32
-    @State private var titleHeight: CGFloat = 28
-    @State private var titleContentHeight: CGFloat = 28
+    @State private var projectBadgeHeight: CGFloat = 0
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
     @ScaledMetric(relativeTo: .caption2) private var metadataSize: CGFloat = 10
@@ -263,153 +263,32 @@ private struct TaskListRowContent: View {
     private var expanded: Bool { editing?.isExpanded == true }
     private var displayedTask: TaskRecord { editing?.savedTask ?? task }
     private var hasProject: Bool { !displayedTask.project.isEmpty }
-    private var titleBottom: CGFloat { max(0, (headerHeight - titleContentHeight) / 2) + titleHeight }
-    private var attributesOverlap: CGFloat { hasProject ? max(0, headerHeight - titleBottom - 4) : 0 }
     private var phase: TaskCompletionFeedback.Phase? { isPreview ? nil : store.completionFeedback.phase(for: task.id, context: store.completionContext) }
     private var checked: Bool { displayedTask.status == "completed" || phase == .checked || phase == .covering || phase == .collapsing }
     private var visibility: CGFloat { phase == .covering || phase == .collapsing ? 0 : 1 }
-    private var hasCompletionControl: Bool { task.canComplete || displayedTask.status == "completed" }
+
+    private var planningTask: TaskRecord {
+        guard let editing, editing.savedTask == nil else { return displayedTask }
+        return TaskRecord(id: task.id, attributes: editing.draft.taskDraft.attributes)
+    }
+
+    private func activateRowControl() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        titleFocused = false
+        focusedNote = nil
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: hasCompletionControl && editing?.isCapture != true ? 0 : 4) {
-            if editing?.isCapture != true {
-                TaskPlannerLeadingDate(task: displayedTask, day: day, today: store.currentDate)
-                    .frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
-                    .contentShape(Rectangle())
-                    .modifier(TaskRowFade(editing: editing, disappearing: true))
-                    .accessibilityAddTraits(task.canComplete ? .isButton : [])
-                    .accessibilityHint(task.canComplete ? (selected ? "Deselect task" : "Select task") : "")
-                    .accessibilityAction { if task.canComplete { store.toggleSelection(task.id) } }
-            }
-            if task.canComplete {
-                Button {
-                    if store.isSelectingTasks { store.toggleSelection(task.id); return }
-                    guard store.rowEditing == nil, !store.isSaving else { return }
-                    Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
-                } label: {
-                    Image(systemName: checked ? "checkmark.circle.fill" : "circle")
-                        .font(.body).foregroundStyle(Color.secondary)
-                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
-                        .animation(reduceMotion ? nil : .default, value: checked)
-                        .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .frame(height: headerHeight)
-                .disabled(phase != nil)
-                .allowsHitTesting(!store.isSaving && store.rowEditing == nil)
-                .accessibilityRespondsToUserInteraction(store.rowEditing == nil)
-                .accessibilityLabel(store.isSelectingTasks ? "\(selected ? "Deselect task" : "Select task"): \(task.description)" : "\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
-                .accessibilityValue(store.isSelectingTasks ? (selected ? "Selected" : "Not selected") : checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
-                .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
-                .accessibilityHidden(editing?.isCapture == true)
-            }
-            else if displayedTask.status == "completed" {
-                if task.canReopen {
-                    Button {
-                        Task { _ = await store.reopen(id: task.id) }
-                    } label: {
-                        completedCheckmark
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(phase != nil || store.rowEditing != nil || store.isSaving || store.isSelectingTasks)
-                    .accessibilityLabel("Reopen task: \(task.description)")
-                    .accessibilityValue("Completed")
-                    .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
-                } else {
-                    completedCheckmark
-                        .accessibilityLabel("Completed task: \(task.description)")
-                        .accessibilityValue("Completed")
-                        .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
-                }
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Group {
-                            if let editing {
-                                TextField("What needs to be done?", text: Binding(
-                                    get: { editing.savedTask?.description ?? editing.draft.taskDraft.description },
-                                    set: { editing.draft.taskDraft.description = $0 }
-                                ), axis: .vertical)
-                                .textFieldStyle(.plain)
-                                .focused($titleFocused)
-                                .disabled(!expanded || editing.isSaving || !task.canEdit)
-                            } else {
-                                Text(verbatim: task.description)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
-                                    .accessibilityElement(children: .ignore)
-                            }
-                        }
-                        .font(.subheadline.leading(.tight))
-                        .foregroundStyle(checked ? .secondary : .primary)
-                        .strikethrough(checked)
-                        .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
-                        .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
-                        .accessibilityLabel("Task title")
-                        .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
-                        .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
-                        .accessibilityHidden(!expanded)
-                        if hasProject {
-                            Text(displayedTask.project)
-                                .font(.system(size: metadataSize))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.secondary.opacity(0.11), in: Capsule())
-                                .padding(.top, 1)
-                                .modifier(TaskRowFade(editing: editing, disappearing: true))
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleContentHeight = $0 }
-                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-                    if displayedTask.deadline != nil {
-                        TimelineView(.periodic(from: .now, by: 60)) { _ in
-                            TaskPlanningCaption(task: displayedTask, today: store.currentDate)
-                                .multilineTextAlignment(.trailing)
-                        }
-                        .layoutPriority(1)
-                        .frame(maxHeight: .infinity, alignment: .trailing)
-                        .modifier(TaskRowFade(editing: editing, disappearing: true))
-                        .accessibilityHidden(true)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
-                if let editing {
-                    TaskRowEditor(store: store, editing: editing, titleFocused: $titleFocused)
-                        .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 24 + attributesOverlap))
-                        .modifier(TaskRowAttributePosition(editing: editing, overlap: attributesOverlap))
-                        .modifier(TaskRowFade(editing: editing))
-                        .allowsHitTesting(expanded)
-                        .accessibilityHidden(!expanded)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay {
-                if !expanded && !isPreview {
-                    Button {
-                        if store.isSelectingTasks { store.toggleSelection(task.id) }
-                        else { expand() }
-                    } label: { Color.clear.contentShape(Rectangle()) }
-                        .buttonStyle(TaskRowTapButtonStyle())
-                        .disabled(phase != nil || editing != nil)
-                        .accessibilityLabel { _ in
-                            VStack {
-                                Text(task.description)
-                                if !task.project.isEmpty { Text(task.project) }
-                                TaskPlanningCaption(task: task, today: store.currentDate)
-                            }
-                            .accessibilityElement(children: .combine)
-                        }
-                        .accessibilityIdentifier(identity)
-                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? (store.taskDragContext != nil ? "Tap to edit; drag the title to reorder; touch the scheduled time to select" : "Tap to edit title and attributes; touch the scheduled time to select") : task.canEdit ? "Expand to edit title and attributes" : "Expand task")
-                        .accessibilityAction(named: task.canEdit ? "Edit title and attributes" : "Expand task", expand)
-                        .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if let editing {
+                TaskRowEditor(store: store, editing: editing, focusedNote: $focusedNote,
+                              onActivate: activateRowControl)
+                    .environment(\.taskRowAvailableHeight, max(44, availableHeight - headerHeight - 32))
+                    .padding(.top, 8 * editing.revealProgress)
+                    .modifier(TaskRowFade(editing: editing))
+                    .allowsHitTesting(expanded)
+                    .accessibilityHidden(!expanded)
             }
         }
         .background {
@@ -418,12 +297,13 @@ private struct TaskListRowContent: View {
                     let frame = geometry.frame(in: .global)
                     Color.clear.preference(key: TaskSelectionRowsKey.self,
                         value: [identity: TaskSelectionRow(id: task.id, rowID: identity,
-                            bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: min(headerHeight, frame.height))),
+                            bounds: CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: editing == nil ? frame.height : min(headerHeight, frame.height))),
                             isEditing: editing != nil)])
                         .background { TaskSelectionRowAnchor().allowsHitTesting(false) }
                 }
             }
         }
+        .padding(.horizontal, 12)
         .modifier(TaskRowSpacing(editing: editing))
         .modifier(TaskSelectionRowFeedback(selected: selected))
         .opacity((checked ? 0.55 : 1) * (store.isTaskDragLifted && store.taskDrag?.ids.contains(task.id) == true ? 0 : 1))
@@ -467,21 +347,188 @@ private struct TaskListRowContent: View {
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.42), value: visibility)
         .accessibilityHidden(phase == .collapsing || store.rowEditing != nil && editing == nil)
-        .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 12))
+        .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .tag(task.id)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if task.canEdit && !expanded && !store.isSelectingTasks {
-                Button(task.isOccurrence ? "Edit occurrence" : "Edit", systemImage: "pencil") { expand() }.disabled(store.isSaving || phase != nil)
+    }
+
+    private var leadingControlHeight: CGFloat { editing == nil ? 28 : headerHeight }
+
+    private var header: some View {
+        let progress = editing?.revealProgress ?? 0
+        return HStack(spacing: 0) {
+            if let editing {
+                TaskRowPickerButton(editing: editing, parameter: .scheduled, onActivate: activateRowControl) {
+                    scheduledLabel.frame(width: TaskSelectionRow.slotWidth, height: leadingControlHeight)
+                }
+            } else {
+                scheduledLabel
+                    .frame(width: TaskSelectionRow.slotWidth, height: leadingControlHeight)
+                    .contentShape(Rectangle())
+                    .accessibilityAddTraits(task.canComplete ? .isButton : [])
+                    .accessibilityHint(task.canComplete ? (selected ? "Deselect task" : "Select task") : "")
+                    .accessibilityAction { if task.canComplete { store.toggleSelection(task.id) } }
+            }
+            if task.canComplete {
+                Button {
+                    if store.isSelectingTasks { store.toggleSelection(task.id); return }
+                    guard store.rowEditing == nil, !store.isSaving else { return }
+                    Task { _ = await store.completeFromList(id: task.id, animated: !reduceMotion) }
+                } label: {
+                    Image(systemName: checked ? "checkmark.circle.fill" : "circle")
+                        .font(.body).foregroundStyle(Color.secondary)
+                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace, options: .speed(3)))
+                        .animation(reduceMotion ? nil : .default, value: checked)
+                        .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .frame(height: leadingControlHeight)
+                .disabled(phase != nil)
+                .allowsHitTesting(!store.isSaving && store.rowEditing == nil)
+                .accessibilityRespondsToUserInteraction(store.rowEditing == nil)
+                .accessibilityLabel(store.isSelectingTasks ? "\(selected ? "Deselect task" : "Select task"): \(task.description)" : "\(task.isOccurrence ? "Complete occurrence" : "Complete task"): \(task.description)")
+                .accessibilityValue(store.isSelectingTasks ? (selected ? "Selected" : "Not selected") : checked ? "Completed" : phase == .saving ? "Saving" : "Not completed")
+                .accessibilityIdentifier("complete-task-row-\(task.id.uuidString)")
+                .accessibilityHidden(editing?.isCapture == true)
+            }
+            else if displayedTask.status == "completed" {
+                if task.canReopen {
+                    Button {
+                        Task { _ = await store.reopen(id: task.id) }
+                    } label: {
+                        completedCheckmark
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(phase != nil || store.rowEditing != nil || store.isSaving || store.isSelectingTasks)
+                    .accessibilityLabel("Reopen task: \(task.description)")
+                    .accessibilityValue("Completed")
+                    .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
+                } else {
+                    completedCheckmark
+                        .accessibilityLabel("Completed task: \(task.description)")
+                        .accessibilityValue("Completed")
+                        .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
+                }
+            } else {
+                Color.clear.frame(width: TaskSelectionRow.completionControlWidth, height: leadingControlHeight)
+                    .accessibilityHidden(true)
+            }
+            ZStack(alignment: Alignment(horizontal: .leading, vertical: .taskTitleBottom)) {
+                HStack(spacing: 8) {
+                    Group {
+                        if let editing {
+                            TextField("What needs to be done?", text: Binding(
+                                get: { editing.savedTask?.description ?? editing.draft.taskDraft.description },
+                                set: { editing.draft.taskDraft.description = $0 }
+                            ), axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .focused($titleFocused)
+                            .disabled(!expanded || editing.isSaving || !task.canEdit)
+                        } else {
+                            collapsedTitle
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .accessibilityElement(children: .ignore)
+                        }
+                    }
+                    .font(.subheadline.leading(.tight))
+                    .foregroundStyle(checked ? .secondary : .primary)
+                    .strikethrough(checked)
+                    .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
+                    .alignmentGuide(.taskTitleBottom) { $0.height }
+                    .accessibilityLabel("Task title")
+                    .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
+                    .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
+                    .accessibilityHidden(!expanded)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                    deadline
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
+                .alignmentGuide(.taskTitleBottom) { dimensions in
+                    let bottom = dimensions[explicit: .taskTitleBottom] ?? dimensions.height
+                    return bottom + (dimensions.height - bottom) * progress
+                }
+                if hasProject {
+                    Text(displayedTask.project)
+                        .font(.system(size: metadataSize))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.11), in: Capsule())
+                        .padding(.top, 1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { projectBadgeHeight = $0 }
+                        .frame(height: editing == nil ? nil : projectBadgeHeight * (1 - progress), alignment: .top)
+                        .clipped()
+                        .opacity(1 - progress)
+                        .alignmentGuide(.taskTitleBottom) { _ in 0 }
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay {
+                if !expanded && !isPreview {
+                    Button {
+                        if store.isSelectingTasks { store.toggleSelection(task.id) }
+                        else { expand() }
+                    } label: { Color.clear.contentShape(Rectangle()) }
+                        .buttonStyle(TaskRowTapButtonStyle())
+                        .disabled(phase != nil || editing != nil)
+                        .accessibilityLabel { _ in
+                            VStack {
+                                Text(task.description)
+                                if task.hasAnnotations { Text("Has annotations") }
+                                if !task.project.isEmpty { Text(task.project) }
+                                TaskPlanningCaption(task: task, today: store.currentDate)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        .accessibilityIdentifier(identity)
+                        .accessibilityHint(store.isSelectingTasks ? "Toggle selection" : task.canComplete ? (store.taskDragContext != nil ? "Tap to edit; drag the title to reorder; touch the scheduled time to select" : "Tap to edit title and attributes; touch the scheduled time to select") : task.canEdit ? "Expand to edit title and attributes" : "Expand task")
+                        .accessibilityAction(named: task.canEdit ? "Edit title and attributes" : "Expand task", expand)
+                        .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
+                }
             }
         }
     }
+
+    private var collapsedTitle: Text {
+        let title = Text(verbatim: task.description)
+        guard task.hasAnnotations else { return title }
+        let marker = Text(Image(systemName: "book.pages")).font(.caption2).foregroundStyle(.secondary)
+        return Text("\(title) \(marker)")
+    }
+
+    private var scheduledLabel: some View {
+        TaskPlannerLeadingDate(task: planningTask, day: day, today: store.currentDate)
+    }
+
+    @ViewBuilder private var deadline: some View {
+        if let editing {
+            TaskRowPickerButton(editing: editing, parameter: .deadline, onActivate: activateRowControl) {
+                deadlineLabel.frame(maxHeight: .infinity, alignment: .trailing)
+            }
+            .layoutPriority(1)
+        } else if displayedTask.deadline != nil {
+            deadlineLabel.layoutPriority(1).accessibilityHidden(true)
+        }
+    }
+
+    private var deadlineLabel: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+            TaskPlanningCaption(task: planningTask, today: store.currentDate, showsEmptyFlag: editing != nil)
+        }
+    }
+
     private var completedCheckmark: some View {
         Image(systemName: "checkmark.circle.fill")
             .font(.body)
             .foregroundStyle(Color.secondary)
-            .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: headerHeight)
+            .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: leadingControlHeight)
             .contentShape(Rectangle())
     }
 
@@ -489,6 +536,14 @@ private struct TaskListRowContent: View {
         store.expandRow(task, rowID: identity)
     }
 
+}
+
+private extension VerticalAlignment {
+    struct TaskTitleBottom: AlignmentID {
+        static func defaultValue(in dimensions: ViewDimensions) -> CGFloat { dimensions.height }
+    }
+
+    static let taskTitleBottom = VerticalAlignment(TaskTitleBottom.self)
 }
 
 @MainActor private final class TaskRowGeometry {
@@ -548,14 +603,5 @@ private struct TaskRowFade: ViewModifier {
         } else {
             content.opacity(disappearing ? 1 - progress : progress)
         }
-    }
-}
-
-private struct TaskRowAttributePosition: ViewModifier {
-    let editing: TaskRowEditing
-    let overlap: CGFloat
-
-    func body(content: Content) -> some View {
-        content.padding(.top, -overlap * editing.revealProgress)
     }
 }

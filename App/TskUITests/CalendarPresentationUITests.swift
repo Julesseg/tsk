@@ -191,6 +191,50 @@ import XCTest
         XCTAssertEqual(accessibleWork.value as? String, "0")
     }
 
+    func testLocalCalendarEventHandoff() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["TSK_UI_ISOLATED_SIMULATOR"] == "1")
+        let token = UUID().uuidString
+        let app = taskTestApplication()
+        app.launchEnvironment["TSK_TEST_REPLICA_NAME"] = token
+        app.launchEnvironment["TSK_UI_ISOLATED_SIMULATOR"] = "1"
+        app.resetAuthorizationStatus(for: .calendar)
+        app.launchEnvironment["TSK_TEST_CALENDAR_FIXTURE"] = token
+        addTeardownBlock {
+            app.terminate()
+            app.launchEnvironment.removeValue(forKey: "TSK_TEST_CALENDAR_FIXTURE")
+            app.launchEnvironment["TSK_TEST_CALENDAR_CLEANUP"] = token
+            app.launch()
+            XCTAssertTrue(app.buttons["New task"].waitForExistence(timeout: 20))
+            app.terminate()
+            app.resetAuthorizationStatus(for: .calendar)
+        }
+        app.launch()
+        openWorkspaceView("Today", app: app)
+        openCalendarSettings(app)
+        let enable = app.buttons["calendar-request-access"]
+        enable.tap()
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 15))
+        let allow = try XCTUnwrap(alert.buttons.allElementsBoundByIndex.first {
+            $0.label.lowercased().hasPrefix("allow") && !$0.label.lowercased().contains("only")
+        }, alert.debugDescription)
+        allow.tap()
+        XCTAssertTrue(enable.waitForNonExistence(timeout: 20))
+        closeCalendarSettings(app)
+        let calendar = XCUIApplication(bundleIdentifier: "com.apple.mobilecal")
+        for name in ["Calendar fixture timed", "Calendar fixture all day"] {
+            let target = event(name, app)
+            XCTAssertTrue(target.waitForExistence(timeout: 10))
+            target.tap()
+            XCTAssertTrue(calendar.wait(for: .runningForeground, timeout: 10))
+            let welcome = calendar.buttons["Continue"]
+            if welcome.exists { welcome.tap() }
+            let title = calendar.staticTexts["event-details-title-text"]
+            XCTAssertTrue(title.wait(for: \.label, toEqual: name, timeout: 5))
+            app.activate()
+        }
+    }
+
     private func browseDay(_ offset: Int, app: XCUIApplication) {
         let pill = app.buttons["planner-date-pill"]
         let day = Date(timeIntervalSince1970: Double(pill.value as! String)!)

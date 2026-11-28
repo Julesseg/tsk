@@ -12,6 +12,8 @@ public struct TaskAnnotation: Identifiable, Equatable, Sendable {
 }
 
 public extension TaskRecord {
+    var hasAnnotations: Bool { attributes.keys.contains { $0.utf8.starts(with: "annotation_".utf8) } }
+
     var annotations: [TaskAnnotation] {
         attributes.compactMap { key, text in
             guard key.utf8.starts(with: "annotation_".utf8) else { return nil }

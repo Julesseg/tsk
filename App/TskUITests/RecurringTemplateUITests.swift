@@ -84,7 +84,7 @@ final class RecurringTemplateUITests: XCTestCase {
         let edited = try XCTUnwrap(description.value as? String) + " occurrence edit"
         replaceTaskText(description, with: edited, app: app)
         XCTAssertEqual(description.value as? String, edited)
-        hideKeyboard("dismiss-row-keyboard", app: app)
+        dismissTaskRowKeyboard(app)
         let supporting = app.scrollViews["task-row-editor"]
         XCTAssertTrue(revealTaskElement(app.buttons["occurrence-template"], in: supporting, app: app))
         app.buttons["occurrence-template"].tap()

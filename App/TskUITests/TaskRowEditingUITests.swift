@@ -26,13 +26,13 @@ import XCTest
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "raw-attribute-")).firstMatch.exists)
         capture("Supporting information is available inside the expanded row", app)
         replaceTaskText(title, with: "Unsaved supporting draft", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        dismissTaskRowKeyboard(app)
         XCTAssertTrue(revealTaskElement(annotation, in: editor, app: app))
         replaceTaskText(annotation, with: "Edited supporting note", app: app)
         let note = app.descendants(matching: .any)["row-note-input"].firstMatch
         XCTAssertTrue(revealTaskElement(note, in: editor, app: app))
         replaceTaskText(note, with: "New supporting note", app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        dismissTaskRowKeyboard(app)
         XCTAssertEqual(title.value as? String, "Unsaved supporting draft")
         XCTAssertEqual(annotation.value as? String, "Edited supporting note")
         XCTAssertEqual(note.value as? String, "New supporting note")
@@ -65,29 +65,54 @@ import XCTest
     }
 
     func testMiddleRowOpensSpaceAroundItsFixedHeader() throws {
-        let app = try launch(neighbors: true)
+        let app = try launch(neighbors: true, organized: true)
         let rows = app.collectionViews["task-list"].cells
         XCTAssertEqual(rows.count, 3)
         let before = rows.element(boundBy: 0).frame
         let after = rows.element(boundBy: 2).frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
-        let header = checkbox.frame
+        let collapsedCheck = checkbox.frame
+        let leadingDate = app.descendants(matching: .any)["planner-leading-" + taskID].firstMatch
         let compact = app.buttons["task-" + taskID].frame
-        XCTAssertEqual(before.height, 36, accuracy: 1, "A plain planner row has a 32-point header and two points of padding on each edge")
+        XCTAssertEqual(before.height, 32, accuracy: 1, "A plain planner row has a 28-point header and two points of padding on each edge")
+        XCTAssertEqual(leadingDate.frame.midY, compact.midY, accuracy: 1)
         capture("Tighter list before middle row expansion", app)
         _ = expandTask(app)
-        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        let schedule = app.buttons["row-scheduled"].frame
+        let deadline = app.buttons["row-deadline"].frame
+        XCTAssertEqual(schedule.minX - app.frame.minX, 20, accuracy: 1)
+        XCTAssertEqual(app.frame.maxX - deadline.maxX, 20, accuracy: 1)
+        let controls = [app.buttons["row-tags"], app.buttons["row-priority"], app.descendants(matching: .any)["row-note-input"].firstMatch]
+        let offsetsWithProject = controls.map { $0.frame.minY - schedule.maxY }
+        for offset in offsetsWithProject { XCTAssertEqual(offset, 8, accuracy: 1) }
+        XCTAssertEqual(checkbox.frame.midY, schedule.midY, accuracy: 1)
+        XCTAssertLessThan(schedule.midY, collapsedCheck.midY - 1)
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY - 12, accuracy: 1)
         XCTAssertGreaterThan(rows.element(boundBy: 2).frame.minY, after.minY + 12)
         capture("Middle row opens space above and below its fixed header", app)
         try tapOutside(app)
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
-        XCTAssertEqual(checkbox.frame.minY, header.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, collapsedCheck.midY, accuracy: 1)
+        XCTAssertEqual(leadingDate.frame.midY, collapsedCheck.midY, accuracy: 1)
         XCTAssertEqual(app.buttons["task-" + taskID].frame.minX, compact.minX, accuracy: 1)
         XCTAssertEqual(app.buttons["task-" + taskID].frame.minY, compact.minY, accuracy: 1)
         XCTAssertEqual(rows.element(boundBy: 0).frame.minY, before.minY, accuracy: 1)
         XCTAssertEqual(rows.element(boundBy: 2).frame.minY, after.minY, accuracy: 1)
         capture("Tighter list restored after middle row collapse", app)
+
+        _ = expandTask(app)
+        openTaskRowParameter("project", app: app)
+        tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
+        closeTaskRow(app)
+        XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 5))
+        _ = expandTask(app)
+        XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
+        let scheduleWithoutProject = app.buttons["row-scheduled"].frame
+        XCTAssertEqual(scheduleWithoutProject.height, schedule.height, accuracy: 1)
+        for (control, offset) in zip(controls, offsetsWithProject) {
+            XCTAssertEqual(control.frame.minY - scheduleWithoutProject.maxY, offset, accuracy: 1)
+        }
+        capture("First line after reopening without a project", app)
     }
 
     func testOutsideSaveValidationPickersAndDurableCompletion() async throws {
@@ -102,8 +127,11 @@ import XCTest
             XCTAssertFalse(app.buttons[id].exists)
         }
         capture("Expanded without keyboard", app)
-        XCTAssertLessThan(app.buttons["row-project"].frame.minX, app.buttons["row-scheduled"].frame.minX)
-        selectHighPriorityAndVerifyReselection(app)
+        XCTAssertEqual(app.buttons["row-project"].frame.minX, title.frame.minX, accuracy: 1)
+        XCTAssertEqual(app.buttons["row-tags"].frame.minX, app.buttons["row-scheduled"].frame.minX, accuracy: 1)
+        XCTAssertEqual(app.buttons["row-priority"].frame.midX, app.buttons["complete-task-row-" + taskID].frame.midX, accuracy: 1)
+        XCTAssertGreaterThan(app.buttons["row-deadline"].frame.minX, title.frame.maxX)
+        cyclePriorityToHigh(app)
         openTaskRowParameter("project", app: app)
         capture("Native project menu", app)
         tapTaskPickerOption("New project…", options: ["No project", "Release", "New project…"], app: app)
@@ -148,8 +176,7 @@ import XCTest
         replaceTaskText(title, with: "Release revised", app: app)
         XCTAssertLessThan(title.frame.maxY, app.keyboards.firstMatch.frame.minY)
         capture("Focused title above keyboard", app)
-        app.buttons["dismiss-row-keyboard"].tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         try tapOutside(app)
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["task-" + taskID].waitForExistence(timeout: 10))
@@ -327,7 +354,7 @@ import XCTest
         let app = try launch(isolated: true)
         let title = expandTask(app)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
-        selectHighPriorityAndVerifyReselection(app)
+        cyclePriorityToHigh(app)
         for cycle in 1...20 {
             XCTContext.runActivity(named: "Native New project presentation \(cycle)") { _ in
                 if cycle == 20 { focusTaskText(title, app: app) }
@@ -341,12 +368,10 @@ import XCTest
         verifyProjectMenuPresentation(app, dismissingKeyboard: true)
         XCTAssertEqual(note.value as? String, "Draft note survives menu")
         focusTaskText(title, app: app)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         focusTaskText(note, app: app)
         XCTAssertEqual(note.value as? String, "Draft note survives menu")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
     }
 
     func testNativeProjectMenuDismissesTitleAndNoteKeyboard() throws {
@@ -366,15 +391,13 @@ import XCTest
         let editedTitle = try XCTUnwrap(title.value as? String)
         XCTAssertEqual(editedTitle.components(separatedBy: " title retained").count, 2)
         XCTAssertEqual(editedTitle.replacingOccurrences(of: " title retained", with: ""), originalTitle)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         focusTaskText(note, app: app)
         note.typeText(" and editable")
         let editedNote = try XCTUnwrap(note.value as? String)
         XCTAssertEqual(editedNote.components(separatedBy: " and editable").count, 2)
         XCTAssertEqual(editedNote.replacingOccurrences(of: " and editable", with: ""), "Focused note survives menu")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
     }
 
     private func verifyProjectMenuPresentation(_ app: XCUIApplication, dismissingKeyboard: Bool, file: StaticString = #filePath, line: UInt = #line) {
@@ -407,11 +430,14 @@ import XCTest
         openTaskRowParameter("tags", app: app)
         let input = app.textFields["row-tag-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
+        XCTAssertLessThan(app.buttons["row-tag-review"].frame.maxY, input.frame.minY)
+        XCTAssertGreaterThan(app.buttons["row-tag-accessibility"].frame.minY, input.frame.maxY)
         XCTAssertEqual(app.buttons["row-tag-review"].value as? String, "Selected")
-        XCTAssertEqual(app.buttons["row-tag-accessibility"].value as? String, "Not selected")
+        capture("Active and available tags around the search field", app)
         app.buttons["row-tag-review"].tap()
         replaceTaskText(input, with: "access", app: app)
         app.buttons["row-tag-accessibility"].tap()
+        XCTAssertLessThan(app.buttons["row-tag-accessibility"].frame.maxY, input.frame.minY)
         XCTAssertFalse(app.buttons["row-add-tag"].exists, "Choosing a search result must clear its unfinished query")
         capture("Existing tags can be removed and selected", app)
         replaceTaskText(input, with: "bad tag", app: app)
@@ -452,7 +478,9 @@ import XCTest
         tapTaskPickerOption("No project", options: ["No project", "Release", "New project…"], app: app)
         XCTAssertEqual(app.buttons["row-project"].value as? String, "Not set")
         openTaskRowParameter("priority", app: app)
-        tapTaskPickerOption("None", options: ["None", "Low", "Medium", "High"], app: app)
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+        app.buttons["row-priority"].tap()
+        XCTAssertEqual(app.buttons["row-priority"].value as? String, "None")
         openTaskRowParameter("tags", app: app)
         app.buttons["row-tag-accessibility"].tap()
         app.buttons["row-tag-next"].tap()
@@ -521,12 +549,7 @@ import XCTest
         XCTAssertLessThan(title.frame.height, app.frame.height / 2)
         title.typeText(" scroll retained")
         XCTAssertTrue((title.value as? String ?? "").contains("scroll retained"))
-        if app.keyboards.firstMatch.exists && app.keyboards.firstMatch.frame.height > 0 {
-            tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app, requiresVisibleKeyboard: true)
-        } else {
-            tapTaskControl(app.buttons["dismiss-row-keyboard"], app: app)
-        }
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         let list = app.collectionViews["task-list"]
         let originalY = title.frame.minY
         let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
@@ -542,16 +565,14 @@ import XCTest
         XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
-    private func selectHighPriorityAndVerifyReselection(_ app: XCUIApplication) {
-        openTaskRowParameter("priority", app: app)
-        capture("Native priority menu", app)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        openTaskRowParameter("priority", app: app)
-        let selectedHigh = app.buttons.matching(NSPredicate(format: "label == %@", "High")).firstMatch
-        XCTAssertTrue(selectedHigh.waitForExistence(timeout: 5))
-        XCTAssertTrue(selectedHigh.isSelected)
-        tapTaskPickerOption("High", options: ["None", "Low", "Medium", "High"], app: app)
-        XCTAssertEqual(app.buttons["row-priority"].value as? String, "High")
+    private func cyclePriorityToHigh(_ app: XCUIApplication) {
+        let button = app.buttons["row-priority"]
+        XCTAssertEqual(button.value as? String, "None")
+        for value in ["Low", "Medium", "High"] {
+            button.tap()
+            XCTAssertEqual(button.value as? String, value)
+        }
+        capture("High priority under the completion circle", app)
     }
 
     private func visibleCompletionCircleFrame(_ id: String, app: XCUIApplication) throws -> CGRect {
@@ -589,8 +610,7 @@ import XCTest
         XCTAssertTrue(collapsedTitle.waitForExistence(timeout: 5))
         let compactTitle = collapsedTitle.frame
         let checkbox = app.buttons["complete-task-row-" + taskID]
-        let circle = checkbox.frame
-        XCTAssertEqual(circle.midY, compact.midY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, compact.midY, accuracy: 1)
         row.tap()
         let title = app.textFields["task-description"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
@@ -598,11 +618,11 @@ import XCTest
         XCTAssertEqual(title.frame.minY, compactTitle.minY, accuracy: 1)
         XCTAssertEqual(title.frame.width, compactTitle.width, accuracy: 1)
         XCTAssertEqual(title.frame.height, compactTitle.height, accuracy: 1)
-        XCTAssertEqual(checkbox.frame.minY, circle.minY, accuracy: 1)
+        XCTAssertEqual(checkbox.frame.midY, title.frame.midY, accuracy: 1)
         let notes = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "row-note-")).firstMatch
         XCTAssertTrue(notes.exists)
         XCTAssertGreaterThanOrEqual(notes.frame.minY, title.frame.maxY)
-        XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 6)
+        XCTAssertLessThanOrEqual(notes.frame.minY, title.frame.maxY + 8 + max(0, (28 - title.frame.height) / 2) + 1)
         XCTAssertGreaterThan(app.buttons["row-project"].frame.minY, notes.frame.minY)
         XCTAssertTrue(checkbox.isEnabled)
         return title

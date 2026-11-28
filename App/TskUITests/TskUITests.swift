@@ -45,7 +45,7 @@ final class TskUITests: XCTestCase {
         let captureCell = app.cells.containing(.any, identifier: "task-description").firstMatch
         XCTAssertGreaterThanOrEqual(captureCell.frame.minY, app.navigationBars.firstMatch.frame.maxY, "The draft card must stay below the navigation header")
         XCTAssertEqual(app.staticTexts["workspace-title-text"].label, "Today")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
+        dismissTaskRowKeyboard(app)
         closeTaskRow(app)
         XCTAssertTrue(description.waitForNonExistence(timeout: 5))
         let today = try XCTUnwrap(pill.value as? String)
@@ -73,8 +73,7 @@ final class TskUITests: XCTestCase {
         let reviewedDescription = app.descendants(matching: .any)["task-description"].firstMatch
         XCTAssertTrue(reviewedDescription.waitForExistence(timeout: 5))
         reviewedDescription.typeText("Buy milk from the market")
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         XCTAssertGreaterThanOrEqual(captureCell.frame.minY, app.navigationBars.firstMatch.frame.maxY, "Hiding the keyboard must keep the draft below the navigation header")
         tapTaskControl(app.buttons["New task"], app: app)
         XCTAssertEqual(reviewedDescription.value as? String, "Buy milk from the market")
@@ -156,8 +155,7 @@ final class TskUITests: XCTestCase {
         let description = app.textFields["task-description"]
         XCTAssertTrue(description.waitForExistence(timeout: 5))
         description.typeText(title)
-        tapTaskControlAtCenter(app.buttons["dismiss-row-keyboard"], app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         XCTAssertEqual(app.buttons["row-project"].value as? String, project)
         XCTAssertEqual(app.buttons["row-scheduled"].value as? String, scheduled)
         screenshot(title + " defaults", app: app)

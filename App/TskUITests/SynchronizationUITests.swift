@@ -15,10 +15,7 @@ final class SynchronizationUITests: XCTestCase {
         draft.tap()
         draft.typeText("Offline work survives server failure")
         XCTAssertEqual(draft.value as? String, "Offline work survives server failure")
-        let keyboardDone = app.buttons["dismiss-row-keyboard"]
-        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5))
-        tapTaskControlAtCenter(keyboardDone, app: app)
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        dismissTaskRowKeyboard(app)
         closeTaskRow(app)
         XCTAssertTrue(waitForTaskSave(app, named: "Offline work survives server failure", timeout: 10))
         XCTAssertTrue(revealSynchronizationSettings(app))

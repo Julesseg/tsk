@@ -4,25 +4,27 @@ import TskCore
 struct TaskPlanningCaption: View {
     let task: TaskRecord
     let today: Date
-    @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 10
+    var showsEmptyFlag = false
+    @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 12
 
     var body: some View {
         if let deadline = task.dateIntent(for: .deadline), let offset = task.deadlineDayOffset(relativeTo: today) {
-            Text("\(Image(systemName: "flag")) \(label(offset, abbreviated: true))")
+            let label = switch offset {
+            case -1: "Yesterday"
+            case 0: "Today"
+            case 1: "Tomorrow"
+            default: deadline.date.formatted(.dateTime.month(.abbreviated).day())
+            }
+            Text("\(Image(systemName: "flag")) \(label)")
                 .font(.system(size: textSize))
                 .foregroundStyle(task.status == "pending" && (deadline.hasTime ? deadline.date < today : offset < 0) ? Color.red : Color.secondary)
-                .accessibilityLabel("Deadline \(label(offset))")
+                .accessibilityLabel("Deadline \(label)")
                 .accessibilityIdentifier("task-row-deadline-\(task.id.uuidString)")
-        }
-    }
-
-    private func label(_ offset: Int, abbreviated: Bool = false) -> String {
-        switch offset {
-        case -1: abbreviated ? "yes." : "Yesterday"
-        case 0: abbreviated ? "tod." : "Today"
-        case 1: abbreviated ? "tom." : "Tomorrow"
-        case ..<0: abbreviated ? "\(-offset)d ago" : "\(-offset) days ago"
-        default: "In \(offset) days"
+        } else if showsEmptyFlag {
+            Image(systemName: "flag")
+                .font(.system(size: textSize))
+                .foregroundStyle(.tertiary)
+                .frame(minWidth: 28, alignment: .trailing)
         }
     }
 }

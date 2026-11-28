@@ -45,6 +45,11 @@ public extension TaskDraft {
         TaskScheduledDate.read(from: attributes, field: field, calendar: calendar)
     }
 
+    mutating func restoreDate(_ field: TaskDateField, from draft: TaskDraft) {
+        attributes[field.attribute] = draft.attributes[field.attribute]
+        attributes[field.precisionAttribute] = draft.attributes[field.precisionAttribute]
+    }
+
     mutating func setScheduled(_ value: TaskScheduledDate?) {
         setDateIntent(value, for: .scheduled)
     }

@@ -14,7 +14,7 @@ public enum TaskCaptureContext: Equatable, Sendable {
 }
 
 public struct TaskRowDraft: Equatable, Sendable {
-    private static let editableAttributes = ["project", "priority", "scheduled", "due", TaskScheduledDate.attribute]
+    private static let editableAttributes = ["project", "priority", "scheduled", "due", TaskScheduledDate.attribute, TaskScheduledDate.deadlineAttribute]
     public enum Plan: Sendable { case today, tomorrow, remove }
     public let original: TaskRecord
     public var taskDraft: TaskDraft

@@ -13,6 +13,7 @@ struct TodayCalendarOverview: View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(overview.allDay) { value in
                 TodayCalendarRow(value: value, timeZone: snapshot.timeZone)
+                    .opensCalendarEvent(value.event)
             }
             if !overview.items.isEmpty {
                 VStack(spacing: 8) {
@@ -23,10 +24,12 @@ struct TodayCalendarOverview: View {
                                 .font(.system(size: labelSize))
                                 .fixedSize(horizontal: false, vertical: true)
                                 .background(Color(uiColor: .systemGroupedBackground))
+                                .opensCalendarEvent(item.value.event)
                                 .calendarDropTarget(item.value.event, enabled: acceptsTaskDrops)
                                 .accessibilityLabel("\(item.value.calendarTimeDescription(timeZone: snapshot.timeZone)), \(item.value.event.title.isEmpty ? "Untitled event" : item.value.event.title)")
                                 .accessibilityIdentifier("calendar-event-\(item.value.accessibilityEventID)")
                             Capsule().fill(item.value.event.color?.swiftUIColor ?? .secondary)
+                                .opensCalendarEvent(item.value.event)
                                 .calendarDropTarget(item.value.event, enabled: acceptsTaskDrops)
                                 .accessibilityHidden(true)
                         }
@@ -40,6 +43,7 @@ struct TodayCalendarOverview: View {
             }
             ForEach(overview.outsideHours) { value in
                 TodayCalendarRow(value: value, timeZone: snapshot.timeZone)
+                    .opensCalendarEvent(value.event)
                     .calendarDropTarget(value.event, enabled: acceptsTaskDrops)
             }
         }
@@ -75,6 +79,10 @@ struct TodayCalendarOverview: View {
 }
 
 private extension View {
+    func opensCalendarEvent(_ event: CalendarEventSnapshot) -> some View {
+        modifier(CalendarEventLink(event: event))
+    }
+
     func calendarDropTarget(_ event: CalendarEventSnapshot, enabled: Bool) -> some View {
         background {
             if enabled {
@@ -84,6 +92,25 @@ private extension View {
                 }
             }
         }
+    }
+}
+
+private struct CalendarEventLink: ViewModifier {
+    @Environment(\.openURL) private var openURL
+    let event: CalendarEventSnapshot
+
+    func body(content: Content) -> some View {
+        Button {
+            let parts = event.eventID.split(separator: ":", maxSplits: 1)
+            let item = parts.last.map(String.init) ?? event.eventID
+            var link = URLComponents()
+            link.scheme = "x-apple-calevent"
+            link.host = parts.count == 2 ? String(parts[0]) : event.calendarID
+            if let url = link.url?.appending(component: item) { openURL(url) }
+        } label: {
+            content.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -112,39 +112,19 @@ extension XCTestCase {
 
 extension XCTestCase {
     @MainActor func openTaskRowParameter(_ identifier: String, app: XCUIApplication) {
-        tapTaskRowPill("row-" + identifier, app: app)
-    }
-
-    @MainActor func tapTaskRowPill(_ identifier: String, app: XCUIApplication) {
-        let parameters = app.scrollViews["row-date-parameters"]
-        let button = app.buttons[identifier]
-        guard button.waitForExistence(timeout: 5) else {
-            XCTFail("Attribute pill is missing: \(identifier)")
-            return
-        }
-        for _ in 0..<12 {
-            guard button.exists else {
-                XCTFail("Attribute pill is missing: \(identifier)")
-                return
-            }
-            let frame = button.frame
-            let visible = frame.intersection(parameters.frame).intersection(app.frame)
-            if !visible.isNull && !visible.isEmpty && visible.width >= 44 - 0.001 && visible.height >= 44 - 0.001 && button.isEnabled {
-                app.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: visible.midX - app.frame.minX, dy: visible.midY - app.frame.minY)).tap()
-                return
-            }
-            let direction: CGFloat = frame.midX < parameters.frame.midX ? 1 : -1
-            let distance = min(parameters.frame.width * 0.4, max(44, abs(frame.midX - parameters.frame.midX)))
-            let start = parameters.coordinate(withNormalizedOffset: CGVector(dx: 0.5 - direction * 0.2, dy: 0.5))
-            let end = start.withOffset(CGVector(dx: direction * distance, dy: 0))
-            start.press(forDuration: 0.1, thenDragTo: end)
-        }
-        XCTFail("Attribute pill could not be reached: \(identifier); frame=\(button.frame); viewport=\(parameters.frame)")
+        let button = app.buttons["row-" + identifier]
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        button.tap()
     }
 }
 
 extension XCTestCase {
+    @MainActor func dismissTaskRowKeyboard(_ app: XCUIApplication) {
+        openTaskRowParameter("tags", app: app)
+        tapTaskControl(app.buttons["close-row-parameter"], app: app)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
     @MainActor func closeTaskRow(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         let deadline = ProcessInfo.processInfo.systemUptime + TaskControlReadinessPolicy.accessibilityAdmissionTimeout
         var previous: TaskRowOutsideGeometry?
