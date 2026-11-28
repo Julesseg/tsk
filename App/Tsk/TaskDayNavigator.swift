@@ -87,7 +87,7 @@ struct TaskDayNavigator: View {
                 }
                 .padding(.horizontal, 16)
             } else {
-                Text("-").frame(minWidth: 2 * TaskDayPaging.pillHeight)
+                TaskDateDash().frame(minWidth: 2 * TaskDayPaging.pillHeight)
             }
         }
         .font(.subheadline.weight(.semibold))
@@ -495,6 +495,12 @@ private struct TaskDayLabelPages: Layout {
     }
 }
 
+private struct TaskDateDash: View {
+    var body: some View {
+        Image(systemName: "minus").font(.title2.bold())
+    }
+}
+
 struct TaskPlannerLeadingDate: View {
     let task: TaskRecord
     let day: Date?
@@ -519,7 +525,7 @@ struct TaskPlannerLeadingDate: View {
                 Text(scheduled.date, style: .time)
                     .font(.caption.bold().monospacedDigit())
             } else if !showsDate {
-                Image(systemName: "minus").font(.title2.bold())
+                TaskDateDash()
             }
         }
         .lineLimit(1)

@@ -252,7 +252,6 @@ private struct TaskListRowContent: View {
     @FocusState private var titleFocused: Bool
     @FocusState private var focusedNote: UTF8String?
     @State private var headerHeight: CGFloat = 32
-    @State private var titleHeight: CGFloat = 28
     @State private var projectBadgeHeight: CGFloat = 0
     @State private var rowGeometry = TaskRowGeometry()
     @ScaledMetric(relativeTo: .subheadline) private var titleLineHeight: CGFloat = 20
@@ -353,15 +352,19 @@ private struct TaskListRowContent: View {
         .listRowBackground(Color.clear)
         .tag(task.id)
     }
+
+    private var leadingControlHeight: CGFloat { editing == nil ? 28 : headerHeight }
+
     private var header: some View {
-        HStack(spacing: 0) {
+        let progress = editing?.revealProgress ?? 0
+        return HStack(spacing: 0) {
             if let editing {
                 TaskRowPickerButton(editing: editing, parameter: .scheduled, onActivate: activateRowControl) {
-                    scheduledLabel.frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
+                    scheduledLabel.frame(width: TaskSelectionRow.slotWidth, height: leadingControlHeight)
                 }
             } else {
                 scheduledLabel
-                    .frame(width: TaskSelectionRow.slotWidth, height: headerHeight)
+                    .frame(width: TaskSelectionRow.slotWidth, height: leadingControlHeight)
                     .contentShape(Rectangle())
                     .accessibilityAddTraits(task.canComplete ? .isButton : [])
                     .accessibilityHint(task.canComplete ? (selected ? "Deselect task" : "Select task") : "")
@@ -381,7 +384,7 @@ private struct TaskListRowContent: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .frame(height: headerHeight)
+                .frame(height: leadingControlHeight)
                 .disabled(phase != nil)
                 .allowsHitTesting(!store.isSaving && store.rowEditing == nil)
                 .accessibilityRespondsToUserInteraction(store.rowEditing == nil)
@@ -409,10 +412,10 @@ private struct TaskListRowContent: View {
                         .accessibilityIdentifier("completed-task-row-\(task.id.uuidString)")
                 }
             } else {
-                Color.clear.frame(width: TaskSelectionRow.completionControlWidth, height: headerHeight)
+                Color.clear.frame(width: TaskSelectionRow.completionControlWidth, height: leadingControlHeight)
                     .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: Alignment(horizontal: .leading, vertical: .taskTitleBottom)) {
                 HStack(spacing: 8) {
                     Group {
                         if let editing {
@@ -434,7 +437,7 @@ private struct TaskListRowContent: View {
                     .foregroundStyle(checked ? .secondary : .primary)
                     .strikethrough(checked)
                     .lineLimit(1...max(1, min(5, Int(max(44, availableHeight - 100) / titleLineHeight))))
-                    .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { titleHeight = $0 }
+                    .alignmentGuide(.taskTitleBottom) { $0.height }
                     .accessibilityLabel("Task title")
                     .accessibilityIdentifier(expanded ? "task-description" : "task-row-title-" + task.id.uuidString)
                     .accessibilityAction(named: "Select") { store.toggleSelection(task.id) }
@@ -444,8 +447,11 @@ private struct TaskListRowContent: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { [displayScale] in ($0.size.height * displayScale).rounded() / displayScale } action: { headerHeight = $0 }
+                .alignmentGuide(.taskTitleBottom) { dimensions in
+                    let bottom = dimensions[explicit: .taskTitleBottom] ?? dimensions.height
+                    return bottom + (dimensions.height - bottom) * progress
+                }
                 if hasProject {
-                    let progress = editing?.revealProgress ?? 0
                     Text(displayedTask.project)
                         .font(.system(size: metadataSize))
                         .foregroundStyle(.secondary)
@@ -459,7 +465,7 @@ private struct TaskListRowContent: View {
                         .frame(height: editing == nil ? nil : projectBadgeHeight * (1 - progress), alignment: .top)
                         .clipped()
                         .opacity(1 - progress)
-                        .padding(.top, -max(0, (headerHeight - titleHeight) / 2) * (1 - progress))
+                        .alignmentGuide(.taskTitleBottom) { _ in 0 }
                         .accessibilityHidden(true)
                 }
             }
@@ -522,7 +528,7 @@ private struct TaskListRowContent: View {
         Image(systemName: "checkmark.circle.fill")
             .font(.body)
             .foregroundStyle(Color.secondary)
-            .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: headerHeight)
+            .frame(minWidth: TaskSelectionRow.completionControlWidth, minHeight: leadingControlHeight)
             .contentShape(Rectangle())
     }
 
@@ -530,6 +536,14 @@ private struct TaskListRowContent: View {
         store.expandRow(task, rowID: identity)
     }
 
+}
+
+private extension VerticalAlignment {
+    struct TaskTitleBottom: AlignmentID {
+        static func defaultValue(in dimensions: ViewDimensions) -> CGFloat { dimensions.height }
+    }
+
+    static let taskTitleBottom = VerticalAlignment(TaskTitleBottom.self)
 }
 
 @MainActor private final class TaskRowGeometry {
